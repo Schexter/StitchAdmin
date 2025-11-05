@@ -1,0 +1,133 @@
+# StitchAdmin 2.0 - Models Package
+# Erstellt von Hans Hahn - Alle Rechte vorbehalten
+
+# Kern-Models aus models.py importieren
+from .models import (
+    db,
+    User,
+    Customer,
+    Article,
+    Order,
+    OrderItem,
+    OrderStatusHistory,
+    Machine,
+    ProductionSchedule,
+    Thread,
+    ThreadStock,
+    ThreadUsage,
+    Shipment,
+    ShipmentItem,
+    Supplier,
+    SupplierOrder,
+    ActivityLog,
+    ProductCategory,
+    Brand,
+    PriceCalculationSettings
+)
+
+# Erweiterte Lieferanten-Models
+from .article_supplier import ArticleSupplier, ArticleSupplierPriceHistory
+from .supplier_contact import SupplierContact, SupplierCommunicationLog
+
+# Artikel-Varianten (L-Shop Integration)
+from .article_variant import ArticleVariant
+
+# Erweiterte Settings
+from .settings import TaxRate, PriceCalculationRule, ImportSettings
+
+# Rechnungsmodul (optional)
+try:
+    from .rechnungsmodul import (
+        Receipt,
+        ReceiptItem,
+        Invoice,
+        InvoiceItem,
+        TSETransaction
+    )
+    RECHNUNGSMODUL_AVAILABLE = True
+except ImportError:
+    RECHNUNGSMODUL_AVAILABLE = False
+    Receipt = None
+    ReceiptItem = None
+    Invoice = None
+    InvoiceItem = None
+    TSETransaction = None
+
+# POS Models (optional)
+try:
+    from .pos import (
+        POSSession,
+        POSTransaction,
+        POSPayment
+    )
+    POS_AVAILABLE = True
+except ImportError:
+    POS_AVAILABLE = False
+    POSSession = None
+    POSTransaction = None
+    POSPayment = None
+
+# Exportiere alle Models
+__all__ = [
+    # Datenbank
+    'db',
+    
+    # Benutzer & Verwaltung
+    'User',
+    'ActivityLog',
+    
+    # Kunden
+    'Customer',
+    
+    # Artikel & Kategorien
+    'Article',
+    'ArticleVariant',
+    'ArticleSupplier',
+    'ArticleSupplierPriceHistory',
+    'ProductCategory',
+    'Brand',
+    
+    # Aufträge
+    'Order',
+    'OrderItem',
+    'OrderStatusHistory',
+    
+    # Produktion
+    'Machine',
+    'ProductionSchedule',
+    
+    # Garne
+    'Thread',
+    'ThreadStock',
+    'ThreadUsage',
+    
+    # Versand
+    'Shipment',
+    'ShipmentItem',
+    
+    # Lieferanten
+    'Supplier',
+    'SupplierOrder',
+    'SupplierContact',
+    'SupplierCommunicationLog',
+    
+    # Einstellungen
+    'PriceCalculationSettings',
+    'TaxRate',
+    'PriceCalculationRule',
+    'ImportSettings',
+    
+    # Rechnungsmodul (optional)
+    'Receipt',
+    'ReceiptItem',
+    'Invoice',
+    'InvoiceItem',
+    'TSETransaction',
+    'RECHNUNGSMODUL_AVAILABLE',
+    
+    # POS (optional)
+    'POSSession',
+    'POSTransaction',
+    'POSPayment',
+    'POS_AVAILABLE',
+]
