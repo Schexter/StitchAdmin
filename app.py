@@ -36,14 +36,23 @@ def create_app():
     # ==========================================
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
     app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'True') == 'True'
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/stitchadmin.db'
+
+    # Erstelle notwendige Verzeichnisse ZUERST
+    instance_dir = os.path.join(BASE_DIR, 'instance')
+    upload_dir = os.path.join(instance_dir, 'uploads')
+    os.makedirs(instance_dir, exist_ok=True)
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # Datenbank-Konfiguration mit absolutem Pfad
+    db_path = os.path.join(instance_dir, 'stitchadmin.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
     app.config['TEMPLATES_AUTO_RELOAD'] = True
-    
+
     # Upload-Konfiguration
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
-    app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'instance', 'uploads')
+    app.config['UPLOAD_FOLDER'] = upload_dir
 
     # ==========================================
     # DATENBANK INITIALISIERUNG

@@ -46,10 +46,13 @@ pandas>=2.2.0
 xlrd==2.0.1
 
 # ==========================================
-# PDF-VERARBEITUNG
+# PDF-VERARBEITUNG & ZUGPFERD
 # ==========================================
 PyPDF2==3.0.1
 pdfplumber==0.10.3
+reportlab>=4.0.0        # PDF-Generierung
+pikepdf>=8.0.0          # PDF/A-3 Konvertierung für ZUGFeRD
+lxml>=5.0.0             # XML-Validierung
 
 # ==========================================
 # STICKEREI-SPEZIFISCH

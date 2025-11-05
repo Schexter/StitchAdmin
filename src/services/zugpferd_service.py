@@ -21,6 +21,22 @@ from decimal import Decimal
 import base64
 from typing import Dict, List, Optional, Any
 import logging
+from io import BytesIO
+import hashlib
+
+# PDF/A-3 Libraries
+try:
+    import pikepdf
+    PIKEPDF_AVAILABLE = True
+except ImportError:
+    PIKEPDF_AVAILABLE = False
+
+# XML Validierung
+try:
+    from lxml import etree
+    LXML_AVAILABLE = True
+except ImportError:
+    LXML_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -290,40 +306,349 @@ class ZugpferdService:
         due_amount = ET.SubElement(summation, '{%s}DuePayableAmount' % self.NAMESPACES['ram'])
         due_amount.text = str(invoice_data.get('total_gross', 0))
         
-    def validate_xml(self, xml_string: str) -> Dict[str, Any]:
+    def validate_xml(self, xml_string: str, xsd_path: Optional[str] = None) -> Dict[str, Any]:
         """
-        Validiere ZUGPFERD XML
-        
+        Validiere ZUGPFERD XML gegen XSD Schema
+
         Args:
             xml_string: XML-String
-            
+            xsd_path: Pfad zum XSD-Schema (optional)
+
         Returns:
-            Validierungsergebnis
+            Validierungsergebnis mit valid, errors, warnings
         """
-        # TODO: Implementiere XSD-Validierung
-        return {
-            'valid': True,
-            'errors': [],
-            'warnings': []
-        }
+        errors = []
+        warnings = []
+
+        if not LXML_AVAILABLE:
+            warnings.append("lxml nicht installiert - XSD-Validierung nicht verfügbar")
+            logger.warning("lxml nicht verfügbar, XML-Validierung übersprungen")
+            return {
+                'valid': True,
+                'errors': [],
+                'warnings': warnings
+            }
+
+        try:
+            # XML parsen
+            xml_doc = etree.fromstring(xml_string.encode('utf-8'))
+
+            # Basis-Validierung (Well-formed XML)
+            if xml_doc is None:
+                errors.append("XML ist nicht wohlgeformt")
+                return {'valid': False, 'errors': errors, 'warnings': warnings}
+
+            # XSD-Validierung (falls Schema vorhanden)
+            if xsd_path and os.path.exists(xsd_path):
+                try:
+                    with open(xsd_path, 'r', encoding='utf-8') as xsd_file:
+                        xsd_doc = etree.parse(xsd_file)
+                        xsd_schema = etree.XMLSchema(xsd_doc)
+
+                        # Validieren
+                        if not xsd_schema.validate(xml_doc):
+                            for error in xsd_schema.error_log:
+                                errors.append(f"Zeile {error.line}: {error.message}")
+                        else:
+                            logger.info("XML erfolgreich gegen XSD validiert")
+                except Exception as e:
+                    warnings.append(f"XSD-Validierung fehlgeschlagen: {str(e)}")
+                    logger.warning(f"XSD-Validierung nicht möglich: {str(e)}")
+            else:
+                warnings.append("Kein XSD-Schema angegeben - nur Basis-Validierung")
+
+            # Pflichtfelder prüfen (ZUGFeRD-spezifisch)
+            required_elements = [
+                './/ram:ID',  # Rechnungsnummer
+                './/ram:TypeCode',  # Dokumenttyp
+                './/ram:IssueDateTime',  # Rechnungsdatum
+                './/ram:SellerTradeParty',  # Verkäufer
+                './/ram:BuyerTradeParty',  # Käufer
+                './/ram:GrandTotalAmount'  # Gesamtbetrag
+            ]
+
+            namespaces = self.NAMESPACES
+            for req_elem in required_elements:
+                if xml_doc.find(req_elem, namespaces=namespaces) is None:
+                    errors.append(f"Pflichtfeld fehlt: {req_elem}")
+
+            is_valid = len(errors) == 0
+
+            return {
+                'valid': is_valid,
+                'errors': errors,
+                'warnings': warnings
+            }
+
+        except Exception as e:
+            logger.error(f"Fehler bei XML-Validierung: {str(e)}")
+            errors.append(f"Validierungsfehler: {str(e)}")
+            return {
+                'valid': False,
+                'errors': errors,
+                'warnings': warnings
+            }
         
-    def create_pdf_with_xml(self, pdf_content: bytes, xml_string: str) -> bytes:
+    def create_pdf_with_xml(self, pdf_content: bytes, xml_string: str, filename: str = "factur-x.xml") -> bytes:
         """
         Erstelle PDF/A-3 mit eingebettetem ZUGPFERD XML
-        
+
         Args:
-            pdf_content: PDF-Inhalt
-            xml_string: ZUGPFERD XML
-            
+            pdf_content: PDF-Inhalt als Bytes
+            xml_string: ZUGPFERD XML als String
+            filename: Name der eingebetteten XML-Datei
+
+        Returns:
+            PDF/A-3 mit eingebettetem XML als Bytes
+        """
+        if not PIKEPDF_AVAILABLE:
+            logger.warning("pikepdf nicht installiert - XML wird nicht eingebettet")
+            logger.warning("Installieren Sie pikepdf: pip install pikepdf")
+            return pdf_content
+
+        try:
+            # PDF öffnen
+            pdf = pikepdf.open(BytesIO(pdf_content))
+
+            # XML als Bytes
+            xml_bytes = xml_string.encode('utf-8')
+
+            # Embedded File Stream erstellen
+            xml_stream = pikepdf.Stream(pdf, xml_bytes)
+            xml_stream.Type = pikepdf.Name.EmbeddedFile
+            xml_stream.Subtype = pikepdf.Name("text/xml")
+            xml_stream.Params = pikepdf.Dictionary({
+                'Size': len(xml_bytes),
+                'ModDate': pikepdf.String(datetime.now().strftime('D:%Y%m%d%H%M%S')),
+                'CheckSum': pikepdf.String(f"<{hashlib.md5(xml_bytes).hexdigest()}>")
+            })
+
+            # Filespec erstellen
+            filespec = pikepdf.Dictionary({
+                'Type': pikepdf.Name.Filespec,
+                'F': pikepdf.String(filename),
+                'UF': pikepdf.String(filename),
+                'EF': pikepdf.Dictionary({
+                    'F': xml_stream
+                }),
+                'Desc': pikepdf.String('ZUGFeRD/Factur-X XML Invoice'),
+                'AFRelationship': pikepdf.Name.Alternative  # PDF/A-3 Compliance
+            })
+
+            # EmbeddedFiles im Names Tree
+            if '/Names' not in pdf.Root:
+                pdf.Root.Names = pikepdf.Dictionary()
+
+            if '/EmbeddedFiles' not in pdf.Root.Names:
+                pdf.Root.Names.EmbeddedFiles = pikepdf.Dictionary()
+
+            # Names Array erstellen oder erweitern
+            if '/Names' not in pdf.Root.Names.EmbeddedFiles:
+                pdf.Root.Names.EmbeddedFiles.Names = pikepdf.Array([
+                    pikepdf.String(filename),
+                    filespec
+                ])
+            else:
+                # An bestehendes Array anhängen
+                names_array = pdf.Root.Names.EmbeddedFiles.Names
+                names_array.extend([pikepdf.String(filename), filespec])
+
+            # Associated Files für PDF/A-3
+            if '/AF' not in pdf.Root:
+                pdf.Root.AF = pikepdf.Array()
+            pdf.Root.AF.append(filespec)
+
+            # PDF/A-3 Metadaten setzen
+            self._set_pdfa3_metadata(pdf)
+
+            # PDF speichern
+            output_buffer = BytesIO()
+            pdf.save(output_buffer)
+            output_buffer.seek(0)
+
+            logger.info(f"PDF/A-3 mit eingebettetem {filename} erfolgreich erstellt")
+            return output_buffer.getvalue()
+
+        except Exception as e:
+            logger.error(f"Fehler bei PDF/A-3 Erstellung: {str(e)}")
+            logger.error("Fallback: Gebe Original-PDF ohne XML zurück")
+            return pdf_content
+
+    def _set_pdfa3_metadata(self, pdf: 'pikepdf.Pdf'):
+        """
+        Setze PDF/A-3 Metadaten
+
+        Args:
+            pdf: pikepdf.Pdf Objekt
+        """
+        try:
+            # XMP Metadaten für PDF/A-3b
+            xmp_metadata = f'''<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+    <rdf:Description rdf:about="" xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/">
+      <pdfaid:part>3</pdfaid:part>
+      <pdfaid:conformance>B</pdfaid:conformance>
+    </rdf:Description>
+    <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+      <dc:format>application/pdf</dc:format>
+      <dc:title>
+        <rdf:Alt>
+          <rdf:li xml:lang="x-default">ZUGFeRD Invoice</rdf:li>
+        </rdf:Alt>
+      </dc:title>
+    </rdf:Description>
+    <rdf:Description rdf:about="" xmlns:pdf="http://ns.adobe.com/pdf/1.3/">
+      <pdf:Producer>StitchAdmin ZUGFeRD Service</pdf:Producer>
+    </rdf:Description>
+    <rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/">
+      <xmp:CreatorTool>StitchAdmin 2.0</xmp:CreatorTool>
+      <xmp:CreateDate>{datetime.now().isoformat()}</xmp:CreateDate>
+      <xmp:ModifyDate>{datetime.now().isoformat()}</xmp:ModifyDate>
+    </rdf:Description>
+    <rdf:Description rdf:about="" xmlns:zf="urn:factur-x:pdfa:CrossIndustryDocument:invoice:1p0#">
+      <zf:DocumentType>INVOICE</zf:DocumentType>
+      <zf:DocumentFileName>factur-x.xml</zf:DocumentFileName>
+      <zf:Version>1.0</zf:Version>
+      <zf:ConformanceLevel>BASIC</zf:ConformanceLevel>
+    </rdf:Description>
+  </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>'''
+
+            # Metadaten als Stream hinzufügen
+            metadata_stream = pikepdf.Stream(pdf, xmp_metadata.encode('utf-8'))
+            metadata_stream.Type = pikepdf.Name.Metadata
+            metadata_stream.Subtype = pikepdf.Name.XML
+
+            pdf.Root.Metadata = metadata_stream
+
+            logger.info("PDF/A-3 Metadaten erfolgreich gesetzt")
+
+        except Exception as e:
+            logger.warning(f"Konnte PDF/A-3 Metadaten nicht setzen: {str(e)}")
+
+    def create_invoice_from_rechnung(self, rechnung) -> bytes:
+        """
+        Erstelle vollständiges ZUGFeRD-PDF aus Rechnungs-Model
+
+        Args:
+            rechnung: Rechnung Model-Instanz
+
         Returns:
             PDF/A-3 mit eingebettetem XML
         """
+        from src.services.pdf_service import PDFService
+
         try:
-            # TODO: Implementiere PDF/A-3 Erstellung mit PyPDF2 oder ähnlich
-            # Für jetzt geben wir das originale PDF zurück
-            logger.warning("PDF/A-3 Erstellung noch nicht implementiert")
-            return pdf_content
-            
+            # Rechnungsdaten aufbereiten
+            invoice_data = self._convert_rechnung_to_invoice_data(rechnung)
+
+            # 1. XML generieren
+            xml_string = self.create_invoice_xml(invoice_data, rechnung.zugpferd_profil.value)
+
+            # 2. XML validieren
+            validation_result = self.validate_xml(xml_string)
+            if not validation_result['valid']:
+                logger.error(f"XML-Validierung fehlgeschlagen: {validation_result['errors']}")
+                # Bei Validierungsfehlern trotzdem weitermachen, aber warnen
+
+            # 3. PDF generieren
+            pdf_service = PDFService()
+            pdf_content = pdf_service.create_invoice_pdf(invoice_data)
+
+            # 4. XML in PDF einbetten (PDF/A-3)
+            zugferd_pdf = self.create_pdf_with_xml(pdf_content, xml_string)
+
+            logger.info(f"ZUGFeRD-Rechnung {rechnung.rechnungsnummer} erfolgreich erstellt")
+            return zugferd_pdf
+
         except Exception as e:
-            logger.error(f"Fehler bei PDF/A-3 Erstellung: {str(e)}")
-            return pdf_content
+            logger.error(f"Fehler bei ZUGFeRD-Erstellung: {str(e)}")
+            raise
+
+    def _convert_rechnung_to_invoice_data(self, rechnung) -> Dict[str, Any]:
+        """
+        Konvertiert Rechnung-Model zu invoice_data Dictionary
+
+        Args:
+            rechnung: Rechnung Model-Instanz
+
+        Returns:
+            Dictionary mit Rechnungsdaten
+        """
+        # Positionen aufbereiten
+        items = []
+        for pos in rechnung.positionen:
+            items.append({
+                'position': pos.position,
+                'description': f"{pos.artikel_name}\n{pos.beschreibung or ''}".strip(),
+                'quantity': float(pos.menge),
+                'unit': pos.einheit,
+                'unit_price': float(pos.einzelpreis),
+                'tax_rate': float(pos.mwst_satz),
+                'total_net': float(pos.netto_betrag),
+                'total': float(pos.brutto_betrag)
+            })
+
+        # Verkäufer-Daten (aus Konfiguration oder Settings)
+        seller_data = {
+            'name': 'StitchAdmin GmbH',  # TODO: Aus Settings laden
+            'street': 'Musterstraße 1',
+            'postcode': '12345',
+            'city': 'Musterstadt',
+            'country': 'DE',
+            'tax_number': 'DE123456789'
+        }
+
+        # Käufer-Daten
+        buyer_data = {
+            'name': rechnung.kunde_name,
+            'street': rechnung.kunde_adresse.split('\n')[0] if rechnung.kunde_adresse else '',
+            'postcode': '',  # TODO: Adresse parsen
+            'city': '',
+            'country': 'DE'
+        }
+
+        # Steuern aggregieren
+        taxes = []
+        # Gruppiere nach MwSt-Satz
+        tax_dict = {}
+        for pos in rechnung.positionen:
+            rate = float(pos.mwst_satz)
+            if rate not in tax_dict:
+                tax_dict[rate] = 0
+            tax_dict[rate] += float(pos.mwst_betrag)
+
+        for rate, amount in tax_dict.items():
+            taxes.append({'rate': rate, 'amount': amount})
+
+        return {
+            'invoice_number': rechnung.rechnungsnummer,
+            'invoice_date': rechnung.rechnungsdatum,
+            'delivery_date': rechnung.leistungsdatum or rechnung.rechnungsdatum,
+            'due_date': rechnung.faelligkeitsdatum,
+            'customer_number': rechnung.kunde_id,
+            'payment_reference': rechnung.rechnungsnummer,
+            'payment_terms': rechnung.zahlungsbedingungen or 'Zahlbar innerhalb 14 Tagen',
+            'currency': 'EUR',
+            'items': items,
+            'seller': seller_data,
+            'buyer': buyer_data,
+            'recipient': buyer_data,  # Gleich wie Käufer
+            'sender': seller_data,  # Gleich wie Verkäufer
+            'subtotal': float(rechnung.netto_gesamt),
+            'total_net': float(rechnung.netto_gesamt),
+            'total_tax': float(rechnung.mwst_gesamt),
+            'total_gross': float(rechnung.brutto_gesamt),
+            'taxes': taxes,
+            'discount_amount': float(rechnung.rabatt_betrag or 0),
+            'discount_percent': float(rechnung.rabatt_prozent or 0),
+            'subject': f"Rechnung {rechnung.rechnungsnummer}",
+            'bank_details': {
+                'bank_name': 'Musterbank',  # TODO: Aus Settings
+                'iban': 'DE89370400440532013000',
+                'bic': 'COBADEFFXXX'
+            },
+            'footer_text': 'Vielen Dank für Ihren Auftrag!'
+        }

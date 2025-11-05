@@ -25,29 +25,36 @@ import io
 # Imports für Models und Services
 try:
     from src.models import db
+    from src.models.models import Customer, Order
     from src.models.rechnungsmodul import (
-        Rechnung, RechnungsPosition, RechnungsZahlung, MwStSatz
+        Rechnung, RechnungsPosition, RechnungsZahlung, MwStSatz, RechnungsStatus, ZugpferdProfil
     )
-    # ZUGPFERD Service erstellen wir später
-    def get_zugpferd_service():
-        # Temporärer Mock für ZUGPFERD
-        class MockZugpferd:
-            def generate_invoice_xml(self, rechnung):
-                return f'<xml>Mock ZUGPFERD für {rechnung.rechnungsnummer}</xml>'
-            def generate_pdf_a3(self, rechnung, xml):
-                return b'Mock PDF/A-3 Content'
-        return MockZugpferd()
-    
+    from src.services.zugpferd_service import ZugpferdService
+    from src.services.pdf_service import PDFService
+    from flask_login import current_user
+
     # Utility-Klasse für Rechnungen
     class RechnungsUtils:
         @staticmethod
         def get_next_invoice_number():
-            import random
-            return f"RE-{datetime.now().strftime('%Y%m')}-{random.randint(1000, 9999)}"
-            
+            # Generiere eindeutige Rechnungsnummer
+            prefix = "RE"
+            jahr = datetime.now().year
+            monat = datetime.now().month
+
+            # Hole die nächste Nummer für diesen Monat
+            count = Rechnung.query.filter(
+                Rechnung.rechnungsnummer.like(f"{prefix}-{jahr:04d}{monat:02d}-%")
+            ).count()
+
+            return f"{prefix}-{jahr:04d}{monat:02d}-{count + 1:04d}"
+
 except ImportError as e:
     print(f"Import-Fehler: {e}")
     db = None
+    Customer = None
+    Order = None
+    Rechnung = None
 
 import logging
 logger = logging.getLogger(__name__)
@@ -213,12 +220,69 @@ def rechnung_erstellen():
     Neue Rechnung erstellen
     """
     try:
-        # TODO: Implementiere Rechnungserstellung
-        flash("Rechnungserstellung wird noch implementiert", "info")
-        return redirect(url_for('rechnung.rechnungs_index'))
-        
+        # Formulardaten auslesen
+        kunde_id = request.form.get('kunde_id')
+        rechnungsdatum = datetime.strptime(request.form.get('rechnungsdatum'), '%Y-%m-%d').date() if request.form.get('rechnungsdatum') else date.today()
+        leistungsdatum = datetime.strptime(request.form.get('leistungsdatum'), '%Y-%m-%d').date() if request.form.get('leistungsdatum') else rechnungsdatum
+        zahlungsbedingungen = request.form.get('zahlungsbedingungen', 'Zahlbar innerhalb 14 Tagen')
+        zugpferd_profil = request.form.get('zugpferd_profil', 'BASIC')
+        bemerkungen = request.form.get('bemerkungen', '')
+
+        # Kunde laden
+        kunde = Customer.query.get(kunde_id)
+        if not kunde:
+            flash("Kunde nicht gefunden!", "error")
+            return redirect(url_for('rechnung.neue_rechnung'))
+
+        # Rechnung erstellen
+        rechnung = Rechnung(
+            kunde_id=kunde_id,
+            kunde_name=kunde.display_name,
+            kunde_adresse=f"{kunde.street} {kunde.house_number}\n{kunde.postal_code} {kunde.city}".strip(),
+            kunde_email=kunde.email,
+            kunde_steuernummer=kunde.tax_id,
+            kunde_ust_id=kunde.vat_id,
+            rechnungsdatum=rechnungsdatum,
+            leistungsdatum=leistungsdatum,
+            zahlungsbedingungen=zahlungsbedingungen,
+            zugpferd_profil=ZugpferdProfil[zugpferd_profil],
+            bemerkungen=bemerkungen,
+            status=RechnungsStatus.ENTWURF,
+            erstellt_von=current_user.username if current_user.is_authenticated else 'System'
+        )
+
+        # Positionen verarbeiten
+        positionen_data = json.loads(request.form.get('positionen', '[]'))
+        for idx, pos_data in enumerate(positionen_data, 1):
+            position = RechnungsPosition(
+                position=idx,
+                artikel_name=pos_data.get('artikel_name', ''),
+                beschreibung=pos_data.get('beschreibung', ''),
+                menge=Decimal(str(pos_data.get('menge', 1))),
+                einheit=pos_data.get('einheit', 'Stück'),
+                einzelpreis=Decimal(str(pos_data.get('einzelpreis', 0))),
+                mwst_satz=Decimal(str(pos_data.get('mwst_satz', 19))),
+                rabatt_prozent=Decimal(str(pos_data.get('rabatt_prozent', 0)))
+            )
+            position.calculate_amounts()
+            rechnung.positionen.append(position)
+
+        # Gesamtsummen berechnen
+        rechnung.calculate_totals()
+
+        # In DB speichern
+        db.session.add(rechnung)
+        db.session.commit()
+
+        logger.info(f"Rechnung {rechnung.rechnungsnummer} erfolgreich erstellt")
+        flash(f"Rechnung {rechnung.rechnungsnummer} wurde erfolgreich erstellt!", "success")
+        return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung.id))
+
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Fehler beim Erstellen der Rechnung: {str(e)}")
+        import traceback
+        traceback.print_exc()
         flash(f"Fehler beim Erstellen der Rechnung: {str(e)}", "error")
         return redirect(url_for('rechnung.neue_rechnung'))
 
@@ -228,10 +292,13 @@ def rechnung_detail(rechnung_id):
     Einzelne Rechnung anzeigen
     """
     try:
-        # TODO: Rechnung aus DB laden
-        flash(f"Rechnung {rechnung_id} - Details werden noch implementiert", "info")
-        return redirect(url_for('rechnung.rechnungs_index'))
-        
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+
+        return render_template('rechnung/detail.html',
+            rechnung=rechnung,
+            page_title=f"Rechnung {rechnung.rechnungsnummer}"
+        )
+
     except Exception as e:
         logger.error(f"Fehler beim Anzeigen der Rechnung: {str(e)}")
         flash(f"Fehler beim Laden der Rechnung: {str(e)}", "error")
@@ -273,29 +340,61 @@ def rechnung_pdf(rechnung_id):
     Rechnung als PDF anzeigen
     """
     try:
-        # TODO: PDF generieren und anzeigen
-        flash(f"PDF für Rechnung {rechnung_id} wird noch generiert", "info")
-        return redirect(url_for('rechnung.rechnungs_index'))
-        
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+
+        # PDF-Service nutzen (ohne ZUGFeRD-XML)
+        pdf_service = PDFService()
+        zugpferd_service = ZugpferdService()
+
+        # Daten aufbereiten
+        invoice_data = zugpferd_service._convert_rechnung_to_invoice_data(rechnung)
+
+        # PDF generieren
+        pdf_content = pdf_service.create_invoice_pdf(invoice_data)
+
+        # Als Response zurückgeben
+        return send_file(
+            io.BytesIO(pdf_content),
+            mimetype='application/pdf',
+            as_attachment=False,  # Im Browser anzeigen
+            download_name=f'{rechnung.rechnungsnummer}.pdf'
+        )
+
     except Exception as e:
         logger.error(f"Fehler beim Generieren des PDFs: {str(e)}")
+        import traceback
+        traceback.print_exc()
         flash(f"Fehler beim Generieren des PDFs: {str(e)}", "error")
-        return redirect(url_for('rechnung.rechnungs_index'))
+        return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
 
 @rechnung_bp.route('/<int:rechnung_id>/download')
 def rechnung_download(rechnung_id):
     """
-    Rechnung herunterladen (ZUGPFERD PDF/XML)
+    Rechnung herunterladen (ZUGPFERD PDF/A-3 mit eingebettetem XML)
     """
     try:
-        # TODO: ZUGPFERD-Datei generieren und download
-        flash(f"Download für Rechnung {rechnung_id} wird noch implementiert", "info")
-        return redirect(url_for('rechnung.rechnungs_index'))
-        
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+
+        # ZUGFeRD-Service nutzen
+        zugpferd_service = ZugpferdService()
+
+        # Vollständiges ZUGFeRD-PDF erstellen (PDF/A-3 + XML)
+        zugferd_pdf = zugpferd_service.create_invoice_from_rechnung(rechnung)
+
+        # Als Download zurückgeben
+        return send_file(
+            io.BytesIO(zugferd_pdf),
+            mimetype='application/pdf',
+            as_attachment=True,  # Download erzwingen
+            download_name=f'{rechnung.rechnungsnummer}_ZUGFeRD.pdf'
+        )
+
     except Exception as e:
-        logger.error(f"Fehler beim Download: {str(e)}")
+        logger.error(f"Fehler beim ZUGFeRD-Download: {str(e)}")
+        import traceback
+        traceback.print_exc()
         flash(f"Fehler beim Download: {str(e)}", "error")
-        return redirect(url_for('rechnung.rechnungs_index'))
+        return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
 
 # API-Endpoints
 @rechnung_bp.route('/api/<int:rechnung_id>/bezahlt', methods=['POST'])
