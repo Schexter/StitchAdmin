@@ -1,0 +1,517 @@
+{% extends "base.html" %}
+
+{% block title %}Thread Color Web Fetcher - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="bi bi-globe"></i> Thread Color Web Fetcher 
+                <span class="badge bg-danger">NEU!</span>
+            </h1>
+            <p class="lead">Holen Sie Garnfarben-Daten direkt von Hersteller-Websites - kein PDF-Parsing mehr nötig!</p>
+        </div>
+    </div>
+
+    <!-- Status-Karten -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> <strong>So funktioniert's:</strong> 
+                Dieses Tool durchsucht Hersteller-Websites und Online-Shops nach Garnfarben-Informationen.
+                Sie können entweder vorkonfigurierte Hersteller scannen oder eine eigene URL analysieren.
+            </div>
+        </div>
+    </div>
+
+    <!-- Hauptaktionen -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-building text-primary"></i> Hersteller scannen
+                    </h5>
+                    <p class="card-text">Wählen Sie einen Hersteller aus der Liste und scannen Sie alle bekannten Produktseiten.</p>
+                    <button class="btn btn-primary" onclick="showManufacturerModal()">
+                        <i class="bi bi-search"></i> Hersteller wählen
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-link-45deg text-success"></i> URL analysieren
+                    </h5>
+                    <p class="card-text">Geben Sie eine spezifische URL ein, um sie nach Garnfarben-Informationen zu durchsuchen.</p>
+                    <button class="btn btn-success" onclick="showUrlModal()">
+                        <i class="bi bi-globe"></i> URL eingeben
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-clock-history text-info"></i> Letzte Scans
+                    </h5>
+                    <p class="card-text">Sehen Sie die Ergebnisse der letzten Scans und importieren Sie gefundene Farben.</p>
+                    <button class="btn btn-info" onclick="showHistoryModal()">
+                        <i class="bi bi-list"></i> Historie anzeigen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ergebnisbereich -->
+    <div class="row" id="resultsArea" style="display: none;">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Scan-Ergebnisse</h5>
+                </div>
+                <div class="card-body" id="resultsContent">
+                    <!-- Ergebnisse werden hier angezeigt -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hersteller-Modal -->
+<div class="modal fade" id="manufacturerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Hersteller scannen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Wählen Sie einen Hersteller aus:</p>
+                <div class="list-group">
+                    <button class="list-group-item list-group-item-action" onclick="scanManufacturer('madeira')">
+                        <h6 class="mb-1">Madeira</h6>
+                        <small>madeira.com, shop.madeira.de</small>
+                    </button>
+                    <button class="list-group-item list-group-item-action" onclick="scanManufacturer('gunold')">
+                        <h6 class="mb-1">Gunold</h6>
+                        <small>gunold.de/shop</small>
+                    </button>
+                    <button class="list-group-item list-group-item-action" onclick="scanManufacturer('mettler')">
+                        <h6 class="mb-1">Mettler</h6>
+                        <small>mettler.com</small>
+                    </button>
+                    <button class="list-group-item list-group-item-action" onclick="scanManufacturer('isacord')">
+                        <h6 class="mb-1">Isacord</h6>
+                        <small>isacord.com</small>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- URL-Modal -->
+<div class="modal fade" id="urlModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">URL analysieren</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">URL eingeben:</label>
+                    <input type="url" class="form-control" id="urlInput" 
+                           placeholder="https://shop.madeira.de/de/stickgarne">
+                    <small class="text-muted">Geben Sie die vollständige URL einer Produktseite oder Farbtabelle ein.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Was suchen Sie? (Optional)</label>
+                    <select class="form-select" id="searchType">
+                        <option value="auto">Automatisch erkennen</option>
+                        <option value="products">Produktliste</option>
+                        <option value="colors">Farbtabelle</option>
+                        <option value="details">Produktdetails</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="analyzeUrl()">
+                    <i class="bi bi-search"></i> Analysieren
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Historie-Modal -->
+<div class="modal fade" id="historyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Scan-Historie</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="historyContent">
+                <p class="text-muted">Noch keine Scans durchgeführt.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let scanHistory = [];
+
+// Modal-Funktionen
+function showManufacturerModal() {
+    const modal = new bootstrap.Modal(document.getElementById('manufacturerModal'));
+    modal.show();
+}
+
+function showUrlModal() {
+    const modal = new bootstrap.Modal(document.getElementById('urlModal'));
+    modal.show();
+}
+
+function showHistoryModal() {
+    updateHistoryDisplay();
+    const modal = new bootstrap.Modal(document.getElementById('historyModal'));
+    modal.show();
+}
+
+// Hersteller scannen
+function scanManufacturer(manufacturer) {
+    // Modal schließen
+    bootstrap.Modal.getInstance(document.getElementById('manufacturerModal')).hide();
+    
+    // Ergebnisbereich vorbereiten
+    const resultsArea = document.getElementById('resultsArea');
+    const resultsContent = document.getElementById('resultsContent');
+    
+    resultsArea.style.display = 'block';
+    resultsContent.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Lade...</span>
+            </div>
+            <p class="mt-3">Scanne ${manufacturer.toUpperCase()} Websites...</p>
+            <small class="text-muted">Dies kann einige Sekunden dauern.</small>
+        </div>
+    `;
+    
+    // API-Aufruf
+    fetch('/thread/online/api/scan', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            manufacturer: manufacturer
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayScanResults(data.results, manufacturer);
+            
+            // Zur Historie hinzufügen
+            scanHistory.unshift({
+                type: 'manufacturer',
+                name: manufacturer,
+                timestamp: new Date(),
+                results: data.results
+            });
+        } else {
+            resultsContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Fehler: ${data.error}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        resultsContent.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Netzwerkfehler: ${error}
+            </div>
+        `;
+    });
+}
+
+// URL analysieren
+function analyzeUrl() {
+    const url = document.getElementById('urlInput').value;
+    const searchType = document.getElementById('searchType').value;
+    
+    if (!url) {
+        alert('Bitte geben Sie eine URL ein.');
+        return;
+    }
+    
+    // Modal schließen
+    bootstrap.Modal.getInstance(document.getElementById('urlModal')).hide();
+    
+    // Ergebnisbereich vorbereiten
+    const resultsArea = document.getElementById('resultsArea');
+    const resultsContent = document.getElementById('resultsContent');
+    
+    resultsArea.style.display = 'block';
+    resultsContent.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Lade...</span>
+            </div>
+            <p class="mt-3">Analysiere URL...</p>
+            <small class="text-muted">${url}</small>
+        </div>
+    `;
+    
+    // API-Aufruf
+    fetch('/thread/online/api/analyze', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            url: url,
+            type: searchType
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayUrlResults(data.results, url);
+            
+            // Zur Historie hinzufügen
+            scanHistory.unshift({
+                type: 'url',
+                url: url,
+                timestamp: new Date(),
+                results: data.results
+            });
+        } else {
+            resultsContent.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Fehler: ${data.error}
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        resultsContent.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Netzwerkfehler: ${error}
+            </div>
+        `;
+    });
+}
+
+// Ergebnisse anzeigen
+function displayScanResults(results, manufacturer) {
+    const resultsContent = document.getElementById('resultsContent');
+    
+    let html = `
+        <h6>Scan-Ergebnisse für ${manufacturer.toUpperCase()}</h6>
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-primary">${results.scanned_urls?.length || 0}</h3>
+                        <p class="mb-0">URLs gescannt</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-success">${results.products?.length || 0}</h3>
+                        <p class="mb-0">Produkte gefunden</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card text-center">
+                    <div class="card-body">
+                        <h3 class="text-info">${results.colors?.length || 0}</h3>
+                        <p class="mb-0">Farben gefunden</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Produkte anzeigen
+    if (results.products && results.products.length > 0) {
+        html += `
+            <h6 class="mt-4">Gefundene Produkte:</h6>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Nummer</th>
+                            <th>Name</th>
+                            <th>Farbe</th>
+                            <th>Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+        
+        results.products.slice(0, 10).forEach(product => {
+            html += `
+                <tr>
+                    <td>${product.number || '-'}</td>
+                    <td>${product.name || '-'}</td>
+                    <td>${product.color ? `<span class="badge" style="background-color: ${product.color}">&nbsp;</span>` : '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="importProduct(${JSON.stringify(product).replace(/"/g, '&quot;')})">
+                            Importieren
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+        
+        if (results.products.length > 10) {
+            html += `<p class="text-muted">... und ${results.products.length - 10} weitere Produkte</p>`;
+        }
+    }
+    
+    // Farben anzeigen
+    if (results.colors && results.colors.length > 0) {
+        html += `
+            <h6 class="mt-4">Gefundene Farben:</h6>
+            <div class="row">
+        `;
+        
+        results.colors.slice(0, 12).forEach(color => {
+            html += `
+                <div class="col-md-2 mb-3">
+                    <div class="card text-center">
+                        <div class="card-body p-2">
+                            <div style="width: 50px; height: 50px; background-color: ${color.hex || '#ccc'}; margin: 0 auto 10px; border: 1px solid #ddd;"></div>
+                            <small><strong>${color.number || '?'}</strong><br>${color.name || 'Unbekannt'}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `</div>`;
+        
+        if (results.colors.length > 12) {
+            html += `<p class="text-muted">... und ${results.colors.length - 12} weitere Farben</p>`;
+        }
+    }
+    
+    // Import-Button
+    if ((results.products && results.products.length > 0) || (results.colors && results.colors.length > 0)) {
+        html += `
+            <div class="mt-4">
+                <button class="btn btn-success" onclick="importAllResults(${JSON.stringify(results).replace(/"/g, '&quot;')}, '${manufacturer}')">
+                    <i class="bi bi-download"></i> Alle importieren
+                </button>
+            </div>
+        `;
+    }
+    
+    resultsContent.innerHTML = html;
+}
+
+function displayUrlResults(results, url) {
+    const resultsContent = document.getElementById('resultsContent');
+    
+    let html = `
+        <h6>Analyse-Ergebnisse</h6>
+        <p class="text-muted">URL: ${url}</p>
+    `;
+    
+    if (results.title) {
+        html += `<p><strong>Seitentitel:</strong> ${results.title}</p>`;
+    }
+    
+    // Gleiche Anzeige wie bei Hersteller-Scan
+    displayScanResults(results, 'URL-Analyse');
+}
+
+// Import-Funktionen
+function importProduct(product) {
+    console.log('Importiere Produkt:', product);
+    // TODO: Implementiere Import-Logik
+    alert('Produkt-Import wird implementiert...');
+}
+
+function importAllResults(results, source) {
+    console.log('Importiere alle Ergebnisse:', results);
+    // TODO: Implementiere Massen-Import
+    alert(`Import von ${results.products?.length || 0} Produkten und ${results.colors?.length || 0} Farben wird implementiert...`);
+}
+
+// Historie aktualisieren
+function updateHistoryDisplay() {
+    const historyContent = document.getElementById('historyContent');
+    
+    if (scanHistory.length === 0) {
+        historyContent.innerHTML = '<p class="text-muted">Noch keine Scans durchgeführt.</p>';
+        return;
+    }
+    
+    let html = '<div class="list-group">';
+    
+    scanHistory.forEach((scan, index) => {
+        const timeAgo = getTimeAgo(scan.timestamp);
+        
+        html += `
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">
+                        ${scan.type === 'manufacturer' ? 
+                            `<i class="bi bi-building"></i> ${scan.name.toUpperCase()}` : 
+                            `<i class="bi bi-link"></i> URL-Analyse`}
+                    </h6>
+                    <small>${timeAgo}</small>
+                </div>
+                <p class="mb-1">
+                    ${scan.results.products?.length || 0} Produkte, 
+                    ${scan.results.colors?.length || 0} Farben
+                </p>
+                ${scan.type === 'url' ? `<small class="text-muted">${scan.url}</small>` : ''}
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    historyContent.innerHTML = html;
+}
+
+function getTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    
+    if (seconds < 60) return 'Gerade eben';
+    if (seconds < 3600) return `Vor ${Math.floor(seconds / 60)} Minuten`;
+    if (seconds < 86400) return `Vor ${Math.floor(seconds / 3600)} Stunden`;
+    return `Vor ${Math.floor(seconds / 86400)} Tagen`;
+}
+</script>
+
+<style>
+.touch-target {
+    min-height: 60px;
+    padding: 15px 30px;
+}
+</style>
+{% endblock %}

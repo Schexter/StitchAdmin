@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Design-Input - Bestellung {{ order.id }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Design-Input für Bestellung {{ order.id }}</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Input-Typ Auswahl -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="input_type" id="file_input" value="file" checked>
+                                <label class="btn btn-outline-primary" for="file_input">
+                                    <i class="bi bi-file-earmark-arrow-up"></i> Datei hochladen
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="input_type" id="link_input" value="link">
+                                <label class="btn btn-outline-secondary" for="link_input">
+                                    <i class="bi bi-link-45deg"></i> Link angeben
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Datei-Upload Bereich -->
+                    <div id="file_upload_area" class="input-area">
+                        <form method="POST" enctype="multipart/form-data" 
+                              action="{{ url_for('design_workflow.design_input', order_id=order.id) }}">
+                            <input type="hidden" name="input_type" value="file">
+                            
+                            <div class="mb-3">
+                                <label for="design_file" class="form-label">
+                                    <i class="bi bi-file-earmark"></i> Design-Datei auswählen
+                                </label>
+                                <input type="file" class="form-control" id="design_file" name="design_file" 
+                                       accept=".dst,.pes,.jef,.exp,.vp3,.vp4,.svg,.ai,.png,.jpg,.jpeg,.pdf,.eps,.cdr" 
+                                       required>
+                                <div class="form-text">
+                                    <strong>Stickerei:</strong> DST, PES, JEF, EXP, VP3, VP4<br>
+                                    <strong>Druck:</strong> SVG, AI, PNG, JPG, PDF, EPS, CDR
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="file_description" class="form-label">Beschreibung (optional)</label>
+                                <textarea class="form-control" id="file_description" name="file_description" 
+                                          rows="2" placeholder="Zusätzliche Hinweise zur Datei..."></textarea>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-upload"></i> Datei hochladen
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- Link-Input Bereich -->
+                    <div id="link_input_area" class="input-area" style="display: none;">
+                        <form method="POST" action="{{ url_for('design_workflow.design_input', order_id=order.id) }}">
+                            <input type="hidden" name="input_type" value="link">
+                            
+                            <div class="mb-3">
+                                <label for="design_url" class="form-label">
+                                    <i class="bi bi-link-45deg"></i> Design-URL
+                                </label>
+                                <input type="url" class="form-control" id="design_url" name="design_url" 
+                                       placeholder="https://beispiel.com/design.jpg" required>
+                                <div class="form-text">
+                                    Unterstützt: Google Drive, Dropbox, WeTransfer, Behance, Dribbble, etc.
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="link_description" class="form-label">Beschreibung (optional)</label>
+                                <textarea class="form-control" id="link_description" name="link_description" 
+                                          rows="2" placeholder="Zusätzliche Hinweise zum Link..."></textarea>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Hinweis:</strong> Links werden automatisch analysiert. Je nach Quelle kann eine 
+                                Grafikmanager-Bearbeitung erforderlich sein.
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-link"></i> Link verarbeiten
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Bestellinfo -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5>Bestellinfo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-sm-5"><strong>Nummer:</strong></div>
+                        <div class="col-sm-7">{{ order.id }}</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-5"><strong>Typ:</strong></div>
+                        <div class="col-sm-7">
+                            {% if order.order_type == 'embroidery' %}
+                                <span class="badge bg-primary">Bestickung</span>
+                            {% elif order.order_type == 'printing' %}
+                                <span class="badge bg-success">Textildruck</span>
+                            {% elif order.order_type == 'combined' %}
+                                <span class="badge bg-info">Kombiniert</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-5"><strong>Status:</strong></div>
+                        <div class="col-sm-7">
+                            <span class="badge {{ order.design_status|design_status_badge }}">
+                                {{ order.design_status|design_status_text }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Existing Link Info -->
+            {% if existing_link %}
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5>Vorhandener Link</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <strong>URL:</strong><br>
+                        <a href="{{ existing_link.url }}" target="_blank" class="text-break">
+                            {{ existing_link.url }}
+                        </a>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Status:</strong>
+                        <span class="badge bg-info">{{ existing_link.status }}</span>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Erstellt:</strong>
+                        <small class="text-muted">{{ existing_link.created_at[:10] }}</small>
+                    </div>
+                    
+                    {% if existing_link.graphics_manager_required %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Grafikmanager-Bearbeitung erforderlich
+                    </div>
+                    <a href="{{ url_for('design_workflow.graphics_manager', order_id=order.id) }}" 
+                       class="btn btn-warning btn-sm">
+                        <i class="bi bi-tools"></i> Grafikmanager
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Hilfe -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>Hilfe</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Datei-Upload</h6>
+                    <ul class="small">
+                        <li>Stickerei: DST, PES, JEF, EXP bevorzugt</li>
+                        <li>Druck: SVG, AI für beste Qualität</li>
+                        <li>Bilder: PNG, JPG mit hoher Auflösung</li>
+                    </ul>
+                    
+                    <h6>Link-Input</h6>
+                    <ul class="small">
+                        <li>Direkte Links zu Dateien bevorzugt</li>
+                        <li>Cloud-Speicher: Öffentliche Links verwenden</li>
+                        <li>Design-Plattformen: Grafikmanager erforderlich</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const inputTypes = document.querySelectorAll('input[name="input_type"]');
+    const fileArea = document.getElementById('file_upload_area');
+    const linkArea = document.getElementById('link_input_area');
+    
+    inputTypes.forEach(input => {
+        input.addEventListener('change', function() {
+            if (this.value === 'file') {
+                fileArea.style.display = 'block';
+                linkArea.style.display = 'none';
+            } else {
+                fileArea.style.display = 'none';
+                linkArea.style.display = 'block';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

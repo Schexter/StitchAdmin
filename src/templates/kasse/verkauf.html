@@ -1,0 +1,610 @@
+{% extends "base.html" %}
+
+{% block title %}Kassenverkauf - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Artikel-Suche und Warenkorb -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4><i class="bi bi-cart"></i> Verkauf</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Artikel-Suche -->
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <input type="text" class="form-control form-control-lg" id="articleSearch" 
+                                   placeholder="Artikelsuche (Name, Nr., Barcode)..." autofocus>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-info btn-lg w-100" onclick="showArticleList()">
+                                <i class="bi bi-list"></i> Artikel-Liste
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Warenkorb -->
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Artikel</th>
+                                    <th>Preis</th>
+                                    <th width="120">Menge</th>
+                                    <th>Gesamt</th>
+                                    <th width="50"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="cartItems">
+                                <!-- Dynamisch gefüllt -->
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Zwischensumme:</strong></td>
+                                    <td><strong id="subtotal">0,00 €</strong></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" class="text-end">MwSt (19%):</td>
+                                    <td id="vat">0,00 €</td>
+                                    <td></td>
+                                </tr>
+                                <tr class="table-primary">
+                                    <td colspan="3" class="text-end"><h4>Gesamt:</h4></td>
+                                    <td><h4 id="total">0,00 €</h4></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Zahlung und Aktionen -->
+        <div class="col-md-4">
+            <!-- Kunde -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5><i class="bi bi-person"></i> Kunde</h5>
+                </div>
+                <div class="card-body">
+                    <select class="form-select" id="customerId">
+                        <option value="">Laufkunde</option>
+                        {% for customer in customers %}
+                        <option value="{{ customer.id }}">
+                            {{ customer.first_name }} {{ customer.last_name }}
+                            {% if customer.company_name %} - {{ customer.company_name }}{% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Zahlung -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5><i class="bi bi-cash"></i> Zahlung</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-success btn-lg" onclick="paymentCash()" id="btnCash">
+                            <i class="bi bi-cash-coin"></i> Bar bezahlen
+                        </button>
+                        <button class="btn btn-primary btn-lg" onclick="paymentCard()">
+                            <i class="bi bi-credit-card"></i> Kartenzahlung
+                        </button>
+                        <button class="btn btn-info btn-lg" onclick="paymentInvoice()">
+                            <i class="bi bi-receipt"></i> Auf Rechnung
+                        </button>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-warning" onclick="parkSale()">
+                            <i class="bi bi-pause"></i> Verkauf parken
+                        </button>
+                        <button class="btn btn-danger" onclick="cancelSale()">
+                            <i class="bi bi-x-circle"></i> Abbrechen
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schnellzugriff -->
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-star"></i> Schnellzugriff</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2" id="quickAccess">
+                        <!-- Dynamisch gefüllt mit häufig verkauften Artikeln -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bar-Zahlung Modal -->
+<div class="modal fade" id="cashModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Barzahlung</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Zu zahlen:</label>
+                    <h3 id="cashTotal">0,00 €</h3>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Gegeben:</label>
+                    <input type="number" class="form-control form-control-lg" id="cashGiven" 
+                           step="0.01" min="0" onkeyup="calculateChange()">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Rückgeld:</label>
+                    <h3 id="cashChange" class="text-danger">0,00 €</h3>
+                </div>
+                <div class="row g-2">
+                    <!-- Schnell-Buttons für häufige Beträge -->
+                    <div class="col-4">
+                        <button class="btn btn-outline-primary w-100" onclick="setCashAmount(5)">5 €</button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-primary w-100" onclick="setCashAmount(10)">10 €</button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-primary w-100" onclick="setCashAmount(20)">20 €</button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-primary w-100" onclick="setCashAmount(50)">50 €</button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-primary w-100" onclick="setCashAmount(100)">100 €</button>
+                    </div>
+                    <div class="col-4">
+                        <button class="btn btn-outline-success w-100" onclick="setCashExact()">Passend</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" onclick="completeCashPayment()">
+                    <i class="bi bi-check-circle"></i> Zahlung abschließen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Artikel-Liste Modal -->
+<div class="modal fade" id="articleListModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Artikel auswählen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="text" class="form-control mb-3" id="modalArticleSearch" 
+                       placeholder="Suchen..." onkeyup="filterArticles()">
+                <div class="table-responsive" style="max-height: 400px;">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Art.Nr.</th>
+                                <th>Name</th>
+                                <th>Preis</th>
+                                <th>Lager</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="articleListBody">
+                            <!-- Dynamisch gefüllt -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Globale Variablen
+let cart = [];
+let articles = [];
+
+// Initialisierung
+document.addEventListener('DOMContentLoaded', function() {
+    loadArticles();
+    loadQuickAccess();
+    
+    // Artikel-Suche mit Enter
+    document.getElementById('articleSearch').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchArticle(this.value);
+            this.value = '';
+        }
+    });
+});
+
+// Artikel laden
+function loadArticles() {
+    fetch('/api/articles')
+        .then(response => response.json())
+        .then(data => {
+            articles = data;
+        });
+}
+
+// Schnellzugriff laden
+function loadQuickAccess() {
+    // Lade häufig verkaufte Artikel
+    fetch('/api/top-selling-articles?limit=6')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('quickAccess');
+            container.innerHTML = '';
+            data.forEach(article => {
+                container.innerHTML += `
+                    <div class="col-6">
+                        <button class="btn btn-outline-primary w-100 p-2" 
+                                onclick="addToCart('${article.id}')">
+                            <small>${article.name}</small><br>
+                            <strong>${formatCurrency(article.price * 1.19)}</strong>
+                        </button>
+                    </div>
+                `;
+            });
+        });
+}
+
+// Artikel suchen
+function searchArticle(query) {
+    if (!query) return;
+    
+    // Suche nach Artikelnummer, Barcode oder Name
+    const article = articles.find(a => 
+        a.article_number === query || 
+        a.barcode === query ||
+        a.name.toLowerCase().includes(query.toLowerCase())
+    );
+    
+    if (article) {
+        addToCart(article.id);
+    } else {
+        showArticleList();
+    }
+}
+
+// Zum Warenkorb hinzufügen
+function addToCart(articleId) {
+    const article = articles.find(a => a.id === articleId);
+    if (!article) return;
+    
+    const existingItem = cart.find(item => item.article.id === articleId);
+    if (existingItem) {
+        existingItem.quantity++;
+    } else {
+        cart.push({
+            article: article,
+            quantity: 1,
+            price: article.price * 1.19 // inkl. MwSt
+        });
+    }
+    
+    updateCartDisplay();
+}
+
+// Warenkorb-Anzeige aktualisieren
+function updateCartDisplay() {
+    const tbody = document.getElementById('cartItems');
+    tbody.innerHTML = '';
+    
+    let subtotal = 0;
+    
+    cart.forEach((item, index) => {
+        const total = item.price * item.quantity;
+        subtotal += total;
+        
+        tbody.innerHTML += `
+            <tr>
+                <td>
+                    <strong>${item.article.name}</strong><br>
+                    <small class="text-muted">Art.Nr.: ${item.article.article_number || item.article.id}</small>
+                </td>
+                <td>${formatCurrency(item.price)}</td>
+                <td>
+                    <input type="number" class="form-control form-control-sm" 
+                           value="${item.quantity}" min="1"
+                           onchange="updateQuantity(${index}, this.value)">
+                </td>
+                <td>${formatCurrency(total)}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="removeFromCart(${index})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+    
+    // Summen berechnen
+    const vat = subtotal - (subtotal / 1.19);
+    const total = subtotal;
+    
+    document.getElementById('subtotal').textContent = formatCurrency(subtotal / 1.19);
+    document.getElementById('vat').textContent = formatCurrency(vat);
+    document.getElementById('total').textContent = formatCurrency(total);
+}
+
+// Menge aktualisieren
+function updateQuantity(index, quantity) {
+    quantity = parseInt(quantity);
+    if (quantity > 0) {
+        cart[index].quantity = quantity;
+        updateCartDisplay();
+    }
+}
+
+// Aus Warenkorb entfernen
+function removeFromCart(index) {
+    cart.splice(index, 1);
+    updateCartDisplay();
+}
+
+// Barzahlung
+function paymentCash() {
+    if (cart.length === 0) {
+        alert('Der Warenkorb ist leer!');
+        return;
+    }
+    
+    const total = calculateTotal();
+    document.getElementById('cashTotal').textContent = formatCurrency(total);
+    document.getElementById('cashGiven').value = '';
+    document.getElementById('cashChange').textContent = '0,00 €';
+    
+    const modal = new bootstrap.Modal(document.getElementById('cashModal'));
+    modal.show();
+    
+    setTimeout(() => {
+        document.getElementById('cashGiven').focus();
+    }, 500);
+}
+
+// Rückgeld berechnen
+function calculateChange() {
+    const total = calculateTotal();
+    const given = parseFloat(document.getElementById('cashGiven').value) || 0;
+    const change = given - total;
+    
+    const changeElement = document.getElementById('cashChange');
+    changeElement.textContent = formatCurrency(Math.max(0, change));
+    changeElement.className = change >= 0 ? 'text-success' : 'text-danger';
+}
+
+// Schnell-Beträge setzen
+function setCashAmount(amount) {
+    document.getElementById('cashGiven').value = amount;
+    calculateChange();
+}
+
+function setCashExact() {
+    const total = calculateTotal();
+    document.getElementById('cashGiven').value = total.toFixed(2);
+    calculateChange();
+}
+
+// Barzahlung abschließen
+function completeCashPayment() {
+    const total = calculateTotal();
+    const given = parseFloat(document.getElementById('cashGiven').value) || 0;
+    
+    if (given < total) {
+        alert('Der gegebene Betrag ist zu gering!');
+        return;
+    }
+    
+    // Beleg erstellen
+    const data = {
+        items: cart.map(item => ({
+            article_id: item.article.id,
+            quantity: item.quantity,
+            price: item.price
+        })),
+        customer_id: document.getElementById('customerId').value || null,
+        payment_method: 'cash',
+        given_amount: given,
+        change_amount: given - total
+    };
+    
+    fetch('/kasse/api/sale', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            // Modal schließen
+            bootstrap.Modal.getInstance(document.getElementById('cashModal')).hide();
+            
+            // Beleg drucken/anzeigen
+            if (confirm('Beleg drucken?')) {
+                window.open(`/kasse/beleg/${result.receipt_id}/print`, '_blank');
+            }
+            
+            // Warenkorb leeren
+            cart = [];
+            updateCartDisplay();
+            
+            // Fokus zurück auf Suche
+            document.getElementById('articleSearch').focus();
+        } else {
+            alert('Fehler beim Speichern: ' + result.message);
+        }
+    });
+}
+
+// Kartenzahlung
+function paymentCard() {
+    if (cart.length === 0) {
+        alert('Der Warenkorb ist leer!');
+        return;
+    }
+    
+    // Vereinfachte Kartenzahlung (ohne Terminal-Integration)
+    if (confirm('Kartenzahlung von ' + formatCurrency(calculateTotal()) + ' durchführen?')) {
+        const data = {
+            items: cart.map(item => ({
+                article_id: item.article.id,
+                quantity: item.quantity,
+                price: item.price
+            })),
+            customer_id: document.getElementById('customerId').value || null,
+            payment_method: 'card'
+        };
+        
+        fetch('/kasse/api/sale', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                // Beleg drucken/anzeigen
+                if (confirm('Beleg drucken?')) {
+                    window.open(`/kasse/beleg/${result.receipt_id}/print`, '_blank');
+                }
+                
+                // Warenkorb leeren
+                cart = [];
+                updateCartDisplay();
+                
+                // Fokus zurück auf Suche
+                document.getElementById('articleSearch').focus();
+            }
+        });
+    }
+}
+
+// Auf Rechnung
+function paymentInvoice() {
+    const customerId = document.getElementById('customerId').value;
+    if (!customerId) {
+        alert('Bitte wählen Sie einen Kunden für die Rechnung aus!');
+        return;
+    }
+    
+    if (cart.length === 0) {
+        alert('Der Warenkorb ist leer!');
+        return;
+    }
+    
+    // Weiterleitung zur Rechnungserstellung
+    const items = cart.map(item => ({
+        article_id: item.article.id,
+        quantity: item.quantity,
+        price: item.price
+    }));
+    
+    // Daten in Session speichern und weiterleiten
+    sessionStorage.setItem('invoiceItems', JSON.stringify(items));
+    sessionStorage.setItem('invoiceCustomerId', customerId);
+    
+    window.location.href = '/rechnungen/neu?from_pos=1';
+}
+
+// Hilfsfunktionen
+function calculateTotal() {
+    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('de-DE', {
+        style: 'currency',
+        currency: 'EUR'
+    }).format(amount);
+}
+
+// Artikel-Liste anzeigen
+function showArticleList() {
+    const modal = new bootstrap.Modal(document.getElementById('articleListModal'));
+    modal.show();
+    
+    // Artikel-Liste füllen
+    const tbody = document.getElementById('articleListBody');
+    tbody.innerHTML = '';
+    
+    articles.forEach(article => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${article.article_number || article.id}</td>
+                <td>${article.name}</td>
+                <td>${formatCurrency(article.price * 1.19)}</td>
+                <td>${article.stock_quantity || 0}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" 
+                            onclick="addToCartFromModal('${article.id}')">
+                        <i class="bi bi-plus"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+// Aus Modal zum Warenkorb hinzufügen
+function addToCartFromModal(articleId) {
+    addToCart(articleId);
+    bootstrap.Modal.getInstance(document.getElementById('articleListModal')).hide();
+    document.getElementById('articleSearch').focus();
+}
+
+// Artikel filtern
+function filterArticles() {
+    const query = document.getElementById('modalArticleSearch').value.toLowerCase();
+    const rows = document.querySelectorAll('#articleListBody tr');
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        row.style.display = text.includes(query) ? '' : 'none';
+    });
+}
+
+// Verkauf parken
+function parkSale() {
+    if (cart.length === 0) {
+        alert('Nichts zum Parken vorhanden!');
+        return;
+    }
+    
+    // TODO: Implementiere Parkfunktion
+    alert('Parkfunktion noch nicht implementiert');
+}
+
+// Verkauf abbrechen
+function cancelSale() {
+    if (cart.length > 0 && !confirm('Wirklich abbrechen? Alle Artikel werden aus dem Warenkorb entfernt.')) {
+        return;
+    }
+    
+    cart = [];
+    updateCartDisplay();
+    document.getElementById('customerId').value = '';
+    document.getElementById('articleSearch').focus();
+}
+</script>
+{% endblock %}

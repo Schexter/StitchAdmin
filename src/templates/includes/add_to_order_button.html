@@ -1,0 +1,200 @@
+<!-- Wiederverwendbarer Button zum Hinzufügen zur Bestellung -->
+<button type="button" 
+        class="btn btn-success w-100 add-to-order-btn" 
+        data-article-id="{{ article.id }}"
+        data-article-name="{{ article.name }}"
+        data-article-number="{{ article.article_number }}"
+        onclick="addToOrder('{{ article.id }}', '{{ article.name }}', '{{ article.article_number }}')">
+    <i class="bi bi-cart-plus"></i> Zur Bestellung hinzufügen
+</button>
+
+<!-- Modal für Mengenauswahl -->
+<div class="modal fade" id="addToOrderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Zur Bestellung hinzufügen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Artikel: <strong id="modalArticleName"></strong></p>
+                <p>Artikel-Nr: <span id="modalArticleNumber"></span></p>
+                
+                <div class="mb-3">
+                    <label for="orderQuantity" class="form-label">Menge:</label>
+                    <input type="number" class="form-control" id="orderQuantity" value="1" min="1">
+                </div>
+                
+                <div id="currentOrderInfo" class="alert alert-info d-none">
+                    <i class="bi bi-info-circle"></i> Wird zur aktuellen Bestellung hinzugefügt
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="confirmAddToOrder()">
+                    <i class="bi bi-cart-plus"></i> Hinzufügen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentArticleData = {};
+
+function addToOrder(articleId, articleName, articleNumber) {
+    // Speichere Artikel-Daten
+    currentArticleData = {
+        id: articleId,
+        name: articleName,
+        number: articleNumber
+    };
+    
+    // Setze Modal-Inhalte
+    document.getElementById('modalArticleName').textContent = articleName;
+    document.getElementById('modalArticleNumber').textContent = articleNumber;
+    document.getElementById('orderQuantity').value = 1;
+    
+    // Prüfe ob eine offene Bestellung existiert
+    fetch('/orders/current')
+        .then(response => response.json())
+        .then(data => {
+            const orderInfo = document.getElementById('currentOrderInfo');
+            if (data.exists) {
+                orderInfo.innerHTML = `<i class="bi bi-info-circle"></i> Wird zu Bestellung <strong>${data.order_id}</strong> für <strong>${data.customer}</strong> hinzugefügt`;
+                orderInfo.classList.remove('d-none');
+            } else {
+                orderInfo.classList.add('d-none');
+            }
+            
+            // Zeige Modal
+            const modal = new bootstrap.Modal(document.getElementById('addToOrderModal'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Fehler beim Prüfen der aktuellen Bestellung:', error);
+            // Zeige Modal trotzdem
+            const modal = new bootstrap.Modal(document.getElementById('addToOrderModal'));
+            modal.show();
+        });
+}
+
+function confirmAddToOrder() {
+    const quantity = document.getElementById('orderQuantity').value;
+    
+    if (!quantity || quantity < 1) {
+        alert('Bitte geben Sie eine gültige Menge ein');
+        return;
+    }
+    
+    // Schließe Modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('addToOrderModal'));
+    modal.hide();
+    
+    // Führe Bestellung aus
+    executeAddToOrder(currentArticleData.id, currentArticleData.name, quantity);
+}
+
+function executeAddToOrder(articleId, articleName, quantity) {
+    // Prüfe ob eine offene Bestellung existiert
+    fetch('/orders/current')
+        .then(response => response.json())
+        .then(data => {
+            if (data.exists) {
+                return data.order_id;
+            } else {
+                // Erstelle neue Bestellung
+                return fetch('/orders/create-quick', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(newOrderData => {
+                    if (!newOrderData.success) {
+                        throw new Error('Fehler beim Erstellen der Bestellung');
+                    }
+                    return newOrderData.order_id;
+                });
+            }
+        })
+        .then(orderId => {
+            // Füge Artikel zur Bestellung hinzu
+            return fetch(`/orders/${orderId}/add-item`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    article_id: articleId,
+                    quantity: parseInt(quantity)
+                })
+            });
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Zeige Erfolgsmeldung
+                showSuccessMessage(`${quantity}x "${articleName}" wurde zur Bestellung hinzugefügt!`);
+                
+                // Optional: Nach 2 Sekunden fragen ob zur Bestellung gewechselt werden soll
+                setTimeout(() => {
+                    if (confirm('Möchten Sie zur Bestellung wechseln?')) {
+                        window.location.href = '/orders/';
+                    }
+                }, 2000);
+            } else {
+                showErrorMessage('Fehler: ' + (data.error || data.message || 'Unbekannter Fehler'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showErrorMessage('Fehler beim Hinzufügen zur Bestellung: ' + error.message);
+        });
+}
+
+function showSuccessMessage(message) {
+    // Erstelle Alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        <i class="bi bi-check-circle"></i> ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    // Entferne nach 5 Sekunden
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+
+function showErrorMessage(message) {
+    // Erstelle Alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        <i class="bi bi-exclamation-circle"></i> ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    // Entferne nach 10 Sekunden
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 10000);
+}
+</script>

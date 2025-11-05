@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Sicherheitseinstellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0"><i class="fas fa-shield-alt"></i> Sicherheitseinstellungen</h1>
+                <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <h5>Zwei-Faktor-Authentifizierung</h5>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="enable_2fa" 
+                                       name="enable_2fa" {{ 'checked' if settings.enable_2fa }}>
+                                <label class="form-check-label" for="enable_2fa">
+                                    2FA für alle Benutzer aktivieren
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    Erfordert zusätzliche Authentifizierung beim Login
+                                </small>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h5>Login-Sicherheit</h5>
+                        <div class="mb-3">
+                            <label for="max_login_attempts" class="form-label">Maximale Login-Versuche</label>
+                            <input type="number" class="form-control" id="max_login_attempts" 
+                                   name="max_login_attempts" value="{{ settings.max_login_attempts }}" 
+                                   min="3" max="10" required>
+                            <small class="form-text text-muted">Nach dieser Anzahl wird der Account temporär gesperrt</small>
+                        </div>
+
+                        <hr>
+
+                        <h5>Passwort-Richtlinien</h5>
+                        <div class="mb-3">
+                            <label for="password_min_length" class="form-label">Minimale Passwortlänge</label>
+                            <input type="number" class="form-control" id="password_min_length" 
+                                   name="password_min_length" value="{{ settings.password_min_length }}" 
+                                   min="6" max="32" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="require_special_chars" 
+                                       name="require_special_chars" {{ 'checked' if settings.require_special_chars }}>
+                                <label class="form-check-label" for="require_special_chars">
+                                    Sonderzeichen erforderlich
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    Passwörter müssen mindestens ein Sonderzeichen enthalten
+                                </small>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

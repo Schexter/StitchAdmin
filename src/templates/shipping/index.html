@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Versandabwicklung - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-truck"></i> Versandabwicklung</h1>
+        <div class="mt-3">
+            <a href="{{ url_for('shipping.index') }}" class="btn btn-primary btn-lg">
+                <i class="bi bi-list-ul"></i> Alle Versendungen
+            </a>
+            <a href="#ready-orders" class="btn btn-success btn-lg">
+                <i class="bi bi-box-seam"></i> Versandbereit ({{ stats.ready_to_ship }})
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Versand-KPIs -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-box-seam"></i> Versandbereit
+                </h5>
+                <p class="card-text display-6">{{ stats.ready_to_ship or 0 }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-truck"></i> Heute versendet
+                </h5>
+                <p class="card-text display-6">{{ stats.shipped or 0 }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-archive"></i> Gesamt-Sendungen
+                </h5>
+                <p class="card-text display-6">{{ shipments|length or 0 }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-clock-history"></i> Ausstehend
+                </h5>
+                <p class="card-text display-6">{{ stats.pending or 0 }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Versandbereite Aufträge -->
+<div class="row mt-4" id="ready-orders">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-box-seam"></i> Versandbereite Aufträge <span class="badge bg-success">{{ ready_orders|length }}</span></h5>
+            </div>
+            <div class="card-body">
+                {% if ready_orders %}
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Auftrag</th>
+                                    <th>Kunde</th>
+                                    <th>Artikel</th>
+                                    <th>Wert</th>
+                                    <th>Fertigstellung</th>
+                                    <th>Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in ready_orders %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('orders.show', order_id=order.id) }}">
+                                            {{ order.order_number or order.id }}
+                                        </a>
+                                        {% if order.rush_order %}
+                                            <br><span class="badge bg-danger">EXPRESS</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if order.customer %}
+                                            <strong>{{ order.customer.first_name }} {{ order.customer.last_name }}</strong>
+                                            {% if order.customer.company_name %}
+                                                <br><small class="text-muted">{{ order.customer.company_name }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">Kunde gelöscht</span>
+                                        {% endif %}
+                                        {% if order.due_date %}
+                                            <br><small class="text-muted">Wunschtermin: {{ order.due_date.strftime('%d.%m.%Y') }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ order.description or 'Keine Beschreibung' }}
+                                    </td>
+                                    <td>
+                                        <strong>{{ "%.2f"|format(order.total_price or 0) }} €</strong>
+                                    </td>
+                                    <td>
+                                        {% if order.production_end %}
+                                            <small>{{ order.production_end.strftime('%d.%m.%Y %H:%M') }}</small>
+                                        {% else %}
+                                            <small class="text-muted">Unbekannt</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{{ url_for('shipping.new', order_id=order.id) }}" 
+                                           class="btn btn-success btn-sm">
+                                            <i class="bi bi-truck"></i> Versand vorbereiten
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-check-circle display-1 text-success"></i>
+                        <h4 class="mt-3">Alle Aufträge versendet!</h4>
+                        <p>Aktuell sind keine Aufträge versandbereit.</p>
+                        <a href="{{ url_for('production.index') }}" class="btn btn-primary">
+                            <i class="bi bi-gear-wide-connected"></i> Zur Produktion
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Versanddienstleister -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="bi bi-truck"></i> Verfügbare Versanddienstleister</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for carrier in carriers %}
+                    <div class="col-md-2">
+                        <div class="card mb-3">
+                            <div class="card-body text-center">
+                                <h6>{{ carrier }}</h6>
+                                <small class="text-muted">Verfügbar</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}Neues Garn anlegen{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">🧵 Neues Garn anlegen</h1>
+                <a href="{{ url_for('thread.index') }}" class="btn btn-secondary btn-touch">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <!-- Grunddaten -->
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Grunddaten</h5>
+                                
+                                <div class="mb-3">
+                                    <label for="brand" class="form-label">Marke *</label>
+                                    <input type="text" class="form-control" id="brand" name="brand" required 
+                                           placeholder="z.B. Madeira, Günermann, Brother">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="color_code" class="form-label">Farbnummer *</label>
+                                    <input type="text" class="form-control" id="color_code" name="color_code" required 
+                                           placeholder="z.B. 1001, RAL5015">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="color_name" class="form-label">Farbname</label>
+                                    <input type="text" class="form-control" id="color_name" name="color_name" 
+                                           placeholder="z.B. Königsblau, Schneeweiß">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="color_hex" class="form-label">Farbcode (Hex)</label>
+                                    <div class="input-group">
+                                        <input type="color" class="form-control form-control-color" id="color_hex" 
+                                               name="color_hex" value="#000000" onchange="updateColorPreview()">
+                                        <input type="text" class="form-control" id="color_hex_text" 
+                                               placeholder="#000000" onchange="updateColorFromText()">
+                                    </div>
+                                    <small class="form-text text-muted">Wählen Sie die Farbe aus oder geben Sie einen Hex-Code ein</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="material" class="form-label">Material *</label>
+                                    <select class="form-select" id="material" name="material" required>
+                                        <option value="">Material wählen</option>
+                                        <option value="polyester">Polyester</option>
+                                        <option value="rayon">Viskose/Rayon</option>
+                                        <option value="cotton">Baumwolle</option>
+                                        <option value="metallic">Metallic</option>
+                                        <option value="wool">Wolle</option>
+                                        <option value="silk">Seide</option>
+                                        <option value="blend">Mischgewebe</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="weight" class="form-label">Garnstärke</label>
+                                    <select class="form-select" id="weight" name="weight">
+                                        <option value="20">20wt (sehr dick)</option>
+                                        <option value="30">30wt (dick)</option>
+                                        <option value="40" selected>40wt (normal)</option>
+                                        <option value="50">50wt (fein)</option>
+                                        <option value="60">60wt (sehr fein)</option>
+                                        <option value="80">80wt (extra fein)</option>
+                                        <option value="120">120wt (ultra fein)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Technische Daten & Einkauf -->
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Technische Daten</h5>
+
+                                <div class="mb-3">
+                                    <label for="length_per_cone" class="form-label">Länge pro Kone (Meter)</label>
+                                    <input type="number" class="form-control" id="length_per_cone" name="length_per_cone" 
+                                           min="100" max="50000" value="5000">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="price_per_cone" class="form-label">Preis pro Kone (€)</label>
+                                    <input type="number" class="form-control" id="price_per_cone" name="price_per_cone" 
+                                           min="0" step="0.01" value="3.50">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="supplier" class="form-label">Lieferant</label>
+                                    <input type="text" class="form-control" id="supplier" name="supplier" 
+                                           placeholder="z.B. Textil Weber GmbH">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="supplier_part_number" class="form-label">Lieferanten-Artikelnummer</label>
+                                    <input type="text" class="form-control" id="supplier_part_number" name="supplier_part_number" 
+                                           placeholder="Interne Bestellnummer beim Lieferanten">
+                                </div>
+
+                                <!-- Verwendungseigenschaften -->
+                                <h6 class="mt-4 mb-3">Verwendungseigenschaften</h6>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="suitable_for_embroidery" 
+                                               name="suitable_for_embroidery" checked>
+                                        <label class="form-check-label" for="suitable_for_embroidery">
+                                            Für Stickerei geeignet
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="suitable_for_quilting" 
+                                               name="suitable_for_quilting">
+                                        <label class="form-check-label" for="suitable_for_quilting">
+                                            Für Quilting geeignet
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="colorfast" 
+                                               name="colorfast" checked>
+                                        <label class="form-check-label" for="colorfast">
+                                            Farbecht
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="washable_temp" class="form-label">Waschtemperatur (°C)</label>
+                                    <select class="form-select" id="washable_temp" name="washable_temp">
+                                        <option value="30">30°C</option>
+                                        <option value="40" selected>40°C</option>
+                                        <option value="60">60°C</option>
+                                        <option value="90">90°C</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bestandsverwaltung -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <h5 class="mb-3">Bestandsverwaltung</h5>
+                                
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="initial_stock" class="form-label">Anfangsbestand (Konen)</label>
+                                            <input type="number" class="form-control" id="initial_stock" name="initial_stock" 
+                                                   min="0" value="0">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="min_stock" class="form-label">Mindestbestand (Konen)</label>
+                                            <input type="number" class="form-control" id="min_stock" name="min_stock" 
+                                                   min="1" value="5">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label for="stock_location" class="form-label">Lagerort</label>
+                                            <input type="text" class="form-control" id="stock_location" name="stock_location" 
+                                                   value="Lager A" placeholder="z.B. Regal B3, Schrank 2">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="notes" class="form-label">Notizen</label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                              placeholder="Zusätzliche Informationen zum Garn..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Vorschau -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Vorschau</h6>
+                                        <div class="d-flex align-items-center">
+                                            <div id="color_preview" class="me-3" 
+                                                 style="width: 40px; height: 40px; border: 2px solid #ccc; border-radius: 50%; background-color: #000000;">
+                                            </div>
+                                            <div>
+                                                <strong id="preview_brand">Marke</strong>-<span id="preview_code">Code</span><br>
+                                                <span id="preview_name" class="text-muted">Farbname</span> | 
+                                                <span id="preview_material" class="text-muted">Material</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('thread.index') }}" class="btn btn-secondary btn-touch">
+                                <i class="fas fa-times"></i> Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-success btn-touch">
+                                <i class="fas fa-save"></i> Garn anlegen
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updateColorPreview() {
+    const colorPicker = document.getElementById('color_hex');
+    const colorText = document.getElementById('color_hex_text');
+    const preview = document.getElementById('color_preview');
+    
+    colorText.value = colorPicker.value;
+    preview.style.backgroundColor = colorPicker.value;
+}
+
+function updateColorFromText() {
+    const colorText = document.getElementById('color_hex_text');
+    const colorPicker = document.getElementById('color_hex');
+    const preview = document.getElementById('color_preview');
+    
+    if (colorText.value.match(/^#[0-9A-F]{6}$/i)) {
+        colorPicker.value = colorText.value;
+        preview.style.backgroundColor = colorText.value;
+    }
+}
+
+function updatePreview() {
+    const brand = document.getElementById('brand').value || 'Marke';
+    const code = document.getElementById('color_code').value || 'Code';
+    const name = document.getElementById('color_name').value || 'Farbname';
+    const material = document.getElementById('material').value || 'Material';
+    
+    document.getElementById('preview_brand').textContent = brand;
+    document.getElementById('preview_code').textContent = code;
+    document.getElementById('preview_name').textContent = name;
+    document.getElementById('preview_material').textContent = material;
+}
+
+// Event Listeners für Live-Vorschau
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = ['brand', 'color_code', 'color_name', 'material'];
+    inputs.forEach(id => {
+        document.getElementById(id).addEventListener('input', updatePreview);
+    });
+    
+    // Initial preview
+    updateColorPreview();
+    updatePreview();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if user %}
+        Benutzer bearbeiten - {{ user.username }}
+    {% else %}
+        Neuer Benutzer
+    {% endif %} - StitchAdmin
+{% endblock %}
+
+{% block content %}
+<!-- Erstellt von Hans Hahn - Alle Rechte vorbehalten -->
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1>
+            <i class="bi bi-person"></i>
+            {% if user %}
+                Benutzer bearbeiten: {{ user.username }}
+            {% else %}
+                Neuer Benutzer
+            {% endif %}
+        </h1>
+        <p class="text-muted">
+            {% if user %}
+                Bearbeiten Sie die Benutzerdaten
+            {% else %}
+                Erstellen Sie einen neuen Systembenutzer
+            {% endif %}
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('settings.users') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>
+                    <i class="bi bi-person-fill"></i>
+                    {% if user %}Benutzerdaten bearbeiten{% else %}Neue Benutzerdaten{% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="userForm">
+                    <!-- Benutzername -->
+                    <div class="mb-3">
+                        <label for="username" class="form-label">
+                            <i class="bi bi-person"></i> Benutzername *
+                        </label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="username" 
+                               name="username"
+                               value="{{ user.username if user else '' }}"
+                               required
+                               {% if user %}readonly{% endif %}>
+                        {% if user %}
+                        <div class="form-text">Der Benutzername kann nicht nachträglich geändert werden.</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- E-Mail -->
+                    <div class="mb-3">
+                        <label for="email" class="form-label">
+                            <i class="bi bi-envelope"></i> E-Mail-Adresse *
+                        </label>
+                        <input type="email" 
+                               class="form-control" 
+                               id="email" 
+                               name="email"
+                               value="{{ user.email if user else '' }}"
+                               required>
+                    </div>
+
+                    <!-- Passwort -->
+                    <div class="mb-3">
+                        <label for="password" class="form-label">
+                            <i class="bi bi-lock"></i> Passwort
+                            {% if not user %} *{% endif %}
+                        </label>
+                        <div class="input-group">
+                            <input type="password" 
+                                   class="form-control" 
+                                   id="password" 
+                                   name="password"
+                                   {% if not user %}required{% endif %}>
+                            <button type="button" 
+                                    class="btn btn-outline-secondary" 
+                                    onclick="togglePasswordVisibility()">
+                                <i class="bi bi-eye" id="passwordToggleIcon"></i>
+                            </button>
+                        </div>
+                        {% if user %}
+                        <div class="form-text">Lassen Sie das Feld leer, um das Passwort unverändert zu lassen.</div>
+                        {% else %}
+                        <div class="form-text">Mindestens 8 Zeichen empfohlen.</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Passwort bestätigen -->
+                    <div class="mb-3">
+                        <label for="password_confirm" class="form-label">
+                            <i class="bi bi-lock"></i> Passwort bestätigen
+                            {% if not user %} *{% endif %}
+                        </label>
+                        <input type="password" 
+                               class="form-control" 
+                               id="password_confirm" 
+                               name="password_confirm"
+                               {% if not user %}required{% endif %}>
+                    </div>
+
+                    <!-- Status und Rollen -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" 
+                                       type="checkbox" 
+                                       id="is_active" 
+                                       name="is_active"
+                                       {% if not user or user.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="is_active">
+                                    <i class="bi bi-check-circle"></i> Benutzer ist aktiv
+                                </label>
+                            </div>
+                            <div class="form-text">Inaktive Benutzer können sich nicht anmelden.</div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" 
+                                       type="checkbox" 
+                                       id="is_admin" 
+                                       name="is_admin"
+                                       {% if user and user.is_admin %}checked{% endif %}
+                                       {% if user and user.username == current_user.username %}disabled{% endif %}>
+                                <label class="form-check-label" for="is_admin">
+                                    <i class="bi bi-shield-check"></i> Administrator
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                {% if user and user.username == current_user.username %}
+                                    Sie können Ihre eigenen Admin-Rechte nicht ändern.
+                                {% else %}
+                                    Administratoren haben vollen Zugriff auf alle Funktionen.
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Formular-Aktionen -->
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-save"></i>
+                                {% if user %}Änderungen speichern{% else %}Benutzer erstellen{% endif %}
+                            </button>
+                            <a href="{{ url_for('settings.users') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x"></i> Abbrechen
+                            </a>
+                        </div>
+                        
+                        {% if user and user.username != current_user.username %}
+                        <div>
+                            <button type="button" 
+                                    class="btn btn-outline-warning" 
+                                    onclick="resetPassword('{{ user.username }}')">
+                                <i class="bi bi-arrow-clockwise"></i> Passwort zurücksetzen
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Informations-Panel -->
+    <div class="col-md-4">
+        {% if user %}
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> Benutzer-Informationen</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-6">Erstellt am:</dt>
+                    <dd class="col-sm-6">
+                        {% if user.created_at %}
+                            {{ user.created_at.strftime('%d.%m.%Y %H:%M') }}
+                        {% else %}
+                            <span class="text-muted">Unbekannt</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-6">Letzter Login:</dt>
+                    <dd class="col-sm-6">
+                        {% if user.last_login %}
+                            {{ user.last_login.strftime('%d.%m.%Y %H:%M') }}
+                        {% else %}
+                            <span class="text-muted">Nie</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-6">Login-Versuche:</dt>
+                    <dd class="col-sm-6">
+                        {% if user.failed_login_attempts %}
+                            <span class="text-warning">{{ user.failed_login_attempts }}</span>
+                        {% else %}
+                            <span class="text-success">0</span>
+                        {% endif %}
+                    </dd>
+                </dl>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Hilfe-Panel -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="bi bi-question-circle"></i> Hilfe</h5>
+            </div>
+            <div class="card-body">
+                <h6>Benutzer-Rollen:</h6>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-shield-check text-danger"></i> <strong>Administrator:</strong> Vollzugriff auf alle Funktionen</li>
+                    <li><i class="bi bi-person text-secondary"></i> <strong>Benutzer:</strong> Eingeschränkter Zugriff</li>
+                </ul>
+
+                <h6 class="mt-3">Passwort-Richtlinien:</h6>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-check-circle text-success"></i> Mindestens 8 Zeichen</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Groß- und Kleinbuchstaben</li>
+                    <li><i class="bi bi-check-circle text-success"></i> Mindestens eine Zahl</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Erstellt von Hans Hahn - Alle Rechte vorbehalten
+
+// Passwort-Sichtbarkeit umschalten
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('password');
+    const toggleIcon = document.getElementById('passwordToggleIcon');
+    
+    if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        toggleIcon.className = 'bi bi-eye-slash';
+    } else {
+        passwordInput.type = 'password';
+        toggleIcon.className = 'bi bi-eye';
+    }
+}
+
+// Passwort-Validierung
+document.getElementById('userForm').addEventListener('submit', function(e) {
+    const password = document.getElementById('password').value;
+    const passwordConfirm = document.getElementById('password_confirm').value;
+    
+    // Prüfe ob Passwort-Felder gefüllt sind (bei neuen Benutzern oder wenn Passwort geändert wird)
+    if (password || passwordConfirm) {
+        if (password !== passwordConfirm) {
+            e.preventDefault();
+            alert('Die Passwörter stimmen nicht überein!');
+            return false;
+        }
+        
+        if (password.length < 8) {
+            e.preventDefault();
+            alert('Das Passwort muss mindestens 8 Zeichen lang sein!');
+            return false;
+        }
+    }
+    
+    {% if not user %}
+    // Bei neuen Benutzern ist Passwort Pflicht
+    if (!password) {
+        e.preventDefault();
+        alert('Bitte geben Sie ein Passwort ein!');
+        return false;
+    }
+    {% endif %}
+});
+
+// Passwort zurücksetzen
+function resetPassword(username) {
+    if (confirm(`Möchten Sie das Passwort für "${username}" wirklich zurücksetzen? Ein neues Passwort wird generiert.`)) {
+        const userId = {{ user.id if user else 'null' }};
+        if (!userId) return;
+        
+        fetch(`/settings/users/${userId}/reset-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Neues Passwort: ${data.new_password}\n\nBitte notieren Sie sich das Passwort und geben Sie es dem Benutzer weiter.`);
+            } else {
+                alert('Fehler: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Fehler bei der Verbindung zum Server');
+        });
+    }
+}
+</script>
+{% endblock %}

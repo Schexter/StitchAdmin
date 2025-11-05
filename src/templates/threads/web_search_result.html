@@ -1,0 +1,507 @@
+{% extends "base.html" %}
+
+{% block title %}Garn-Suchergebnisse - {{ thread.manufacturer }} {{ thread.color_number }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .result-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid #007bff;
+    }
+    
+    .result-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    
+    .price-highlight {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+    }
+    
+    .source-badge {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 10;
+    }
+    
+    .color-preview {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 2px solid #ddd;
+        display: inline-block;
+        margin-right: 10px;
+    }
+    
+    .comparison-chart {
+        max-height: 300px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('thread.index') }}">Garne</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('thread.web_search') }}">Web-Suche</a></li>
+            <li class="breadcrumb-item active">{{ thread.manufacturer }} {{ thread.color_number }}</li>
+        </ol>
+    </nav>
+    
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>
+                <i class="fas fa-search-plus me-2"></i>
+                Suchergebnisse für {{ thread.manufacturer }} {{ thread.color_number }}
+            </h1>
+            <p class="text-muted">
+                {{ search_result.search_results|length }} Ergebnisse gefunden
+                • Gesucht am {{ search_result.search_timestamp|strftime('%d.%m.%Y %H:%M') }}
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('thread.web_search') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-2"></i>Neue Suche
+                </a>
+                <a href="{{ url_for('thread.show', thread_id=thread.id) }}" class="btn btn-primary">
+                    <i class="fas fa-eye me-2"></i>Garn anzeigen
+                </a>
+                <button class="btn btn-success" onclick="exportResults()">
+                    <i class="fas fa-download me-2"></i>Exportieren
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Originalfaden-Info -->
+    <div class="card mb-4 bg-light">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-2">
+                    {% if thread.hex_color %}
+                    <div class="color-preview" style="background-color: {{ thread.hex_color }};"></div>
+                    {% else %}
+                    <div class="color-preview bg-secondary"></div>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <h5 class="mb-1">{{ thread.manufacturer }} {{ thread.color_number }}</h5>
+                    <p class="mb-1">
+                        <strong>{{ thread.color_name_de or 'Farbname unbekannt' }}</strong>
+                    </p>
+                    <small class="text-muted">
+                        Material: {{ thread.material or 'Unbekannt' }} •
+                        Gewicht: {{ thread.weight or 'Unbekannt' }} •
+                        Kategorie: {{ thread.category or 'Standard' }}
+                    </small>
+                </div>
+                <div class="col-md-4">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <strong>Aktueller Bestand</strong><br>
+                            <span class="h5 text-{{ 'danger' if thread.stock and thread.stock.quantity <= thread.stock.min_stock else 'success' }}">
+                                {{ thread.stock.quantity if thread.stock else 'Unbekannt' }}
+                            </span>
+                        </div>
+                        <div class="col-6">
+                            <strong>Mindestbestand</strong><br>
+                            <span class="h6">{{ thread.stock.min_stock if thread.stock else 'Unbekannt' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Preisvergleich-Übersicht -->
+    {% if search_result.price_comparison and search_result.price_comparison.sources %}
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-chart-line me-2"></i>
+                Preisvergleich-Übersicht
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="price-highlight">
+                        <strong>Bester Preis</strong><br>
+                        <span class="h4">{{ search_result.price_comparison.best_price or 'N/A' }}€</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <strong>Durchschnitt</strong><br>
+                        <span class="h5">{{ search_result.price_comparison.average_price or 'N/A' }}€</span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <strong>Preisspanne</strong><br>
+                        <span class="h6">
+                            {% if search_result.price_comparison.price_range %}
+                                {{ search_result.price_comparison.price_range.min }}€ - {{ search_result.price_comparison.price_range.max }}€
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="text-center">
+                        <strong>Quellen</strong><br>
+                        <span class="h5">{{ search_result.price_comparison.sources|length }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Suchergebnisse -->
+    <div class="row">
+        {% for result in search_result.search_results %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card result-card h-100">
+                <div class="source-badge">
+                    <span class="badge bg-primary">{{ result.source or 'Unbekannt' }}</span>
+                    {% if result.supplier_type %}
+                    <span class="badge bg-secondary">{{ result.supplier_type }}</span>
+                    {% endif %}
+                </div>
+                
+                <div class="card-body">
+                    <!-- Farbvorschau falls Bild verfügbar -->
+                    {% if result.image_url %}
+                    <div class="text-center mb-3">
+                        <img src="{{ result.image_url }}" class="img-fluid" style="max-height: 80px;" alt="Garnfarbe">
+                    </div>
+                    {% endif %}
+                    
+                    <h6 class="card-title">
+                        {{ result.manufacturer or thread.manufacturer }}
+                        <code>{{ result.color_number or thread.color_number }}</code>
+                    </h6>
+                    
+                    {% if result.color_name %}
+                    <p class="card-text">
+                        <strong>{{ result.color_name }}</strong>
+                    </p>
+                    {% endif %}
+                    
+                    <div class="mb-3">
+                        {% if result.price %}
+                        <div class="price-highlight">
+                            <strong>{{ result.price }} {{ result.currency or 'EUR' }}</strong>
+                        </div>
+                        {% else %}
+                        <div class="text-center p-2 bg-light rounded">
+                            <span class="text-muted">Preis nicht verfügbar</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-2">
+                        <strong>Verfügbarkeit:</strong>
+                        <span class="badge bg-{{ 'success' if result.availability == 'available' else 'danger' if result.availability == 'out_of_stock' else 'secondary' }}">
+                            {% if result.availability == 'available' %}
+                                Verfügbar
+                            {% elif result.availability == 'out_of_stock' %}
+                                Nicht verfügbar
+                            {% else %}
+                                Unbekannt
+                            {% endif %}
+                        </span>
+                    </div>
+                    
+                    <small class="text-muted">
+                        Gefunden: {{ result.search_timestamp|strftime('%H:%M') }}
+                    </small>
+                </div>
+                
+                <div class="card-footer">
+                    <div class="btn-group w-100" role="group">
+                        {% if result.link %}
+                        <a href="{{ result.link }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-external-link-alt"></i> Öffnen
+                        </a>
+                        {% endif %}
+                        
+                        <button class="btn btn-outline-success btn-sm" 
+                                onclick="addToWishlist('{{ result.manufacturer }}', '{{ result.color_number }}', '{{ result.price }}', '{{ result.link }}')">
+                            <i class="fas fa-heart"></i> Merken
+                        </button>
+                        
+                        {% if result.price %}
+                        <button class="btn btn-outline-info btn-sm" 
+                                onclick="comparePrice('{{ result.price }}', '{{ result.currency }}', '{{ result.source }}')">
+                            <i class="fas fa-chart-line"></i> Vergleichen
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not search_result.search_results %}
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h5>Keine Ergebnisse gefunden</h5>
+                    <p class="text-muted">
+                        Für {{ thread.manufacturer }} {{ thread.color_number }} wurden keine Treffer gefunden.
+                    </p>
+                    <a href="{{ url_for('thread.web_search') }}" class="btn btn-primary">
+                        <i class="fas fa-search me-2"></i>Neue Suche starten
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Aktionen -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5>Weitere Aktionen</h5>
+            <div class="btn-group" role="group">
+                <button class="btn btn-outline-success" onclick="createSupplierOrder()">
+                    <i class="fas fa-shopping-cart me-2"></i>Lieferantenbestellung erstellen
+                </button>
+                
+                <button class="btn btn-outline-info" onclick="updateThreadInfo()">
+                    <i class="fas fa-sync-alt me-2"></i>Garninfos aktualisieren
+                </button>
+                
+                <button class="btn btn-outline-warning" onclick="setStockAlert()">
+                    <i class="fas fa-bell me-2"></i>Lagerbestand-Alarm setzen
+                </button>
+                
+                <button class="btn btn-outline-secondary" onclick="shareResults()">
+                    <i class="fas fa-share me-2"></i>Ergebnisse teilen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Wishlist Modal -->
+<div class="modal fade" id="wishlistModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-heart me-2"></i>Zu Wunschliste hinzufügen
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="wishlistContent">
+                <!-- Wird dynamisch gefüllt -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" onclick="saveToWishlist()">
+                    <i class="fas fa-save me-2"></i>Speichern
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentWishlistData = null;
+
+function addToWishlist(manufacturer, colorNumber, price, link) {
+    currentWishlistData = {
+        manufacturer: manufacturer,
+        color_number: colorNumber,
+        price: price,
+        link: link
+    };
+    
+    const modalContent = document.getElementById('wishlistContent');
+    modalContent.innerHTML = `
+        <div class="mb-3">
+            <label class="form-label">Hersteller</label>
+            <input type="text" class="form-control" value="${manufacturer}" readonly>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Farbnummer</label>
+            <input type="text" class="form-control" value="${colorNumber}" readonly>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Preis</label>
+            <input type="text" class="form-control" value="${price || 'Nicht verfügbar'}" readonly>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Notizen</label>
+            <textarea class="form-control" id="wishlistNotes" rows="3" placeholder="Optionale Notizen..."></textarea>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Priorität</label>
+            <select class="form-select" id="wishlistPriority">
+                <option value="medium">Normal</option>
+                <option value="high">Hoch</option>
+                <option value="low">Niedrig</option>
+            </select>
+        </div>
+    `;
+    
+    const modal = new bootstrap.Modal(document.getElementById('wishlistModal'));
+    modal.show();
+}
+
+function saveToWishlist() {
+    if (!currentWishlistData) return;
+    
+    const notes = document.getElementById('wishlistNotes').value;
+    const priority = document.getElementById('wishlistPriority').value;
+    
+    // AJAX-Request zum Speichern
+    const formData = new FormData();
+    formData.append('manufacturer', currentWishlistData.manufacturer);
+    formData.append('color_number', currentWishlistData.color_number);
+    formData.append('price', currentWishlistData.price);
+    formData.append('link', currentWishlistData.link);
+    formData.append('notes', notes);
+    formData.append('priority', priority);
+    
+    fetch('/thread/add-to-wishlist', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Erfolgreich gespeichert', 'Garn wurde zur Wunschliste hinzugefügt', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('wishlistModal')).hide();
+        } else {
+            showToast('Fehler', data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Verbindungsfehler', error.message, 'error');
+    });
+}
+
+function comparePrice(price, currency, source) {
+    // Zeige Preisvergleich-Info
+    showToast('Preisvergleich', `${source}: ${price} ${currency}`, 'info');
+}
+
+function exportResults() {
+    const searchData = {{ search_result|tojson }};
+    const dataStr = JSON.stringify(searchData, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `garn-suche-{{ thread.manufacturer }}-{{ thread.color_number }}.json`;
+    link.click();
+    
+    showToast('Export erfolgreich', 'Suchergebnisse wurden heruntergeladen', 'success');
+}
+
+function createSupplierOrder() {
+    // Weiterleitung zur Lieferantenbestellung
+    window.location.href = '/suppliers/order-suggestions';
+}
+
+function updateThreadInfo() {
+    // AJAX-Request zum Aktualisieren der Garninfos
+    fetch(`/thread/{{ thread.id }}/update-from-search`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Aktualisiert', 'Garninformationen wurden aktualisiert', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast('Fehler', data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Verbindungsfehler', error.message, 'error');
+    });
+}
+
+function setStockAlert() {
+    const newMinStock = prompt('Neuer Mindestbestand:', '{{ thread.stock.min_stock if thread.stock else 5 }}');
+    
+    if (newMinStock && !isNaN(newMinStock)) {
+        fetch(`/thread/{{ thread.id }}/set-min-stock`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                min_stock: parseInt(newMinStock)
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Gespeichert', `Mindestbestand auf ${newMinStock} gesetzt`, 'success');
+            } else {
+                showToast('Fehler', data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Verbindungsfehler', error.message, 'error');
+        });
+    }
+}
+
+function shareResults() {
+    const url = window.location.href;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: 'Garn-Suchergebnisse',
+            text: `Suchergebnisse für {{ thread.manufacturer }} {{ thread.color_number }}`,
+            url: url
+        });
+    } else {
+        // Fallback: URL in Zwischenablage
+        navigator.clipboard.writeText(url).then(() => {
+            showToast('Link kopiert', 'URL wurde in die Zwischenablage kopiert', 'success');
+        });
+    }
+}
+
+function showToast(title, message, type) {
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 'alert-info';
+    
+    const toast = document.createElement('div');
+    toast.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    toast.innerHTML = `
+        <strong>${title}</strong><br>${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,606 @@
+{% extends "base.html" %}
+
+{% block title %}Garn-Nachbestellvorschläge - StitchAdmin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .suggestion-card {
+        transition: all 0.3s ease;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .suggestion-card.urgent {
+        border-left-color: #dc3545;
+        background-color: #fff5f5;
+    }
+    
+    .suggestion-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+    }
+    
+    .stock-indicator {
+        position: relative;
+        height: 20px;
+        background-color: #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    .stock-fill {
+        height: 100%;
+        transition: width 0.3s ease;
+        border-radius: 10px;
+    }
+    
+    .price-comparison-mini {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        padding: 8px;
+        border-radius: 6px;
+        text-align: center;
+        font-size: 0.9em;
+    }
+    
+    .batch-actions {
+        position: sticky;
+        top: 20px;
+        z-index: 1000;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>
+                <i class="fas fa-clipboard-list me-2"></i>
+                Garn-Nachbestellvorschläge
+            </h1>
+            <p class="text-muted">
+                Automatisch generierte Vorschläge basierend auf Lagerbeständen und Web-Preisen
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('thread.web_search') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-search me-2"></i>Manuelle Suche
+                </a>
+                <button class="btn btn-primary" onclick="refreshSuggestions()">
+                    <i class="fas fa-sync-alt me-2"></i>Aktualisieren
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Statistiken -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-primary">{{ suggestions|length }}</h3>
+                    <p class="mb-0">Vorschläge gesamt</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-danger">
+                        {{ suggestions|selectattr('thread.stock.quantity', 'equalto', 0)|list|length }}
+                    </h3>
+                    <p class="mb-0">Ausverkauft</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-warning">
+                        {{ suggestions|selectattr('current_stock', 'lessthan', 5)|list|length }}
+                    </h3>
+                    <p class="mb-0">Kritisch niedrig</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h3 class="text-success">
+                        {% set total_savings = suggestions|sum(attribute='best_price')|default(0) %}
+                        {{ "%.0f"|format(total_savings) }}€
+                    </h3>
+                    <p class="mb-0">Potentielle Kosten</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Batch-Aktionen -->
+    {% if suggestions %}
+    <div class="batch-actions mb-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleAllSuggestions()">
+                            <label class="form-check-label" for="selectAll">
+                                <strong>Alle auswählen</strong>
+                            </label>
+                        </div>
+                        <small class="text-muted">
+                            <span id="selectedCount">0</span> von {{ suggestions|length }} ausgewählt
+                        </small>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <div class="btn-group" role="group">
+                            <button class="btn btn-success" onclick="createBulkOrder()" disabled id="bulkOrderBtn">
+                                <i class="fas fa-shopping-cart me-2"></i>Sammelbestellung erstellen
+                            </button>
+                            <button class="btn btn-info" onclick="exportSelected()" disabled id="exportBtn">
+                                <i class="fas fa-download me-2"></i>Exportieren
+                            </button>
+                            <button class="btn btn-warning" onclick="updateSelectedStock()" disabled id="updateStockBtn">
+                                <i class="fas fa-sync-alt me-2"></i>Lager aktualisieren
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Vorschläge -->
+    <div class="row">
+        {% for suggestion in suggestions %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card suggestion-card h-100 {% if suggestion.current_stock == 0 %}urgent{% endif %}">
+                <div class="card-body">
+                    <!-- Auswahl-Checkbox -->
+                    <div class="form-check position-absolute" style="top: 10px; right: 10px;">
+                        <input class="form-check-input suggestion-checkbox" type="checkbox" 
+                               value="{{ suggestion.thread.id }}" onchange="updateSelectedCount()">
+                    </div>
+                    
+                    <!-- Garn-Info -->
+                    <div class="mb-3">
+                        <h6 class="card-title">
+                            {{ suggestion.thread.manufacturer }} 
+                            <code>{{ suggestion.thread.color_number }}</code>
+                        </h6>
+                        <p class="card-text">
+                            <strong>{{ suggestion.thread.color_name_de or 'Farbname unbekannt' }}</strong>
+                        </p>
+                        <small class="text-muted">
+                            {{ suggestion.thread.material or 'Material unbekannt' }} •
+                            {{ suggestion.thread.weight or 'Gewicht unbekannt' }}
+                        </small>
+                    </div>
+                    
+                    <!-- Lagerbestand-Anzeige -->
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <small><strong>Lagerbestand</strong></small>
+                            <small>
+                                {{ suggestion.current_stock }} / {{ suggestion.min_stock }}
+                                {% if suggestion.current_stock == 0 %}
+                                <span class="badge bg-danger">Ausverkauft</span>
+                                {% elif suggestion.current_stock <= suggestion.min_stock %}
+                                <span class="badge bg-warning">Niedrig</span>
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div class="stock-indicator">
+                            {% set percentage = (suggestion.current_stock / suggestion.min_stock * 100) if suggestion.min_stock > 0 else 0 %}
+                            <div class="stock-fill bg-{{ 'danger' if percentage == 0 else 'warning' if percentage <= 100 else 'success' }}" 
+                                 style="width: {{ percentage|min(100) }}%;"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Preisinfo -->
+                    {% if suggestion.best_price %}
+                    <div class="mb-3">
+                        <div class="price-comparison-mini">
+                            <strong>Bester Preis: {{ suggestion.best_price }}€</strong>
+                            {% if suggestion.average_price %}
+                            <br><small>Durchschnitt: {{ suggestion.average_price }}€</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Such-Ergebnisse -->
+                    {% if suggestion.search_results %}
+                    <div class="mb-3">
+                        <small class="text-muted">
+                            <strong>{{ suggestion.search_results|length }} Anbieter gefunden:</strong>
+                        </small>
+                        {% for result in suggestion.search_results[:2] %}
+                        <div class="d-flex justify-content-between align-items-center border-bottom py-1">
+                            <small>{{ result.source }}</small>
+                            {% if result.price %}
+                            <small><strong>{{ result.price }}€</strong></small>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% if suggestion.search_results|length > 2 %}
+                        <small class="text-muted">...und {{ suggestion.search_results|length - 2 }} weitere</small>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="card-footer">
+                    <div class="btn-group w-100" role="group">
+                        <a href="{{ url_for('thread.search_existing_thread_web', thread_id=suggestion.thread.id) }}" 
+                           class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-search"></i> Details
+                        </a>
+                        
+                        <button class="btn btn-outline-success btn-sm" 
+                                onclick="quickOrder('{{ suggestion.thread.id }}')">
+                            <i class="fas fa-shopping-cart"></i> Bestellen
+                        </button>
+                        
+                        <button class="btn btn-outline-info btn-sm" 
+                                onclick="updateStock('{{ suggestion.thread.id }}')">
+                            <i class="fas fa-edit"></i> Lager
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not suggestions %}
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                    <h5>Keine Nachbestellungen erforderlich</h5>
+                    <p class="text-muted">
+                        Alle Garne sind ausreichend auf Lager oder es wurden keine niedrigen Bestände gefunden.
+                    </p>
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('thread.index') }}" class="btn btn-primary">
+                            <i class="fas fa-list me-2"></i>Alle Garne anzeigen
+                        </a>
+                        <a href="{{ url_for('thread.web_search') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-search me-2"></i>Manuelle Suche
+                        </a>
+                        <button class="btn btn-outline-info" onclick="refreshSuggestions()">
+                            <i class="fas fa-sync-alt me-2"></i>Neu laden
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Info-Panel -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="fas fa-info-circle me-2"></i>
+                Wie funktionieren die Nachbestellvorschläge?
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Automatische Erkennung</h6>
+                    <ul>
+                        <li>Garne mit Lagerbestand ≤ Mindestbestand</li>
+                        <li>Ausverkaufte Garne (0 Stück)</li>
+                        <li>Kritisch niedrige Bestände (&lt; 5 Stück)</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Web-Suche Integration</h6>
+                    <ul>
+                        <li>Automatische Preissuche bei Herstellern</li>
+                        <li>Vergleich zwischen verschiedenen Anbietern</li>
+                        <li>Verfügbarkeits-Check</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <h6>Nächste Schritte</h6>
+                <ol>
+                    <li><strong>Auswählen:</strong> Markieren Sie die Garne, die Sie bestellen möchten</li>
+                    <li><strong>Vergleichen:</strong> Prüfen Sie Preise und Verfügbarkeit</li>
+                    <li><strong>Bestellen:</strong> Erstellen Sie eine Sammelbestellung oder bestellen Sie einzeln</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Order Modal -->
+<div class="modal fade" id="quickOrderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-shopping-cart me-2"></i>Schnellbestellung
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="quickOrderContent">
+                <!-- Wird dynamisch gefüllt -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" onclick="submitQuickOrder()">
+                    <i class="fas fa-check me-2"></i>Bestellung erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let selectedSuggestions = new Set();
+
+function toggleAllSuggestions() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.suggestion-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+        if (selectAll.checked) {
+            selectedSuggestions.add(checkbox.value);
+        } else {
+            selectedSuggestions.delete(checkbox.value);
+        }
+    });
+    
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('.suggestion-checkbox:checked');
+    const count = checkboxes.length;
+    
+    document.getElementById('selectedCount').textContent = count;
+    
+    // Batch-Buttons aktivieren/deaktivieren
+    const bulkOrderBtn = document.getElementById('bulkOrderBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const updateStockBtn = document.getElementById('updateStockBtn');
+    
+    const hasSelection = count > 0;
+    bulkOrderBtn.disabled = !hasSelection;
+    exportBtn.disabled = !hasSelection;
+    updateStockBtn.disabled = !hasSelection;
+    
+    // selectedSuggestions Set aktualisieren
+    selectedSuggestions.clear();
+    checkboxes.forEach(checkbox => {
+        selectedSuggestions.add(checkbox.value);
+    });
+}
+
+function refreshSuggestions() {
+    window.location.reload();
+}
+
+function createBulkOrder() {
+    if (selectedSuggestions.size === 0) return;
+    
+    const threadIds = Array.from(selectedSuggestions);
+    
+    // POST-Request für Sammelbestellung
+    fetch('/suppliers/create-bulk-order-from-suggestions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            thread_ids: threadIds
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Sammelbestellung erstellt', `${threadIds.length} Garne zur Bestellung hinzugefügt`, 'success');
+            window.location.href = data.redirect_url || '/suppliers/orders';
+        } else {
+            showToast('Fehler', data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Verbindungsfehler', error.message, 'error');
+    });
+}
+
+function exportSelected() {
+    if (selectedSuggestions.size === 0) return;
+    
+    const suggestions = {{ suggestions|tojson }};
+    const selectedData = suggestions.filter(s => selectedSuggestions.has(s.thread.id));
+    
+    const dataStr = JSON.stringify(selectedData, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `garn-nachbestellvorschlaege-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    
+    showToast('Export erfolgreich', `${selectedSuggestions.size} Vorschläge exportiert`, 'success');
+}
+
+function updateSelectedStock() {
+    if (selectedSuggestions.size === 0) return;
+    
+    const newStock = prompt('Neuer Lagerbestand für alle ausgewählten Garne:');
+    
+    if (newStock && !isNaN(newStock)) {
+        const threadIds = Array.from(selectedSuggestions);
+        
+        fetch('/thread/bulk-update-stock', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                thread_ids: threadIds,
+                new_stock: parseInt(newStock)
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Lager aktualisiert', `${threadIds.length} Garne auf ${newStock} Stück gesetzt`, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('Fehler', data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Verbindungsfehler', error.message, 'error');
+        });
+    }
+}
+
+function quickOrder(threadId) {
+    // Lade Garn-Details für Schnellbestellung
+    fetch(`/thread/${threadId}/quick-order-info`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showQuickOrderModal(data.thread, data.suggestions);
+            } else {
+                showToast('Fehler', data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Verbindungsfehler', error.message, 'error');
+        });
+}
+
+function showQuickOrderModal(thread, suggestions) {
+    const modalContent = document.getElementById('quickOrderContent');
+    
+    let html = `
+        <div class="mb-3">
+            <h6>${thread.manufacturer} ${thread.color_number}</h6>
+            <p class="text-muted">${thread.color_name_de || 'Farbname unbekannt'}</p>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label">Anbieter wählen</label>
+            <select class="form-select" id="selectedSupplier">
+    `;
+    
+    suggestions.forEach((suggestion, index) => {
+        html += `
+            <option value="${index}" data-price="${suggestion.price}" data-link="${suggestion.link}">
+                ${suggestion.source} - ${suggestion.price || 'Preis n/a'}€
+            </option>
+        `;
+    });
+    
+    html += `
+            </select>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label">Bestellmenge</label>
+            <input type="number" class="form-control" id="orderQuantity" value="10" min="1">
+            <small class="text-muted">Empfohlene Menge basierend auf Verbrauch</small>
+        </div>
+        
+        <div class="mb-3">
+            <label class="form-label">Notizen</label>
+            <textarea class="form-control" id="orderNotes" rows="2" placeholder="Optionale Bestellnotizen..."></textarea>
+        </div>
+    `;
+    
+    modalContent.innerHTML = html;
+    
+    const modal = new bootstrap.Modal(document.getElementById('quickOrderModal'));
+    modal.show();
+}
+
+function submitQuickOrder() {
+    const supplier = document.getElementById('selectedSupplier');
+    const quantity = document.getElementById('orderQuantity').value;
+    const notes = document.getElementById('orderNotes').value;
+    
+    if (!supplier.value || !quantity) {
+        showToast('Fehler', 'Bitte füllen Sie alle Pflichtfelder aus', 'error');
+        return;
+    }
+    
+    // Hier würde die Bestellung erstellt werden
+    showToast('Bestellung erstellt', `${quantity} Stück bestellt bei ${supplier.selectedOptions[0].text}`, 'success');
+    bootstrap.Modal.getInstance(document.getElementById('quickOrderModal')).hide();
+}
+
+function updateStock(threadId) {
+    const newStock = prompt('Neuer Lagerbestand:');
+    
+    if (newStock && !isNaN(newStock)) {
+        fetch(`/thread/${threadId}/update-stock`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                new_stock: parseInt(newStock)
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Lager aktualisiert', `Bestand auf ${newStock} gesetzt`, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showToast('Fehler', data.error, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Verbindungsfehler', error.message, 'error');
+        });
+    }
+}
+
+function showToast(title, message, type) {
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 'alert-info';
+    
+    const toast = document.createElement('div');
+    toast.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    toast.innerHTML = `
+        <strong>${title}</strong><br>${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
+
+// Initialisierung
+document.addEventListener('DOMContentLoaded', function() {
+    updateSelectedCount();
+});
+</script>
+{% endblock %}

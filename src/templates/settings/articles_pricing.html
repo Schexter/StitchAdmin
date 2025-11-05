@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Preiskalkulation - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('settings.index') }}">Einstellungen</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('settings.articles') }}">Artikel-Einstellungen</a></li>
+                <li class="breadcrumb-item active">Preiskalkulation</li>
+            </ol>
+        </nav>
+        
+        <h1><i class="bi bi-calculator"></i> Preiskalkulation</h1>
+        <p class="text-muted">Konfiguration der Faktoren für automatische VK-Preis-Berechnung</p>
+    </div>
+</div>
+
+<form method="POST">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-gear"></i> Kalkulationsfaktoren</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="price_factor_calculated" class="form-label">Faktor für kalkulierten VK-Preis</label>
+                            <div class="input-group">
+                                <span class="input-group-text">EK ×</span>
+                                <input type="number" class="form-control" id="price_factor_calculated" 
+                                       name="price_factor_calculated" value="{{ settings.price_factor_calculated }}" 
+                                       step="0.1" min="1.0" max="10.0" required>
+                            </div>
+                            <small class="text-muted">Standard: 1.5 (entspricht 50% Aufschlag)</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="price_factor_recommended" class="form-label">Faktor für empfohlenen VK-Preis</label>
+                            <div class="input-group">
+                                <span class="input-group-text">EK ×</span>
+                                <input type="number" class="form-control" id="price_factor_recommended" 
+                                       name="price_factor_recommended" value="{{ settings.price_factor_recommended }}" 
+                                       step="0.1" min="1.0" max="10.0" required>
+                            </div>
+                            <small class="text-muted">Standard: 2.0 (entspricht 100% Aufschlag)</small>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <h6><i class="bi bi-info-circle"></i> So funktioniert die Kalkulation:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Basis-EK:</strong> Das System wählt automatisch den niedrigsten EK-Preis (Einzel-, Karton- oder 10-Karton-Preis)</li>
+                            <li><strong>VK kalkuliert:</strong> Basis-EK × Kalkulationsfaktor (für interne Kalkulation)</li>
+                            <li><strong>VK empfohlen:</strong> Basis-EK × Empfehlungsfaktor (als Verkaufsempfehlung)</li>
+                            <li><strong>Brutto-Preise:</strong> Netto-Preise + MwSt (standardmäßig 19%)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-calculator"></i> Live-Vorschau</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="preview_ek" class="form-label">Beispiel EK-Preis (€):</label>
+                        <input type="number" class="form-control" id="preview_ek" 
+                               value="10.00" step="0.01" min="0">
+                    </div>
+                    
+                    <div id="price_preview">
+                        <p class="text-muted">Ändern Sie die Faktoren für Live-Vorschau</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-save"></i> Einstellungen speichern
+                    </button>
+                    <a href="{{ url_for('settings.articles') }}" class="btn btn-secondary w-100">
+                        <i class="bi bi-arrow-left"></i> Zurück
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- Beispiel-Kalkulation -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-table"></i> Beispiel-Kalkulationen</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>EK-Preis</th>
+                                <th>VK kalkuliert (netto)</th>
+                                <th>VK kalkuliert (brutto)</th>
+                                <th>VK empfohlen (netto)</th>
+                                <th>VK empfohlen (brutto)</th>
+                                <th>Aufschlag kalkuliert</th>
+                                <th>Aufschlag empfohlen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="examples_table">
+                            <!-- Wird per JavaScript gefüllt -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Erstellt von Hans Hahn - Alle Rechte vorbehalten
+
+function updatePreview() {
+    const ekPrice = parseFloat(document.getElementById('preview_ek').value) || 0;
+    const factorCalculated = parseFloat(document.getElementById('price_factor_calculated').value) || 1.5;
+    const factorRecommended = parseFloat(document.getElementById('price_factor_recommended').value) || 2.0;
+    
+    if (ekPrice > 0) {
+        const vkCalculatedNet = ekPrice * factorCalculated;
+        const vkRecommendedNet = ekPrice * factorRecommended;
+        const vkCalculatedGross = vkCalculatedNet * 1.19;
+        const vkRecommendedGross = vkRecommendedNet * 1.19;
+        
+        const preview = document.getElementById('price_preview');
+        preview.innerHTML = `
+            <div class="mb-2">
+                <strong>Basis EK:</strong> ${ekPrice.toFixed(2).replace('.', ',')} €
+            </div>
+            <div class="mb-2 text-primary">
+                <strong>VK kalkuliert:</strong><br>
+                ${vkCalculatedNet.toFixed(2).replace('.', ',')} € (netto)<br>
+                ${vkCalculatedGross.toFixed(2).replace('.', ',')} € (19% MwSt)
+            </div>
+            <div class="mb-2 text-success">
+                <strong>VK empfohlen:</strong><br>
+                ${vkRecommendedNet.toFixed(2).replace('.', ',')} € (netto)<br>
+                ${vkRecommendedGross.toFixed(2).replace('.', ',')} € (19% MwSt)
+            </div>
+            <div class="text-muted small">
+                Aufschlag: ${((factorCalculated - 1) * 100).toFixed(0)}% / ${((factorRecommended - 1) * 100).toFixed(0)}%
+            </div>
+        `;
+        
+        // Update Beispiel-Tabelle
+        updateExamplesTable();
+    }
+}
+
+function updateExamplesTable() {
+    const factorCalculated = parseFloat(document.getElementById('price_factor_calculated').value) || 1.5;
+    const factorRecommended = parseFloat(document.getElementById('price_factor_recommended').value) || 2.0;
+    
+    const examples = [1.00, 2.50, 5.00, 7.50, 10.00, 15.00, 25.00, 50.00];
+    const tbody = document.getElementById('examples_table');
+    
+    tbody.innerHTML = examples.map(ek => {
+        const vkCalcNet = ek * factorCalculated;
+        const vkRecNet = ek * factorRecommended;
+        const vkCalcGross = vkCalcNet * 1.19;
+        const vkRecGross = vkRecNet * 1.19;
+        const markupCalc = ((factorCalculated - 1) * 100);
+        const markupRec = ((factorRecommended - 1) * 100);
+        
+        return `
+            <tr>
+                <td>${ek.toFixed(2).replace('.', ',')} €</td>
+                <td>${vkCalcNet.toFixed(2).replace('.', ',')} €</td>
+                <td>${vkCalcGross.toFixed(2).replace('.', ',')} €</td>
+                <td>${vkRecNet.toFixed(2).replace('.', ',')} €</td>
+                <td>${vkRecGross.toFixed(2).replace('.', ',')} €</td>
+                <td>${markupCalc.toFixed(0)}%</td>
+                <td>${markupRec.toFixed(0)}%</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Event Listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Initial preview
+    updatePreview();
+    
+    // Live updates
+    ['preview_ek', 'price_factor_calculated', 'price_factor_recommended'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.addEventListener('input', updatePreview);
+            element.addEventListener('change', updatePreview);
+        }
+    });
+});
+</script>
+{% endblock %}

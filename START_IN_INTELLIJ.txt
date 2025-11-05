@@ -1,0 +1,76 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                                                                              ║
+║              ✅ INTELLIJ IDEA - SCHNELLSTART-ANLEITUNG                       ║
+║              StitchAdmin 2.0 ist BEREIT!                                     ║
+║                                                                              ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📌 ALLES IST BEREITS KONFIGURIERT!
+   ✅ Python 3.13 Virtual Environment
+   ✅ Alle 71 Dependencies installiert
+   ✅ Flask-Support aktiviert
+   ✅ Run-Configuration fertig
+   ✅ Jinja2-Templates konfiguriert
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 STARTEN IN 3 SCHRITTEN:
+
+   1. IntelliJ IDEA öffnen
+      → Projekt öffnen: C:\SoftwareEntwicklung\StitchAdmin2.0
+
+   2. Python SDK einrichten (EINMALIG):
+      → File → Project Structure → SDKs
+      → [+] → Python SDK → Existing environment
+      → Wähle: .venv\Scripts\python.exe
+      → Name: "Python 3.13 (StitchAdmin2.0)"
+      → OK
+
+   3. Starten:
+      → Oben rechts: "StitchAdmin 2.0" auswählen
+      → Grüner PLAY-Button ▶️ drücken
+      → ODER: Shift + F10
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌐 BROWSER ÖFFNEN:
+
+   http://localhost:5000
+
+   Login:
+   Username: admin
+   Password: admin
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 DETAILLIERTE ANLEITUNG:
+
+   → Siehe: INTELLIJ_SETUP.md
+   → Vollständige Doku: PROJEKT_STRUKTUR.md
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚡ ALTERNATIVE: TERMINAL IN INTELLIJ
+
+   1. Terminal öffnen: Alt + F12
+   2. Aktiviere venv: .venv\Scripts\activate
+   3. Starte App: python app.py
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔧 TROUBLESHOOTING:
+
+   Problem: "Python interpreter not configured"
+   → Schritt 2 oben wiederholen
+
+   Problem: Run-Configuration fehlt
+   → .idea/runConfigurations/StitchAdmin_2_0.xml ist da!
+   → IntelliJ neustarten
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ BEREIT? → KLICK AUF PLAY UND LOS GEHT'S! 🚀
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Erstellt: 05.11.2025 | Für: Hans Hahn

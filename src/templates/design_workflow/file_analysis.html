@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block title %}Datei-Analyse - Bestellung {{ order.id }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Datei-Analyse - Bestellung {{ order.id }}</h4>
+                </div>
+                <div class="card-body">
+                    {% if analysis and analysis.success %}
+                    
+                    <!-- Datei-Informationen -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Datei-Informationen</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Dateiname:</strong></td>
+                                    <td>{{ analysis.file_info.filename }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Dateigröße:</strong></td>
+                                    <td>{{ analysis.file_info.file_size_kb }} KB</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Analysiert am:</strong></td>
+                                    <td>{{ analysis.file_info.created_date[:10] }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Stich-Statistiken (nur bei Stickerei) -->
+                    {% if analysis.stitch_stats %}
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Stich-Statistiken</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td><strong>Gesamtstiche:</strong></td>
+                                            <td>{{ "{:,}".format(analysis.stitch_stats.total_stitches) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Normale Stiche:</strong></td>
+                                            <td>{{ "{:,}".format(analysis.stitch_stats.normal_stitches) }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Sprünge:</strong></td>
+                                            <td>{{ analysis.stitch_stats.jumps }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Farbwechsel:</strong></td>
+                                            <td>{{ analysis.stitch_stats.color_changes }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td><strong>Anzahl Farben:</strong></td>
+                                            <td>{{ analysis.stitch_stats.total_colors }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Trims:</strong></td>
+                                            <td>{{ analysis.stitch_stats.trims }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Bewegungen:</strong></td>
+                                            <td>{{ analysis.stitch_stats.moves }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Dimensionen -->
+                    {% if analysis.dimensions %}
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Dimensionen</h5>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td><strong>Breite:</strong></td>
+                                            <td>{{ analysis.dimensions.width_mm }} mm</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Höhe:</strong></td>
+                                            <td>{{ analysis.dimensions.height_mm }} mm</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-4">
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td><strong>Breite:</strong></td>
+                                            <td>{{ analysis.dimensions.width_cm }} cm</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Höhe:</strong></td>
+                                            <td>{{ analysis.dimensions.height_cm }} cm</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-4">
+                                    <table class="table table-sm">
+                                        <tr>
+                                            <td><strong>Breite:</strong></td>
+                                            <td>{{ analysis.dimensions.width_inches }}"</td>
+                                        </tr>
+                                        <tr>
+                                            <td><strong>Höhe:</strong></td>
+                                            <td>{{ analysis.dimensions.height_inches }}"</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Qualitäts-Metriken -->
+                    {% if analysis.quality_metrics %}
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Qualitäts-Metriken</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Stich-Dichte:</strong></td>
+                                    <td>{{ analysis.quality_metrics.density_stitches_per_cm2 }} Stiche/cm²</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Dichte-Bewertung:</strong></td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if analysis.quality_metrics.density_rating == 'Niedrig' %}bg-success
+                                            {% elif analysis.quality_metrics.density_rating == 'Normal' %}bg-primary
+                                            {% elif analysis.quality_metrics.density_rating == 'Hoch' %}bg-warning
+                                            {% else %}bg-danger{% endif %}">
+                                            {{ analysis.quality_metrics.density_rating }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Komplexität:</strong></td>
+                                    <td>
+                                        <span class="badge 
+                                            {% if analysis.quality_metrics.complexity_rating == 'Niedrig' %}bg-success
+                                            {% elif analysis.quality_metrics.complexity_rating == 'Mittel' %}bg-primary
+                                            {% elif analysis.quality_metrics.complexity_rating == 'Hoch' %}bg-warning
+                                            {% else %}bg-danger{% endif %}">
+                                            {{ analysis.quality_metrics.complexity_rating }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Gesamtlänge:</strong></td>
+                                    <td>{{ analysis.quality_metrics.total_length_meters }} m</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Produktions-Informationen -->
+                    {% if analysis.production_info %}
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Produktions-Informationen</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Geschätzte Stickzeit:</strong></td>
+                                    <td>{{ analysis.production_info.estimated_time_hours }} h ({{ analysis.production_info.estimated_time_minutes }} min)</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Empfohlene Garnstärke:</strong></td>
+                                    <td>{{ analysis.production_info.recommended_thread_weight }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Empfohlenes Stickvlies:</strong></td>
+                                    <td>{{ analysis.production_info.recommended_backing }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Maschinenkompatibilität:</strong></td>
+                                    <td>
+                                        {% for machine in analysis.production_info.machine_compatibility %}
+                                        <span class="badge bg-info me-1">{{ machine }}</span>
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Empfehlungen -->
+                    {% if analysis.recommendations %}
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Empfehlungen</h5>
+                            <ul class="list-group">
+                                {% for rec in analysis.recommendations %}
+                                <li class="list-group-item">
+                                    <i class="bi bi-lightbulb text-warning"></i> {{ rec }}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        {% if analysis %}
+                        Fehler bei der Analyse: {{ analysis.error }}
+                        {% else %}
+                        Keine Analyse-Daten verfügbar
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Aktionen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('orders.show', order_id=order.id) }}" 
+                           class="btn btn-primary">
+                            <i class="bi bi-arrow-left"></i> Zurück zur Bestellung
+                        </a>
+                        
+                        {% if order.design_file_path %}
+                        <a href="{{ url_for('static', filename='../uploads/designs/' + order.design_file_path.split('/')[-1]) }}" 
+                           target="_blank" class="btn btn-outline-primary">
+                            <i class="bi bi-download"></i> Datei herunterladen
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

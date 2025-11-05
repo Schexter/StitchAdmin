@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block title %}{{ machine.name }} - Maschinendetails{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">🔧 {{ machine.name }}</h1>
+                <div>
+                    <a href="{{ url_for('machines.edit', machine_id=machine.id) }}" class="btn btn-warning btn-touch me-2">
+                        <i class="fas fa-edit"></i> Bearbeiten
+                    </a>
+                    <a href="{{ url_for('machines.index') }}" class="btn btn-secondary btn-touch">
+                        <i class="fas fa-arrow-left"></i> Zurück
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Maschineninfo -->
+                <div class="col-lg-8 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Maschinendetails</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <td class="fw-bold">Typ:</td>
+                                            <td>
+                                                {% if machine.type == 'embroidery' %}🧵 Stickmaschine
+                                                {% elif machine.type == 'dtf' %}🖨️ DTF-Drucker
+                                                {% elif machine.type == 'dtg' %}👕 DTG-Drucker
+                                                {% elif machine.type == 'vinyl' %}📋 Vinyl/Flex-Plotter
+                                                {% elif machine.type == 'sublimation' %}🌈 Sublimationsdrucker
+                                                {% elif machine.type == 'heat_press' %}🔥 Transferpresse
+                                                {% else %}⚙️ {{ machine.type|title }}
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Hersteller:</td>
+                                            <td>{{ machine.manufacturer or '-' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Modell:</td>
+                                            <td>{{ machine.model or '-' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Seriennummer:</td>
+                                            <td>{{ machine.serial_number or '-' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Standort:</td>
+                                            <td>{{ machine.location or '-' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Status:</td>
+                                            <td>
+                                                {% if machine.status == 'active' %}
+                                                <span class="badge bg-success">Aktiv</span>
+                                                {% elif machine.status == 'inactive' %}
+                                                <span class="badge bg-secondary">Inaktiv</span>
+                                                {% elif machine.status == 'maintenance' %}
+                                                <span class="badge bg-warning">Wartung</span>
+                                                {% else %}
+                                                <span class="badge bg-light text-dark">{{ machine.status|title }}</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table table-borderless">
+                                        {% if machine.type == 'embroidery' %}
+                                        <tr>
+                                            <td class="fw-bold">Stickköpfe:</td>
+                                            <td>{{ machine.num_heads or 1 }} Köpfe</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Nadeln:</td>
+                                            <td>{{ machine.needles_per_head or 15 }} pro Kopf ({{ machine.num_needles or (machine.num_heads or 1) * (machine.needles_per_head or 15) }} gesamt)</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Max. Geschwindigkeit:</td>
+                                            <td>{{ machine.max_speed or '-' }} Stiche/min (praktisch: {{ ((machine.max_speed or 1000) * 0.7)|round|int }} Stiche/min)</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Max. Arbeitsbereich:</td>
+                                            <td>{{ machine.max_embroidery_area_width }}×{{ machine.max_embroidery_area_height }}mm</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Rahmengrößen:</td>
+                                            <td>
+                                                {% if machine.hoop_sizes %}
+                                                {{ machine.hoop_sizes|join(', ') }}cm
+                                                {% else %}-{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Rüstzeiten:</td>
+                                            <td>
+                                                Grund: {{ machine.setup_time_minutes or 15 }}min, 
+                                                Garnwechsel: {{ machine.thread_change_time_minutes or 3 }}min, 
+                                                Rahmen: {{ machine.hoop_change_time_minutes or 5 }}min
+                                            </td>
+                                        </tr>
+                                        {% elif machine.type == 'dtf' %}
+                                        <tr>
+                                            <td class="fw-bold">Max. Druckbreite:</td>
+                                            <td>{{ machine.max_print_width or '-' }}mm</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Auflösung:</td>
+                                            <td>{{ machine.print_resolution or '-' }}</td>
+                                        </tr>
+                                        {% endif %}
+                                        <tr>
+                                            <td class="fw-bold">Betriebszeiten:</td>
+                                            <td>{{ machine.operating_hours_start or '08:00' }} - {{ machine.operating_hours_end or '18:00' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Arbeitstage:</td>
+                                            <td>
+                                                {% if machine.working_days %}
+                                                {{ machine.working_days|length }} Tage/Woche
+                                                {% else %}Mo-Fr{% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Kaufdatum:</td>
+                                            <td>{{ machine.purchase_date or '-' }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {% if machine.notes %}
+                            <div class="mt-3">
+                                <h6>Notizen:</h6>
+                                <p class="text-muted">{{ machine.notes|nl2br|safe }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wartung & Planung -->
+                <div class="col-lg-4 mb-4">
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">Wartung</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if machine.last_maintenance %}
+                            <p><strong>Letzte Wartung:</strong><br>{{ machine.last_maintenance }}</p>
+                            {% endif %}
+                            
+                            {% if machine.next_maintenance %}
+                            <p><strong>Nächste Wartung:</strong><br>{{ machine.next_maintenance }}</p>
+                            {% elif next_maintenance_calculated %}
+                            <p><strong>Nächste Wartung:</strong><br>{{ next_maintenance_calculated }}</p>
+                            {% endif %}
+                            
+                            <p><strong>Intervall:</strong><br>{{ machine.maintenance_interval_days or 90 }} Tage</p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">Aktionen</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="{{ url_for('machines.schedule', machine_id=machine.id) }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-calendar-alt"></i> Belegungsplan
+                                </a>
+                                {% if machine.type == 'embroidery' %}
+                                <a href="{{ url_for('machines.thread_setup', machine_id=machine.id) }}" class="btn btn-success btn-sm">
+                                    <i class="fas fa-palette"></i> Garnkonfiguration
+                                </a>
+                                {% endif %}
+                                <a href="{{ url_for('production.planning') }}" class="btn btn-outline-info btn-sm">
+                                    <i class="fas fa-tasks"></i> Produktionsplanung
+                                </a>
+                                <button class="btn btn-outline-warning btn-sm" onclick="alert('Wartungsmodus wird in einem zukünftigen Update verfügbar sein.')">
+                                    <i class="fas fa-wrench"></i> Wartung starten
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kommende Jobs -->
+            {% if upcoming_jobs %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Kommende Jobs ({{ upcoming_jobs|length }})</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Job</th>
+                                            <th>Auftrag</th>
+                                            <th>Startzeit</th>
+                                            <th>Endzeit</th>
+                                            <th>Dauer</th>
+                                            <th>Priorität</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for job in upcoming_jobs %}
+                                        <tr>
+                                            <td>{{ job.job_title }}</td>
+                                            <td>
+                                                {% if job.order_id %}
+                                                <a href="{{ url_for('orders.show', order_id=job.order_id) }}">{{ job.order_id }}</a>
+                                                {% else %}-{% endif %}
+                                            </td>
+                                            <td>{{ job.start_time|format_datetime or '-' }}</td>
+                                            <td>{{ job.end_time|format_datetime or '-' }}</td>
+                                            <td>{{ job.estimated_duration_minutes }}min</td>
+                                            <td>
+                                                {% if job.priority == 'urgent' %}
+                                                <span class="badge bg-danger">Eilig</span>
+                                                {% elif job.priority == 'high' %}
+                                                <span class="badge bg-warning">Hoch</span>
+                                                {% elif job.priority == 'low' %}
+                                                <span class="badge bg-secondary">Niedrig</span>
+                                                {% else %}
+                                                <span class="badge bg-primary">Normal</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if job.status == 'scheduled' %}
+                                                <span class="badge bg-info">Geplant</span>
+                                                {% elif job.status == 'in_progress' %}
+                                                <span class="badge bg-warning">In Arbeit</span>
+                                                {% elif job.status == 'completed' %}
+                                                <span class="badge bg-success">Abgeschlossen</span>
+                                                {% elif job.status == 'cancelled' %}
+                                                <span class="badge bg-secondary">Storniert</span>
+                                                {% else %}
+                                                <span class="badge bg-light text-dark">{{ job.status|title }}</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

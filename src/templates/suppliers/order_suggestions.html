@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}Bestellvorschläge - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.index') }}">Lieferanten</a></li>
+                <li class="breadcrumb-item active">Bestellvorschläge</li>
+            </ol>
+        </nav>
+        
+        <h1 class="mb-4">
+            <i class="bi bi-lightbulb"></i> Bestellvorschläge
+        </h1>
+        
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            Diese Artikel aus offenen Aufträgen sind nicht oder nicht ausreichend auf Lager.
+        </div>
+    </div>
+</div>
+
+{% if supplier_suggestions %}
+    {% for supplier_id, data in supplier_suggestions.items() %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                <i class="bi bi-building"></i>
+                {% if data.supplier %}
+                    {{ data.supplier.name }}
+                {% else %}
+                    Kein Lieferant zugeordnet
+                {% endif %}
+            </h5>
+        </div>
+        <div class="card-body">
+            {% if supplier_id != 'no_supplier' %}
+            <form method="POST" action="{{ url_for('suppliers.create_order_from_suggestions') }}">
+                <input type="hidden" name="supplier_id" value="{{ supplier_id }}">
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th width="40">
+                                    <input type="checkbox" class="form-check-input select-all" 
+                                           data-supplier="{{ supplier_id }}">
+                                </th>
+                                <th>Artikel</th>
+                                <th>Auftrag</th>
+                                <th>Benötigt</th>
+                                <th>Lager</th>
+                                <th>Zu bestellen</th>
+                                <th>Preis/Stück</th>
+                                <th>Gesamt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item_data in data.items %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input item-checkbox" 
+                                           name="selected_items" 
+                                           value="{{ item_data.order_item.id }}"
+                                           data-supplier="{{ supplier_id }}">
+                                </td>
+                                <td>
+                                    <strong>{{ item_data.article.name }}</strong><br>
+                                    <small class="text-muted">
+                                        {% if item_data.article.article_number %}
+                                            Art.Nr: {{ item_data.article.article_number }}
+                                        {% endif %}
+                                        {% if item_data.article.supplier_article_number %}
+                                            | Lief.Nr: {{ item_data.article.supplier_article_number }}
+                                        {% endif %}
+                                    </small>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=item_data.order.id) }}">
+                                        {{ item_data.order.order_number }}
+                                    </a><br>
+                                    <small class="text-muted">{{ item_data.order.customer_name }}</small>
+                                </td>
+                                <td>{{ item_data.order_item.quantity }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'danger' if item_data.current_stock == 0 else 'warning' }}">
+                                        {{ item_data.current_stock }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <input type="number" 
+                                           class="form-control form-control-sm quantity-input" 
+                                           name="quantity_{{ item_data.order_item.id }}"
+                                           value="{{ item_data.needed_quantity }}"
+                                           min="0"
+                                           data-price="{{ item_data.article.purchase_price or 0 }}"
+                                           data-item-id="{{ item_data.order_item.id }}"
+                                           style="width: 80px;">
+                                </td>
+                                <td class="price">
+                                    {{ '%.2f'|format(item_data.article.purchase_price or 0)|replace('.', ',') }} €
+                                </td>
+                                <td class="line-total" data-item-id="{{ item_data.order_item.id }}">
+                                    {{ '%.2f'|format((item_data.article.purchase_price or 0) * item_data.needed_quantity)|replace('.', ',') }} €
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th colspan="7" class="text-end">Gesamt:</th>
+                                <th class="supplier-total" data-supplier="{{ supplier_id }}">0,00 €</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+                
+                <div class="row mt-3">
+                    <div class="col-md-12 text-end">
+                        <button type="submit" class="btn btn-primary" name="action" value="create">
+                            <i class="bi bi-cart-plus"></i> Bestellung erstellen
+                        </button>
+                    </div>
+                </div>
+            </form>
+            {% else %}
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                Diese Artikel haben keinen zugeordneten Lieferanten. Bitte weisen Sie zuerst einen Lieferanten zu.
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Artikel</th>
+                            <th>Auftrag</th>
+                            <th>Benötigt</th>
+                            <th>Lager</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item_data in data.items %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('articles.edit', article_id=item_data.article.id) }}">
+                                    {{ item_data.article.name }}
+                                </a>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('orders.show', order_id=item_data.order.id) }}">
+                                    {{ item_data.order.order_number }}
+                                </a>
+                            </td>
+                            <td>{{ item_data.order_item.quantity }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'danger' if item_data.current_stock == 0 else 'warning' }}">
+                                    {{ item_data.current_stock }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="alert alert-success">
+        <i class="bi bi-check-circle"></i>
+        Keine Bestellvorschläge vorhanden. Alle Artikel aus offenen Aufträgen sind ausreichend auf Lager!
+    </div>
+{% endif %}
+
+<script>
+// Select all checkbox functionality
+document.querySelectorAll('.select-all').forEach(checkbox => {
+    checkbox.addEventListener('change', function() {
+        const supplierId = this.dataset.supplier;
+        const itemCheckboxes = document.querySelectorAll(`.item-checkbox[data-supplier="${supplierId}"]`);
+        itemCheckboxes.forEach(cb => cb.checked = this.checked);
+        updateTotals();
+    });
+});
+
+// Update line totals and supplier totals
+function updateTotals() {
+    const suppliers = {};
+    
+    document.querySelectorAll('.quantity-input').forEach(input => {
+        const itemId = input.dataset.itemId;
+        const quantity = parseFloat(input.value) || 0;
+        const price = parseFloat(input.dataset.price) || 0;
+        const lineTotal = quantity * price;
+        
+        // Update line total
+        const lineTotalEl = document.querySelector(`.line-total[data-item-id="${itemId}"]`);
+        if (lineTotalEl) {
+            lineTotalEl.textContent = lineTotal.toFixed(2).replace('.', ',') + ' €';
+        }
+        
+        // Add to supplier total if checkbox is checked
+        const checkbox = document.querySelector(`input[name="selected_items"][value="${itemId}"]`);
+        if (checkbox && checkbox.checked) {
+            const supplierId = checkbox.dataset.supplier;
+            suppliers[supplierId] = (suppliers[supplierId] || 0) + lineTotal;
+        }
+    });
+    
+    // Update supplier totals
+    Object.keys(suppliers).forEach(supplierId => {
+        const totalEl = document.querySelector(`.supplier-total[data-supplier="${supplierId}"]`);
+        if (totalEl) {
+            totalEl.textContent = suppliers[supplierId].toFixed(2).replace('.', ',') + ' €';
+        }
+    });
+}
+
+// Add event listeners for quantity changes
+document.querySelectorAll('.quantity-input').forEach(input => {
+    input.addEventListener('input', updateTotals);
+});
+
+// Add event listeners for checkboxes
+document.querySelectorAll('.item-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', updateTotals);
+});
+
+// Initial calculation
+updateTotals();
+</script>
+
+{% endblock %}

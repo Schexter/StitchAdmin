@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Lieferanten{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1>Lieferanten</h1>
+    </div>
+    <div class="col-auto">
+        {# Bestellvorschläge - später implementieren
+        <a href="{{ url_for('suppliers.order_suggestions') }}" class="btn btn-warning me-2">
+            <i class="fas fa-lightbulb me-2"></i>Bestellvorschläge
+        </a>
+        #}
+        <a href="{{ url_for('suppliers.new') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Neuer Lieferant
+        </a>
+    </div>
+</div>
+
+<!-- Suchleiste und Filter -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" action="{{ url_for('suppliers.index') }}">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" name="search" 
+                               placeholder="Suche nach Name, Kontaktperson, E-Mail..." 
+                               value="{{ search_query }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="status">
+                        <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Alle Status</option>
+                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Aktiv</option>
+                        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inaktiv</option>
+                        <option value="preferred" {% if status_filter == 'preferred' %}selected{% endif %}>Bevorzugt</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-2"></i>Filtern
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lieferanten-Tabelle -->
+<div class="card">
+    <div class="card-body">
+        {% if suppliers %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Kontaktperson</th>
+                        <th>E-Mail</th>
+                        <th>Telefon</th>
+                        <th>Stadt</th>
+                        <th>Status</th>
+                        <th class="text-end">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for supplier in suppliers %}
+                    <tr class="{% if not supplier.active %}table-secondary{% endif %}">
+                        <td>
+                            <a href="{{ url_for('suppliers.show', supplier_id=supplier.id) }}" 
+                               class="text-decoration-none">
+                                {{ supplier.id }}
+                            </a>
+                        </td>
+                        <td>
+                            <strong>{{ supplier.name }}</strong>
+                            {% if supplier.preferred %}
+                                <span class="badge bg-warning text-dark ms-2">
+                                    <i class="fas fa-star"></i> Bevorzugt
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td>{{ supplier.contact_person or '-' }}</td>
+                        <td>
+                            {% if supplier.email %}
+                                <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ supplier.phone or '-' }}</td>
+                        <td>{{ supplier.city or '-' }}</td>
+                        <td>
+                            {% if supplier.active %}
+                                <span class="badge bg-success">Aktiv</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inaktiv</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('suppliers.show', supplier_id=supplier.id) }}" 
+                                   class="btn btn-sm btn-outline-primary" title="Details">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{{ url_for('suppliers.edit', supplier_id=supplier.id) }}" 
+                                   class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-truck fa-3x text-muted mb-3"></i>
+            <p class="text-muted">Keine Lieferanten gefunden.</p>
+            <a href="{{ url_for('suppliers.new') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Ersten Lieferanten anlegen
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Statistik-Karten -->
+{% if suppliers %}
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Gesamt</h5>
+                <h2 class="text-primary">{{ suppliers|length }}</h2>
+                <p class="card-text text-muted">Lieferanten</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Aktiv</h5>
+                <h2 class="text-success">{{ suppliers|selectattr('active')|list|length }}</h2>
+                <p class="card-text text-muted">Lieferanten</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Bevorzugt</h5>
+                <h2 class="text-warning">{{ suppliers|selectattr('preferred')|list|length }}</h2>
+                <p class="card-text text-muted">Lieferanten</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">Inaktiv</h5>
+                <h2 class="text-secondary">{{ suppliers|rejectattr('active')|list|length }}</h2>
+                <p class="card-text text-muted">Lieferanten</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produktdatenblatt - {{ article.name }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: white;
+        }
+        
+        /* Header */
+        .header {
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 15mm;
+            margin-bottom: 10mm;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        .company-info {
+            flex: 1;
+        }
+        
+        .company-name {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 5mm;
+        }
+        
+        .company-details {
+            font-size: 10pt;
+            color: #666;
+            line-height: 1.4;
+        }
+        
+        .document-info {
+            text-align: right;
+            font-size: 10pt;
+            color: #666;
+        }
+        
+        /* Produktbild Platzhalter */
+        .product-image {
+            width: 80mm;
+            height: 60mm;
+            border: 2px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10mm;
+            color: #999;
+            font-size: 12pt;
+        }
+        
+        /* Produktname */
+        .product-title {
+            font-size: 20pt;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 5mm;
+            color: #333;
+        }
+        
+        .product-subtitle {
+            font-size: 12pt;
+            text-align: center;
+            color: #666;
+            margin-bottom: 10mm;
+        }
+        
+        /* Hauptinhalt */
+        .main-content {
+            display: flex;
+            gap: 10mm;
+            margin-bottom: 10mm;
+        }
+        
+        .left-column {
+            flex: 1;
+        }
+        
+        .right-column {
+            flex: 1;
+        }
+        
+        /* Info-Boxen */
+        .info-box {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 8mm;
+            margin-bottom: 8mm;
+            background: #f9f9f9;
+        }
+        
+        .info-box h3 {
+            font-size: 14pt;
+            margin-bottom: 5mm;
+            color: #007bff;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 2mm;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 3mm;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            width: 40mm;
+            flex-shrink: 0;
+        }
+        
+        .info-value {
+            flex: 1;
+        }
+        
+        /* Preis-Box */
+        .price-box {
+            background: #e3f2fd;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            padding: 8mm;
+            text-align: center;
+            margin-bottom: 8mm;
+        }
+        
+        .price-main {
+            font-size: 28pt;
+            font-weight: bold;
+            color: #007bff;
+            margin-bottom: 2mm;
+        }
+        
+        .price-note {
+            font-size: 10pt;
+            color: #666;
+        }
+        
+        /* Barcode-Sektion */
+        .barcode-section {
+            text-align: center;
+            margin: 10mm 0;
+            padding: 8mm;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .barcode-canvas {
+            max-width: 100%;
+            height: auto;
+            margin: 5mm 0;
+        }
+        
+        .article-number {
+            font-size: 12pt;
+            font-weight: bold;
+            margin-bottom: 3mm;
+        }
+        
+        /* Beschreibung */
+        .description {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 8mm;
+            margin-bottom: 8mm;
+            min-height: 30mm;
+        }
+        
+        .description h3 {
+            font-size: 14pt;
+            margin-bottom: 5mm;
+            color: #007bff;
+        }
+        
+        .description p {
+            font-size: 11pt;
+            line-height: 1.5;
+        }
+        
+        /* Footer */
+        .footer {
+            border-top: 1px solid #ddd;
+            padding-top: 5mm;
+            margin-top: 15mm;
+            font-size: 9pt;
+            color: #666;
+            text-align: center;
+        }
+        
+        /* Eigenschaften-Grid */
+        .properties-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5mm;
+            margin-bottom: 8mm;
+        }
+        
+        .property-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 5mm;
+            text-align: center;
+        }
+        
+        .property-label {
+            font-size: 10pt;
+            color: #666;
+            margin-bottom: 2mm;
+        }
+        
+        .property-value {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        /* Druckoptimierungen */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+        }
+        
+        /* Qualitätsbadges */
+        .quality-badges {
+            display: flex;
+            gap: 5mm;
+            justify-content: center;
+            margin: 5mm 0;
+        }
+        
+        .quality-badge {
+            padding: 2mm 5mm;
+            border-radius: 20px;
+            font-size: 9pt;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .badge-premium {
+            background: #28a745;
+        }
+        
+        .badge-standard {
+            background: #007bff;
+        }
+        
+        .badge-basic {
+            background: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="company-info">
+            <div class="company-name">STITCHADMIN</div>
+            <div class="company-details">
+                Musterstraße 123<br>
+                12345 Musterstadt<br>
+                Tel: +49 123 456789<br>
+                info@stitchadmin.de
+            </div>
+        </div>
+        <div class="document-info">
+            <strong>Produktdatenblatt</strong><br>
+            Erstellt: {{ now.strftime('%d.%m.%Y') }}<br>
+            {% if article.article_number %}
+            Art.Nr.: {{ article.article_number }}<br>
+            {% endif %}
+            ID: {{ article.id }}
+        </div>
+    </div>
+    
+    <!-- Produktbild Platzhalter -->
+    <div class="product-image">
+        <i>Produktbild</i>
+    </div>
+    
+    <!-- Produktname -->
+    <div class="product-title">{{ article.name }}</div>
+    {% if article.brand %}
+    <div class="product-subtitle">{{ article.brand }}{% if article.product_type %} - {{ article.product_type }}{% endif %}</div>
+    {% endif %}
+    
+    <!-- Qualitätsbadges -->
+    <div class="quality-badges">
+        {% if article.price and article.price > 50 %}
+        <span class="quality-badge badge-premium">Premium</span>
+        {% elif article.price and article.price > 20 %}
+        <span class="quality-badge badge-standard">Standard</span>
+        {% else %}
+        <span class="quality-badge badge-basic">Basic</span>
+        {% endif %}
+        
+        {% if article.active %}
+        <span class="quality-badge badge-premium">Verfügbar</span>
+        {% endif %}
+    </div>
+    
+    <!-- Hauptinhalt -->
+    <div class="main-content">
+        <div class="left-column">
+            <!-- Produktinformationen -->
+            <div class="info-box">
+                <h3>Produktinformationen</h3>
+                {% if article.category %}
+                <div class="info-row">
+                    <span class="info-label">Kategorie:</span>
+                    <span class="info-value">{{ article.category }}</span>
+                </div>
+                {% endif %}
+                {% if article.material %}
+                <div class="info-row">
+                    <span class="info-label">Material:</span>
+                    <span class="info-value">{{ article.material }}</span>
+                </div>
+                {% endif %}
+                {% if article.weight %}
+                <div class="info-row">
+                    <span class="info-label">Gewicht:</span>
+                    <span class="info-value">{{ \"%.0f\"|format(article.weight * 1000) }} g</span>
+                </div>
+                {% endif %}
+                {% if article.manufacturer_number %}
+                <div class="info-row">
+                    <span class="info-label">Hersteller-Nr:</span>
+                    <span class="info-value">{{ article.manufacturer_number }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Eigenschaften -->
+            <div class="properties-grid">
+                {% if article.color %}
+                <div class="property-item">
+                    <div class="property-label">Farbe</div>
+                    <div class="property-value">{{ article.color }}</div>
+                </div>
+                {% endif %}
+                {% if article.size %}
+                <div class="property-item">
+                    <div class="property-label">Größe</div>
+                    <div class="property-value">{{ article.size }}</div>
+                </div>
+                {% endif %}
+                {% if article.units_per_carton %}
+                <div class="property-item">
+                    <div class="property-label">VE/Karton</div>
+                    <div class="property-value">{{ article.units_per_carton }} St.</div>
+                </div>
+                {% endif %}
+                {% if article.stock %}
+                <div class="property-item">
+                    <div class="property-label">Lagerbestand</div>
+                    <div class="property-value">{{ article.stock }} St.</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="right-column">
+            <!-- Preis -->
+            <div class="price-box">
+                <div class="price-main">{{ \"%.2f\"|format((article.price or 0) * 1.19) }} €</div>
+                <div class="price-note">
+                    inkl. 19% MwSt.<br>
+                    ({{ \"%.2f\"|format(article.price or 0) }} € netto)
+                </div>
+            </div>
+            
+            <!-- Technische Daten -->
+            <div class="info-box">
+                <h3>Technische Daten</h3>
+                {% if article.article_number %}
+                <div class="info-row">
+                    <span class="info-label">Artikelnummer:</span>
+                    <span class="info-value">{{ article.article_number }}</span>
+                </div>
+                {% endif %}
+                {% if article.supplier %}
+                <div class="info-row">
+                    <span class="info-label">Lieferant:</span>
+                    <span class="info-value">{{ article.supplier }}</span>
+                </div>
+                {% endif %}
+                {% if article.location %}
+                <div class="info-row">
+                    <span class="info-label">Lagerort:</span>
+                    <span class="info-value">{{ article.location }}</span>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <span class="info-label">Status:</span>
+                    <span class="info-value">
+                        {% if article.active %}Verfügbar{% else %}Nicht verfügbar{% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Beschreibung -->
+    <div class="description">
+        <h3>Produktbeschreibung</h3>
+        <p>
+            {% if article.description %}
+                {{ article.description }}
+            {% else %}
+                Hochwertiges Produkt von {{ article.brand or 'STITCHADMIN' }}. 
+                {% if article.material %}
+                Hergestellt aus {{ article.material }}.
+                {% endif %}
+                {% if article.color and article.size %}
+                Verfügbar in {{ article.color }}, Größe {{ article.size }}.
+                {% endif %}
+                Perfekt für professionelle Anwendungen geeignet.
+            {% endif %}
+        </p>
+    </div>
+    
+    <!-- Barcode -->
+    <div class="barcode-section">
+        <div class="article-number">
+            Artikelnummer: {{ article.article_number or article.id }}
+        </div>
+        <canvas id="barcode" class="barcode-canvas"></canvas>
+    </div>
+    
+    <!-- Footer -->
+    <div class="footer">
+        <p>
+            <strong>STITCHADMIN</strong> - Ihr Partner für professionelle Textilveredelung<br>
+            Alle Preise verstehen sich inkl. MwSt. | Änderungen und Irrtümer vorbehalten<br>
+            Erstellt am {{ now.strftime('%d.%m.%Y um %H:%M') }} Uhr
+        </p>
+    </div>
+    
+    <!-- JsBarcode Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    
+    <!-- Barcode Generation und automatischer Druck -->
+    <script>
+        window.onload = function() {
+            // Generiere Barcode
+            const barcodeValue = {% if article.article_number %}"{{ article.article_number }}"{% else %}"{{ article.id }}"{% endif %};
+            
+            try {
+                JsBarcode("#barcode", barcodeValue, {
+                    format: "CODE128",
+                    width: 2,
+                    height: 50,
+                    displayValue: false,
+                    margin: 10,
+                    fontSize: 14
+                });
+            } catch (e) {
+                console.error("Barcode generation failed:", e);
+                document.getElementById('barcode').style.display = 'none';
+            }
+            
+            // Auto-Print wenn Parameter gesetzt
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('autoprint') === '1') {
+                setTimeout(function() {
+                    window.print();
+                }, 1000);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Garn bearbeiten{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Garn bearbeiten</h1>
+    <form method="POST">
+        <div class="mb-3">
+            <label class="form-label">Farbnummer</label>
+            <input type="text" class="form-control" value="{{ thread.color_number }}" disabled>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Name (DE)</label>
+            <input type="text" name="color_name_de" class="form-control" value="{{ thread.color_name_de }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Hex-Farbe</label>
+            <input type="color" name="hex_color" class="form-control" value="{{ thread.hex_color or '#ffffff' }}">
+        </div>
+        <button type="submit" class="btn btn-primary">Speichern</button>
+        <a href="{{ url_for('thread.show', thread_id=thread.id) }}" class="btn btn-secondary">Abbrechen</a>
+    </form>
+</div>
+{% endblock %}

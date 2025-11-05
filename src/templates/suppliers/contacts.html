@@ -1,0 +1,498 @@
+{% extends "base.html" %}
+
+{% block title %}Ansprechpartner - {{ supplier.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Ansprechpartner: {{ supplier.name }}</h2>
+                <div>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addContactModal">
+                        <i class="bi bi-person-plus"></i> Ansprechpartner hinzufügen
+                    </button>
+                    <a href="{{ url_for('suppliers.detail', id=supplier.id) }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Zurück
+                    </a>
+                </div>
+            </div>
+
+            <!-- Ansprechpartner-Liste -->
+            <div class="row">
+                {% for contact in contacts %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">
+                                    {{ contact.full_name }}
+                                    {% if contact.is_primary_contact %}
+                                    <span class="badge bg-primary">Hauptkontakt</span>
+                                    {% endif %}
+                                </h5>
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-light" data-bs-toggle="dropdown">
+                                        <i class="bi bi-three-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <a class="dropdown-item" href="#" 
+                                               onclick="editContact('{{ contact.id }}')">
+                                                <i class="bi bi-pencil"></i> Bearbeiten
+                                            </a>
+                                        </li>
+                                        {% if not contact.is_primary_contact %}
+                                        <li>
+                                            <a class="dropdown-item" href="#" 
+                                               onclick="setPrimaryContact('{{ contact.id }}')">
+                                                <i class="bi bi-star"></i> Als Hauptkontakt
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <a class="dropdown-item text-danger" href="#" 
+                                               onclick="deleteContact('{{ contact.id }}')">
+                                                <i class="bi bi-trash"></i> Löschen
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            {% if contact.position %}
+                            <p class="text-muted mb-2">{{ contact.position }}</p>
+                            {% endif %}
+                            {% if contact.department %}
+                            <p class="text-muted mb-3"><small>{{ contact.department }}</small></p>
+                            {% endif %}
+                            
+                            <div class="contact-details">
+                                {% if contact.email %}
+                                <div class="mb-2">
+                                    <i class="bi bi-envelope"></i>
+                                    <a href="mailto:{{ contact.email }}">{{ contact.email }}</a>
+                                </div>
+                                {% endif %}
+                                
+                                {% if contact.phone_direct %}
+                                <div class="mb-2">
+                                    <i class="bi bi-telephone"></i>
+                                    <a href="tel:{{ contact.phone_direct }}">{{ contact.phone_direct }}</a>
+                                    <small class="text-muted">(Direkt)</small>
+                                </div>
+                                {% endif %}
+                                
+                                {% if contact.mobile %}
+                                <div class="mb-2">
+                                    <i class="bi bi-phone"></i>
+                                    <a href="tel:{{ contact.mobile }}">{{ contact.mobile }}</a>
+                                </div>
+                                {% endif %}
+                                
+                                {% if contact.phone and contact.phone != contact.phone_direct %}
+                                <div class="mb-2">
+                                    <i class="bi bi-telephone"></i>
+                                    <a href="tel:{{ contact.phone }}">{{ contact.phone }}</a>
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    Bevorzugt: 
+                                    {% if contact.preferred_contact_method == 'email' %}
+                                    <i class="bi bi-envelope"></i> E-Mail
+                                    {% elif contact.preferred_contact_method == 'phone' %}
+                                    <i class="bi bi-telephone"></i> Telefon
+                                    {% elif contact.preferred_contact_method == 'mobile' %}
+                                    <i class="bi bi-phone"></i> Mobil
+                                    {% endif %}
+                                </small>
+                            </div>
+                            
+                            {% if contact.availability_notes %}
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> {{ contact.availability_notes }}
+                                </small>
+                            </div>
+                            {% endif %}
+                            
+                            <!-- Zuständigkeiten -->
+                            <div class="mt-3">
+                                {% if contact.is_sales_contact %}
+                                <span class="badge bg-success">Vertrieb</span>
+                                {% endif %}
+                                {% if contact.is_technical_contact %}
+                                <span class="badge bg-info">Technik</span>
+                                {% endif %}
+                                {% if contact.is_accounting_contact %}
+                                <span class="badge bg-warning">Buchhaltung</span>
+                                {% endif %}
+                                {% if contact.is_complaints_contact %}
+                                <span class="badge bg-danger">Reklamation</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-sm btn-outline-primary w-100" 
+                                    onclick="logCommunication('{{ contact.id }}')">
+                                <i class="bi bi-chat-left-text"></i> Kommunikation erfassen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            {% if not contacts %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Noch keine Ansprechpartner vorhanden.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Ansprechpartner hinzufügen -->
+<div class="modal fade" id="addContactModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('suppliers.add_contact', supplier_id=supplier.id) }}">
+                {{ form.hidden_tag() if form }}
+                <div class="modal-header">
+                    <h5 class="modal-title">Ansprechpartner hinzufügen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-2">
+                            <div class="mb-3">
+                                <label class="form-label">Anrede</label>
+                                <select name="salutation" class="form-select">
+                                    <option value="">-</option>
+                                    <option value="Herr">Herr</option>
+                                    <option value="Frau">Frau</option>
+                                    <option value="Dr.">Dr.</option>
+                                    <option value="Prof.">Prof.</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="mb-3">
+                                <label class="form-label">Vorname</label>
+                                <input type="text" name="first_name" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <div class="mb-3">
+                                <label class="form-label">Nachname *</label>
+                                <input type="text" name="last_name" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Position</label>
+                                <input type="text" name="position" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Abteilung</label>
+                                <input type="text" name="department" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">E-Mail</label>
+                                <input type="email" name="email" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Telefon (Zentrale)</label>
+                                <input type="tel" name="phone" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Durchwahl</label>
+                                <input type="tel" name="phone_direct" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Mobil</label>
+                                <input type="tel" name="mobile" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Bevorzugte Kontaktart</label>
+                                <select name="preferred_contact_method" class="form-select">
+                                    <option value="email">E-Mail</option>
+                                    <option value="phone">Telefon</option>
+                                    <option value="mobile">Mobil</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Sprache</label>
+                                <select name="language" class="form-select">
+                                    <option value="de">Deutsch</option>
+                                    <option value="en">Englisch</option>
+                                    <option value="fr">Französisch</option>
+                                    <option value="it">Italienisch</option>
+                                    <option value="es">Spanisch</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Zuständigkeiten</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input type="checkbox" name="is_primary_contact" class="form-check-input" id="primaryCheck">
+                                    <label class="form-check-label" for="primaryCheck">Hauptkontakt</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="is_sales_contact" class="form-check-input" id="salesCheck" checked>
+                                    <label class="form-check-label" for="salesCheck">Vertrieb</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input type="checkbox" name="is_technical_contact" class="form-check-input" id="techCheck">
+                                    <label class="form-check-label" for="techCheck">Technik</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="is_accounting_contact" class="form-check-input" id="accountingCheck">
+                                    <label class="form-check-label" for="accountingCheck">Buchhaltung</label>
+                                </div>
+                                <div class="form-check">
+                                    <input type="checkbox" name="is_complaints_contact" class="form-check-input" id="complaintsCheck">
+                                    <label class="form-check-label" for="complaintsCheck">Reklamation</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Verfügbarkeit</label>
+                        <input type="text" name="availability_notes" class="form-control" 
+                               placeholder="z.B. Mo-Fr 8-17 Uhr">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Notizen</label>
+                        <textarea name="notes" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Kommunikation erfassen -->
+<div class="modal fade" id="logCommunicationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" id="communicationForm">
+                <div class="modal-header">
+                    <h5 class="modal-title">Kommunikation erfassen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="contact_id" id="comm_contact_id">
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Art</label>
+                                <select name="communication_type" class="form-select" required>
+                                    <option value="email">E-Mail</option>
+                                    <option value="phone">Telefon</option>
+                                    <option value="meeting">Meeting</option>
+                                    <option value="letter">Brief</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Richtung</label>
+                                <select name="direction" class="form-select" required>
+                                    <option value="outbound">Ausgehend</option>
+                                    <option value="inbound">Eingehend</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Datum/Zeit</label>
+                                <input type="datetime-local" name="communication_date" class="form-control" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Betreff</label>
+                        <input type="text" name="subject" class="form-control" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Inhalt/Notizen</label>
+                        <textarea name="content" class="form-control" rows="4" required></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Bezug zu Bestellung</label>
+                                <select name="order_id" class="form-select">
+                                    <option value="">-- Keine --</option>
+                                    {% for order in recent_orders %}
+                                    <option value="{{ order.id }}">{{ order.order_number }} - {{ order.created_at.strftime('%d.%m.%Y') if order.created_at else '-' }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Follow-up erforderlich?</label>
+                                <div class="form-check">
+                                    <input type="checkbox" name="follow_up_required" class="form-check-input" 
+                                           id="followUpCheck" onchange="toggleFollowUp()">
+                                    <label class="form-check-label" for="followUpCheck">
+                                        Ja, Follow-up erforderlich
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="followUpFields" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Follow-up Datum</label>
+                                    <input type="date" name="follow_up_date" class="form-control">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Follow-up Notizen</label>
+                                    <input type="text" name="follow_up_notes" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Aktuelles Datum/Zeit für Kommunikationsformular
+document.addEventListener('DOMContentLoaded', function() {
+    const dateInput = document.querySelector('input[name="communication_date"]');
+    if (dateInput) {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        dateInput.value = now.toISOString().slice(0, 16);
+    }
+});
+
+function editContact(contactId) {
+    // TODO: Lade Kontaktdaten und öffne Edit-Modal
+    alert('Edit-Funktion wird implementiert');
+}
+
+function setPrimaryContact(contactId) {
+    if (confirm('Diesen Kontakt als Hauptkontakt festlegen?')) {
+        fetch(`/suppliers/{{ supplier.id }}/contacts/${contactId}/set-primary`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        }).then(() => location.reload());
+    }
+}
+
+function deleteContact(contactId) {
+    if (confirm('Diesen Kontakt wirklich löschen?')) {
+        fetch(`/suppliers/{{ supplier.id }}/contacts/${contactId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        }).then(() => location.reload());
+    }
+}
+
+function logCommunication(contactId) {
+    document.getElementById('comm_contact_id').value = contactId;
+    const modal = new bootstrap.Modal(document.getElementById('logCommunicationModal'));
+    modal.show();
+}
+
+function toggleFollowUp() {
+    const followUpCheck = document.getElementById('followUpCheck');
+    const followUpFields = document.getElementById('followUpFields');
+    followUpFields.style.display = followUpCheck.checked ? 'block' : 'none';
+}
+
+// Kommunikationsformular Submit
+document.getElementById('communicationForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData);
+    
+    fetch(`/suppliers/{{ supplier.id }}/communication`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    }).then(() => {
+        bootstrap.Modal.getInstance(document.getElementById('logCommunicationModal')).hide();
+        location.reload();
+    });
+});
+</script>
+{% endblock %}

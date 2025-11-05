@@ -1,0 +1,246 @@
+/* StitchAdmin Touch-Optimized Styles */
+
+/* Basis-Schriftgröße erhöhen für bessere Lesbarkeit */
+:root {
+    font-size: 18px; /* Basis für Touch-Geräte */
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-size: 1rem; /* 18px */
+}
+
+main {
+    flex: 1;
+}
+
+/* Touch-optimierte Navigation */
+.navbar {
+    min-height: 80px; /* Größere Navbar für Touch */
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+    padding: 1rem;
+}
+
+.nav-link {
+    padding: 1rem 1.5rem !important; /* Größere Touch-Ziele */
+    font-size: 1.1rem;
+}
+
+/* Touch-optimierte Buttons */
+.btn {
+    min-height: 60px; /* Mindestgröße für Touch */
+    min-width: 120px;
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.btn-sm {
+    min-height: 48px;
+    min-width: 80px;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+}
+
+/* Touch-optimierte Karten */
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: transform 0.2s;
+    margin-bottom: 1.5rem;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Touch-optimierte Formulare */
+.form-control, .form-select {
+    min-height: 60px;
+    font-size: 1.1rem;
+    padding: 1rem;
+}
+
+.form-label {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 0.75rem;
+}
+
+.form-check-input {
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-top: 0.25rem;
+}
+
+.form-check-label {
+    font-size: 1.1rem;
+    padding-left: 0.5rem;
+}
+
+/* Touch-optimierte Tabellen */
+.table {
+    font-size: 1rem;
+}
+
+.table td, .table th {
+    padding: 1rem;
+    vertical-align: middle;
+}
+
+/* Größere Icons */
+.bi {
+    font-size: 1.3em;
+}
+
+/* Touch-optimierte Dropdown-Menüs */
+.dropdown-menu {
+    font-size: 1.1rem;
+}
+
+.dropdown-item {
+    padding: 1rem 1.5rem;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+}
+
+/* Alerts */
+.alert {
+    border-radius: 0.5rem;
+    font-size: 1.1rem;
+    padding: 1.25rem;
+}
+
+/* Dashboard-Statistiken */
+.display-6 {
+    font-size: 2.5rem;
+}
+
+/* Responsive anpassen für kleinere Geräte */
+@media (max-width: 768px) {
+    :root {
+        font-size: 16px;
+    }
+    
+    .btn {
+        min-height: 56px;
+        width: 100%;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Login-Karte */
+.login-card {
+    margin-top: 3rem;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Abstände zwischen Elementen */
+.mb-3 {
+    margin-bottom: 1.5rem !important;
+}
+
+.mt-4 {
+    margin-top: 2rem !important;
+}
+
+/* Breadcrumb größer */
+.breadcrumb {
+    font-size: 1.1rem;
+    padding: 1rem 0;
+}
+
+.breadcrumb-item {
+    padding: 0.5rem 0;
+}
+
+/* Touch-optimierte Auftrags-Buttons */
+.order-status-button {
+    min-height: 80px !important;
+    min-width: 140px !important;
+    font-size: 1.1rem !important;
+    padding: 1rem !important;
+    margin: 0.5rem !important;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.order-status-button i {
+    font-size: 1.8rem !important;
+}
+
+/* Auftrags-Tabelle Touch-optimiert */
+.table-orders td {
+    padding: 1.25rem 1rem;
+}
+
+/* Preiskalkulation Box */
+#price-calculation {
+    margin-top: 1rem;
+}
+
+#price-calculation .alert {
+    font-size: 1rem;
+}
+
+#price-calculation .table {
+    margin-bottom: 0;
+    font-size: 0.95rem;
+}
+
+/* Badge größer */
+.badge {
+    font-size: 0.9rem;
+    padding: 0.5rem 0.75rem;
+}
+
+/* File Input Touch-optimiert */
+input[type="file"] {
+    min-height: 60px;
+    padding: 1rem;
+}
+
+/* Touch-freundliche Tooltips */
+.tooltip {
+    font-size: 1rem;
+}
+
+/* Responsive Status-Buttons */
+@media (max-width: 768px) {
+    .dropdown-toggle {
+        display: none !important;
+    }
+    
+    .status-buttons {
+        display: flex !important;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .order-status-button {
+        width: 100%;
+    }
+}

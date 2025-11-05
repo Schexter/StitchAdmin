@@ -1,0 +1,1314 @@
+{% extends "base.html" %}
+
+{% block title %}Neuer Auftrag - StitchAdmin{% endblock %}
+
+<!-- File Browser Modal -->
+{% include 'file_browser/modal.html' %}
+
+<script>
+// Zusätzliche Workflow-Funktionen
+function validateDesignWorkflow() {
+    const designStatus = document.getElementById('design_status').value;
+    
+    if (!designStatus) {
+        alert('Bitte wählen Sie einen Design-Status aus.');
+        return false;
+    }
+    
+    if (designStatus === 'logo_available') {
+        const filePath = document.getElementById('design_file_path').value;
+        const fileUpload = document.getElementById('design_file_upload').files.length;
+        
+        if (!filePath && fileUpload === 0) {
+            alert('Bitte wählen Sie eine Design-Datei aus oder laden Sie eine hoch.');
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Form-Validation erweitern
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!validateDesignWorkflow()) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    }
+});
+</script>
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-plus-circle"></i> Neuer Auftrag</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('orders.index') }}">Aufträge</a></li>
+                <li class="breadcrumb-item active">Neuer Auftrag</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-clipboard-plus"></i> Stickerei & Textildruck Auftrag</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data">
+                    <!-- Kunde und Auftragstyp -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label" for="customer_id">Kunde *</label>
+                                <select class="form-control" id="customer_id" name="customer_id" required>
+                                    <option value="">Kunde wählen...</option>
+                                    {% for customer_id, customer in customers.items() %}
+                                    <option value="{{ customer_id }}">
+                                        {% if customer.customer_type == 'business' %}
+                                            {{ customer.company_name or customer.display_name }}
+                                            {% if customer.contact_person %} ({{ customer.contact_person }}){% endif %}
+                                        {% else %}
+                                            {{ customer.display_name or (customer.first_name + " " + customer.last_name) }}
+                                        {% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label" for="order_type">Auftragstyp *</label>
+                                <select class="form-control" id="order_type" name="order_type" required onchange="toggleFields()">
+                                    <option value="embroidery">Bestickung</option>
+                                    <option value="printing">Textildruck</option>
+                                    <option value="dtf">DTF (Direct to Film)</option>
+                                    <option value="combined">Bestickung + Druck</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Textil-Details -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="bi bi-shirt"></i> Textil-Details</h6>
+                        </div>
+                        <div class="card-body">
+                            <!-- Textil-Items Container -->
+                            <div id="textile-items">
+                                <div class="textile-item border p-3 mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="mb-0">Textil #1</h6>
+                                        <button type="button" class="btn btn-sm btn-outline-danger d-none remove-textile" onclick="removeTextileItem(this)">
+                                            <i class="bi bi-trash"></i> Entfernen
+                                        </button>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">Artikel auswählen *</label>
+                                                <select class="form-control article-select" name="article_id[]" required onchange="updateTextileInfo(this)">
+                                                    <option value="">-- Artikel wählen --</option>
+                                                    {% for article_id, article in articles.items() %}
+                                                        {% if article.active %}
+                                                        <option value="{{ article_id }}" 
+                                                                data-name="{{ article.name }}"
+                                                                data-price="{{ article.price }}"
+                                                                data-weight="{{ article.weight or 0.5 }}"
+                                                                data-color="{{ article.color or '' }}"
+                                                                data-size="{{ article.size or '' }}"
+                                                                data-material="{{ article.material or '' }}">
+                                                            {{ article.name }} - {{ "%.2f"|format(article.price) }}€
+                                                            {% if article.color %} ({{ article.color }}){% endif %}
+                                                            {% if article.size %} - {{ article.size }}{% endif %}
+                                                        </option>
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                <label class="form-label">Menge *</label>
+                                                <input type="number" class="form-control quantity-input" name="quantity[]" 
+                                                       min="1" value="1" required onchange="calculatePrice()">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                <label class="form-label">Einzelpreis</label>
+                                                <input type="text" class="form-control price-display" readonly>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">Textil-Info</label>
+                                                <input type="text" class="form-control textile-info" readonly 
+                                                       placeholder="Automatisch aus Artikel">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">Größe</label>
+                                                <select class="form-control" name="textile_size[]" title="Wird automatisch aus Artikel übernommen">
+                                                    <option value="">Wählen...</option>
+                                                    <option value="XS">XS</option>
+                                                    <option value="S">S</option>
+                                                    <option value="M">M</option>
+                                                    <option value="L">L</option>
+                                                    <option value="XL">XL</option>
+                                                    <option value="XXL">XXL</option>
+                                                    <option value="XXXL">XXXL</option>
+                                                    <option value="mixed">Gemischt</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">Farbe/Material</label>
+                                                <input type="text" class="form-control" name="textile_color_note[]" 
+                                                       placeholder="Automatisch aus Artikel" 
+                                                       title="Wird automatisch aus Artikel übernommen, kann ergänzt werden">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-center mb-3">
+                                <button type="button" class="btn btn-outline-primary" id="add-textile">
+                                    <i class="bi bi-plus-lg"></i> Weiteres Textil hinzufügen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Design-Details -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="bi bi-palette"></i> Design-Details</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label" for="design_description">Design-Beschreibung *</label>
+                                <textarea class="form-control" id="design_description" name="design_description" rows="3" required
+                                          placeholder="Beschreiben Sie das gewünschte Design (Logo, Text, Motiv)..."></textarea>
+                            </div>
+                            
+                            <!-- Design-Datei Upload (wird vom Workflow gesteuert) -->
+                            <div id="file-analysis-result" class="mt-2"></div>
+                            
+                            <!-- VERBESSERTES DESIGN-WORKFLOW SYSTEM -->
+                            <div class="card mb-3" id="design-workflow-card">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="bi bi-palette"></i> Design-Workflow</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Design-Status *</label>
+                                        <select class="form-control" id="design_status" name="design_status" required onchange="toggleDesignWorkflow()">
+                                            <option value="">Wählen Sie...</option>
+                                            <option value="logo_available">Logo vorhanden</option>
+                                            <option value="logo_needs_creation">Logo muss erstellt werden</option>
+                                            <option value="logo_needs_adaptation">Logo muss angepasst werden</option>
+                                        </select>
+                                        <small class="text-muted">Bestimmt den Workflow für die Design-Verarbeitung</small>
+                                    </div>
+                                    
+                                    <!-- Logo vorhanden - Pfad oder Upload -->
+                                    <div id="logo-available-section" style="display: none;">
+                                        <div class="alert alert-success">
+                                            <i class="bi bi-check-circle"></i> 
+                                            <strong>Super!</strong> Bitte wählen Sie, wie Sie das Logo bereitstellen möchten.
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="card border-primary">
+                                                    <div class="card-body text-center">
+                                                        <h6><i class="bi bi-folder"></i> Bereits gespeichert</h6>
+                                                        <p class="text-muted">Logo aus Verzeichnis auswählen</p>
+                                                        <div class="mb-3">
+                                                            <input type="text" class="form-control" id="design_file_path" name="design_file_path" 
+                                                                   placeholder="Pfad zur Design-Datei" readonly>
+                                                        </div>
+                                                        <button type="button" class="btn btn-outline-primary" onclick="selectDesignFile()">
+                                                            <i class="bi bi-search"></i> Auswählen
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="card border-success">
+                                                    <div class="card-body text-center">
+                                                        <h6><i class="bi bi-cloud-upload"></i> Hochladen</h6>
+                                                        <p class="text-muted">Design-Datei jetzt hochladen</p>
+                                                        <div class="mb-3">
+                                                            <input type="file" class="form-control" id="design_file_upload" name="design_file" 
+                                                                   accept=".dst,.pes,.jef,.exp,.svg,.ai,.pdf,.png,.jpg" 
+                                                                   onchange="handleDesignUpload(this)">
+                                                        </div>
+                                                        <small class="text-muted">DST, PES, SVG, AI, PDF, PNG, JPG</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Logo muss erstellt werden -->
+                                    <div id="logo-creation-section" style="display: none;">
+                                        <div class="alert alert-warning">
+                                            <i class="bi bi-exclamation-triangle"></i> 
+                                            <strong>Hinweis:</strong> Dieser Auftrag kann erst in Produktion gehen, wenn das Logo erstellt wurde.
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Zuständiger Designer</label>
+                                                    <select class="form-control" name="designer_id">
+                                                        <option value="">Designer wählen...</option>
+                                                        <option value="internal">Interne Erstellung</option>
+                                                        <option value="external">Externer Designer</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Geschätzter Fertigstellungstermin</label>
+                                                    <input type="date" class="form-control" name="design_estimated_date">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Design-Anforderungen</label>
+                                            <textarea class="form-control" name="design_requirements" rows="3" 
+                                                      placeholder="Detaillierte Beschreibung der Design-Anforderungen (Farben, Stil, Größe, etc.)..."></textarea>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Priorität</label>
+                                                    <select class="form-control" name="design_priority">
+                                                        <option value="normal">Normal</option>
+                                                        <option value="high">Hoch</option>
+                                                        <option value="urgent">Dringend</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Zusätzliche Kosten</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" name="design_cost" 
+                                                               step="0.01" min="0" placeholder="0.00">
+                                                        <span class="input-group-text">€</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Logo muss angepasst werden -->
+                                    <div id="logo-adaptation-section" style="display: none;">
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> 
+                                            <strong>Info:</strong> Das bestehende Logo muss für diesen Auftrag angepasst werden.
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Original Logo</label>
+                                                    <div class="input-group">
+                                                        <input type="text" class="form-control" id="original_logo_path" name="original_logo_path" 
+                                                               placeholder="Pfad zum Original-Logo" readonly>
+                                                        <button type="button" class="btn btn-outline-secondary" onclick="selectOriginalLogo()">
+                                                            <i class="bi bi-search"></i> Auswählen
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Bearbeitungszeit (Tage)</label>
+                                                    <input type="number" class="form-control" name="adaptation_days" 
+                                                           min="1" max="10" value="2">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Anpassungsdetails</label>
+                                            <textarea class="form-control" name="adaptation_details" rows="3" 
+                                                      placeholder="Welche Anpassungen sollen vorgenommen werden? (Größe, Farbe, Format, etc.)..."></textarea>
+                                        </div>
+                                        
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Gewünschtes Format</label>
+                                                    <select class="form-control" name="target_format">
+                                                        <option value="">Format wählen...</option>
+                                                        <option value="dst">DST (Stickerei)</option>
+                                                        <option value="svg">SVG (Vektor)</option>
+                                                        <option value="png">PNG (Raster)</option>
+                                                        <option value="pdf">PDF (Druck)</option>
+                                                        <option value="ai">AI (Adobe Illustrator)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Anpassungskosten</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control" name="adaptation_cost" 
+                                                               step="0.01" min="0" placeholder="0.00">
+                                                        <span class="input-group-text">€</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Status-Anzeige -->
+                                    <div id="design-status-display" class="mt-3" style="display: none;">
+                                        <div class="alert alert-success">
+                                            <i class="bi bi-check-circle"></i> 
+                                            <strong>Design-Status:</strong> <span id="status-text"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Stickerei-Felder -->
+                            <div id="embroidery-fields">
+                                <h6 class="text-primary"><i class="bi bi-thread"></i> Stickerei-Details</h6>
+                                
+                                <!-- Stichzahl für Preiskalkulation -->
+                                <div class="row mb-3" id="stitch-calculation">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="stitch_count">
+                                                Geschätzte Stichzahl 
+                                                <i class="bi bi-info-circle" data-bs-toggle="tooltip" 
+                                                   title="Ca. 1000 Stiche pro cm² bei normaler Dichte"></i>
+                                            </label>
+                                            <input type="number" class="form-control" id="stitch_count" 
+                                                   name="stitch_count" min="0" step="100" 
+                                                   placeholder="z.B. 5000" onchange="calculatePrice()">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="design_width_mm">Design-Breite (mm)</label>
+                                            <input type="number" class="form-control" id="design_width_mm" 
+                                                   name="design_width_mm" min="0" placeholder="z.B. 80">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="design_height_mm">Design-Höhe (mm)</label>
+                                            <input type="number" class="form-control" id="design_height_mm" 
+                                                   name="design_height_mm" min="0" placeholder="z.B. 60">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="embroidery_position">Stickerei-Position</label>
+                                            <select class="form-control" id="embroidery_position" name="embroidery_position">
+                                                <option value="">Wählen...</option>
+                                                <option value="brust-links">Brust links</option>
+                                                <option value="brust-rechts">Brust rechts</option>
+                                                <option value="brust-mitte">Brust mittig</option>
+                                                <option value="ruecken">Rücken</option>
+                                                <option value="aermel">Ärmel</option>
+                                                <option value="cap-front">Cap vorne</option>
+                                                <option value="multiple">Mehrere Positionen</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="embroidery_size">Stickerei-Größe (cm)</label>
+                                            <input type="text" class="form-control" id="embroidery_size" name="embroidery_size" 
+                                                   placeholder="z.B. 10x8 cm">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="thread_colors">Garn-Farben</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="thread_colors" name="thread_colors" 
+                                                       placeholder="Farben auswählen..." readonly>
+                                                <button type="button" class="btn btn-outline-secondary" onclick="openThreadSelector()" 
+                                                        id="thread-selector-btn" title="Garnfarben auswählen">
+                                                    <i class="bi bi-palette"></i> Auswählen
+                                                </button>
+                                            </div>
+                                            <input type="hidden" id="selected_threads" name="selected_threads" value="[]">
+                                            <div id="selected-threads-display" class="mt-2"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Druck-Felder -->
+                            <div id="printing-fields" style="display: none;">
+                                <h6 class="text-success"><i class="bi bi-printer"></i> Druck-Details</h6>
+                                
+                                <!-- Druckgröße für Kalkulation -->
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="print_width_cm">Druck-Breite (cm)</label>
+                                            <input type="number" class="form-control" id="print_width_cm" 
+                                                   name="print_width_cm" min="0" step="0.5" 
+                                                   placeholder="z.B. 20" onchange="calculatePrice()">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="print_height_cm">Druck-Höhe (cm)</label>
+                                            <input type="number" class="form-control" id="print_height_cm" 
+                                                   name="print_height_cm" min="0" step="0.5" 
+                                                   placeholder="z.B. 30" onchange="calculatePrice()">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="ink_coverage_percent">Deckungsgrad %</label>
+                                            <input type="number" class="form-control" id="ink_coverage_percent" 
+                                                   name="ink_coverage_percent" value="50" min="10" max="100" 
+                                                   onchange="calculatePrice()">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="print_method">Druckverfahren</label>
+                                            <select class="form-control" id="print_method" name="print_method">
+                                                <option value="">Wählen...</option>
+                                                <option value="dtg">DTG (Direct to Garment)</option>
+                                                <option value="dtf">DTF (Direct to Film)</option>
+                                                <option value="flex">Flexdruck</option>
+                                                <option value="flock">Flockdruck</option>
+                                                <option value="screen">Siebdruck</option>
+                                                <option value="sublimation">Sublimationsdruck</option>
+                                                <option value="vinyl">Vinyl-Transfer</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="print_colors">Druckfarben</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="print_colors" name="print_colors" 
+                                                       placeholder="Farben auswählen..." readonly>
+                                                <button type="button" class="btn btn-outline-secondary" onclick="openPrintColorSelector()">
+                                                    <i class="bi bi-palette"></i> Auswählen
+                                                </button>
+                                            </div>
+                                            <input type="hidden" id="selected_print_colors" name="selected_print_colors" value="[]">
+                                            <div id="selected-print-colors-display" class="mt-2"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="print_position">Druck-Position *</label>
+                                            <select class="form-control" id="print_position" name="print_position">
+                                                <option value="">Position wählen...</option>
+                                                <optgroup label="Vorderseite">
+                                                    <option value="brust-links">Brust links</option>
+                                                    <option value="brust-rechts">Brust rechts</option>
+                                                    <option value="brust-mitte">Brust mittig</option>
+                                                    <option value="vorne-gross">Vorderseite groß (A3)</option>
+                                                    <option value="vorne-komplett">Vorderseite komplett</option>
+                                                </optgroup>
+                                                <optgroup label="Rückseite">
+                                                    <option value="ruecken-oben">Rücken oben</option>
+                                                    <option value="ruecken-mitte">Rücken mittig</option>
+                                                    <option value="ruecken-gross">Rücken groß (A3)</option>
+                                                    <option value="ruecken-komplett">Rücken komplett</option>
+                                                    <option value="nacken">Nacken/Kragen</option>
+                                                </optgroup>
+                                                <optgroup label="Ärmel">
+                                                    <option value="aermel-links">Ärmel links</option>
+                                                    <option value="aermel-rechts">Ärmel rechts</option>
+                                                    <option value="aermel-beide">Beide Ärmel</option>
+                                                </optgroup>
+                                                <optgroup label="Spezial">
+                                                    <option value="bein-links">Hosenbein links</option>
+                                                    <option value="bein-rechts">Hosenbein rechts</option>
+                                                    <option value="kapuze">Kapuze</option>
+                                                    <option value="allover">All-Over Print</option>
+                                                    <option value="multiple">Mehrere Positionen</option>
+                                                </optgroup>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Produktionsart</label>
+                                            <select class="form-control" name="production_type" id="production_type" onchange="calculatePrice()">
+                                                <option value="internal">Eigene Produktion</option>
+                                                <option value="supplier">Lieferantenbezug</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Auftrags-Details -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="bi bi-info-circle"></i> Auftrags-Details</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="price">Preis *</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="price" name="price" 
+                                                   step="0.01" min="0.01" required>
+                                            <span class="input-group-text">€</span>
+                                        </div>
+                                        <!-- Preiskalkulation-Anzeige -->
+                                        <div id="price-calculation" class="mt-2">
+                                            <!-- Hier wird die Live-Kalkulation angezeigt -->
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="priority">Priorität</label>
+                                        <select class="form-control" id="priority" name="priority">
+                                            <option value="normal">Normal</option>
+                                            <option value="high">Hoch</option>
+                                            <option value="urgent">Dringend</option>
+                                            <option value="low">Niedrig</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="estimated_completion_days">Bearbeitungszeit (Tage)</label>
+                                        <input type="number" class="form-control" id="estimated_completion_days" 
+                                               name="estimated_completion_days" min="1" placeholder="z.B. 5">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="pickup_date">Gewünschtes Abholdatum</label>
+                                        <input type="date" class="form-control" id="pickup_date" name="pickup_date">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <div class="form-check mt-4">
+                                            <input class="form-check-input" type="checkbox" id="rush_order" name="rush_order">
+                                            <label class="form-check-label" for="rush_order">
+                                                <strong>Express-Auftrag</strong> (Aufpreis)
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label" for="special_instructions">Besondere Anweisungen</label>
+                                <textarea class="form-control" id="special_instructions" name="special_instructions" rows="3"
+                                          placeholder="Spezielle Wünsche, Qualitätsanforderungen, Verpackung..."></textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label" for="notes">Interne Notizen</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="2" 
+                                          placeholder="Interne Notizen (nicht für Kunden sichtbar)..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('orders.index') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Zurück
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-lg"></i> Auftrag erstellen
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleFields() {
+    const orderType = document.getElementById('order_type').value;
+    const embroideryFields = document.getElementById('embroidery-fields');
+    const printingFields = document.getElementById('printing-fields');
+    
+    if (orderType === 'embroidery') {
+        embroideryFields.style.display = 'block';
+        printingFields.style.display = 'none';
+    } else if (orderType === 'printing' || orderType === 'dtf') {
+        embroideryFields.style.display = 'none';
+        printingFields.style.display = 'block';
+    } else if (orderType === 'combined') {
+        embroideryFields.style.display = 'block';
+        printingFields.style.display = 'block';
+    }
+}
+
+// Verbessertes Design-Workflow Toggle
+function toggleDesignWorkflow() {
+    const designStatus = document.getElementById('design_status').value;
+    const logoAvailableSection = document.getElementById('logo-available-section');
+    const logoCreationSection = document.getElementById('logo-creation-section');
+    const logoAdaptationSection = document.getElementById('logo-adaptation-section');
+    const statusDisplay = document.getElementById('design-status-display');
+    const workflowCard = document.getElementById('design-workflow-card');
+    
+    // Verstecke alle Sektionen
+    logoAvailableSection.style.display = 'none';
+    logoCreationSection.style.display = 'none';
+    logoAdaptationSection.style.display = 'none';
+    statusDisplay.style.display = 'none';
+    
+    // Setze Card-Styling zurück
+    workflowCard.className = 'card mb-3';
+    
+    // Zeige entsprechende Sektion basierend auf Auswahl
+    if (designStatus === 'logo_available') {
+        logoAvailableSection.style.display = 'block';
+        updateStatusDisplay('Logo vorhanden - Bereitstellung auswählen');
+    } else if (designStatus === 'logo_needs_creation') {
+        logoCreationSection.style.display = 'block';
+        updateStatusDisplay('Logo wird erstellt - Wartet auf Fertigstellung');
+    } else if (designStatus === 'logo_needs_adaptation') {
+        logoAdaptationSection.style.display = 'block';
+        updateStatusDisplay('Logo wird angepasst - Wartet auf Bearbeitung');
+    }
+}
+
+function updateStatusDisplay(text) {
+    const statusDisplay = document.getElementById('design-status-display');
+    const statusText = document.getElementById('status-text');
+    
+    if (statusDisplay && statusText) {
+        statusText.textContent = text;
+        statusDisplay.style.display = 'block';
+    }
+}
+
+// Datei-Dialog-Funktionen
+function selectDesignFile() {
+    // Öffne File-Browser Modal
+    fileBrowser.openModal(function(selectedFile) {
+        document.getElementById('design_file_path').value = selectedFile.path;
+        markDesignAsReady();
+        
+        // Versuche Datei-Analyse
+        analyzeSelectedFile(selectedFile.path);
+    });
+}
+
+function selectOriginalLogo() {
+    // Öffne File-Browser Modal für Original-Logo
+    fileBrowser.openModal(function(selectedFile) {
+        document.getElementById('original_logo_path').value = selectedFile.path;
+    });
+}
+
+function analyzeSelectedFile(filePath) {
+    // Simuliere Datei-Analyse für ausgewählte Datei
+    const resultDiv = document.getElementById('file-analysis-result');
+    
+    resultDiv.innerHTML = `
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            <strong>Datei ausgewählt:</strong> ${filePath.split('/').pop()}
+        </div>`;
+    
+    // TODO: Hier könnte eine echte Datei-Analyse implementiert werden
+    // über einen separaten AJAX-Call
+}
+
+function handleDesignUpload(input) {
+    if (input.files && input.files[0]) {
+        analyzeDesignFile(input);
+    }
+}
+
+function markDesignAsReady() {
+    const workflowCard = document.getElementById('design-workflow-card');
+    if (workflowCard) {
+        workflowCard.className = 'card mb-3 border-success';
+    }
+    updateStatusDisplay('Design bereit - Auftrag kann fortgesetzt werden');
+}
+
+// Live-Preiskalkulation
+// Textile-Item Management
+let textileItemCounter = 1;
+
+function updateTextileInfo(selectElement) {
+    const option = selectElement.selectedOptions[0];
+    const textileItem = selectElement.closest('.textile-item');
+    
+    if (option && option.value) {
+        const name = option.dataset.name;
+        const price = parseFloat(option.dataset.price || 0);
+        const color = option.dataset.color || '';
+        const size = option.dataset.size || '';
+        const material = option.dataset.material || '';
+        
+        // Textil-Info zusammensetzen
+        let info = name;
+        if (material) info += ` (${material})`;
+        
+        textileItem.querySelector('.textile-info').value = info;
+        textileItem.querySelector('.price-display').value = price.toFixed(2) + ' €';
+        
+        // Farbe und Größe automatisch setzen, falls im Artikel vorhanden
+        const sizeSelect = textileItem.querySelector('select[name="textile_size[]"]');
+        const colorInput = textileItem.querySelector('input[name="textile_color_note[]"]');
+        
+        // Größe setzen, falls sie in den Optionen vorhanden ist
+        if (size && sizeSelect) {
+            for (let i = 0; i < sizeSelect.options.length; i++) {
+                if (sizeSelect.options[i].value.toLowerCase() === size.toLowerCase()) {
+                    sizeSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        // Farbe setzen, falls vorhanden
+        if (color && colorInput) {
+            colorInput.value = color;
+        }
+        
+        calculatePrice();
+    } else {
+        textileItem.querySelector('.textile-info').value = '';
+        textileItem.querySelector('.price-display').value = '';
+        
+        // Felder zurücksetzen
+        const sizeSelect = textileItem.querySelector('select[name="textile_size[]"]');
+        const colorInput = textileItem.querySelector('input[name="textile_color_note[]"]');
+        
+        if (sizeSelect) sizeSelect.selectedIndex = 0;
+        if (colorInput) colorInput.value = '';
+    }
+}
+
+function addTextileItem() {
+    textileItemCounter++;
+    const container = document.getElementById('textile-items');
+    const firstItem = container.querySelector('.textile-item');
+    const newItem = firstItem.cloneNode(true);
+    
+    // Update counter and clear values
+    newItem.querySelector('h6').textContent = `Textil #${textileItemCounter}`;
+    newItem.querySelector('.article-select').selectedIndex = 0;
+    newItem.querySelector('.quantity-input').value = 1;
+    newItem.querySelector('.textile-info').value = '';
+    newItem.querySelector('.price-display').value = '';
+    newItem.querySelector('select[name="textile_size[]"]').selectedIndex = 0;
+    newItem.querySelector('input[name="textile_color_note[]"]').value = '';
+    
+    // Event-Handler für das neue Item aktualisieren
+    const articleSelect = newItem.querySelector('.article-select');
+    articleSelect.setAttribute('onchange', 'updateTextileInfo(this)');
+    
+    const quantityInput = newItem.querySelector('.quantity-input');
+    quantityInput.setAttribute('onchange', 'calculatePrice()');
+    
+    // Show remove button
+    newItem.querySelector('.remove-textile').classList.remove('d-none');
+    
+    container.appendChild(newItem);
+    updateRemoveButtons();
+}
+
+function removeTextileItem(button) {
+    const item = button.closest('.textile-item');
+    item.remove();
+    updateTextileNumbers();
+    updateRemoveButtons();
+    calculatePrice();
+}
+
+function updateTextileNumbers() {
+    const items = document.querySelectorAll('.textile-item');
+    items.forEach((item, index) => {
+        item.querySelector('h6').textContent = `Textil #${index + 1}`;
+    });
+    textileItemCounter = items.length;
+}
+
+function updateRemoveButtons() {
+    const items = document.querySelectorAll('.textile-item');
+    const removeButtons = document.querySelectorAll('.remove-textile');
+    
+    removeButtons.forEach((btn, index) => {
+        if (items.length > 1) {
+            btn.classList.remove('d-none');
+        } else {
+            btn.classList.add('d-none');
+        }
+    });
+}
+
+function calculatePrice() {
+    const order_type = document.getElementById('order_type').value;
+    const textileItems = document.querySelectorAll('.textile-item');
+    
+    // Sammle alle Textil-Daten
+    let totalQuantity = 0;
+    let textileData = [];
+    
+    textileItems.forEach(item => {
+        const articleSelect = item.querySelector('.article-select');
+        const quantity = parseInt(item.querySelector('.quantity-input').value) || 0;
+        
+        if (articleSelect.value && quantity > 0) {
+            const option = articleSelect.selectedOptions[0];
+            textileData.push({
+                article_id: articleSelect.value,
+                quantity: quantity,
+                price: parseFloat(option.dataset.price || 0),
+                weight: parseFloat(option.dataset.weight || 0)
+            });
+            totalQuantity += quantity;
+        }
+    });
+    
+    if (textileData.length === 0) {
+        document.getElementById('price-calculation').innerHTML = `
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i> Bitte wählen Sie mindestens ein Textil aus
+            </div>`;
+        return;
+    }
+    
+    let data = {
+        order_type: order_type,
+        quantity: totalQuantity,
+        textile_items: textileData
+    };
+    
+    if (order_type === 'embroidery' || order_type === 'combined') {
+        data.stitch_count = document.getElementById('stitch_count').value || 0;
+    }
+    
+    if (order_type === 'printing' || order_type === 'dtf' || order_type === 'combined') {
+        data.print_width_cm = document.getElementById('print_width_cm').value || 0;
+        data.print_height_cm = document.getElementById('print_height_cm').value || 0;
+        data.ink_coverage_percent = document.getElementById('ink_coverage_percent').value || 50;
+        data.production_type = document.getElementById('production_type').value || 'internal';
+    }
+    
+    // AJAX-Call
+    fetch('/orders/calculate_price', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Preis-Anzeige aktualisieren
+        if (!data.error) {
+            document.getElementById('price').value = data.total ? data.total.toFixed(2) : data.total_cost.toFixed(2);
+            
+            // Kalkulations-Details anzeigen
+            let html = `
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-calculator"></i> Preiskalkulation:</h6>
+                    <table class="table table-sm mb-0">`;
+            
+            if (data.unit_price !== undefined) {
+                html += `
+                        <tr>
+                            <td>Stückpreis:</td>
+                            <td class="text-end">${data.unit_price.toFixed(2)} €</td>
+                        </tr>`;
+            }
+            
+            if (data.subtotal !== undefined) {
+                html += `
+                        <tr>
+                            <td>Zwischensumme (${totalQuantity} Stück):</td>
+                            <td class="text-end">${data.subtotal.toFixed(2)} €</td>
+                        </tr>`;
+            }
+            
+            if (data.discount_percent > 0) {
+                html += `
+                        <tr class="text-success">
+                            <td>Mengenrabatt (${data.discount_percent}%):</td>
+                            <td class="text-end">-${data.discount_amount.toFixed(2)} €</td>
+                        </tr>`;
+            }
+            
+            if (data.setup_fee) {
+                html += `
+                        <tr>
+                            <td>Einrichtungspauschale:</td>
+                            <td class="text-end">${data.setup_fee.toFixed(2)} €</td>
+                        </tr>`;
+            }
+            
+            // DTF-spezifische Details
+            if (data.film_cost !== undefined) {
+                html += `
+                        <tr>
+                            <td colspan="2" class="text-muted"><small>Materialkosten:</small></td>
+                        </tr>
+                        <tr>
+                            <td><small>- DTF-Folie (${data.film_usage_m}m):</small></td>
+                            <td class="text-end"><small>${data.film_cost.toFixed(2)} €</small></td>
+                        </tr>
+                        <tr>
+                            <td><small>- Pulver:</small></td>
+                            <td class="text-end"><small>${data.powder_cost.toFixed(2)} €</small></td>
+                        </tr>
+                        <tr>
+                            <td><small>- Tinte:</small></td>
+                            <td class="text-end"><small>${data.ink_cost.toFixed(2)} €</small></td>
+                        </tr>
+                        <tr>
+                            <td><small>- Produktion:</small></td>
+                            <td class="text-end"><small>${data.production_cost.toFixed(2)} €</small></td>
+                        </tr>`;
+            }
+            
+            const total = data.total || data.total_cost || 0;
+            html += `
+                        <tr class="fw-bold">
+                            <td>Gesamtpreis:</td>
+                            <td class="text-end">${total.toFixed(2)} €</td>
+                        </tr>
+                    </table>
+                </div>`;
+            
+            document.getElementById('price-calculation').innerHTML = html;
+        } else {
+            document.getElementById('price-calculation').innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> ${data.error}
+                </div>`;
+        }
+    })
+    .catch(error => {
+        console.error('Fehler bei Preiskalkulation:', error);
+    });
+}
+
+// Event-Listener
+document.getElementById('add-textile').addEventListener('click', addTextileItem);
+
+// Event-Delegation für dynamische Elemente
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('remove-textile') || e.target.closest('.remove-textile')) {
+        removeTextileItem(e.target.closest('.remove-textile'));
+    }
+});
+
+document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('quantity-input')) {
+        calculatePrice();
+    }
+});
+
+function analyzeDesignFile(input) {
+    const file = input.files[0];
+    const resultDiv = document.getElementById('file-analysis-result');
+    
+    if (!file) {
+        resultDiv.innerHTML = '';
+        return;
+    }
+    
+    // Zeige Loading
+    resultDiv.innerHTML = `
+        <div class="alert alert-info">
+            <i class="bi bi-hourglass-split"></i> Analysiere Datei...
+        </div>`;
+    
+    const formData = new FormData();
+    formData.append('design_file', file);
+    
+    fetch('/orders/analyze_file', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let html = `<div class="alert alert-success">
+                <h6><i class="bi bi-check-circle"></i> Datei analysiert:</h6>
+                <ul class="mb-0">`;
+            
+            // DST-spezifische Informationen
+            if (data.stitch_count) {
+                html += `<li><strong>Stichzahl:</strong> ${data.stitch_count.toLocaleString()} Stiche</li>`;
+                html += `<li><strong>Abmessungen:</strong> ${data.width_mm} × ${data.height_mm} mm</li>`;
+                
+                // Automatisch Felder ausfüllen
+                document.getElementById('stitch_count').value = data.stitch_count;
+                document.getElementById('design_width_mm').value = Math.round(data.width_mm);
+                document.getElementById('design_height_mm').value = Math.round(data.height_mm);
+            }
+            
+            // Druck-spezifische Informationen
+            if (data.width_cm) {
+                html += `<li><strong>Druckgröße:</strong> ${data.width_cm} × ${data.height_cm} cm</li>`;
+                
+                if (data.width_px) {
+                    html += `<li><strong>Auflösung:</strong> ${data.width_px} × ${data.height_px} px</li>`;
+                    html += `<li><strong>DPI:</strong> ${data.dpi[0]} × ${data.dpi[1]}</li>`;
+                }
+                
+                // Automatisch Felder ausfüllen
+                document.getElementById('print_width_cm').value = data.width_cm;
+                document.getElementById('print_height_cm').value = data.height_cm;
+            }
+            
+            html += `</ul></div>`;
+            resultDiv.innerHTML = html;
+            
+            // WICHTIG: Design-Status automatisch auf "logo_available" setzen
+            const designStatusSelect = document.getElementById('design_status');
+            if (designStatusSelect) {
+                designStatusSelect.value = 'logo_available';
+                // Trigger das Change-Event um UI zu aktualisieren
+                designStatusSelect.dispatchEvent(new Event('change'));
+                
+                // Markiere als bereit
+                markDesignAsReady();
+                
+                // Zeige Success-Message
+                const workflowCard = document.getElementById('design-workflow-card');
+                if (workflowCard) {
+                    workflowCard.className = 'card mb-3 border-success bg-light-success';
+                    const cardHeader = workflowCard.querySelector('.card-header h6');
+                    if (cardHeader) {
+                        cardHeader.innerHTML = '<i class="bi bi-check-circle text-success"></i> Design-Workflow: Automatisch erkannt';
+                    }
+                }
+            }
+            
+            // Preiskalkulation neu berechnen
+            calculatePrice();
+            
+        } else {
+            resultDiv.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> ${data.error}
+                </div>`;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        resultDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-x-circle"></i> Fehler beim Analysieren der Datei
+            </div>`;
+    });
+}
+
+// Initial call
+toggleFields();
+
+// Tooltips aktivieren
+document.addEventListener('DOMContentLoaded', function() {
+    if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+});
+
+// Thread selector wird von externer Datei geladen
+
+// Prüfe ob Funktionen geladen wurden nach kurzer Verzögerung
+setTimeout(function() {
+    if (typeof openThreadSelector === 'undefined') {
+        console.error('thread_selector.js wurde nicht geladen - erstelle Fallback');
+        window.openThreadSelector = function() {
+            alert('Die Garnauswahl konnte nicht geladen werden.\n\nBitte laden Sie die Seite neu (F5) und versuchen Sie es erneut.');
+            location.reload();
+        };
+    } else {
+        console.log('openThreadSelector erfolgreich geladen');
+    }
+}, 1000);
+</script>
+<!-- Bereinigte Version ohne Syntax-Fehler -->
+<script src="{{ url_for('static', filename='js/thread_selector_fixed.js') }}" 
+        onerror="console.error('Fehler beim Laden von thread_selector_fixed.js'); alert('Fehler beim Laden der Garnauswahl.');"></script>
+<script src="{{ url_for('static', filename='js/print_color_selector.js') }}" 
+        onerror="console.error('Fehler beim Laden von print_color_selector.js');"></script>
+
+<!-- Debug: Prüfe ob Funktionen geladen wurden -->
+<script>
+window.addEventListener('load', function() {
+    console.log('Page loaded. Checking functions...');
+    console.log('openThreadSelector exists:', typeof openThreadSelector !== 'undefined');
+    console.log('Bootstrap exists:', typeof bootstrap !== 'undefined');
+    
+    // Prüfe ob alle notwendigen Elemente da sind
+    const orderTypeElement = document.getElementById('order_type');
+    console.log('Order type element found:', orderTypeElement !== null);
+    
+    if (orderTypeElement) {
+        console.log('Current order type:', orderTypeElement.value);
+    }
+    
+    // Direkter Event Listener für den Button
+    const threadBtn = document.getElementById('thread-selector-btn');
+    if (threadBtn) {
+        console.log('Thread selector button found');
+        threadBtn.addEventListener('click', function(e) {
+            console.log('Thread button clicked via event listener');
+            e.preventDefault();
+            try {
+                if (typeof openThreadSelector === 'function') {
+                    openThreadSelector();
+                } else {
+                    console.error('openThreadSelector function not found');
+                    alert('Die Garnauswahl konnte nicht geladen werden. Bitte laden Sie die Seite neu (F5).');
+                }
+            } catch (error) {
+                console.error('Error in thread selector:', error);
+                alert('Fehler: ' + error.message);
+            }
+        });
+    } else {
+        console.error('Thread selector button not found!');
+    }
+});
+</script>
+
+<!-- CSS für Print Color Selector -->
+<style>
+/* Print Color Selector Styles */
+.color-card {
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.color-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.color-card.selected {
+    border: 3px solid #0d6efd !important;
+}
+
+.color-card .bi-check-circle-fill {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 16px;
+}
+
+.selected-color-chip {
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+#modal-selected-colors .btn-close {
+    width: 0.5em;
+    height: 0.5em;
+    padding: 0;
+}
+
+#selected-print-colors-display .badge {
+    padding: 0.5em 0.75em;
+    font-size: 0.875rem;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Design Workflow Styles */
+.bg-light-success {
+    background-color: #f8f9fa;
+    border-color: #198754;
+}
+
+.design-option-card {
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.design-option-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+#design-workflow-card .card-body {
+    padding: 1.5rem;
+}
+
+#design-workflow-card .alert {
+    margin-bottom: 1rem;
+}
+
+.design-option-card .card-body {
+    padding: 1rem;
+}
+
+.design-option-card h6 {
+    color: #495057;
+    margin-bottom: 0.5rem;
+}
+
+.design-option-card .text-muted {
+    font-size: 0.875rem;
+}
+</style>
+{% endblock %}

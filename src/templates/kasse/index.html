@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Kasse - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1><i class="bi bi-cash-stack"></i> Kassensystem</h1>
+    
+    <!-- Übersicht -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Heutiger Umsatz</h5>
+                    <h2 class="text-success">{{ "%.2f"|format(today_revenue) }} €</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Belege heute</h5>
+                    <h2 class="text-primary">{{ today_receipts }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Kasse aktiv</h5>
+                    <h2 class="text-info">{{ kasse_status }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">TSE Status</h5>
+                    <h2 class="text-warning">{{ tse_status }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Hauptaktionen -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h3 class="card-title"><i class="bi bi-cart"></i> Kassenverkauf</h3>
+                    <p class="card-text">Artikel verkaufen und Belege erstellen</p>
+                    <a href="{{ url_for('kasse.verkauf_interface') }}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-play-circle"></i> Verkauf starten
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center">
+                    <h3 class="card-title"><i class="bi bi-calendar-check"></i> Tagesabschluss</h3>
+                    <p class="card-text">Tägliche Kassenberichte und Abschlüsse</p>
+                    <a href="{{ url_for('kasse.tagesabschluss') }}" class="btn btn-info btn-lg">
+                        <i class="bi bi-clipboard-data"></i> Tagesabschluss
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Letzte Belege -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="bi bi-receipt"></i> Letzte Belege</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Zeit</th>
+                            <th>Beleg-Nr.</th>
+                            <th>Kunde</th>
+                            <th>Betrag</th>
+                            <th>Zahlungsart</th>
+                            <th>Status</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for beleg in recent_receipts %}
+                        <tr>
+                            <td>{{ beleg.datum.strftime('%H:%M') }}</td>
+                            <td>{{ beleg.beleg_nummer }}</td>
+                            <td>
+                                {% if beleg.kunde %}
+                                    {{ beleg.kunde.first_name }} {{ beleg.kunde.last_name }}
+                                {% else %}
+                                    Laufkunde
+                                {% endif %}
+                            </td>
+                            <td>{{ "%.2f"|format(beleg.summe_brutto) }} €</td>
+                            <td>
+                                {% if beleg.zahlungsart == 'cash' %}
+                                    <i class="bi bi-cash"></i> Bar
+                                {% elif beleg.zahlungsart == 'card' %}
+                                    <i class="bi bi-credit-card"></i> Karte
+                                {% elif beleg.zahlungsart == 'invoice' %}
+                                    <i class="bi bi-receipt"></i> Rechnung
+                                {% else %}
+                                    {{ beleg.zahlungsart }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if beleg.storniert %}
+                                    <span class="badge bg-danger">Storniert</span>
+                                {% else %}
+                                    <span class="badge bg-success">OK</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('kasse.beleg_detail', beleg_id=beleg.id) }}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> Details
+                                </a>
+                                <button class="btn btn-sm btn-outline-secondary" 
+                                        onclick="printReceipt('{{ beleg.id }}')">
+                                    <i class="bi bi-printer"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">Noch keine Belege heute</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Weitere Funktionen -->
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-gear"></i> Kassen-Einstellungen</h5>
+                    <p class="card-text">TSE-Konfiguration und Systemeinstellungen</p>
+                    <a href="{{ url_for('kasse.kassen_einstellungen') }}" class="btn btn-secondary">Einstellungen</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-graph-up"></i> Berichte</h5>
+                    <p class="card-text">Umsatzstatistiken und Auswertungen</p>
+                    <a href="{{ url_for('kasse.berichte') }}" class="btn btn-secondary">Berichte</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-book"></i> Z-Bericht</h5>
+                    <p class="card-text">Kassenjournal und Protokolle</p>
+                    <a href="{{ url_for('kasse.z_bericht') }}" class="btn btn-secondary">Z-Bericht</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function printReceipt(belegId) {
+    window.open(`/kasse/beleg/${belegId}/print`, '_blank');
+}
+</script>
+{% endblock %}

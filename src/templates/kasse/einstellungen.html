@@ -1,0 +1,608 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block head %}
+<style>
+.einstellungen-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.einstellungen-header {
+    background: linear-gradient(135deg, #6c757d, #495057);
+    color: white;
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+}
+
+.einstellungen-card {
+    background: white;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 25px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.tse-status {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.tse-indicator {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #fff;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.config-item {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.config-label {
+    font-weight: bold;
+    color: #495057;
+    margin-bottom: 10px;
+}
+
+.config-value {
+    font-size: 1.1rem;
+    color: #212529;
+    margin-bottom: 15px;
+}
+
+.config-input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+.mwst-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.mwst-table th {
+    background: #007bff;
+    color: white;
+    padding: 15px;
+    font-weight: bold;
+}
+
+.mwst-table td {
+    padding: 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.mwst-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+.mwst-table tr:last-child td {
+    border-bottom: none;
+}
+
+.status-badge {
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.status-aktiv {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-inaktiv {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.btn-gruppe {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn-speichern {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-speichern:hover {
+    background: #218838;
+    transform: translateY(-2px);
+}
+
+.btn-test {
+    background: #17a2b8;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-test:hover {
+    background: #138496;
+    transform: translateY(-2px);
+}
+
+.btn-reset {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 12px 25px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-reset:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+}
+
+.info-box {
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 0 8px 8px 0;
+}
+
+.warning-box {
+    background: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 0 8px 8px 0;
+}
+
+.section-divider {
+    border-top: 2px solid #e9ecef;
+    margin: 30px 0;
+}
+
+.kassen-config {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.drucker-config {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.test-ergebnis {
+    margin-top: 15px;
+    padding: 15px;
+    border-radius: 8px;
+    display: none;
+}
+
+.test-erfolg {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.test-fehler {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="einstellungen-container">
+    <!-- Header -->
+    <div class="einstellungen-header">
+        <h2>⚙️ {{ page_title }}</h2>
+        <p class="mb-0">Konfiguration des Kassensystems und der TSE</p>
+    </div>
+
+    <!-- TSE-Status -->
+    <div class="tse-status">
+        <div class="tse-indicator"></div>
+        <div class="flex-grow-1">
+            <h5 class="mb-1">🔐 TSE-Status</h5>
+            <p class="mb-0">
+                {% if tse_config %}
+                    TSE {{ tse_config.tse_seriennummer }} - {{ tse_config.tse_hersteller }}
+                    <span class="badge bg-light text-dark ms-2">{{ tse_config.status.value if tse_config.status else 'Unbekannt' }}</span>
+                {% else %}
+                    Mock-TSE aktiv (Entwicklungsmodus)
+                    <span class="badge bg-warning text-dark ms-2">Testmodus</span>
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <button class="btn btn-light" onclick="tseTest()">
+                <i class="fas fa-flask"></i> Test
+            </button>
+        </div>
+    </div>
+
+    <!-- TSE-Konfiguration -->
+    <div class="einstellungen-card">
+        <h5>🔐 TSE-Konfiguration</h5>
+        <div class="info-box">
+            <i class="fas fa-info-circle"></i>
+            <strong>Hinweis:</strong> Änderungen an der TSE-Konfiguration erfordern einen Neustart des Systems.
+        </div>
+        
+        <div class="config-grid">
+            <div class="config-item">
+                <div class="config-label">TSE-Seriennummer</div>
+                <div class="config-value">{{ tse_config.tse_seriennummer if tse_config else 'MOCK_TSE_DEV_001' }}</div>
+                <input type="text" class="config-input" id="tse-seriennummer" 
+                       value="{{ tse_config.tse_seriennummer if tse_config else 'MOCK_TSE_DEV_001' }}"
+                       placeholder="TSE-Seriennummer eingeben">
+            </div>
+            
+            <div class="config-item">
+                <div class="config-label">TSE-Hersteller</div>
+                <div class="config-value">{{ tse_config.tse_hersteller if tse_config else 'StitchAdmin Mock' }}</div>
+                <select class="config-input" id="tse-hersteller">
+                    <option value="StitchAdmin Mock" {{ 'selected' if not tse_config or tse_config.tse_hersteller == 'StitchAdmin Mock' else '' }}>StitchAdmin Mock</option>
+                    <option value="Fiskaltrust" {{ 'selected' if tse_config and tse_config.tse_hersteller == 'Fiskaltrust' else '' }}>Fiskaltrust</option>
+                    <option value="Epson" {{ 'selected' if tse_config and tse_config.tse_hersteller == 'Epson' else '' }}>Epson</option>
+                    <option value="Diebold Nixdorf" {{ 'selected' if tse_config and tse_config.tse_hersteller == 'Diebold Nixdorf' else '' }}>Diebold Nixdorf</option>
+                    <option value="Swissbit" {{ 'selected' if tse_config and tse_config.tse_hersteller == 'Swissbit' else '' }}>Swissbit</option>
+                </select>
+            </div>
+            
+            <div class="config-item">
+                <div class="config-label">Kassen-ID</div>
+                <div class="config-value">{{ tse_config.kassen_id if tse_config else 'KASSE-01' }}</div>
+                <input type="text" class="config-input" id="kassen-id" 
+                       value="{{ tse_config.kassen_id if tse_config else 'KASSE-01' }}"
+                       placeholder="Kassen-ID eingeben">
+            </div>
+            
+            <div class="config-item">
+                <div class="config-label">Client-ID</div>
+                <div class="config-value">{{ tse_config.client_id if tse_config else 'CLIENT-01' }}</div>
+                <input type="text" class="config-input" id="client-id" 
+                       value="{{ tse_config.client_id if tse_config else 'CLIENT-01' }}"
+                       placeholder="Client-ID eingeben">
+            </div>
+        </div>
+        
+        <div id="tse-test-ergebnis" class="test-ergebnis"></div>
+        
+        <div class="btn-gruppe">
+            <button class="btn-speichern" onclick="tseKonfigurationSpeichern()">
+                <i class="fas fa-save"></i> Speichern
+            </button>
+            <button class="btn-test" onclick="tseTest()">
+                <i class="fas fa-flask"></i> Verbindung testen
+            </button>
+        </div>
+    </div>
+
+    <!-- Kassen-Konfiguration -->
+    <div class="einstellungen-card">
+        <h5>🏪 Kassen-Konfiguration</h5>
+        
+        <div class="kassen-config">
+            <div class="config-item">
+                <div class="config-label">Kassenbezeichnung</div>
+                <input type="text" class="config-input" id="kassen-name" 
+                       value="StitchAdmin Kasse 1"
+                       placeholder="Kassenbezeichnung eingeben">
+            </div>
+            
+            <div class="config-item">
+                <div class="config-label">Standort</div>
+                <input type="text" class="config-input" id="kassen-standort" 
+                       value="Hauptgeschäft"
+                       placeholder="Standort eingeben">
+            </div>
+            
+            <div class="config-item">
+                <div class="config-label">Währung</div>
+                <select class="config-input" id="waehrung">
+                    <option value="EUR" selected>EUR (€)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="CHF">CHF (Fr.)</option>
+                </select>
+            </div>
+            
+            <div class="config-item">
+                <div class="config-label">Automatischer Tagesabschluss</div>
+                <select class="config-input" id="auto-tagesabschluss">
+                    <option value="false" selected>Deaktiviert</option>
+                    <option value="true">Aktiviert</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- MwSt-Sätze -->
+    <div class="einstellungen-card">
+        <h5>📊 Mehrwertsteuersätze</h5>
+        <div class="warning-box">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Wichtig:</strong> Änderungen an MwSt-Sätzen wirken sich auf alle zukünftigen Belege aus.
+        </div>
+        
+        <div class="table-responsive">
+            <table class="mwst-table">
+                <thead>
+                    <tr>
+                        <th>Bezeichnung</th>
+                        <th>Steuersatz</th>
+                        <th>Gültig von</th>
+                        <th>Gültig bis</th>
+                        <th>Status</th>
+                        <th>Standard</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if mwst_saetze %}
+                        {% for satz in mwst_saetze %}
+                        <tr>
+                            <td>{{ satz.bezeichnung }}</td>
+                            <td>{{ "%.1f"|format(satz.satz) }}%</td>
+                            <td>{{ satz.gueltig_von.strftime('%d.%m.%Y') if satz.gueltig_von else '-' }}</td>
+                            <td>{{ satz.gueltig_bis.strftime('%d.%m.%Y') if satz.gueltig_bis else 'Unbefristet' }}</td>
+                            <td>
+                                <span class="status-badge {{ 'status-aktiv' if satz.aktiv else 'status-inaktiv' }}">
+                                    {{ 'Aktiv' if satz.aktiv else 'Inaktiv' }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if satz.standard %}
+                                    <i class="fas fa-star text-warning"></i>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="bearbeiteMwstSatz({{ satz.id }})">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">
+                                Keine MwSt-Sätze konfiguriert (verwendet Standard-Sätze)
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="btn-gruppe">
+            <button class="btn-speichern" onclick="neuenMwstSatzHinzufuegen()">
+                <i class="fas fa-plus"></i> Neuen Satz hinzufügen
+            </button>
+            <button class="btn-test" onclick="standardSaetzeErstellen()">
+                <i class="fas fa-magic"></i> Standard-Sätze erstellen
+            </button>
+        </div>
+    </div>
+
+    <!-- Drucker-Konfiguration -->
+    <div class="einstellungen-card">
+        <h5>🖨️ Drucker-Konfiguration</h5>
+        
+        <div class="drucker-config">
+            <div class="config-grid">
+                <div class="config-item">
+                    <div class="config-label">Beleg-Drucker</div>
+                    <select class="config-input" id="beleg-drucker">
+                        <option value="default">Standard-Drucker</option>
+                        <option value="thermal">Thermal-Drucker</option>
+                        <option value="pdf">PDF-Export</option>
+                        <option value="none">Kein Drucker</option>
+                    </select>
+                </div>
+                
+                <div class="config-item">
+                    <div class="config-label">Automatischer Druck</div>
+                    <select class="config-input" id="auto-druck">
+                        <option value="false" selected>Deaktiviert</option>
+                        <option value="true">Bei jedem Beleg</option>
+                        <option value="customer">Nur bei Kundenkauf</option>
+                    </select>
+                </div>
+                
+                <div class="config-item">
+                    <div class="config-label">Papierformat</div>
+                    <select class="config-input" id="papier-format">
+                        <option value="80mm" selected>80mm (Standard)</option>
+                        <option value="58mm">58mm (Kompakt)</option>
+                        <option value="A4">A4 (Büro)</option>
+                    </select>
+                </div>
+                
+                <div class="config-item">
+                    <div class="config-label">Logo drucken</div>
+                    <select class="config-input" id="logo-druck">
+                        <option value="false" selected>Nein</option>
+                        <option value="true">Ja</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div id="drucker-test-ergebnis" class="test-ergebnis"></div>
+            
+            <div class="btn-gruppe">
+                <button class="btn-speichern" onclick="druckerKonfigurationSpeichern()">
+                    <i class="fas fa-save"></i> Speichern
+                </button>
+                <button class="btn-test" onclick="druckerTest()">
+                    <i class="fas fa-print"></i> Testdruck
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zurück-Button -->
+    <div class="text-center">
+        <a href="{{ url_for('kasse.kassen_index') }}" class="btn btn-secondary btn-lg">
+            <i class="fas fa-arrow-left"></i> Zurück zum Kassensystem
+        </a>
+    </div>
+</div>
+
+<script>
+// TSE-Test
+function tseTest() {
+    const ergebnisDiv = document.getElementById('tse-test-ergebnis');
+    ergebnisDiv.style.display = 'block';
+    ergebnisDiv.className = 'test-ergebnis';
+    ergebnisDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Teste TSE-Verbindung...';
+    
+    // Mock-Test (später durch echten TSE-Test ersetzen)
+    setTimeout(() => {
+        ergebnisDiv.className = 'test-ergebnis test-erfolg';
+        ergebnisDiv.innerHTML = '<i class="fas fa-check"></i> TSE-Verbindung erfolgreich! Mock-TSE antwortet korrekt.';
+    }, 2000);
+}
+
+// TSE-Konfiguration speichern
+function tseKonfigurationSpeichern() {
+    const config = {
+        tse_seriennummer: document.getElementById('tse-seriennummer').value,
+        tse_hersteller: document.getElementById('tse-hersteller').value,
+        kassen_id: document.getElementById('kassen-id').value,
+        client_id: document.getElementById('client-id').value
+    };
+    
+    // TODO: Implementiere Speichern
+    showAlert('TSE-Konfiguration gespeichert (Mock)', 'success');
+}
+
+// Drucker-Test
+function druckerTest() {
+    const ergebnisDiv = document.getElementById('drucker-test-ergebnis');
+    ergebnisDiv.style.display = 'block';
+    ergebnisDiv.className = 'test-ergebnis';
+    ergebnisDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sende Testdruck...';
+    
+    // Mock-Test
+    setTimeout(() => {
+        ergebnisDiv.className = 'test-ergebnis test-erfolg';
+        ergebnisDiv.innerHTML = '<i class="fas fa-check"></i> Testdruck erfolgreich! Prüfen Sie den Drucker.';
+    }, 1500);
+}
+
+// Drucker-Konfiguration speichern
+function druckerKonfigurationSpeichern() {
+    const config = {
+        beleg_drucker: document.getElementById('beleg-drucker').value,
+        auto_druck: document.getElementById('auto-druck').value,
+        papier_format: document.getElementById('papier-format').value,
+        logo_druck: document.getElementById('logo-druck').value
+    };
+    
+    // TODO: Implementiere Speichern
+    showAlert('Drucker-Konfiguration gespeichert (Mock)', 'success');
+}
+
+// MwSt-Satz bearbeiten
+function bearbeiteMwstSatz(id) {
+    // TODO: Implementiere MwSt-Satz-Bearbeitung
+    showAlert('MwSt-Satz-Bearbeitung wird noch implementiert', 'info');
+}
+
+// Neuen MwSt-Satz hinzufügen
+function neuenMwstSatzHinzufuegen() {
+    // TODO: Implementiere Hinzufügen
+    showAlert('MwSt-Satz-Hinzufügen wird noch implementiert', 'info');
+}
+
+// Standard-Sätze erstellen
+function standardSaetzeErstellen() {
+    if (confirm('Möchten Sie die Standard-MwSt-Sätze (19%, 7%, 0%) erstellen?')) {
+        // TODO: Implementiere Standard-Sätze
+        showAlert('Standard-MwSt-Sätze erstellt (Mock)', 'success');
+    }
+}
+
+// Alert-Funktion
+function showAlert(message, type = 'info') {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.style.minWidth = '300px';
+    
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+
+// Initialisierung
+document.addEventListener('DOMContentLoaded', function() {
+    // Automatischer TSE-Test beim Laden
+    setTimeout(() => {
+        tseTest();
+    }, 1000);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Erweiterte Etiketten - {{ article.name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .article-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .btn {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        
+        .btn:hover {
+            background: #0056b3;
+        }
+        
+        .btn-success {
+            background: #28a745;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .preview-area {
+            border: 2px dashed #ddd;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 18px;
+        }
+        
+        .row {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .col {
+            flex: 1;
+        }
+        
+        .format-option {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .format-option:hover {
+            background: #f8f9fa;
+            border-color: #007bff;
+        }
+        
+        .format-option.active {
+            background: #e3f2fd;
+            border-color: #007bff;
+        }
+        
+        .format-option input[type="radio"] {
+            margin-right: 10px;
+        }
+        
+        .format-details {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .grid-preview {
+            display: grid;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .grid-2x4 {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        
+        .grid-3x5 {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        
+        .grid-4x6 {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        
+        .label-cell {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+            font-size: 12px;
+            background: white;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .buttons {
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .no-print {
+            display: none;
+        }
+        
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            body {
+                margin: 0;
+                padding: 0;
+                background: white;
+            }
+            
+            .container {
+                max-width: none;
+                margin: 0;
+                padding: 0;
+                box-shadow: none;
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="no-print">Erweiterte Etiketten-Optionen</h1>
+        
+        <div class="article-info no-print">
+            <h3>{{ article.name }}</h3>
+            <p>
+                <strong>Art.Nr.:</strong> {{ article.article_number or article.id }} | 
+                <strong>Preis:</strong> {{ "%.2f"|format(article.price or 0) }} €
+            </p>
+        </div>
+        
+        <div class="no-print">
+            <div class="row">
+                <div class="col">
+                    <div class="form-group">
+                        <label>Anzahl Etiketten</label>
+                        <input type="number" id="labelCount" value="1" min="1" max="100" onchange="updatePreview()">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Etikettenformat</label>
+                        <div class="format-option active" onclick="selectFormat('62mm')">
+                            <input type="radio" name="format" value="62mm" checked>
+                            <strong>62mm Endlos-Etikett</strong>
+                            <div class="format-details">Standard-Etikettendrucker (62mm x variabel)</div>
+                        </div>
+                        <div class="format-option" onclick="selectFormat('a4-grid')">
+                            <input type="radio" name="format" value="a4-grid">
+                            <strong>A4 Etikettenbogen</strong>
+                            <div class="format-details">Mehrere Etiketten pro A4-Seite</div>
+                        </div>
+                        <div class="format-option" onclick="selectFormat('custom')">
+                            <input type="radio" name="format" value="custom">
+                            <strong>Benutzerdefiniert</strong>
+                            <div class="format-details">Eigene Abmessungen festlegen</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col">
+                    <div class="form-group" id="gridOptions" style="display: none;">
+                        <label>Raster-Layout</label>
+                        <select id="gridLayout" onchange="updatePreview()">
+                            <option value="2x4">2 x 4 Etiketten (8 pro Seite)</option>
+                            <option value="3x5">3 x 5 Etiketten (15 pro Seite)</option>
+                            <option value="4x6">4 x 6 Etiketten (24 pro Seite)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="customSize" style="display: none;">
+                        <label>Benutzerdefinierte Größe</label>
+                        <div class="row">
+                            <div class="col">
+                                <input type="number" id="customWidth" placeholder="Breite (mm)" value="62">
+                            </div>
+                            <div class="col">
+                                <input type="number" id="customHeight" placeholder="Höhe (mm)" value="29">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Zusätzliche Optionen</label>
+                        <div>
+                            <input type="checkbox" id="showBarcode" checked onchange="updatePreview()">
+                            <label for="showBarcode" style="display: inline; margin-left: 5px;">Barcode anzeigen</label>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="showPrice" checked onchange="updatePreview()">
+                            <label for="showPrice" style="display: inline; margin-left: 5px;">Preis anzeigen</label>
+                        </div>
+                        <div>
+                            <input type="checkbox" id="showDate" onchange="updatePreview()">
+                            <label for="showDate" style="display: inline; margin-left: 5px;">Datum anzeigen</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="preview-area" id="previewArea">
+            <div>Vorschau wird hier angezeigt...</div>
+        </div>
+        
+        <div class="buttons no-print">
+            <button class="btn btn-success" onclick="printLabels()">
+                <i class="bi bi-printer"></i> Etiketten drucken
+            </button>
+            <button class="btn btn-secondary" onclick="window.close()">
+                Schließen
+            </button>
+        </div>
+    </div>
+    
+    <!-- JsBarcode Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    
+    <script>
+        const article = {
+            name: "{{ article.name }}",
+            articleNumber: "{{ article.article_number or article.id }}",
+            price: {{ article.price or 0 }},
+            brand: "{{ article.brand or '' }}",
+            category: "{{ article.category or '' }}"
+        };
+        
+        function selectFormat(format) {
+            // Radio buttons aktualisieren
+            document.querySelectorAll('input[name="format"]').forEach(radio => {
+                radio.checked = radio.value === format;
+            });
+            
+            // Format-Optionen visuell aktualisieren
+            document.querySelectorAll('.format-option').forEach(option => {
+                option.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+            
+            // Spezifische Optionen anzeigen/verstecken
+            document.getElementById('gridOptions').style.display = 
+                format === 'a4-grid' ? 'block' : 'none';
+            document.getElementById('customSize').style.display = 
+                format === 'custom' ? 'block' : 'none';
+            
+            updatePreview();
+        }
+        
+        function updatePreview() {
+            const format = document.querySelector('input[name="format"]:checked').value;
+            const count = parseInt(document.getElementById('labelCount').value);
+            const showBarcode = document.getElementById('showBarcode').checked;
+            const showPrice = document.getElementById('showPrice').checked;
+            const showDate = document.getElementById('showDate').checked;
+            
+            const previewArea = document.getElementById('previewArea');
+            
+            if (format === 'a4-grid') {
+                const gridLayout = document.getElementById('gridLayout').value;
+                previewArea.innerHTML = generateGridPreview(gridLayout, count, showBarcode, showPrice, showDate);
+            } else {
+                previewArea.innerHTML = generateSinglePreview(count, showBarcode, showPrice, showDate);
+            }
+        }
+        
+        function generateGridPreview(gridLayout, count, showBarcode, showPrice, showDate) {
+            const gridClass = 'grid-' + gridLayout;
+            const maxPerPage = parseInt(gridLayout.split('x')[0]) * parseInt(gridLayout.split('x')[1]);
+            
+            let html = `<div class="grid-preview ${gridClass}">`;
+            
+            for (let i = 0; i < Math.min(count, maxPerPage); i++) {
+                html += `
+                    <div class="label-cell">
+                        <div style="width: 100%;">
+                            <div style="font-weight: bold; font-size: 10px;">${article.name}</div>
+                            <div style="font-size: 8px;">${article.articleNumber}</div>
+                            ${showPrice ? `<div style="font-size: 8px; color: #007bff;">${article.price.toFixed(2)} €</div>` : ''}
+                            ${showBarcode ? '<div style="font-size: 6px;">[Barcode]</div>' : ''}
+                            ${showDate ? `<div style="font-size: 6px;">${new Date().toLocaleDateString('de-DE')}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            
+            if (count > maxPerPage) {
+                html += `<p style="text-align: center; color: #666; margin-top: 10px;">
+                    ... und ${count - maxPerPage} weitere Etiketten auf zusätzlichen Seiten
+                </p>`;
+            }
+            
+            return html;
+        }
+        
+        function generateSinglePreview(count, showBarcode, showPrice, showDate) {
+            return `
+                <div style="border: 1px solid #ddd; padding: 15px; background: white; width: 200px;">
+                    <div style="text-align: center;">
+                        <div style="font-weight: bold; font-size: 14px; margin-bottom: 5px;">${article.name}</div>
+                        <div style="font-size: 12px; margin-bottom: 5px;">${article.articleNumber}</div>
+                        ${showPrice ? `<div style="font-size: 12px; color: #007bff; margin-bottom: 5px;">${article.price.toFixed(2)} €</div>` : ''}
+                        ${showBarcode ? '<div style="margin: 10px 0; font-size: 10px;">[Barcode wird generiert]</div>' : ''}
+                        ${showDate ? `<div style="font-size: 10px; color: #666;">${new Date().toLocaleDateString('de-DE')}</div>` : ''}
+                    </div>
+                </div>
+                <p style="text-align: center; margin-top: 10px;">
+                    ${count} Etikett${count > 1 ? 'en' : ''} werden gedruckt
+                </p>
+            `;
+        }
+        
+        function printLabels() {
+            const format = document.querySelector('input[name="format"]:checked').value;
+            const count = parseInt(document.getElementById('labelCount').value);
+            const showBarcode = document.getElementById('showBarcode').checked;
+            const showPrice = document.getElementById('showPrice').checked;
+            const showDate = document.getElementById('showDate').checked;
+            
+            // Parameter für den Druck zusammenstellen
+            const params = new URLSearchParams({
+                format: format,
+                count: count,
+                showBarcode: showBarcode,
+                showPrice: showPrice,
+                showDate: showDate
+            });
+            
+            if (format === 'a4-grid') {
+                params.append('gridLayout', document.getElementById('gridLayout').value);
+            } else if (format === 'custom') {
+                params.append('customWidth', document.getElementById('customWidth').value);
+                params.append('customHeight', document.getElementById('customHeight').value);
+            }
+            
+            // Zur Standard-Etikett-Route weiterleiten mit erweiterten Parametern
+            const url = `{{ url_for('articles.print_label', article_id=article.id) }}?${params.toString()}&autoprint=1`;
+            window.open(url, '_blank');
+        }
+        
+        // Initiale Vorschau
+        document.addEventListener('DOMContentLoaded', function() {
+            updatePreview();
+        });
+    </script>
+</body>
+</html>

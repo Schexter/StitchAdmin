@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+
+{% block title %}Berichte - Kassensystem{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1><i class="bi bi-graph-up"></i> Kassenberichte</h1>
+            
+            <!-- Zeitraum-Filter -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Von Datum</label>
+                            <input type="date" class="form-control" name="von" 
+                                   value="{{ request.args.get('von', start_date.strftime('%Y-%m-%d')) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Bis Datum</label>
+                            <input type="date" class="form-control" name="bis" 
+                                   value="{{ request.args.get('bis', end_date.strftime('%Y-%m-%d')) }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Schnellauswahl</label>
+                            <select class="form-control" onchange="setDateRange(this.value)">
+                                <option value="">Benutzerdefiniert</option>
+                                <option value="today">Heute</option>
+                                <option value="yesterday">Gestern</option>
+                                <option value="week">Diese Woche</option>
+                                <option value="month">Dieser Monat</option>
+                                <option value="last_month">Letzter Monat</option>
+                                <option value="year">Dieses Jahr</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" class="btn btn-primary d-block w-100">
+                                <i class="bi bi-funnel"></i> Berichte generieren
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Umsatzübersicht -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Gesamtumsatz</h5>
+                            <h2 class="text-primary">{{ "%.2f"|format(total_revenue) }} €</h2>
+                            <p class="text-muted">{{ total_receipts }} Belege</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Ø Beleg</h5>
+                            <h2 class="text-info">{{ "%.2f"|format(avg_receipt) }} €</h2>
+                            <p class="text-muted">Durchschnitt</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Stornierungen</h5>
+                            <h2 class="text-danger">{{ cancelled_count }}</h2>
+                            <p class="text-muted">{{ "%.2f"|format(cancelled_amount) }} €</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">Netto-Umsatz</h5>
+                            <h2 class="text-success">{{ "%.2f"|format(net_revenue) }} €</h2>
+                            <p class="text-muted">Nach Storno</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tab-Navigation -->
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item">
+                    <a class="nav-link active" data-bs-toggle="tab" href="#umsatz">
+                        <i class="bi bi-cash-coin"></i> Umsätze
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#zahlungsarten">
+                        <i class="bi bi-credit-card"></i> Zahlungsarten
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#artikel">
+                        <i class="bi bi-box"></i> Top Artikel
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#steuern">
+                        <i class="bi bi-calculator"></i> Steuern
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="tab" href="#mitarbeiter">
+                        <i class="bi bi-people"></i> Mitarbeiter
+                    </a>
+                </li>
+            </ul>
+            
+            <!-- Tab-Inhalte -->
+            <div class="tab-content">
+                <!-- Umsätze Tab -->
+                <div class="tab-pane fade show active" id="umsatz">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-graph-up-arrow"></i> Tagesumsätze</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="umsatzChart" height="100"></canvas>
+                            
+                            <!-- Tabelle -->
+                            <table class="table table-striped mt-4">
+                                <thead>
+                                    <tr>
+                                        <th>Datum</th>
+                                        <th class="text-end">Belege</th>
+                                        <th class="text-end">Brutto</th>
+                                        <th class="text-end">Netto</th>
+                                        <th class="text-end">MwSt</th>
+                                        <th class="text-end">Storniert</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for day in daily_sales %}
+                                    <tr>
+                                        <td>{{ day.date.strftime('%d.%m.%Y') }}</td>
+                                        <td class="text-end">{{ day.receipt_count }}</td>
+                                        <td class="text-end">{{ "%.2f"|format(day.gross_total) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(day.net_total) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(day.tax_total) }} €</td>
+                                        <td class="text-end text-danger">{{ "%.2f"|format(day.cancelled_total) }} €</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="fw-bold">
+                                        <td>Gesamt</td>
+                                        <td class="text-end">{{ total_receipts }}</td>
+                                        <td class="text-end">{{ "%.2f"|format(total_revenue) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(total_net) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(total_tax) }} €</td>
+                                        <td class="text-end text-danger">{{ "%.2f"|format(cancelled_amount) }} €</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Zahlungsarten Tab -->
+                <div class="tab-pane fade" id="zahlungsarten">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-wallet2"></i> Zahlungsarten-Verteilung</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <canvas id="zahlungsartenChart"></canvas>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table">
+                                        <thead>
+                                            <tr>
+                                                <th>Zahlungsart</th>
+                                                <th class="text-end">Anzahl</th>
+                                                <th class="text-end">Betrag</th>
+                                                <th class="text-end">Anteil</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for payment in payment_methods %}
+                                            <tr>
+                                                <td>
+                                                    <i class="bi bi-{{ payment.icon }}"></i> {{ payment.name }}
+                                                </td>
+                                                <td class="text-end">{{ payment.count }}</td>
+                                                <td class="text-end">{{ "%.2f"|format(payment.amount) }} €</td>
+                                                <td class="text-end">{{ "%.1f"|format(payment.percentage) }}%</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Top Artikel Tab -->
+                <div class="tab-pane fade" id="artikel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between">
+                            <h5><i class="bi bi-star"></i> Top 20 Artikel</h5>
+                            <button class="btn btn-sm btn-outline-primary" onclick="exportTopArticles()">
+                                <i class="bi bi-download"></i> Export
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Artikel</th>
+                                        <th>Art.Nr.</th>
+                                        <th class="text-end">Menge</th>
+                                        <th class="text-end">Umsatz</th>
+                                        <th class="text-end">Ø Preis</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for article in top_articles %}
+                                    <tr>
+                                        <td>{{ article.name }}</td>
+                                        <td>{{ article.article_number }}</td>
+                                        <td class="text-end">{{ article.quantity }}</td>
+                                        <td class="text-end">{{ "%.2f"|format(article.revenue) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(article.avg_price) }} €</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Steuern Tab -->
+                <div class="tab-pane fade" id="steuern">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-calculator"></i> Steuerübersicht</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Steuersatz</th>
+                                        <th class="text-end">Netto</th>
+                                        <th class="text-end">Steuer</th>
+                                        <th class="text-end">Brutto</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tax in tax_summary %}
+                                    <tr>
+                                        <td>{{ tax.rate }}%</td>
+                                        <td class="text-end">{{ "%.2f"|format(tax.net_amount) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(tax.tax_amount) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(tax.gross_amount) }} €</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                    <tr class="fw-bold">
+                                        <td>Gesamt</td>
+                                        <td class="text-end">{{ "%.2f"|format(total_net) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(total_tax) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(total_revenue) }} €</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                            
+                            <div class="alert alert-info mt-3">
+                                <i class="bi bi-info-circle"></i>
+                                Die Steuerbeträge sind für die Umsatzsteuer-Voranmeldung relevant.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Mitarbeiter Tab -->
+                <div class="tab-pane fade" id="mitarbeiter">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-people"></i> Mitarbeiter-Performance</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Mitarbeiter</th>
+                                        <th class="text-end">Belege</th>
+                                        <th class="text-end">Umsatz</th>
+                                        <th class="text-end">Ø Beleg</th>
+                                        <th class="text-end">Stornos</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for emp in employee_stats %}
+                                    <tr>
+                                        <td>{{ emp.name }}</td>
+                                        <td class="text-end">{{ emp.receipt_count }}</td>
+                                        <td class="text-end">{{ "%.2f"|format(emp.revenue) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(emp.avg_receipt) }} €</td>
+                                        <td class="text-end">{{ emp.cancellation_count }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Export-Buttons -->
+            <div class="card mt-4">
+                <div class="card-body text-center">
+                    <h5>Berichte exportieren</h5>
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-outline-primary" onclick="exportReport('pdf')">
+                            <i class="bi bi-file-pdf"></i> PDF
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="exportReport('excel')">
+                            <i class="bi bi-file-excel"></i> Excel
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="exportReport('csv')">
+                            <i class="bi bi-file-csv"></i> CSV
+                        </button>
+                        <button class="btn btn-outline-primary" onclick="printReport()">
+                            <i class="bi bi-printer"></i> Drucken
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Datumbereich setzen
+function setDateRange(range) {
+    const today = new Date();
+    let startDate, endDate;
+    
+    switch(range) {
+        case 'today':
+            startDate = endDate = today;
+            break;
+        case 'yesterday':
+            startDate = endDate = new Date(today.setDate(today.getDate() - 1));
+            break;
+        case 'week':
+            startDate = new Date(today.setDate(today.getDate() - today.getDay()));
+            endDate = new Date();
+            break;
+        case 'month':
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = new Date();
+            break;
+        case 'last_month':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case 'year':
+            startDate = new Date(today.getFullYear(), 0, 1);
+            endDate = new Date();
+            break;
+        default:
+            return;
+    }
+    
+    document.querySelector('input[name="von"]').value = startDate.toISOString().split('T')[0];
+    document.querySelector('input[name="bis"]').value = endDate.toISOString().split('T')[0];
+}
+
+// Umsatz-Chart
+const umsatzCtx = document.getElementById('umsatzChart').getContext('2d');
+const umsatzChart = new Chart(umsatzCtx, {
+    type: 'line',
+    data: {
+        labels: {{ chart_labels|tojson }},
+        datasets: [{
+            label: 'Tagesumsatz',
+            data: {{ chart_data|tojson }},
+            borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            tension: 0.1
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value.toFixed(2) + ' €';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Zahlungsarten-Chart
+const zahlungsartenCtx = document.getElementById('zahlungsartenChart').getContext('2d');
+const zahlungsartenChart = new Chart(zahlungsartenCtx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ payment_labels|tojson }},
+        datasets: [{
+            data: {{ payment_data|tojson }},
+            backgroundColor: [
+                '#0d6efd',
+                '#198754',
+                '#ffc107',
+                '#dc3545',
+                '#6c757d'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+});
+
+// Export-Funktionen
+function exportReport(format) {
+    const params = new URLSearchParams(window.location.search);
+    params.set('format', format);
+    window.location.href = `/kasse/berichte/export?${params.toString()}`;
+}
+
+function exportTopArticles() {
+    const params = new URLSearchParams(window.location.search);
+    window.location.href = `/kasse/berichte/artikel-export?${params.toString()}`;
+}
+
+function printReport() {
+    window.print();
+}
+</script>
+
+<style>
+@media print {
+    .nav-tabs, .btn-group, form {
+        display: none !important;
+    }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}{{ machine.name }} - Belegungsplanung{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">📅 {{ machine.name }} - Belegungsplanung</h1>
+                <div>
+                    <a href="{{ url_for('machines.show', machine_id=machine.id) }}" class="btn btn-secondary btn-touch me-2">
+                        <i class="fas fa-arrow-left"></i> Zurück
+                    </a>
+                    <a href="{{ url_for('production.planning') }}" class="btn btn-outline-info btn-touch">
+                        <i class="fas fa-tasks"></i> Produktionsplanung
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Neuen Job hinzufügen -->
+                <div class="col-lg-4 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Neuen Job einplanen</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST">
+                                <div class="mb-3">
+                                    <label for="job_title" class="form-label">Job-Titel *</label>
+                                    <input type="text" class="form-control" id="job_title" name="job_title" required
+                                           placeholder="z.B. Auftrag A2024-001 - Logo-Stickerei">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="order_id" class="form-label">Auftragsnummer</label>
+                                    <input type="text" class="form-control" id="order_id" name="order_id"
+                                           placeholder="z.B. A2024-001">
+                                    <small class="form-text text-muted">Optional: Verknüpfung zu bestehendem Auftrag</small>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="start_time" class="form-label">Startzeit *</label>
+                                    <input type="datetime-local" class="form-control" id="start_time" name="start_time" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="estimated_duration_minutes" class="form-label">Geschätzte Dauer (Minuten) *</label>
+                                    <input type="number" class="form-control" id="estimated_duration_minutes" 
+                                           name="estimated_duration_minutes" min="1" max="1440" value="60" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="priority" class="form-label">Priorität</label>
+                                    <select class="form-select" id="priority" name="priority">
+                                        <option value="normal">Normal</option>
+                                        <option value="high">Hoch</option>
+                                        <option value="urgent">Eilig</option>
+                                        <option value="low">Niedrig</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="notes" class="form-label">Notizen</label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3"
+                                              placeholder="Zusätzliche Informationen zum Job..."></textarea>
+                                </div>
+
+                                <button type="submit" class="btn btn-success w-100 btn-touch">
+                                    <i class="fas fa-plus"></i> Job einplanen
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Maschineninfo -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">Maschineninfo</h6>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Typ:</strong> 
+                                {% if machine.type == 'embroidery' %}🧵 Stickmaschine
+                                {% elif machine.type == 'dtf' %}🖨️ DTF-Drucker
+                                {% else %}⚙️ {{ machine.type|title }}
+                                {% endif %}
+                            </p>
+                            
+                            {% if machine.type == 'embroidery' %}
+                            <p><strong>Nadeln:</strong> {{ machine.needles_per_head or '-' }}</p>
+                            <p><strong>Max. Bereich:</strong> {{ machine.max_area_width }}×{{ machine.max_area_height }}mm</p>
+                            {% elif machine.type == 'dtf' %}
+                            <p><strong>Max. Breite:</strong> {{ machine.max_print_width or '-' }}mm</p>
+                            {% endif %}
+                            
+                            <p><strong>Status:</strong> {{ machine.status or '-' }}</p>
+                            <p><strong>Betriebszeiten:</strong> 08:00 - 17:00</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Belegungsplan -->
+                <div class="col-lg-8 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Geplante Jobs ({{ jobs|length }})</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if jobs %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Job</th>
+                                            <th>Auftrag</th>
+                                            <th>Start</th>
+                                            <th>Ende</th>
+                                            <th>Dauer</th>
+                                            <th>Priorität</th>
+                                            <th>Status</th>
+                                            <th>Aktionen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for job in jobs %}
+                                        {% set start_dt = job.scheduled_start.strftime('%Y-%m-%d %H:%M') if job.scheduled_start else '' %}
+                                        {% set end_dt = job.scheduled_end.strftime('%Y-%m-%d %H:%M') if job.scheduled_end else '' %}
+                                        {% set is_current = false %}
+                                        
+                                        <tr class="{{ 'table-warning' if is_current else '' }}">
+                                            <td>
+                                                <strong>{{ job.order.description if job.order else ('Schedule #' + job.id|string) }}</strong>
+                                                {% if job.notes %}
+                                                <br><small class="text-muted">{{ job.notes[:50] }}{% if job.notes|length > 50 %}...{% endif %}</small>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if job.order_id %}
+                                                <a href="{{ url_for('orders.show', order_id=job.order_id) }}" class="text-decoration-none">
+                                                    {{ job.order_id }}
+                                                </a>
+                                                {% else %}
+                                                <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small>{{ start_dt }}</small>
+                                                {% if is_current %}
+                                                <br><span class="badge bg-warning">Läuft</span>
+                                                {% endif %}
+                                            </td>
+                                            <td><small>{{ end_dt }}</small></td>
+                                            <td>
+                                                <span class="badge bg-light text-dark">
+                                                    {% set duration_minutes = ((job.scheduled_end - job.scheduled_start).total_seconds() / 60)|int %}
+                                                    {% if duration_minutes >= 60 %}
+                                                    {{ (duration_minutes / 60)|round(1) }}h
+                                                    {% else %}
+                                                    {{ duration_minutes }}min
+                                                    {% endif %}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {% set priority_level = job.priority|default(5) %}
+                                                {% if priority_level <= 2 %}
+                                                <span class="badge bg-danger">Eilig</span>
+                                                {% elif priority_level <= 4 %}
+                                                <span class="badge bg-warning">Hoch</span>
+                                                {% elif priority_level >= 8 %}
+                                                <span class="badge bg-secondary">Niedrig</span>
+                                                {% else %}
+                                                <span class="badge bg-primary">Normal</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if job.status == 'scheduled' %}
+                                                <span class="badge bg-info">Geplant</span>
+                                                {% elif job.status == 'in_progress' %}
+                                                <span class="badge bg-warning">In Arbeit</span>
+                                                {% elif job.status == 'completed' %}
+                                                <span class="badge bg-success">Abgeschlossen</span>
+                                                {% elif job.status == 'cancelled' %}
+                                                <span class="badge bg-secondary">Storniert</span>
+                                                {% else %}
+                                                <span class="badge bg-light text-dark">{{ job.status|title }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    {% if job.status == 'scheduled' %}
+                                                    <button class="btn btn-outline-success btn-sm" 
+                                                            onclick="changeJobStatus({{ job.id }}, 'in_progress')"
+                                                            title="Job starten">
+                                                        <i class="fas fa-play"></i>
+                                                    </button>
+                                                    {% elif job.status == 'in_progress' %}
+                                                    <button class="btn btn-outline-primary btn-sm" 
+                                                            onclick="changeJobStatus({{ job.id }}, 'completed')"
+                                                            title="Job abschließen">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    {% endif %}
+                                                    
+                                                    <button class="btn btn-outline-danger btn-sm" 
+                                                            onclick="cancelJob({{ job.id }})"
+                                                            title="Job stornieren">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Kalender-Ansicht (vereinfacht) -->
+                            <div class="mt-4">
+                                <h6>Übersicht heute</h6>
+                                <div class="timeline">
+                                    {% set today = start_date.strftime('%Y-%m-%d') %}
+                                    {% set today_jobs = [] %}
+                                    {% for job in jobs %}
+                                        {% if job.scheduled_start.date() == start_date.date() %}
+                                            {% set _ = today_jobs.append(job) %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if today_jobs %}
+                                    <div class="row">
+                                        {% for hour in range(8, 19) %}
+                                        <div class="col-1 text-center small border-end" style="min-height: 40px;">
+                                            <strong>{{ hour }}:00</strong>
+                                            {% for job in today_jobs %}
+                                            {% set job_hour = job.scheduled_start.hour %}
+                                            {% if job_hour == hour %}
+                                            <div class="mt-1">
+                                                {% set priority_level = job.priority|default(5) %}
+                                                {% set duration_minutes = ((job.scheduled_end - job.scheduled_start).total_seconds() / 60)|int %}
+                                                <div class="badge bg-{{ 'danger' if priority_level <= 2 else 'warning' if priority_level <= 4 else 'primary' }} small" 
+                                                     title="{{ job.order.description if job.order else 'Schedule #' + job.id|string }}">
+                                                    {{ duration_minutes }}min
+                                                </div>
+                                            </div>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% else %}
+                                    <div class="text-center text-muted py-3">
+                                        <i class="fas fa-calendar-check fa-2x mb-2"></i>
+                                        <p>Keine Jobs für heute geplant</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {% else %}
+                            <div class="text-center text-muted py-5">
+                                <i class="fas fa-calendar-plus fa-3x mb-3"></i>
+                                <h4>Keine Jobs geplant</h4>
+                                <p>Planen Sie den ersten Job für diese Maschine über das Formular links.</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function changeJobStatus(jobId, newStatus) {
+    // TODO: AJAX-Request zum Ändern des Job-Status
+    // Für jetzt: Seite neu laden
+    alert(`Job-Status würde auf "${newStatus}" geändert. (Funktion wird in einem zukünftigen Update implementiert)`);
+}
+
+function cancelJob(jobId) {
+    if (confirm('Möchten Sie diesen Job wirklich stornieren?')) {
+        // TODO: AJAX-Request zum Stornieren
+        alert('Job-Stornierung wird in einem zukünftigen Update implementiert');
+    }
+}
+
+// Setze Standardstartzeit auf nächste volle Stunde
+document.addEventListener('DOMContentLoaded', function() {
+    const startTimeInput = document.getElementById('start_time');
+    const now = new Date();
+    now.setHours(now.getHours() + 1, 0, 0, 0); // Nächste volle Stunde
+    
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    
+    startTimeInput.value = `${year}-${month}-${day}T${hours}:${minutes}`;
+});
+</script>
+
+<style>
+.timeline {
+    overflow-x: auto;
+}
+
+.table-warning {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+}
+
+.btn-group-sm .btn {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.75rem;
+}
+
+.timeline .col-1 {
+    min-width: 80px;
+    flex: 0 0 80px;
+}
+</style>
+{% endblock %}

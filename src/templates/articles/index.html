@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+
+{% block title %}Artikel-Verwaltung - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-box-seam"></i> Artikel-Verwaltung</h1>
+        
+        <div class="mb-3">
+            <a href="{{ url_for('articles.new') }}" class="btn btn-success">
+                <i class="bi bi-plus-circle"></i> Neuer Artikel
+            </a>
+            <a href="{{ url_for('articles.import_lshop') }}" class="btn btn-primary">
+                <i class="bi bi-file-earmark-excel"></i> L-Shop Import
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filter -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Suche</label>
+                <input type="text" class="form-control" name="search" value="{{ search_query }}" 
+                       placeholder="Name, SKU oder Beschreibung">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Kategorie</label>
+                <select class="form-control" name="category">
+                    <option value="">Alle Kategorien</option>
+                    {% for category in categories %}
+                    <option value="{{ category }}" {% if category_filter == category %}selected{% endif %}>
+                        {{ category }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Lagerbestand</label>
+                <select class="form-control" name="stock">
+                    <option value="">Alle</option>
+                    <option value="out" {% if stock_filter == 'out' %}selected{% endif %}>Nicht vorrätig</option>
+                    <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Niedriger Bestand (≤10)</option>
+                    <option value="available" {% if stock_filter == 'available' %}selected{% endif %}>Vorrätig</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-funnel"></i> Filtern
+                    </button>
+                    <a href="{{ url_for('articles.index') }}" class="btn btn-secondary">
+                        <i class="bi bi-x-circle"></i> Reset
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Artikel-Tabelle -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>SKU</th>
+                        <th>Name</th>
+                        <th>Kategorie</th>
+                        <th>VK-Preis</th>
+                        <th>Lagerbestand</th>
+                        <th>Status</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for article_id, article in articles.items() %}
+                    <tr>
+                        <td>
+                            <small class="text-muted">{{ article.article_number or article.id }}</small>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('articles.show', article_id=article_id) }}">
+                                {{ article.name }}
+                            </a>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ article.category or 'Keine' }}</span>
+                        </td>
+                        <td>
+                            <div>
+                                <strong>{{ "%.2f"|format(article.price_calculated or article.price or 0) }} €</strong>
+                                <br><small class="text-muted">Kalkuliert</small>
+                                {% if article.price_recommended and article.price_recommended != (article.price_calculated or article.price) %}
+                                <br><small class="text-warning">UVP: {{ "%.2f"|format(article.price_recommended) }} €</small>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge 
+                                {% if not article.stock or article.stock == 0 %}bg-danger
+                                {% elif article.min_stock and article.stock <= article.min_stock %}bg-warning
+                                {% else %}bg-success{% endif %}">
+                                {{ article.stock or 0 }} Stück
+                            </span>
+                        </td>
+                        <td>
+                            {% if article.active %}
+                                <span class="badge bg-success">Aktiv</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inaktiv</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('articles.show', article_id=article_id) }}" 
+                               class="btn btn-sm btn-info" title="Details">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                            <a href="{{ url_for('articles.edit', article_id=article_id) }}" 
+                               class="btn btn-sm btn-primary" title="Bearbeiten">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <button class="btn btn-sm btn-success" 
+                                    onclick="(function() {
+                                        console.log('Button geklickt für: {{ article.name }}');
+                                        if (typeof addToOrder === 'function') {
+                                            addToOrder('{{ article_id }}', '{{ article.name }}', '{{ article.article_number or article_id }}');
+                                        } else {
+                                            const q = prompt('Wie viele {{ article.name }} zur Bestellung hinzufügen?', '1');
+                                            if (q && q > 0) {
+                                                fetch('/orders/current').then(r => r.json()).then(d => {
+                                                    return d.exists ? d.order_id : fetch('/orders/create-quick', {method: 'POST', headers: {'Content-Type': 'application/json'}}).then(r => r.json()).then(n => n.order_id);
+                                                }).then(orderId => {
+                                                    return fetch(`/orders/${orderId}/add-item`, {
+                                                        method: 'POST',
+                                                        headers: {'Content-Type': 'application/json'},
+                                                        body: JSON.stringify({article_id: '{{ article_id }}', quantity: parseInt(q)})
+                                                    });
+                                                }).then(r => r.json()).then(data => {
+                                                    if (data.success) {
+                                                        alert('Artikel hinzugefügt!');
+                                                        if (confirm('Zur Bestellung?')) window.location.href = '/orders/';
+                                                    }
+                                                }).catch(e => alert('Fehler: ' + e.message));
+                                            }
+                                        }
+                                    })()" 
+                                    title="Zur Bestellung hinzufügen">
+                                <i class="bi bi-cart-plus"></i>
+                            </button>
+                            <button class="btn btn-sm btn-warning" 
+                                    onclick="adjustStock('{{ article_id }}', '{{ article.name }}')" 
+                                    title="Lagerbestand">
+                                <i class="bi bi-box"></i>
+                            </button>
+                            <button class="btn btn-sm btn-secondary" 
+                                    onclick="duplicateArticle('{{ article_id }}', '{{ article.name }}')" 
+                                    title="Duplizieren">
+                                <i class="bi bi-files"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">
+                            Keine Artikel gefunden
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Lagerbestand Modal -->
+<div class="modal fade" id="stockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Lagerbestand anpassen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Artikel: <strong id="stockArticleName"></strong></p>
+                
+                <div class="mb-3">
+                    <label class="form-label">Änderung</label>
+                    <div class="input-group">
+                        <button class="btn btn-danger" type="button" onclick="changeStockValue(-1)">-</button>
+                        <input type="number" class="form-control text-center" id="stockChange" value="0">
+                        <button class="btn btn-success" type="button" onclick="changeStockValue(1)">+</button>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Grund</label>
+                    <select class="form-control" id="stockReason">
+                        <option value="Wareneingang">Wareneingang</option>
+                        <option value="Verkauf">Verkauf</option>
+                        <option value="Inventur">Inventur</option>
+                        <option value="Schwund">Schwund</option>
+                        <option value="Sonstiges">Sonstiges</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="saveStockChange()">Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentArticleId = null;
+
+function adjustStock(articleId, articleName) {
+    currentArticleId = articleId;
+    document.getElementById('stockArticleName').textContent = articleName;
+    document.getElementById('stockChange').value = 0;
+    
+    const modal = new bootstrap.Modal(document.getElementById('stockModal'));
+    modal.show();
+}
+
+function changeStockValue(delta) {
+    const input = document.getElementById('stockChange');
+    input.value = parseInt(input.value) + delta;
+}
+
+function saveStockChange() {
+    const change = parseInt(document.getElementById('stockChange').value);
+    const reason = document.getElementById('stockReason').value;
+    
+    if (change === 0) {
+        alert('Keine Änderung vorgenommen');
+        return;
+    }
+    
+    // Form erstellen für POST-Request
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/articles/${currentArticleId}/stock`;
+    
+    // Action-Feld
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = change > 0 ? 'add' : 'remove';
+    form.appendChild(actionInput);
+    
+    // Quantity-Feld
+    const quantityInput = document.createElement('input');
+    quantityInput.type = 'hidden';
+    quantityInput.name = 'quantity';
+    quantityInput.value = Math.abs(change);
+    form.appendChild(quantityInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function duplicateArticle(articleId, articleName) {
+    if (confirm(`Artikel "${articleName}" wirklich duplizieren?`)) {
+        fetch(`/articles/${articleId}/duplicate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Artikel erfolgreich dupliziert als "${data.new_name}"`);
+                location.reload();
+            } else {
+                alert('Fehler beim Duplizieren: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Fehler beim Duplizieren des Artikels');
+        });
+    }
+}
+
+// handleAddToOrder ist jetzt im head-Block definiert
+
+// Warte bis DOM geladen ist, dann lade das Modal
+document.addEventListener('DOMContentLoaded', function() {
+    // Modal sollte jetzt verfügbar sein
+    if (typeof addToOrder === 'undefined') {
+        console.error('FEHLER: addToOrder Funktion immer noch nicht verfügbar!');
+    } else {
+        console.log('addToOrder Funktion erfolgreich geladen');
+    }
+});
+</script>
+
+<!-- Add to Order Modal direkt hier einfügen -->
+{% include 'includes/add_to_order_modal.html' %}
+
+{% endblock %}

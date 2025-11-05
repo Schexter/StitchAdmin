@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Versandetikett - {{ shipment.id }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <!-- Versandetikett -->
+            <div class="card">
+                <div class="card-body">
+                    <!-- Absender -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="border p-3">
+                                <h6><i class="bi bi-building"></i> ABSENDER</h6>
+                                <address class="mb-0">
+                                    <strong>{{ sender.company }}</strong><br>
+                                    {{ sender.name }}<br>
+                                    {{ sender.street }}<br>
+                                    {{ sender.postal_code }} {{ sender.city }}<br>
+                                    {{ sender.country }}
+                                    {% if sender.phone %}
+                                        <br>Tel: {{ sender.phone }}
+                                    {% endif %}
+                                </address>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="text-end">
+                                <h3>VERSANDETIKETT</h3>
+                                <p class="mb-1"><strong>{{ shipment.carrier|upper }}</strong></p>
+                                {% if shipment.tracking_number %}
+                                <p class="mb-1">Tracking: <strong>{{ shipment.tracking_number }}</strong></p>
+                                {% endif %}
+                                <p class="mb-0">{{ generated_at.strftime('%d.%m.%Y %H:%M') }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Empfänger -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <div class="border p-4 bg-light">
+                                <h4><i class="bi bi-geo-alt"></i> EMPFÄNGER</h4>
+                                <address style="font-size: 1.2em; line-height: 1.4;">
+                                    <strong>{{ shipment.recipient_name|safe }}</strong><br>
+                                    {{ shipment.recipient_street }}<br>
+                                    <strong>{{ shipment.recipient_postal_code }} {{ shipment.recipient_city }}</strong><br>
+                                    {{ shipment.recipient_country or 'Deutschland' }}
+                                </address>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                {% if shipment.tracking_number %}
+                                <!-- Barcode-Platzhalter -->
+                                <div class="border p-3 mb-2">
+                                    <div style="font-family: 'Courier New', monospace; font-size: 2em; letter-spacing: 0.1em;">
+                                        ||||| ||||| |||||
+                                    </div>
+                                    <small>{{ shipment.tracking_number }}</small>
+                                </div>
+                                {% endif %}
+                                
+                                {% if shipment.weight %}
+                                <p><strong>Gewicht:</strong><br>{{ "%.2f"|format(shipment.weight) }} kg</p>
+                                {% endif %}
+                                
+                                {% if shipment.length and shipment.width and shipment.height %}
+                                <p><strong>Maße:</strong><br>{{ shipment.length }}×{{ shipment.width }}×{{ shipment.height }} cm</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Service-Informationen -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Auftrag:</strong></td>
+                                    <td>{{ shipment.order_id }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Versandart:</strong></td>
+                                    <td>{{ shipment.carrier|upper }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Service:</strong></td>
+                                    <td>
+                                        {% if shipment.carrier == 'dhl' %}
+                                            DHL Paket
+                                        {% elif shipment.carrier == 'dpd' %}
+                                            DPD Classic
+                                        {% elif shipment.carrier == 'hermes' %}
+                                            Hermes PaketShop
+                                        {% elif shipment.carrier == 'ups' %}
+                                            UPS Standard
+                                        {% else %}
+                                            Standard
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if shipment.shipping_cost > 0 %}
+                                <tr>
+                                    <td><strong>Versandkosten:</strong></td>
+                                    <td>{{ "%.2f"|format(shipment.shipping_cost) }} €</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- Service-Icons -->
+                            <div class="text-center">
+                                {% if shipment.carrier == 'dhl' %}
+                                    <div class="bg-warning text-dark p-2 rounded mb-1">
+                                        <strong>DHL</strong>
+                                    </div>
+                                {% elif shipment.carrier == 'dpd' %}
+                                    <div class="bg-danger text-white p-2 rounded mb-1">
+                                        <strong>DPD</strong>
+                                    </div>
+                                {% elif shipment.carrier == 'hermes' %}
+                                    <div class="bg-primary text-white p-2 rounded mb-1">
+                                        <strong>HERMES</strong>
+                                    </div>
+                                {% elif shipment.carrier == 'ups' %}
+                                    <div class="bg-success text-white p-2 rounded mb-1">
+                                        <strong>UPS</strong>
+                                    </div>
+                                {% endif %}
+                                
+                                {% if shipment.weight and shipment.weight > 5 %}
+                                <div class="badge bg-warning">SCHWER</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Versanddatum -->
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="border-top pt-3">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Versanddatum:</strong> {{ generated_at.strftime('%d.%m.%Y') }}</p>
+                                        <p><strong>Erstellt von:</strong> {{ current_user.username if current_user.is_authenticated else 'System' }}</p>
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        {% if shipment.tracking_number %}
+                                        <p><strong>Tracking-Nr.:</strong> {{ shipment.tracking_number }}</p>
+                                        {% endif %}
+                                        <p><strong>Sendungs-ID:</strong> {{ shipment.id }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nur bei Ansicht, nicht beim Drucken -->
+            <div class="mt-3 d-print-none">
+                <button onclick="window.print()" class="btn btn-primary">
+                    <i class="bi bi-printer"></i> Etikett drucken
+                </button>
+                <a href="{{ url_for('shipping.show', shipment_id=shipment.id) }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück zur Versendung
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .d-print-none {
+        display: none !important;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    body {
+        font-size: 11px;
+    }
+    
+    h3 {
+        font-size: 1.3rem;
+    }
+    
+    h4 {
+        font-size: 1.2rem;
+    }
+    
+    h6 {
+        font-size: 1rem;
+    }
+    
+    .border {
+        border: 2px solid #000 !important;
+    }
+    
+    .bg-light {
+        background-color: #f8f9fa !important;
+    }
+    
+    address {
+        margin-bottom: 0;
+    }
+}
+
+/* Barcode styling */
+.barcode {
+    font-family: 'Courier New', monospace;
+    font-size: 24px;
+    letter-spacing: 2px;
+    font-weight: bold;
+}
+</style>
+{% endblock %}

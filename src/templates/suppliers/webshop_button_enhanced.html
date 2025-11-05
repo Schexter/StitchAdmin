@@ -1,0 +1,368 @@
+<!-- Erweiterte Webshop-Buttons mit Automation -->
+<!-- Erstellt von Hans Hahn - Alle Rechte vorbehalten -->
+
+<div class="webshop-controls mb-3">
+    {% if supplier.webshop_url %}
+    
+    <!-- Haupt-Webshop-Buttons -->
+    <div class="btn-group w-100 mb-2" role="group">
+        <!-- Einfache Webshop-Weiterleitung -->
+        <a href="{{ url_for('suppliers.open_webshop_for_order', supplier_id=supplier.id, order_id=order.id) }}" 
+           class="btn btn-outline-primary" target="_blank" 
+           data-bs-toggle="tooltip" data-bs-placement="top" 
+           title="Öffnet den Webshop in einem neuen Tab">
+            <i class="fas fa-external-link-alt"></i>
+            Webshop öffnen
+        </a>
+        
+        <!-- Automation-Button (falls verfügbar) -->
+        <button type="button" class="btn btn-info" id="automationBtn" 
+                onclick="startWebshopAutomation('{{ supplier.id }}', '{{ order.id }}')"
+                data-bs-toggle="tooltip" data-bs-placement="top" 
+                title="Automatisches Hinzufügen zum Warenkorb">
+            <i class="fas fa-robot"></i>
+            <span id="automationBtnText">🤖 Auto-Bestellung</span>
+        </button>
+        
+        <!-- Test-Button -->
+        <button type="button" class="btn btn-outline-secondary btn-sm" 
+                onclick="testWebshopConnection('{{ supplier.id }}')"
+                data-bs-toggle="tooltip" data-bs-placement="top" 
+                title="Testet die Webshop-Verbindung">
+            <i class="fas fa-plug"></i>
+            Test
+        </button>
+    </div>
+    
+    <!-- Webshop-Info-Panel -->
+    <div class="card border-info mb-3" id="webshopInfo" style="display: none;">
+        <div class="card-header bg-info text-white">
+            <h6 class="mb-0">
+                <i class="fas fa-info-circle me-2"></i>Webshop-Information
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="mb-1"><strong>URL:</strong> 
+                       <a href="{{ supplier.webshop_url }}" target="_blank">{{ supplier.webshop_url[:50] }}...</a>
+                    </p>
+                    <p class="mb-1"><strong>Shop-System:</strong> {{ supplier.webshop_type or 'Generic' }}</p>
+                </div>
+                <div class="col-md-6">
+                    {% if supplier.webshop_username %}
+                    <p class="mb-1"><strong>Benutzername:</strong> {{ supplier.webshop_username }}</p>
+                    {% endif %}
+                    {% if supplier.customer_number %}
+                    <p class="mb-1"><strong>Kundennummer:</strong> {{ supplier.customer_number }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% if supplier.webshop_notes %}
+            <div class="mt-2">
+                <small class="text-muted">
+                    <i class="fas fa-sticky-note me-1"></i>
+                    {{ supplier.webshop_notes }}
+                </small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Bestelldetails für Automation -->
+    <div class="card border-secondary" id="orderDetails" style="display: none;">
+        <div class="card-header">
+            <h6 class="mb-0">
+                <i class="fas fa-list me-2"></i>Zu bestellende Artikel ({{ order.get_items()|length }})
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Artikelnummer</th>
+                            <th>Beschreibung</th>
+                            <th>Menge</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order.get_items() %}
+                        <tr>
+                            <td>
+                                <code>{{ item.article_number or item.supplier_article_number or 'N/A' }}</code>
+                            </td>
+                            <td>{{ item.description[:30] }}...</td>
+                            <td>
+                                <span class="badge bg-secondary">{{ item.quantity }}x</span>
+                            </td>
+                            <td>
+                                <span id="item-status-{{ loop.index0 }}" class="badge bg-secondary">Warten</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    {% else %}
+    <!-- Kein Webshop konfiguriert -->
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>Kein Webshop konfiguriert</strong>
+        <br>
+        <small>
+            Konfigurieren Sie die Webshop-Integration in den 
+            <a href="{{ url_for('suppliers.edit', supplier_id=supplier.id) }}">Lieferanten-Einstellungen</a>.
+        </small>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Automation-Status-Modal -->
+<div class="modal fade" id="automationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-robot me-2"></i>Webshop-Automation
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="automationProgress">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Lädt...</span>
+                        </div>
+                        <p class="mt-3">Starte Webshop-Automation...</p>
+                    </div>
+                </div>
+                <div id="automationResult" style="display: none;">
+                    <!-- Wird dynamisch gefüllt -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+                <button type="button" class="btn btn-primary" id="openBrowserBtn" style="display: none;">
+                    <i class="fas fa-external-link-alt me-2"></i>Browser öffnen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Webshop-Automation JavaScript
+let automationStatus = null;
+
+// Prüfe Automation-Verfügbarkeit beim Laden
+document.addEventListener('DOMContentLoaded', function() {
+    checkAutomationStatus();
+});
+
+function checkAutomationStatus() {
+    fetch('/suppliers/automation-status')
+        .then(response => response.json())
+        .then(data => {
+            automationStatus = data;
+            updateAutomationUI(data);
+        })
+        .catch(error => {
+            console.error('Fehler beim Prüfen der Automation:', error);
+            document.getElementById('automationBtn').disabled = true;
+            document.getElementById('automationBtnText').textContent = '❌ Nicht verfügbar';
+        });
+}
+
+function updateAutomationUI(status) {
+    const btn = document.getElementById('automationBtn');
+    const btnText = document.getElementById('automationBtnText');
+    
+    if (status.automation_ready) {
+        btn.classList.remove('btn-info');
+        btn.classList.add('btn-success');
+        btnText.textContent = '🤖 Auto-Bestellung';
+        btn.disabled = false;
+    } else {
+        btn.classList.remove('btn-info');
+        btn.classList.add('btn-warning');
+        btnText.textContent = '⚠️ Setup benötigt';
+        btn.disabled = false; // Erlaubt Klick für Fehlermeldung
+    }
+}
+
+function startWebshopAutomation(supplierId, orderId) {
+    if (!automationStatus || !automationStatus.automation_ready) {
+        alert('Webshop-Automation ist nicht verfügbar.\n\nBitte führen Sie INSTALL_WEBSHOP_AUTOMATION.bat aus.');
+        return;
+    }
+    
+    // Modal öffnen
+    const modal = new bootstrap.Modal(document.getElementById('automationModal'));
+    modal.show();
+    
+    // Reset Modal-Inhalt
+    document.getElementById('automationProgress').style.display = 'block';
+    document.getElementById('automationResult').style.display = 'none';
+    document.getElementById('openBrowserBtn').style.display = 'none';
+    
+    // Automation starten
+    const automationUrl = `/suppliers/${supplierId}/webshop/${orderId}?automate=1`;
+    
+    // Simulation des Automation-Prozesses (in echter Anwendung würde das via WebSocket laufen)
+    setTimeout(() => {
+        window.open(automationUrl, '_blank');
+        
+        // Modal-Inhalt aktualisieren
+        document.getElementById('automationProgress').style.display = 'none';
+        document.getElementById('automationResult').innerHTML = `
+            <div class="alert alert-success">
+                <h5><i class="fas fa-check-circle me-2"></i>Automation gestartet!</h5>
+                <p>Die Webshop-Automation wurde in einem neuen Browser-Fenster gestartet.</p>
+                <ul>
+                    <li>Artikel werden automatisch gesucht</li>
+                    <li>Warenkorb wird befüllt</li>
+                    <li>Sie können manuell zur Kasse gehen</li>
+                </ul>
+            </div>
+        `;
+        document.getElementById('automationResult').style.display = 'block';
+        document.getElementById('openBrowserBtn').style.display = 'inline-block';
+        document.getElementById('openBrowserBtn').onclick = () => window.open(automationUrl, '_blank');
+        
+    }, 2000);
+}
+
+function testWebshopConnection(supplierId) {
+    const btn = event.target;
+    const originalContent = btn.innerHTML;
+    
+    // Loading-Zustand
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+    
+    fetch(`/suppliers/${supplierId}/test-webshop`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                btn.innerHTML = '<i class="fas fa-check text-success"></i>';
+                
+                // Zeige Details
+                const details = `
+                    Verbindung erfolgreich!
+                    
+                    URL erreichbar: ${data.url_reachable ? '✅' : '❌'}
+                    Seitentitel: ${data.page_title || 'Unbekannt'}
+                    Login getestet: ${data.login_tested ? (data.login_success ? '✅ Erfolgreich' : '❌ Fehlgeschlagen') : 'Nicht getestet'}
+                `;
+                
+                showToast('Webshop-Test erfolgreich', details, 'success');
+            } else {
+                btn.innerHTML = '<i class="fas fa-times text-danger"></i>';
+                showToast('Webshop-Test fehlgeschlagen', data.error, 'error');
+            }
+        })
+        .catch(error => {
+            btn.innerHTML = '<i class="fas fa-times text-danger"></i>';
+            showToast('Verbindungsfehler', error.message, 'error');
+        })
+        .finally(() => {
+            setTimeout(() => {
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            }, 3000);
+        });
+}
+
+function showToast(title, message, type) {
+    // Einfache Toast-Implementierung
+    const toastHtml = `
+        <div class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="fas fa-${type === 'success' ? 'check-circle text-success' : 'exclamation-triangle text-danger'} me-2"></i>
+                <strong class="me-auto">${title}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                ${message.replace(/\n/g, '<br>')}
+            </div>
+        </div>
+    `;
+    
+    // Toast-Container erstellen falls nicht vorhanden
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'position-fixed bottom-0 end-0 p-3';
+        container.style.zIndex = '11';
+        document.body.appendChild(container);
+    }
+    
+    container.innerHTML = toastHtml;
+    const toast = new bootstrap.Toast(container.querySelector('.toast'));
+    toast.show();
+}
+
+// Info-Panel Toggle
+function toggleWebshopInfo() {
+    const info = document.getElementById('webshopInfo');
+    info.style.display = info.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleOrderDetails() {
+    const details = document.getElementById('orderDetails');
+    details.style.display = details.style.display === 'none' ? 'block' : 'none';
+}
+
+// Event-Listener für Info-Buttons
+document.addEventListener('DOMContentLoaded', function() {
+    // Tooltip-Initialisierung
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>
+
+<style>
+.webshop-controls .btn-group {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.webshop-controls .card {
+    transition: all 0.3s ease;
+}
+
+.webshop-controls .card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+#automationBtn {
+    position: relative;
+    overflow: hidden;
+}
+
+#automationBtn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.5s;
+}
+
+#automationBtn:hover::before {
+    left: 100%;
+}
+
+.toast {
+    min-width: 300px;
+}
+</style>

@@ -1,0 +1,343 @@
+{% extends "base.html" %}
+
+{% block title %}Auftrag {{ order.id }} bearbeiten - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('orders.index') }}">Aufträge</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('orders.show', order_id=order.id) }}">{{ order.id }}</a></li>
+                <li class="breadcrumb-item active">Bearbeiten</li>
+            </ol>
+        </nav>
+        
+        <h1><i class="bi bi-pencil"></i> Auftrag {{ order.id }} bearbeiten</h1>
+    </div>
+</div>
+
+<form method="POST">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Auftrags-Grundinformationen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Auftrags-Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Kunde:</strong> {{ order.customer.display_name if order.customer else 'Unbekannt' }}<br>
+                        <strong>Typ:</strong> 
+                        {% if order.order_type == 'embroidery' %}Bestickung
+                        {% elif order.order_type == 'printing' %}Textildruck
+                        {% elif order.order_type == 'dtf' %}DTF
+                        {% elif order.order_type == 'combined' %}Kombiniert
+                        {% endif %}<br>
+                        <strong>Artikel:</strong> {{ order.items.count() }} Position(en)<br>
+                        <strong>Preis:</strong> {{ "%.2f"|format(order.total_price) }} €
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="description" class="form-label">Beschreibung</label>
+                            <textarea class="form-control" id="description" name="description" rows="3">{{ order.description or '' }}</textarea>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="price" class="form-label">Preis</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="price" name="price" 
+                                       value="{{ order.total_price }}" step="0.01" min="0.01" required>
+                                <span class="input-group-text">€</span>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="priority" class="form-label">Priorität</label>
+                            <select class="form-control" id="priority" name="priority">
+                                <option value="low">Niedrig</option>
+                                <option value="normal" selected>Normal</option>
+                                <option value="high">Hoch</option>
+                                <option value="urgent">Dringend</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="pickup_date" class="form-label">Gewünschtes Abholdatum</label>
+                            <input type="date" class="form-control" id="pickup_date" name="pickup_date" 
+                                   value="{{ order.due_date.strftime('%Y-%m-%d') if order.due_date else '' }}">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="rush_order" class="form-label">Express-Auftrag</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="rush_order" name="rush_order" 
+                                       {% if order.rush_order %}checked{% endif %}>
+                                <label class="form-check-label" for="rush_order">
+                                    Eilauftrag mit höherer Priorität
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Artikel-Details -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-cart"></i> Artikel-Positionen</h5>
+                </div>
+                <div class="card-body">
+                    {% if order.items.count() > 0 %}
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Artikel</th>
+                                    <th>Menge</th>
+                                    <th>Größe</th>
+                                    <th>Farbe</th>
+                                    <th>Einzelpreis</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in order.items %}
+                                <tr>
+                                    <td>{{ item.article.name if item.article else 'Gelöscht' }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>{{ item.textile_size or '-' }}</td>
+                                    <td>{{ item.textile_color or '-' }}</td>
+                                    <td>{{ "%.2f"|format(item.unit_price) }} €</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-muted small mt-2">
+                        <i class="bi bi-info-circle"></i> Artikel können nur bei der Auftragserstellung hinzugefügt werden.
+                    </p>
+                    {% else %}
+                    <p class="text-muted">Keine Artikel-Positionen vorhanden.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Design-Details -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-palette"></i> Design-Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Design-Beschreibung</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ order.description or '' }}</textarea>
+                    </div>
+                    
+                    {% if order.order_type == 'embroidery' or order.order_type == 'combined' %}
+                    <div class="mb-3">
+                        <label for="embroidery_position" class="form-label">Stickerei-Position</label>
+                        <input type="text" class="form-control" id="embroidery_position" name="embroidery_position" 
+                               value="{{ order.embroidery_position or '' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="thread_colors" class="form-label">Garn-Farben</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="thread_colors" name="thread_colors" 
+                                   value="{{ order.thread_colors or '' }}" placeholder="Farben auswählen..." readonly>
+                            <button type="button" class="btn btn-outline-secondary" onclick="openThreadSelector()">
+                                <i class="bi bi-palette"></i> Auswählen
+                            </button>
+                        </div>
+                        <input type="hidden" id="selected_threads" name="selected_threads" value="{{ order.selected_threads or '[]' }}">
+                        <div id="selected-threads-display" class="mt-2"></div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="stitch_count" class="form-label">Stichzahl</label>
+                        <input type="number" class="form-control" id="stitch_count" name="stitch_count" 
+                               value="{{ order.stitch_count or '' }}">
+                    </div>
+                    {% endif %}
+                    
+                    {% if order.order_type == 'printing' or order.order_type == 'dtf' or order.order_type == 'combined' %}
+                    <div class="mb-3">
+                        <label for="print_method" class="form-label">Druckverfahren</label>
+                        <select class="form-control" id="print_method" name="print_method">
+                            <option value="">Wählen...</option>
+                            <option value="dtg" {% if order.print_method == 'dtg' %}selected{% endif %}>DTG</option>
+                            <option value="dtf" {% if order.print_method == 'dtf' %}selected{% endif %}>DTF</option>
+                            <option value="flex" {% if order.print_method == 'flex' %}selected{% endif %}>Flexdruck</option>
+                            <option value="flock" {% if order.print_method == 'flock' %}selected{% endif %}>Flockdruck</option>
+                            <option value="screen" {% if order.print_method == 'screen' %}selected{% endif %}>Siebdruck</option>
+                            <option value="sublimation" {% if order.print_method == 'sublimation' %}selected{% endif %}>Sublimation</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="print_position" class="form-label">Druck-Position</label>
+                        <input type="text" class="form-control" id="print_position" name="print_position" 
+                               value="{{ order.embroidery_position or '' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="print_colors" class="form-label">Druckfarben</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="print_colors" name="print_colors" 
+                                   value="{{ order.print_colors or '' }}" placeholder="Farben auswählen..." readonly>
+                            <button type="button" class="btn btn-outline-secondary" onclick="openPrintColorSelector()">
+                                <i class="bi bi-palette"></i> Auswählen
+                            </button>
+                        </div>
+                        <input type="hidden" id="selected_print_colors" name="selected_print_colors" 
+                               value="{{ order.print_colors or '[]' }}">
+                        <div id="selected-print-colors-display" class="mt-2"></div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="print_width_cm" class="form-label">Breite (cm)</label>
+                            <input type="number" class="form-control" id="print_width_cm" name="print_width_cm" 
+                                   value="{{ order.print_width_cm or '' }}" step="0.1">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="print_height_cm" class="form-label">Höhe (cm)</label>
+                            <input type="number" class="form-control" id="print_height_cm" name="print_height_cm" 
+                                   value="{{ order.print_height_cm or '' }}" step="0.1">
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Notizen und Anweisungen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-sticky"></i> Notizen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="customer_notes" class="form-label">Kundenhinweise</label>
+                        <textarea class="form-control" id="customer_notes" name="customer_notes" rows="3">{{ order.customer_notes or '' }}</textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Interne Notizen</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3">{{ order.internal_notes or '' }}</textarea>
+                    </div>
+                    
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="rush_order" name="rush_order" 
+                               {% if order.rush_order %}checked{% endif %}>
+                        <label class="form-check-label" for="rush_order">
+                            Express-Auftrag
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status-Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Status</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Aktueller Status:</strong></p>
+                    {% if order.status == 'accepted' %}
+                        <span class="badge bg-primary fs-6">Angenommen</span>
+                    {% elif order.status == 'in_progress' %}
+                        <span class="badge bg-warning fs-6">In Arbeit</span>
+                    {% elif order.status == 'ready' %}
+                        <span class="badge bg-info fs-6">Abholbereit</span>
+                    {% elif order.status == 'completed' %}
+                        <span class="badge bg-success fs-6">Abgeholt</span>
+                    {% elif order.status == 'cancelled' %}
+                        <span class="badge bg-danger fs-6">Storniert</span>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    <p class="text-muted small">
+                        Status kann über die Auftragsübersicht oder die Detailansicht geändert werden.
+                    </p>
+                </div>
+            </div>
+            
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Aktionen -->
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-save"></i> Änderungen speichern
+                    </button>
+                    <a href="{{ url_for('orders.show', order_id=order.id) }}" class="btn btn-secondary w-100">
+                        <i class="bi bi-x-circle"></i> Abbrechen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script src="{{ url_for('static', filename='js/thread_selector.js') }}"></script>
+<script src="{{ url_for('static', filename='js/print_color_selector.js') }}"></script>
+
+<!-- CSS für Print Color Selector -->
+<style>
+/* Print Color Selector Styles */
+.color-card {
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.color-card:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.color-card.selected {
+    border: 3px solid #0d6efd !important;
+}
+
+.color-card .bi-check-circle-fill {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 16px;
+}
+
+.selected-color-chip {
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+#modal-selected-colors .btn-close {
+    width: 0.5em;
+    height: 0.5em;
+    padding: 0;
+}
+
+#selected-print-colors-display .badge {
+    padding: 0.5em 0.75em;
+    font-size: 0.875rem;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+</style>
+{% endblock %}
+

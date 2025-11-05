@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}Einstellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-gear"></i> Einstellungen</h1>
+        <p class="text-muted">Zentrale Verwaltung aller System-Einstellungen</p>
+    </div>
+</div>
+
+<!-- Übersicht-Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-people-fill text-primary" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Benutzer</h5>
+                <p class="card-text">{{ settings_overview.user_count }} Benutzer<br>{{ settings_overview.admin_count }} Admins</p>
+                <a href="{{ url_for('settings.users') }}" class="btn btn-primary btn-sm">Verwalten</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-box-seam text-success" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Artikel</h5>
+                <p class="card-text">{{ settings_overview.category_count }} Kategorien<br>{{ settings_overview.brand_count }} Marken</p>
+                <a href="{{ url_for('settings.articles') }}" class="btn btn-success btn-sm">Konfigurieren</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-calculator text-warning" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Preiskalkulation</h5>
+                <p class="card-text">Faktor: {{ legacy_settings.price_factor_calculated }}x / {{ legacy_settings.price_factor_recommended }}x</p>
+                <a href="{{ url_for('settings.articles_pricing') }}" class="btn btn-warning btn-sm">Anpassen</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                {% if settings_overview.advanced_available %}
+                <i class="bi bi-gear-wide-connected text-info" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Erweitert</h5>
+                <p class="card-text">
+                    {% if advanced_settings.tax_rates %}{{ advanced_settings.tax_rates }} MwSt-Sätze{% else %}Nicht konfiguriert{% endif %}<br>
+                    {% if advanced_settings.calculation_rules %}{{ advanced_settings.calculation_rules }} Regeln{% else %}Keine Regeln{% endif %}
+                </p>
+                <a href="{{ url_for('settings.advanced') }}" class="btn btn-info btn-sm">Konfigurieren</a>
+                {% else %}
+                <i class="bi bi-exclamation-triangle text-secondary" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Erweitert</h5>
+                <p class="card-text">Nicht verfügbar</p>
+                <button class="btn btn-secondary btn-sm" disabled>Nicht verfügbar</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Schnellaktionen -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-lightning"></i> Schnellaktionen</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('settings.articles_pricing') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-calculator"></i> Preisfaktoren anpassen
+                    </a>
+                    
+                    {% if current_user.is_admin %}
+                    <a href="{{ url_for('settings.new_user') }}" class="btn btn-outline-success">
+                        <i class="bi bi-person-plus"></i> Neuen Benutzer erstellen
+                    </a>
+                    {% endif %}
+                    
+                    {% if settings_overview.advanced_available %}
+                    <button class="btn btn-outline-info" onclick="initAdvancedSettings()">
+                        <i class="bi bi-gear-wide"></i> Erweiterte Einstellungen initialisieren
+                    </button>
+                    {% endif %}
+                    
+                    {% if current_user.is_admin %}
+                    <a href="{{ url_for('settings.system') }}" class="btn btn-outline-warning">
+                        <i class="bi bi-info-circle"></i> System-Informationen
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-calculator"></i> Preiskalkulation testen</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="test_purchase_price" class="form-label">EK-Preis (€):</label>
+                    <input type="number" class="form-control" id="test_purchase_price" 
+                           value="10.00" step="0.01" min="0">
+                </div>
+                
+                <button class="btn btn-primary" onclick="testCalculation()">
+                    <i class="bi bi-calculator"></i> Berechnen
+                </button>
+                
+                <div id="calculation_result" class="mt-3" style="display: none;">
+                    <!-- Ergebnis wird hier angezeigt -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status-Information -->
+{% if settings_overview.advanced_available and advanced_settings %}
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> System-Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>Standard MwSt-Satz:</strong><br>
+                        {% if advanced_settings.default_tax_rate %}
+                            {{ advanced_settings.default_tax_rate.name }} ({{ advanced_settings.default_tax_rate.rate }}%)
+                        {% else %}
+                            <span class="text-warning">Nicht konfiguriert</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Standard Kalkulationsregel:</strong><br>
+                        {% if advanced_settings.default_calculation_rule %}
+                            {{ advanced_settings.default_calculation_rule.name }}
+                        {% else %}
+                            <span class="text-warning">Nicht konfiguriert</span>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Import-Einstellungen:</strong><br>
+                        {% if advanced_settings.import_settings_configured %}
+                            <span class="text-success">Konfiguriert</span>
+                        {% else %}
+                            <span class="text-warning">Nicht konfiguriert</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+// Erstellt von Hans Hahn - Alle Rechte vorbehalten
+
+function testCalculation() {
+    const purchasePrice = parseFloat(document.getElementById('test_purchase_price').value);
+    
+    if (!purchasePrice || purchasePrice <= 0) {
+        alert('Bitte geben Sie einen gültigen EK-Preis ein.');
+        return;
+    }
+    
+    fetch('{{ url_for("settings.test_calculation") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            purchase_price: purchasePrice
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const resultDiv = document.getElementById('calculation_result');
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <strong>Kalkulationsergebnis:</strong><br>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>VK kalkuliert:</strong><br>
+                            ${data.calculated_net.toFixed(2).replace('.', ',')} € (netto)<br>
+                            ${data.calculated_gross.toFixed(2).replace('.', ',')} € (${data.tax_rate}% MwSt)
+                        </div>
+                        <div class="col-md-6">
+                            <strong>VK empfohlen:</strong><br>
+                            ${data.recommended_net.toFixed(2).replace('.', ',')} € (netto)<br>
+                            ${data.recommended_gross.toFixed(2).replace('.', ',')} € (${data.tax_rate}% MwSt)
+                        </div>
+                    </div>
+                    <small class="text-muted">Regel: ${data.rule_used}</small>
+                </div>
+            `;
+            resultDiv.style.display = 'block';
+        } else {
+            alert('Fehler bei der Berechnung: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Fehler bei der Verbindung zum Server');
+    });
+}
+
+function initAdvancedSettings() {
+    if (confirm('Sollen die erweiterten Einstellungen mit Standard-Werten initialisiert werden?')) {
+        fetch('{{ url_for("settings.init_advanced_settings") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Erweiterte Einstellungen wurden erfolgreich initialisiert!');
+                location.reload();
+            } else {
+                alert('Fehler: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Fehler bei der Verbindung zum Server');
+        });
+    }
+}
+</script>
+{% endblock %}

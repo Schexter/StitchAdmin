@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Garnfarben Import - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>
+                    <a href="{{ url_for('thread.index') }}" class="text-decoration-none">
+                        <i class="bi bi-arrow-left-circle"></i>
+                    </a>
+                    Garnfarben importieren
+                </h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import-Optionen -->
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-file-earmark-spreadsheet text-success"></i> CSV-Import
+                    </h5>
+                    <p class="card-text">Importieren Sie Garnfarben aus einer CSV-Datei mit den Spalten:</p>
+                    <ul class="small">
+                        <li>Hersteller</li>
+                        <li>Produktlinie</li>
+                        <li>Farbnummer</li>
+                        <li>Farbname_DE</li>
+                        <li>Farbname_EN</li>
+                        <li>Pantone</li>
+                        <li>HexWert</li>
+                        <li>Kategorie</li>
+                    </ul>
+                    
+                    <form id="csvImportForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <input type="file" class="form-control form-control-lg" 
+                                   id="csvFile" accept=".csv" required>
+                        </div>
+                        <button type="submit" class="btn btn-success btn-lg touch-target">
+                            <i class="bi bi-upload"></i> CSV importieren
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-file-earmark-pdf text-danger"></i> PDF-Analyse
+                    </h5>
+                    <p class="card-text">Analysieren Sie PDF-Farbtabellen und extrahieren Sie Farben automatisch.</p>
+                    <div class="alert alert-info alert-sm">
+                        <small><i class="bi bi-info-circle"></i> Benötigt Java Runtime für optimale Tabellen-Extraktion</small>
+                    </div>
+                    
+                    <form id="pdfImportForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <input type="file" class="form-control form-control-lg" 
+                                   id="pdfFile" accept=".pdf" required>
+                        </div>
+                        <button type="submit" class="btn btn-danger btn-lg touch-target">
+                            <i class="bi bi-search"></i> PDF analysieren
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import-Verlauf -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3>Import-Vorlagen</h3>
+            <div class="card">
+                <div class="card-body">
+                    <p>Laden Sie eine Beispiel-CSV-Vorlage herunter:</p>
+                    <a href="{{ url_for('static', filename='templates/garnfarben_vorlage.csv') }}" 
+                       class="btn btn-outline-primary" download>
+                        <i class="bi bi-download"></i> CSV-Vorlage herunterladen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import-Ergebnis -->
+    <div class="row mt-4 d-none" id="importResult">
+        <div class="col-12">
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <h5 class="alert-heading">Import erfolgreich!</h5>
+                <p id="importMessage"></p>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// CSV Import
+document.getElementById('csvImportForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('csvFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Bitte wählen Sie eine Datei aus.');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Loading-Anzeige
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Importiere...';
+    submitBtn.disabled = true;
+    
+    fetch('/threads/api/import/csv', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('importMessage').textContent = data.message;
+            document.getElementById('importResult').classList.remove('d-none');
+            
+            // Form zurücksetzen
+            fileInput.value = '';
+            
+            // Nach 3 Sekunden zur Farbübersicht wechseln
+            setTimeout(() => {
+                window.location.href = '{{ url_for("thread.colors") }}';
+            }, 3000);
+        } else {
+            alert('Fehler beim Import: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Fehler beim Import: ' + error);
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+// PDF Import
+document.getElementById('pdfImportForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('pdfFile');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        alert('Bitte wählen Sie eine PDF-Datei aus.');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    // Loading-Anzeige
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Analysiere PDF...';
+    submitBtn.disabled = true;
+    
+    fetch('/threads/api/analyze/pdf', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Zeige Ergebnis
+            alert(`PDF-Analyse abgeschlossen.\n\nGefundene Farben: ${data.colors_found}\n\n${data.message}`);
+            
+            // Form zurücksetzen
+            fileInput.value = '';
+            
+            if (data.colors_found > 0) {
+                // Nach 2 Sekunden zur Farbübersicht wechseln
+                setTimeout(() => {
+                    window.location.href = '{{ url_for("thread.colors") }}';
+                }, 2000);
+            }
+        } else {
+            alert('Fehler bei der PDF-Analyse: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Fehler bei der PDF-Analyse: ' + error);
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+</script>
+
+<style>
+.touch-target {
+    min-height: 60px;
+    padding: 15px 30px;
+}
+</style>
+{% endblock %}

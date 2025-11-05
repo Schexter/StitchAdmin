@@ -1,0 +1,585 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.name }} - Artikel Details{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('articles.index') }}">Artikel</a></li>
+                <li class="breadcrumb-item active">{{ article.name }}</li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>{{ article.name }}</h1>
+            <div>
+                <div class="btn-group">
+                    <a href="{{ url_for('articles.print_label', article_id=article.id) }}?autoprint=1" class="btn btn-success" target="_blank">
+                        <i class="bi bi-printer"></i> Etikett drucken
+                    </a>
+                    <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                        <span class="visually-hidden">Weitere Optionen</span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{{ url_for('articles.print_label_multi', article_id=article.id) }}" target="_blank">
+                            <i class="bi bi-grid-3x3"></i> Mehrere Etiketten...
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('articles.print_datasheet', article_id=article.id) }}?autoprint=1" target="_blank">
+                            <i class="bi bi-file-earmark-pdf"></i> Produktdatenblatt (PDF)
+                        </a></li>
+                    </ul>
+                </div>
+                <a href="{{ url_for('articles.edit', article_id=article.id) }}" class="btn btn-primary">
+                    <i class="bi bi-pencil"></i> Bearbeiten
+                </a>
+                <button class="btn btn-danger" onclick="confirmDelete()">
+                    <i class="bi bi-trash"></i> Löschen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Artikel-Details -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Artikel-Informationen</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Artikel-ID:</strong></div>
+                    <div class="col-md-9">{{ article.id }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Artikelnummer:</strong></div>
+                    <div class="col-md-9">{{ article.article_number or '-' }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Kategorie:</strong></div>
+                    <div class="col-md-9">
+                        {% if article.category_obj %}
+                            <span class="badge bg-primary">{{ article.category_obj.name }}</span>
+                        {% elif article.category %}
+                            <span class="badge bg-secondary">{{ article.category }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Keine</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Marke:</strong></div>
+                    <div class="col-md-9">
+                        {% if article.brand_obj %}
+                            <strong>{{ article.brand_obj.name }}</strong>
+                        {% elif article.brand %}
+                            {{ article.brand }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Produkttyp:</strong></div>
+                    <div class="col-md-9">{{ article.product_type or '-' }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Herstellernummer:</strong></div>
+                    <div class="col-md-9">{{ article.manufacturer_number or '-' }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Beschreibung:</strong></div>
+                    <div class="col-md-9">{{ article.description or '-' }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Status:</strong></div>
+                    <div class="col-md-9">
+                        {% if article.active %}
+                            <span class="badge bg-success">Aktiv</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inaktiv</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Eigenschaften -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Eigenschaften</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Größe:</strong></div>
+                    <div class="col-md-9">{{ article.size or '-' }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Farbe:</strong></div>
+                    <div class="col-md-9">{{ article.color or '-' }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Material:</strong></div>
+                    <div class="col-md-9">{{ article.material or '-' }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Gewicht:</strong></div>
+                    <div class="col-md-9">
+                        {% if article.weight %}
+                            {{ "%.3f"|format(article.weight) }} kg
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Preis-Informationen -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Preis-Informationen</h5>
+            </div>
+            <div class="card-body">
+                <h6 class="text-muted mb-3">Einkaufspreise (netto)</h6>
+                <div class="row mb-2">
+                    <div class="col-md-4"><strong>Einzelpreis:</strong></div>
+                    <div class="col-md-8">{{ "%.2f"|format(article.purchase_price_single or 0) }} €</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-4"><strong>Kartonpreis:</strong></div>
+                    <div class="col-md-8">{{ "%.2f"|format(article.purchase_price_carton or 0) }} €</div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4"><strong>10-Karton-Preis:</strong></div>
+                    <div class="col-md-8">{{ "%.2f"|format(article.purchase_price_10carton or 0) }} €</div>
+                </div>
+                
+                <hr>
+                
+                <h6 class="text-muted mb-3">Verkaufspreise (netto)</h6>
+                <div class="row mb-2">
+                    <div class="col-md-4"><strong>VK aktuell:</strong></div>
+                    <div class="col-md-8">
+                        <span class="fs-5 text-primary">{{ "%.2f"|format(article.price or 0) }} €</span>
+                        <small class="text-muted">({{ "%.2f"|format((article.price or 0) * 1.19) }} € brutto)</small>
+                    </div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-4"><strong>VK kalkuliert:</strong></div>
+                    <div class="col-md-8">
+                        <span class="text-info">{{ "%.2f"|format(article.price_calculated or 0) }} €</span>
+                        <small class="text-muted">(EK × 1,5)</small>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4"><strong>VK empfohlen:</strong></div>
+                    <div class="col-md-8">
+                        <span class="text-success">{{ "%.2f"|format(article.price_recommended or 0) }} €</span>
+                        <small class="text-muted">(EK × 2,0)</small>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row mb-2">
+                    <div class="col-md-4"><strong>Marge:</strong></div>
+                    <div class="col-md-8">
+                        {% if article.price and article.price > 0 and article.purchase_price_single %}
+                            {% set margin = ((article.price - article.purchase_price_single) / article.price * 100) %}
+                            <span class="{% if margin > 30 %}text-success{% elif margin > 0 %}text-warning{% else %}text-danger{% endif %}">
+                                {{ "%.1f"|format(margin) }}%
+                            </span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Lieferanten-Informationen -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Lieferanten-Informationen</h5>
+                <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
+                    <i class="bi bi-plus"></i> Lieferant hinzufügen
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3"><strong>Hauptlieferant:</strong></div>
+                    <div class="col-md-9">
+                        {% if article.supplier %}
+                            <span class="badge bg-primary">{{ article.supplier }}</span>
+                        {% else %}
+                            <span class="text-muted">Kein Hauptlieferant</span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if article.supplier_articles and article.supplier_articles.count() > 0 %}
+                <h6 class="text-muted mb-3">Alle Lieferanten</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Lieferant</th>
+                                <th>Art.Nr.</th>
+                                <th>Preis</th>
+                                <th>Verfügbar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for supplier_link in article.supplier_articles %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('suppliers.show', supplier_id=supplier_link.supplier_id) }}">
+                                        {{ supplier_link.supplier.name }}
+                                    </a>
+                                </td>
+                                <td>{{ supplier_link.supplier_article_number or '-' }}</td>
+                                <td>{{ "%.2f"|format(supplier_link.purchase_price or 0) }} €</td>
+                                <td>
+                                    {% if supplier_link.is_available %}
+                                        <span class="badge bg-success">Ja</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Nein</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">Keine zusätzlichen Lieferanten verknüpft.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Zusätzliche Informationen -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Zusätzliche Informationen</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Lagerort:</strong></div>
+                    <div class="col-md-9">{{ article.location or '-' }}</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>VE/Karton:</strong></div>
+                    <div class="col-md-9">{{ article.units_per_carton or '-' }} Stück</div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Erstellt am:</strong></div>
+                    <div class="col-md-9">
+                        {% if article.created_at %}
+                            {{ article.created_at.strftime('%d.%m.%Y %H:%M') }}
+                            {% if article.created_by %}
+                                von {{ article.created_by }}
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                </div>
+                {% if article.updated_at %}
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Aktualisiert am:</strong></div>
+                    <div class="col-md-9">
+                        {{ article.updated_at.strftime('%d.%m.%Y %H:%M') }}
+                        {% if article.updated_by %}
+                            von {{ article.updated_by }}
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Lagerbestand -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Lagerbestand</h5>
+            </div>
+            <div class="card-body text-center">
+                <h2 class="display-4 text-{{ stock_status }}">
+                    {{ article.stock or 0 }}
+                </h2>
+                <p class="text-muted">Stück</p>
+                
+                <p class="mb-3">
+                    <span class="badge bg-{{ stock_status }}">{{ stock_text }}</span>
+                </p>
+                
+                <hr>
+                
+                <p><strong>Mindestbestand:</strong> {{ article.min_stock or 0 }} Stück</p>
+                
+                {% if stock_status == 'warning' or stock_status == 'danger' %}
+                <div class="alert alert-{{ stock_status }}">
+                    <i class="bi bi-exclamation-triangle"></i> 
+                    {% if stock_status == 'danger' %}
+                        Artikel nicht vorrätig!
+                    {% else %}
+                        Mindestbestand unterschritten!
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <button class="btn btn-primary w-100 mb-2" onclick="adjustStock()">
+                    <i class="bi bi-box"></i> Bestand anpassen
+                </button>
+                
+                <!-- Zur Bestellung hinzufügen Button -->
+                {% include 'includes/add_to_order_button_only.html' %}
+            </div>
+        </div>
+        
+        <!-- Schnellaktionen -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Schnellaktionen</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-secondary" onclick="duplicateArticle()">
+                        <i class="bi bi-files"></i> Artikel duplizieren
+                    </button>
+                    {% if article.stock and article.stock > 0 %}
+                    <a href="{{ url_for('articles.index') }}?search={{ article.category or '' }}" 
+                       class="btn btn-outline-info">
+                        <i class="bi bi-search"></i> Ähnliche Artikel
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Löschen Bestätigung -->
+<form id="deleteForm" method="POST" action="{{ url_for('articles.delete', article_id=article.id) }}" style="display: none;">
+</form>
+
+<!-- Add to Order Modal - Nur einmal einbinden! -->
+{% include 'includes/add_to_order_modal.html' %}
+
+<!-- Lagerbestand Modal -->
+<div class="modal fade" id="stockModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Lagerbestand anpassen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Aktuelle Menge: <strong>{{ article.stock or 0 }} Stück</strong></label>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Änderung</label>
+                    <div class="input-group">
+                        <button class="btn btn-danger" type="button" onclick="changeStockValue(-1)">-</button>
+                        <input type="number" class="form-control text-center" id="stockChange" value="0">
+                        <button class="btn btn-success" type="button" onclick="changeStockValue(1)">+</button>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Aktion</label>
+                    <select class="form-control" id="stockAction" onchange="toggleOrderField()">
+                        <option value="add">Wareneingang (+)</option>
+                        <option value="remove">Entnahme (-)</option>
+                        <option value="inventory">Inventur (=)</option>
+                        <option value="correction">Korrektur (+/-)</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3" id="orderNumberField" style="display: none;">
+                    <label class="form-label">Bestellnummer</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="orderNumber" placeholder="z.B. PO2025001 oder A2025-001" onchange="checkOrderNumber()">
+                        <button type="button" class="btn btn-outline-secondary" id="orderLinkBtn" style="display: none;" onclick="openOrder()">
+                            <i class="bi bi-box-arrow-up-right"></i> Öffnen
+                        </button>
+                    </div>
+                    <small class="text-muted">Geben Sie die Bestellnummer ein, um sie mit dieser Bestandsänderung zu verknüpfen</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Grund / Notiz</label>
+                    <textarea class="form-control" id="stockReason" rows="2" placeholder="Optional: Grund für die Bestandsänderung"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="saveStockChange()">Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete() {
+    if (confirm('Möchten Sie diesen Artikel wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+        document.getElementById('deleteForm').submit();
+    }
+}
+
+function adjustStock() {
+    document.getElementById('stockChange').value = 0;
+    document.getElementById('stockAction').value = 'add';
+    document.getElementById('orderNumber').value = '';
+    document.getElementById('stockReason').value = '';
+    document.getElementById('orderLinkBtn').style.display = 'none';
+    toggleOrderField();
+    const modal = new bootstrap.Modal(document.getElementById('stockModal'));
+    modal.show();
+}
+
+function toggleOrderField() {
+    const action = document.getElementById('stockAction').value;
+    const orderField = document.getElementById('orderNumberField');
+    
+    // Zeige Bestellnummer-Feld bei Wareneingang oder Entnahme
+    if (action === 'add' || action === 'remove') {
+        orderField.style.display = 'block';
+    } else {
+        orderField.style.display = 'none';
+    }
+}
+
+function checkOrderNumber() {
+    const orderNumber = document.getElementById('orderNumber').value.trim();
+    const linkBtn = document.getElementById('orderLinkBtn');
+    
+    if (orderNumber) {
+        // Zeige den Link-Button
+        linkBtn.style.display = 'block';
+        
+        // Bestimme den Typ der Bestellung
+        if (orderNumber.startsWith('PO') || orderNumber.startsWith('SO')) {
+            linkBtn.setAttribute('data-order-type', 'supplier');
+        } else if (orderNumber.startsWith('A')) {
+            linkBtn.setAttribute('data-order-type', 'customer');
+        } else {
+            linkBtn.style.display = 'none';
+        }
+    } else {
+        linkBtn.style.display = 'none';
+    }
+}
+
+function openOrder() {
+    const orderNumber = document.getElementById('orderNumber').value.trim();
+    const linkBtn = document.getElementById('orderLinkBtn');
+    const orderType = linkBtn.getAttribute('data-order-type');
+    
+    if (orderNumber && orderType) {
+        let url = '';
+        
+        if (orderType === 'supplier') {
+            // Lieferantenbestellung - extrahiere Supplier ID aus Order
+            // PO-Nummern haben meist keine direkte Supplier-ID, daher Suche nötig
+            url = `/suppliers/?search=${orderNumber}`;
+        } else if (orderType === 'customer') {
+            // Kundenauftrag
+            url = `/orders/${orderNumber}`;
+        }
+        
+        if (url) {
+            window.open(url, '_blank');
+        }
+    }
+}
+
+function changeStockValue(delta) {
+    const input = document.getElementById('stockChange');
+    input.value = parseInt(input.value) + delta;
+}
+
+function saveStockChange() {
+    const change = parseInt(document.getElementById('stockChange').value);
+    const action = document.getElementById('stockAction').value;
+    const orderNumber = document.getElementById('orderNumber').value;
+    const reason = document.getElementById('stockReason').value;
+    
+    // Validierung
+    if (change === 0 && action !== 'inventory') {
+        alert('Bitte geben Sie eine Änderung ein');
+        return;
+    }
+    
+    // Form erstellen für POST-Request
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{{ url_for("articles.update_stock", article_id=article.id) }}';
+    
+    // CSRF Token hinzufügen (falls vorhanden)
+    const csrfToken = document.querySelector('meta[name="csrf-token"]');
+    if (csrfToken) {
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = 'csrf_token';
+        csrfInput.value = csrfToken.content;
+        form.appendChild(csrfInput);
+    }
+    
+    // Action-Feld
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = action;
+    form.appendChild(actionInput);
+    
+    // Quantity-Feld
+    const quantityInput = document.createElement('input');
+    quantityInput.type = 'hidden';
+    quantityInput.name = 'quantity';
+    quantityInput.value = Math.abs(change);
+    form.appendChild(quantityInput);
+    
+    // Bestellnummer
+    if (orderNumber) {
+        const orderInput = document.createElement('input');
+        orderInput.type = 'hidden';
+        orderInput.name = 'order_number';
+        orderInput.value = orderNumber;
+        form.appendChild(orderInput);
+    }
+    
+    // Grund/Notiz
+    if (reason) {
+        const reasonInput = document.createElement('input');
+        reasonInput.type = 'hidden';
+        reasonInput.name = 'reason';
+        reasonInput.value = reason;
+        form.appendChild(reasonInput);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function duplicateArticle() {
+    alert('Duplizieren-Funktion wird in der nächsten Version implementiert');
+}
+
+function printLabel() {
+    alert('Etikettendruck wird in der nächsten Version implementiert');
+}
+</script>
+{% endblock %}

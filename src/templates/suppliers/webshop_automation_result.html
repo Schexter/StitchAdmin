@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Webshop-Automation Ergebnis - {{ supplier.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .automation-result {
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .success-item {
+        background-color: #d4edda;
+        border-left: 4px solid #28a745;
+        padding: 10px;
+        margin-bottom: 5px;
+    }
+    .failed-item {
+        background-color: #f8d7da;
+        border-left: 4px solid #dc3545;
+        padding: 10px;
+        margin-bottom: 5px;
+    }
+    .automation-stats {
+        display: flex;
+        justify-content: space-around;
+        margin: 20px 0;
+    }
+    .stat-box {
+        text-align: center;
+        padding: 15px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        min-width: 120px;
+    }
+    .browser-controls {
+        position: sticky;
+        top: 20px;
+        z-index: 1000;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.index') }}">Lieferanten</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.show', supplier_id=supplier.id) }}">{{ supplier.name }}</a></li>
+                <li class="breadcrumb-item active">Webshop-Automation</li>
+            </ol>
+        </nav>
+        
+        <h1><i class="fas fa-robot me-2"></i>Webshop-Automation Ergebnis</h1>
+        <p class="text-muted">Automatisierte Bestellung bei {{ supplier.name }}</p>
+    </div>
+</div>
+
+<!-- Browser-Steuerung (Sticky) -->
+<div class="browser-controls">
+    <div class="card bg-info text-white mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-1"><i class="fas fa-browser me-2"></i>Browser-Session aktiv</h5>
+                    <small>Der Browser bleibt geöffnet für manuelle Nachbearbeitung</small>
+                </div>
+                <div>
+                    {% if automation_result.browser_url %}
+                    <a href="{{ automation_result.browser_url }}" target="_blank" class="btn btn-light btn-sm me-2">
+                        <i class="fas fa-external-link-alt"></i> Browser öffnen
+                    </a>
+                    {% endif %}
+                    <button type="button" class="btn btn-outline-light btn-sm" onclick="window.print()">
+                        <i class="fas fa-print"></i> Drucken
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Automation-Statistiken -->
+<div class="automation-stats">
+    <div class="stat-box">
+        <h3>{{ automation_result.search_results.total_added }}</h3>
+        <small>Artikel hinzugefügt</small>
+    </div>
+    <div class="stat-box">
+        <h3>{{ automation_result.search_results.success|length }}</h3>
+        <small>Erfolgreich</small>
+    </div>
+    <div class="stat-box">
+        <h3>{{ automation_result.search_results.failed|length }}</h3>
+        <small>Fehlgeschlagen</small>
+    </div>
+    {% if automation_result.search_results.total_value > 0 %}
+    <div class="stat-box">
+        <h3>{{ "%.2f"|format(automation_result.search_results.total_value) }}€</h3>
+        <small>Warenwert</small>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row">
+    <!-- Erfolgreich hinzugefügte Artikel -->
+    <div class="col-md-6">
+        <div class="card automation-result mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Erfolgreich hinzugefügt ({{ automation_result.search_results.success|length }})
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if automation_result.search_results.success %}
+                    {% for item in automation_result.search_results.success %}
+                    <div class="success-item">
+                        <strong>{{ item.article_number }}</strong>
+                        <br>
+                        <small>{{ item.article.description }}</small>
+                        <br>
+                        <span class="badge bg-success">Menge: {{ item.quantity }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">Keine Artikel erfolgreich hinzugefügt</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Fehlgeschlagene Artikel -->
+    <div class="col-md-6">
+        <div class="card automation-result mb-4">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Fehlgeschlagen ({{ automation_result.search_results.failed|length }})
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if automation_result.search_results.failed %}
+                    {% for item in automation_result.search_results.failed %}
+                    <div class="failed-item">
+                        <strong>
+                            {{ item.article.article_number or item.article.supplier_article_number or 'Unbekannt' }}
+                        </strong>
+                        <br>
+                        <small>{{ item.article.description }}</small>
+                        <br>
+                        <span class="badge bg-danger">{{ item.reason }}</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-success">Alle Artikel erfolgreich verarbeitet!</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Warenkorb-Zusammenfassung -->
+{% if automation_result.cart_summary %}
+<div class="card automation-result mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+            <i class="fas fa-shopping-cart me-2"></i>
+            Warenkorb-Zusammenfassung
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Artikel im Warenkorb:</strong> {{ automation_result.cart_summary.total_items or 'Unbekannt' }}</p>
+                {% if automation_result.cart_summary.total_price %}
+                <p><strong>Gesamtpreis:</strong> {{ "%.2f"|format(automation_result.cart_summary.total_price) }}€</p>
+                {% endif %}
+            </div>
+            <div class="col-md-6">
+                {% if automation_result.cart_summary.cart_url %}
+                <a href="{{ automation_result.cart_summary.cart_url }}" target="_blank" class="btn btn-outline-primary">
+                    <i class="fas fa-external-link-alt me-2"></i>Warenkorb öffnen
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Checkout-Status -->
+{% if automation_result.checkout_result %}
+<div class="card automation-result mb-4">
+    <div class="card-header {% if automation_result.checkout_result.success %}bg-info{% else %}bg-warning{% endif %} text-white">
+        <h5 class="mb-0">
+            <i class="fas fa-cash-register me-2"></i>
+            Checkout-Status
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if automation_result.checkout_result.success %}
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                {{ automation_result.checkout_result.message }}
+            </div>
+            {% if automation_result.checkout_result.checkout_url %}
+            <a href="{{ automation_result.checkout_result.checkout_url }}" target="_blank" class="btn btn-info">
+                <i class="fas fa-external-link-alt me-2"></i>Zur Kasse gehen
+            </a>
+            {% endif %}
+        {% else %}
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                {{ automation_result.checkout_result.message }}
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Login-Status -->
+<div class="card automation-result mb-4">
+    <div class="card-header bg-secondary text-white">
+        <h5 class="mb-0">
+            <i class="fas fa-sign-in-alt me-2"></i>
+            Verbindungs-Details
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p><strong>Webshop-URL:</strong> 
+                   <a href="{{ supplier.webshop_url }}" target="_blank">{{ supplier.webshop_url }}</a>
+                </p>
+                <p><strong>Shop-System:</strong> {{ supplier.webshop_type or 'Generic' }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Login-Status:</strong> 
+                   <span class="badge {% if automation_result.login_success %}bg-success{% else %}bg-warning{% endif %}">
+                       {% if automation_result.login_success %}Erfolgreich{% else %}Fehlgeschlagen/Nicht versucht{% endif %}
+                   </span>
+                </p>
+                {% if supplier.webshop_username %}
+                <p><strong>Benutzername:</strong> {{ supplier.webshop_username }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ursprüngliche Bestellung -->
+<div class="card automation-result mb-4">
+    <div class="card-header bg-dark text-white">
+        <h5 class="mb-0">
+            <i class="fas fa-list me-2"></i>
+            Ursprüngliche Bestellung
+        </h5>
+    </div>
+    <div class="card-body">
+        <p><strong>Bestellnummer:</strong> {{ order.order_number }}</p>
+        <p><strong>Erstellt:</strong> {{ order.created_at.strftime('%d.%m.%Y %H:%M') if order.created_at else 'Unbekannt' }}</p>
+        
+        <h6 class="mt-3">Bestellpositionen:</h6>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Artikelnummer</th>
+                        <th>Beschreibung</th>
+                        <th>Menge</th>
+                        <th>Einzelpreis</th>
+                        <th>Gesamt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.get_items() %}
+                    <tr>
+                        <td>{{ item.article_number or item.supplier_article_number }}</td>
+                        <td>{{ item.description }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>{{ "%.2f"|format(item.unit_price) }}€</td>
+                        <td>{{ "%.2f"|format(item.line_total) }}€</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Aktionen -->
+<div class="card">
+    <div class="card-body">
+        <h5>Nächste Schritte</h5>
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('suppliers.show', supplier_id=supplier.id) }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Zurück zum Lieferanten
+            </a>
+            
+            {% if automation_result.browser_url %}
+            <a href="{{ automation_result.browser_url }}" target="_blank" class="btn btn-primary">
+                <i class="fas fa-external-link-alt me-2"></i>Webshop öffnen
+            </a>
+            {% endif %}
+            
+            <button type="button" class="btn btn-info" onclick="window.print()">
+                <i class="fas fa-print me-2"></i>Ergebnis drucken
+            </button>
+        </div>
+        
+        <div class="mt-3">
+            <small class="text-muted">
+                <i class="fas fa-lightbulb me-1"></i>
+                <strong>Tipp:</strong> Der Browser bleibt geöffnet, damit Sie die Bestellung manuell überprüfen und abschließen können.
+                Nicht alle Webshops unterstützen vollautomatische Bestellungen.
+            </small>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Auto-Refresh für Browser-Status
+setTimeout(function() {
+    // Verstecke Browser-Controls nach 30 Minuten
+    setTimeout(function() {
+        document.querySelector('.browser-controls').style.display = 'none';
+    }, 30 * 60 * 1000);
+}, 1000);
+
+// Print-Optimierung
+window.addEventListener('beforeprint', function() {
+    document.querySelector('.browser-controls').style.display = 'none';
+});
+
+window.addEventListener('afterprint', function() {
+    document.querySelector('.browser-controls').style.display = 'block';
+});
+</script>
+{% endblock %}

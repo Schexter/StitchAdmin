@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}Neuer Versand - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('shipping.index') }}">Versand</a></li>
+                <li class="breadcrumb-item active">Neuer Versand</li>
+            </ol>
+        </nav>
+        
+        <h1><i class="bi bi-truck"></i> Neuer Versand</h1>
+    </div>
+</div>
+
+<form method="POST">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Auftrag auswählen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Auftrag auswählen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="order_id" class="form-label">Versandbereiter Auftrag *</label>
+                        <select class="form-control" id="order_id" name="order_id" required onchange="loadOrderDetails(this.value)">
+                            <option value="">-- Bitte wählen --</option>
+                            {% for order in ready_orders %}
+                            <option value="{{ order.id }}" 
+                                    {% if selected_order_id == order.id %}selected{% endif %}
+                                    data-customer="{{ order.customer.display_name if order.customer else 'Unbekannt' }}"
+                                    data-street="{{ order.customer.street if order.customer else '' }}"
+                                    data-house="{{ order.customer.house_number if order.customer else '' }}"
+                                    data-postal="{{ order.customer.postal_code if order.customer else '' }}"
+                                    data-city="{{ order.customer.city if order.customer else '' }}"
+                                    data-country="{{ order.customer.country or 'Deutschland' if order.customer else 'Deutschland' }}">
+                                {{ order.order_number or order.id }} - 
+                                {{ order.customer.display_name if order.customer else 'Unbekannt' }}
+                                ({{ order.description[:50] }}{% if order.description|length > 50 %}...{% endif %})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        {% if not ready_orders %}
+                        <div class="alert alert-info mt-2">
+                            <i class="bi bi-info-circle"></i> Keine versandbereiten Aufträge vorhanden.
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Auftragsdetails -->
+                    <div id="orderDetails" style="display: none;">
+                        <hr>
+                        <h6>Auftragsdetails:</h6>
+                        <div id="orderInfo" class="text-muted"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Versanddetails -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Versanddetails</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="carrier" class="form-label">Versanddienstleister *</label>
+                            <select class="form-control" id="carrier" name="carrier" required>
+                                <option value="">-- Bitte wählen --</option>
+                                {% for carrier in carriers %}
+                                <option value="{{ carrier }}">{{ carrier }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="service" class="form-label">Service</label>
+                            <select class="form-control" id="service" name="service">
+                                <option value="Standard">Standard</option>
+                                <option value="Express">Express</option>
+                                <option value="Economy">Economy</option>
+                                <option value="Overnight">Overnight</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="tracking_number" class="form-label">Sendungsnummer</label>
+                            <input type="text" class="form-control" id="tracking_number" name="tracking_number" 
+                                   placeholder="z.B. 00340434192837458932">
+                            <small class="form-text text-muted">Lassen Sie dieses Feld leer, wenn noch keine Sendungsnummer vorhanden ist.</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Paketmaße -->
+                    <h6 class="mt-4 mb-3">Paketmaße</h6>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="weight" class="form-label">Gewicht (kg)</label>
+                            <input type="number" class="form-control" id="weight" name="weight" 
+                                   step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="length" class="form-label">Länge (cm)</label>
+                            <input type="number" class="form-control" id="length" name="length" 
+                                   step="1" min="0" placeholder="0">
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="width" class="form-label">Breite (cm)</label>
+                            <input type="number" class="form-control" id="width" name="width" 
+                                   step="1" min="0" placeholder="0">
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="height" class="form-label">Höhe (cm)</label>
+                            <input type="number" class="form-control" id="height" name="height" 
+                                   step="1" min="0" placeholder="0">
+                        </div>
+                    </div>
+                    
+                    <!-- Kosten -->
+                    <h6 class="mt-4 mb-3">Kosten</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="shipping_cost" class="form-label">Versandkosten (€)</label>
+                            <input type="number" class="form-control" id="shipping_cost" name="shipping_cost" 
+                                   step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="insurance_value" class="form-label">Versicherungswert (€)</label>
+                            <input type="number" class="form-control" id="insurance_value" name="insurance_value" 
+                                   step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Empfängeradresse -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Empfängeradresse</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="use_custom_address" name="use_custom_address" 
+                               onchange="toggleCustomAddress()">
+                        <label class="form-check-label" for="use_custom_address">
+                            Abweichende Lieferadresse verwenden
+                        </label>
+                    </div>
+                    
+                    <div id="defaultAddress">
+                        <p class="text-muted mb-0">Die Adresse wird automatisch vom Kunden übernommen.</p>
+                        <div id="customerAddress" class="mt-2"></div>
+                    </div>
+                    
+                    <div id="customAddress" style="display: none;">
+                        <div class="mb-3">
+                            <label for="recipient_name" class="form-label">Empfänger</label>
+                            <input type="text" class="form-control" id="recipient_name" name="recipient_name">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="recipient_street" class="form-label">Straße & Hausnummer</label>
+                            <input type="text" class="form-control" id="recipient_street" name="recipient_street">
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-5 mb-3">
+                                <label for="recipient_postal_code" class="form-label">PLZ</label>
+                                <input type="text" class="form-control" id="recipient_postal_code" name="recipient_postal_code">
+                            </div>
+                            
+                            <div class="col-md-7 mb-3">
+                                <label for="recipient_city" class="form-label">Ort</label>
+                                <input type="text" class="form-control" id="recipient_city" name="recipient_city">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="recipient_country" class="form-label">Land</label>
+                            <input type="text" class="form-control" id="recipient_country" name="recipient_country" 
+                                   value="Deutschland">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aktionen -->
+            <div class="card">
+                <div class="card-body">
+                    <div class="form-check mb-3">
+                        <input type="checkbox" class="form-check-input" id="print_label" name="print_label" checked>
+                        <label class="form-check-label" for="print_label">
+                            Nach Erstellung direkt zum Versandlabel
+                        </label>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success w-100 mb-2" {% if not ready_orders %}disabled{% endif %}>
+                        <i class="bi bi-truck"></i> Versand erstellen
+                    </button>
+                    <a href="{{ url_for('shipping.index') }}" class="btn btn-secondary w-100">
+                        <i class="bi bi-x-circle"></i> Abbrechen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+function loadOrderDetails(orderId) {
+    if (!orderId) {
+        document.getElementById('orderDetails').style.display = 'none';
+        document.getElementById('customerAddress').innerHTML = '';
+        return;
+    }
+    
+    const select = document.getElementById('order_id');
+    const option = select.options[select.selectedIndex];
+    
+    // Auftragsdetails anzeigen
+    document.getElementById('orderDetails').style.display = 'block';
+    document.getElementById('orderInfo').innerHTML = `
+        <strong>Kunde:</strong> ${option.dataset.customer}<br>
+        <strong>Auftrag:</strong> ${option.text}
+    `;
+    
+    // Kundenadresse anzeigen
+    const street = option.dataset.street;
+    const house = option.dataset.house;
+    const postal = option.dataset.postal;
+    const city = option.dataset.city;
+    const country = option.dataset.country;
+    
+    if (street || city) {
+        let addressHtml = '<address class="mb-0">';
+        addressHtml += `<strong>${option.dataset.customer}</strong><br>`;
+        if (street) {
+            addressHtml += `${street} ${house}<br>`;
+        }
+        if (postal || city) {
+            addressHtml += `${postal} ${city}<br>`;
+        }
+        addressHtml += country;
+        addressHtml += '</address>';
+        
+        document.getElementById('customerAddress').innerHTML = addressHtml;
+    } else {
+        document.getElementById('customerAddress').innerHTML = '<p class="text-danger mb-0">Keine Adresse hinterlegt!</p>';
+    }
+}
+
+function toggleCustomAddress() {
+    const useCustom = document.getElementById('use_custom_address').checked;
+    document.getElementById('defaultAddress').style.display = useCustom ? 'none' : 'block';
+    document.getElementById('customAddress').style.display = useCustom ? 'block' : 'none';
+    
+    // Felder required setzen
+    const fields = ['recipient_name', 'recipient_street', 'recipient_postal_code', 'recipient_city'];
+    fields.forEach(field => {
+        document.getElementById(field).required = useCustom;
+    });
+}
+
+// Initiales Laden wenn eine Auswahl vorhanden ist
+window.onload = function() {
+    const selectedOrderId = document.getElementById('order_id').value;
+    if (selectedOrderId) {
+        loadOrderDetails(selectedOrderId);
+    }
+};
+</script>
+{% endblock %}

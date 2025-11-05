@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block title %}Tagesabschluss - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1><i class="bi bi-calendar-check"></i> Tagesabschluss</h1>
+    
+    <!-- Datum-Auswahl -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Datum</label>
+                    <input type="date" class="form-control" name="date" 
+                           value="{{ selected_date.strftime('%Y-%m-%d') }}"
+                           max="{{ today.strftime('%Y-%m-%d') }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">&nbsp;</label>
+                    <button type="submit" class="btn btn-primary d-block">
+                        <i class="bi bi-search"></i> Anzeigen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    {% if not abschluss_exists %}
+    <!-- Zusammenfassung -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Anzahl Belege</h5>
+                    <h2 class="text-primary">{{ stats.anzahl_belege }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Umsatz (Brutto)</h5>
+                    <h2 class="text-success">{{ "%.2f"|format(stats.umsatz_brutto) }} €</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">MwSt</h5>
+                    <h2 class="text-info">{{ "%.2f"|format(stats.summe_mwst) }} €</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Stornierungen</h5>
+                    <h2 class="text-danger">{{ stats.anzahl_stornos }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Zahlungsarten -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-cash-stack"></i> Zahlungsarten</h5>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Zahlungsart</th>
+                        <th class="text-end">Anzahl</th>
+                        <th class="text-end">Betrag</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in payment_methods %}
+                    <tr>
+                        <td>
+                            {% if payment.zahlungsart == 'cash' %}
+                                <i class="bi bi-cash"></i> Bar
+                            {% elif payment.zahlungsart == 'card' %}
+                                <i class="bi bi-credit-card"></i> Karte
+                            {% elif payment.zahlungsart == 'invoice' %}
+                                <i class="bi bi-receipt"></i> Rechnung
+                            {% else %}
+                                {{ payment.zahlungsart }}
+                            {% endif %}
+                        </td>
+                        <td class="text-end">{{ payment.anzahl }}</td>
+                        <td class="text-end">{{ "%.2f"|format(payment.summe) }} €</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-secondary">
+                        <th>Gesamt</th>
+                        <th class="text-end">{{ stats.anzahl_belege }}</th>
+                        <th class="text-end">{{ "%.2f"|format(stats.umsatz_brutto) }} €</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    
+    <!-- MwSt-Übersicht -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-percent"></i> Mehrwertsteuer</h5>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>MwSt-Satz</th>
+                        <th class="text-end">Netto</th>
+                        <th class="text-end">MwSt</th>
+                        <th class="text-end">Brutto</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vat in vat_summary %}
+                    <tr>
+                        <td>{{ vat.mwst_satz }}%</td>
+                        <td class="text-end">{{ "%.2f"|format(vat.netto) }} €</td>
+                        <td class="text-end">{{ "%.2f"|format(vat.mwst) }} €</td>
+                        <td class="text-end">{{ "%.2f"|format(vat.brutto) }} €</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-secondary">
+                        <th>Gesamt</th>
+                        <th class="text-end">{{ "%.2f"|format(stats.umsatz_netto) }} €</th>
+                        <th class="text-end">{{ "%.2f"|format(stats.summe_mwst) }} €</th>
+                        <th class="text-end">{{ "%.2f"|format(stats.umsatz_brutto) }} €</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Belege -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-list-ul"></i> Belege</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Zeit</th>
+                            <th>Beleg-Nr.</th>
+                            <th>Kunde</th>
+                            <th>Zahlungsart</th>
+                            <th class="text-end">Betrag</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for beleg in belege %}
+                        <tr {% if beleg.storniert %}class="text-muted text-decoration-line-through"{% endif %}>
+                            <td>{{ beleg.datum.strftime('%H:%M') }}</td>
+                            <td>{{ beleg.beleg_nummer }}</td>
+                            <td>
+                                {% if beleg.kunde %}
+                                    {{ beleg.kunde.first_name }} {{ beleg.kunde.last_name }}
+                                {% else %}
+                                    Laufkunde
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if beleg.zahlungsart == 'cash' %}
+                                    <i class="bi bi-cash"></i> Bar
+                                {% elif beleg.zahlungsart == 'card' %}
+                                    <i class="bi bi-credit-card"></i> Karte
+                                {% elif beleg.zahlungsart == 'invoice' %}
+                                    <i class="bi bi-receipt"></i> Rechnung
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ "%.2f"|format(beleg.summe_brutto) }} €</td>
+                            <td>
+                                {% if beleg.storniert %}
+                                    <span class="badge bg-danger">Storniert</span>
+                                {% else %}
+                                    <span class="badge bg-success">OK</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('kasse.beleg_detail', beleg_id=beleg.id) }}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Aktionen -->
+    <div class="card">
+        <div class="card-body">
+            <div class="row">
+                <div class="col">
+                    <a href="{{ url_for('kasse.kassen_index') }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Zurück
+                    </a>
+                </div>
+                <div class="col text-end">
+                    {% if selected_date.date() == today %}
+                    <button class="btn btn-warning" onclick="performDailyClose()">
+                        <i class="bi bi-lock"></i> Tagesabschluss durchführen
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-primary" onclick="printReport()">
+                        <i class="bi bi-printer"></i> Bericht drucken
+                    </button>
+                    <button class="btn btn-success" onclick="exportReport()">
+                        <i class="bi bi-download"></i> Export (CSV)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% else %}
+    <!-- Abschluss bereits durchgeführt -->
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Der Tagesabschluss für den {{ selected_date.strftime('%d.%m.%Y') }} wurde bereits durchgeführt.
+    </div>
+    
+    <div class="card">
+        <div class="card-header">
+            <h5>Abschluss-Details</h5>
+        </div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-3">Abschluss-Zeit:</dt>
+                <dd class="col-sm-9">{{ abschluss.created_at.strftime('%d.%m.%Y %H:%M') }}</dd>
+                
+                <dt class="col-sm-3">Durchgeführt von:</dt>
+                <dd class="col-sm-9">{{ abschluss.created_by }}</dd>
+                
+                <dt class="col-sm-3">Anzahl Belege:</dt>
+                <dd class="col-sm-9">{{ abschluss.anzahl_belege }}</dd>
+                
+                <dt class="col-sm-3">Umsatz (Brutto):</dt>
+                <dd class="col-sm-9">{{ "%.2f"|format(abschluss.summe_brutto) }} €</dd>
+                
+                <dt class="col-sm-3">TSE-Signatur:</dt>
+                <dd class="col-sm-9">
+                    {% if abschluss.tse_signatur %}
+                        <small>{{ abschluss.tse_signatur[:50] }}...</small>
+                    {% else %}
+                        <span class="text-muted">Keine TSE-Signatur</span>
+                    {% endif %}
+                </dd>
+            </dl>
+        </div>
+        <div class="card-footer">
+            <a href="{{ url_for('kasse.kassen_index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Zurück
+            </a>
+            <button class="btn btn-primary" onclick="printReport()">
+                <i class="bi bi-printer"></i> Bericht drucken
+            </button>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function performDailyClose() {
+    if (!confirm('Tagesabschluss wirklich durchführen? Nach dem Abschluss können keine Belege mehr für diesen Tag erstellt werden.')) {
+        return;
+    }
+    
+    fetch('/kasse/api/tagesabschluss', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            date: '{{ selected_date.strftime("%Y-%m-%d") }}'
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            alert('Tagesabschluss wurde erfolgreich durchgeführt');
+            location.reload();
+        } else {
+            alert('Fehler beim Tagesabschluss: ' + result.message);
+        }
+    });
+}
+
+function printReport() {
+    window.open(`/kasse/tagesabschluss/print?date={{ selected_date.strftime("%Y-%m-%d") }}`, '_blank');
+}
+
+function exportReport() {
+    window.location.href = `/kasse/tagesabschluss/export?date={{ selected_date.strftime("%Y-%m-%d") }}`;
+}
+</script>
+{% endblock %}

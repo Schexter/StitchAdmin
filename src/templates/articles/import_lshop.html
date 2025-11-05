@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+
+{% block title %}L-Shop Import{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">📥 L-Shop Artikel Import</h1>
+                <a href="{{ url_for('articles.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Zurück zur Übersicht
+                </a>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Excel-Datei hochladen</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" enctype="multipart/form-data" id="importForm">
+                                <div class="mb-4">
+                                    <label for="excel_file" class="form-label">Excel-Datei auswählen</label>
+                                    <input type="file" class="form-control" id="excel_file" name="excel_file" 
+                                           accept=".xlsx" required onchange="previewFile()">
+                                    <div class="form-text">
+                                        Nur Excel-Dateien (.xlsx) werden unterstützt. 
+                                        Die Datei sollte Spalten wie "Artnr.", "Bezeichnung", "Farbe", "Größe" etc. enthalten.
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="supplier_id" class="form-label">Lieferant</label>
+                                    <select class="form-select" id="supplier_id" name="supplier_id">
+                                        <option value="L-SHOP" selected>L-Shop (Standard)</option>
+                                        {% for supplier in suppliers %}
+                                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="update_existing" 
+                                               name="update_existing" checked>
+                                        <label class="form-check-label" for="update_existing">
+                                            Bestehende Artikel aktualisieren
+                                        </label>
+                                        <div class="form-text">
+                                            Wenn aktiviert, werden existierende Artikel mit neuen Daten überschrieben.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="create_variants" 
+                                               name="create_variants" checked>
+                                        <label class="form-check-label" for="create_variants">
+                                            Varianten erstellen (Farbe/Größe)
+                                        </label>
+                                        <div class="form-text">
+                                            Erstellt automatisch Varianten für verschiedene Farben und Größen.
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-primary" id="importBtn" disabled>
+                                        <i class="fas fa-upload"></i> Import starten
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="previewFile()" 
+                                            id="previewBtn" style="display: none;">
+                                        <i class="fas fa-eye"></i> Vorschau aktualisieren
+                                    </button>
+                                </div>
+                                
+                                <div class="mt-2" id="importStatus">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle"></i> 
+                                        Bitte wählen Sie eine Excel-Datei aus und ordnen Sie die Spalten zu.
+                                    </small>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Spalten-Mapping Card -->
+                    <div class="card mt-4" id="mappingCard" style="display: none;">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">🔗 Spalten-Zuordnung</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> 
+                                Bitte ordnen Sie die Excel-Spalten den Datenbankfeldern zu. 
+                                <strong>Artikelnummer</strong> und <strong>Bezeichnung</strong> sind erforderlich.
+                            </div>
+                            <div id="mappingInterface"></div>
+                            <div class="mt-3">
+                                <button type="button" class="btn btn-success" onclick="validateAndShowPreview()" id="applyMappingBtn">
+                                    <i class="fas fa-check"></i> Zuordnung übernehmen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Vorschau -->
+                    <div class="card mt-4" id="previewCard" style="display: none;">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">👁️ Vorschau der zu importierenden Artikel</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="previewInfo" class="alert alert-info mb-3"></div>
+                            <div id="previewWarnings"></div>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Zeile</th>
+                                            <th>Artikelnr.</th>
+                                            <th>Bezeichnung</th>
+                                            <th>Farbe</th>
+                                            <th>Größe</th>
+                                            <th>Einzelpreis</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="previewTable">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">📋 Import-Anleitung</h5>
+                        </div>
+                        <div class="card-body">
+                            <h6>Excel-Format</h6>
+                            <p>Die Excel-Datei sollte folgende Spalten enthalten:</p>
+                            <ul class="small">
+                                <li><strong>Artnr.</strong> - Artikelnummer (erforderlich)</li>
+                                <li><strong>Bezeichnung</strong> - Artikelname (erforderlich)</li>
+                                <li><strong>Produkttyp</strong> - z.B. T-Shirt, Polo, etc.</li>
+                                <li><strong>Hersteller</strong> - Markenname</li>
+                                <li><strong>Herstellernummer</strong></li>
+                                <li><strong>Farbe</strong> - Farbbezeichnung</li>
+                                <li><strong>Größe</strong> - Größenangabe</li>
+                                <li><strong>EAN</strong> - Barcode</li>
+                                <li><strong>VE</strong> - Verpackungseinheit/Karton</li>
+                                <li><strong>Einzelpreis</strong></li>
+                                <li><strong>Kartonpreis</strong></li>
+                                <li><strong>10-Karton-Preis</strong></li>
+                            </ul>
+
+                            <h6 class="mt-3">Import-Prozess</h6>
+                            <ol class="small">
+                                <li>Excel-Datei auswählen</li>
+                                <li>Spalten zuordnen</li>
+                                <li>Vorschau prüfen</li>
+                                <li>Import starten</li>
+                            </ol>
+
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-exclamation-triangle"></i> 
+                                <strong>Wichtig:</strong> Erstellen Sie vor dem Import ein Backup der Datenbank!
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">📊 Statistiken</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="importStats">
+                                <p class="text-muted">Wählen Sie eine Datei aus, um Statistiken zu sehen.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentMapping = {};
+let analysisData = null;
+
+function previewFile() {
+    const fileInput = document.getElementById('excel_file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        // Reset UI
+        document.getElementById('mappingCard').style.display = 'none';
+        document.getElementById('previewCard').style.display = 'none';
+        document.getElementById('importBtn').disabled = true;
+        document.getElementById('importStatus').innerHTML = '<small class="text-muted"><i class="fas fa-info-circle"></i> Bitte wählen Sie eine Excel-Datei aus und ordnen Sie die Spalten zu.</small>';
+        return;
+    }
+    
+    // FormData für Upload
+    const formData = new FormData();
+    formData.append('excel_file', file);
+    
+    // Status aktualisieren
+    document.getElementById('importStatus').innerHTML = '<small class="text-primary"><i class="fas fa-spinner fa-spin"></i> Analysiere Excel-Datei...</small>';
+    
+    // Erst Spalten analysieren
+    fetch('{{ url_for("articles.import_lshop_analyze") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            analysisData = data;
+            showMappingInterface(data.mapping_preview);
+            document.getElementById('importStatus').innerHTML = '<small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Bitte ordnen Sie die Spalten zu.</small>';
+        } else {
+            document.getElementById('importStatus').innerHTML = '<small class="text-danger"><i class="fas fa-exclamation-circle"></i> Fehler: ' + data.error + '</small>';
+            alert('Fehler: ' + data.error);
+        }
+    })
+    .catch(error => {
+        document.getElementById('importStatus').innerHTML = '<small class="text-danger"><i class="fas fa-exclamation-circle"></i> Fehler beim Analysieren der Datei.</small>';
+        console.error('Error:', error);
+    });
+}
+
+function showMappingInterface(mappingData) {
+    // Zeige Mapping Card
+    document.getElementById('mappingCard').style.display = 'block';
+    
+    // Erstelle Mapping Interface
+    let html = '<div class="table-responsive"><table class="table table-bordered table-sm">';
+    
+    // Header mit Spaltennamen
+    html += '<thead><tr><th width="200">Datenbankfeld</th>';
+    mappingData.columns.forEach(col => {
+        html += `<th class="text-center">
+            <div><strong>${col.name}</strong></div>
+            <div class="small text-muted">Spalte ${col.index + 1}</div>
+        </th>`;
+    });
+    html += '</tr></thead>';
+    
+    // Beispielwerte anzeigen
+    html += '<tbody>';
+    for (let i = 0; i < Math.min(3, mappingData.preview_rows.length); i++) {
+        html += '<tr>';
+        html += `<td><small class="text-muted">Beispiel ${i + 1}</small></td>`;
+        mappingData.preview_rows[i].forEach(cell => {
+            const value = cell.value || '';
+            const displayValue = value.length > 20 ? value.substring(0, 20) + '...' : value;
+            html += `<td class="small text-center">${displayValue || '<em>leer</em>'}</td>`;
+        });
+        html += '</tr>';
+    }
+    html += '</tbody>';
+    
+    // Mapping Selects
+    html += '<tfoot><tr><td><strong>Zuordnung:</strong></td>';
+    
+    const dbFields = [
+        {value: '', label: '-- Nicht importieren --'},
+        {value: 'supplier_article_number', label: 'Lieferanten-Artikelnr. *'},
+        {value: 'name', label: 'Bezeichnung *'},
+        {value: 'product_type', label: 'Produkttyp'},
+        {value: 'manufacturer', label: 'Hersteller'},
+        {value: 'manufacturer_number', label: 'Herstellernummer'},
+        {value: 'color', label: 'Farbe'},
+        {value: 'size', label: 'Größe'},
+        {value: 'ean', label: 'EAN/Barcode'},
+        {value: 'units_per_carton', label: 'VE/Karton'},
+        {value: 'single_price', label: 'Einzelpreis'},
+        {value: 'carton_price', label: 'Kartonpreis'},
+        {value: 'ten_carton_price', label: '10-Karton-Preis'}
+    ];
+    
+    mappingData.columns.forEach((col, idx) => {
+        html += '<td>';
+        html += `<select class="form-select form-select-sm column-mapping" data-column="${idx}" onchange="updateMappingStatus()">`;
+        
+        dbFields.forEach(field => {
+            // Automatische Zuordnung basierend auf Spaltennamen
+            let selected = '';
+            const colName = col.name.toLowerCase();
+            
+            if (field.value === 'supplier_article_number' && (
+                colName.includes('art. nr:') || 
+                colName.includes('art.nr.') || 
+                colName === 'artnr.' ||
+                colName.includes('artikelnummer')
+            )) {
+                selected = 'selected';
+            } else if (field.value === 'name' && (colName === 'artikel' || colName === 'bezeichnung')) {
+                selected = 'selected';
+            } else if (field.value === 'product_type' && (colName === 'produktart' || colName === 'produkttyp')) {
+                selected = 'selected';
+            } else if (field.value === 'manufacturer' && (colName === 'marke' || colName === 'hersteller')) {
+                selected = 'selected';
+            } else if (field.value === 'manufacturer_number' && colName.includes('art. nr. herst')) {
+                selected = 'selected';
+            } else if (field.value === 'color' && colName === 'farbe') {
+                selected = 'selected';
+            } else if (field.value === 'size' && (colName === 'größe' || colName === 'groesse')) {
+                selected = 'selected';
+            } else if (field.value === 'units_per_carton' && (colName.includes('ve/kart') || colName === 've')) {
+                selected = 'selected';
+            } else if (field.value === 'single_price' && (colName === 'einzel' || colName === 'einzelpreis')) {
+                selected = 'selected';
+            } else if (field.value === 'carton_price' && (colName === 'karton' || colName === 'kartonpreis')) {
+                selected = 'selected';
+            } else if (field.value === 'ten_carton_price' && colName.includes('10 kart')) {
+                selected = 'selected';
+            }
+            
+            html += `<option value="${field.value}" ${selected}>${field.label}</option>`;
+        });
+        html += '</select></td>';
+    });
+    html += '</tr></tfoot>';
+    
+    html += '</table></div>';
+    
+    document.getElementById('mappingInterface').innerHTML = html;
+    
+    // Initial mapping status check
+    updateMappingStatus();
+}
+
+function updateMappingStatus() {
+    // Sammle aktuelles Mapping
+    currentMapping = {};
+    document.querySelectorAll('.column-mapping').forEach(select => {
+        const column = select.dataset.column;
+        const field = select.value;
+        if (field) {
+            currentMapping[field] = column;
+        }
+    });
+    
+    // Validierung
+    const hasSupplierArticleNumber = currentMapping.supplier_article_number !== undefined;
+    const hasName = currentMapping.name !== undefined;
+    
+    const applyBtn = document.getElementById('applyMappingBtn');
+    
+    if (hasSupplierArticleNumber && hasName) {
+        applyBtn.disabled = false;
+        applyBtn.className = 'btn btn-success';
+        applyBtn.innerHTML = '<i class="fas fa-check"></i> Zuordnung übernehmen';
+    } else {
+        applyBtn.disabled = true;
+        applyBtn.className = 'btn btn-secondary';
+        applyBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Artikelnummer und Bezeichnung erforderlich';
+    }
+}
+
+function validateAndShowPreview() {
+    // Finale Validierung
+    if (!currentMapping.supplier_article_number || !currentMapping.name) {
+        alert('Bitte ordnen Sie mindestens Lieferanten-Artikelnummer und Bezeichnung zu!');
+        return;
+    }
+    
+    // Status aktualisieren
+    document.getElementById('importStatus').innerHTML = '<small class="text-success"><i class="fas fa-check"></i> Spalten zugeordnet. Vorschau wird geladen...</small>';
+    
+    // Import Button aktivieren
+    document.getElementById('importBtn').disabled = false;
+    document.getElementById('importBtn').className = 'btn btn-primary';
+    
+    // Vorschau laden wäre hier möglich, aber für jetzt einfach aktivieren
+    document.getElementById('importStatus').innerHTML = '<small class="text-success"><i class="fas fa-check"></i> Bereit für Import!</small>';
+    
+    // Verstecke Mapping Card
+    document.getElementById('mappingCard').style.display = 'none';
+}
+
+// Bestätigungsdialog vor Import
+document.getElementById('importForm').addEventListener('submit', function(e) {
+    // Mapping hinzufügen
+    if (Object.keys(currentMapping).length > 0) {
+        const mappingInput = document.createElement('input');
+        mappingInput.type = 'hidden';
+        mappingInput.name = 'column_mapping';
+        mappingInput.value = JSON.stringify(currentMapping);
+        this.appendChild(mappingInput);
+    }
+    
+    if (!confirm('Möchten Sie den Import wirklich starten? Dies kann einige Minuten dauern.')) {
+        e.preventDefault();
+        return false;
+    }
+    
+    document.getElementById('importBtn').disabled = true;
+    document.getElementById('importBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Import läuft...';
+    document.getElementById('importStatus').innerHTML = '<small class="text-primary"><i class="fas fa-spinner fa-spin"></i> Import wird durchgeführt...</small>';
+});
+</script>
+{% endblock %}

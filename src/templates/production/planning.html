@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}Produktionsplanung{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">📋 Produktionsplanung</h1>
+                <div>
+                    <a href="{{ url_for('production.calendar') }}" class="btn btn-primary btn-touch me-2">
+                        <i class="fas fa-calendar-alt"></i> Kalenderansicht
+                    </a>
+                    <a href="{{ url_for('production.index') }}" class="btn btn-outline-primary btn-touch">
+                        <i class="fas fa-chart-bar"></i> Übersicht
+                    </a>
+                </div>
+            </div>
+
+            <!-- Warnungen bei niedrigem Garnbestand -->
+            {% if low_stock_warnings %}
+            <div class="alert alert-warning">
+                <h5 class="alert-heading">⚠️ Niedriger Garnbestand</h5>
+                <p class="mb-0">Folgende Garne haben einen niedrigen Bestand:</p>
+                <ul class="mb-0 mt-2">
+                    {% for warning in low_stock_warnings %}
+                    <li>
+                        <strong>{{ warning.thread.manufacturer }} {{ warning.thread.color_number }}</strong> 
+                        - {{ warning.thread.color_name_de }}: 
+                        <span class="text-danger">{{ warning.current_stock }} Konen</span> 
+                        (Mindestbestand: {{ warning.min_stock }})
+                        {% if warning.location %}
+                        <span class="text-muted ms-2"><i class="bi bi-geo-alt"></i> {{ warning.location }}</span>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div class="row">
+                <!-- Stickerei-Queue -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">🧵 Stickerei-Warteschlange</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if production_queue.embroidery %}
+                            {% for item in production_queue.embroidery %}
+                            <div class="card mb-3 border-{{ 'danger' if item.priority_weight == 1 else 'warning' if item.priority_weight == 2 else 'light' }}">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="card-title mb-1">
+                                                <a href="{{ url_for('orders.show', order_id=item.order.id) }}">{{ item.order.id }}</a>
+                                                {% if item.priority_weight == 1 %}
+                                                <span class="badge bg-danger ms-1">Eilig</span>
+                                                {% elif item.priority_weight == 2 %}
+                                                <span class="badge bg-warning ms-1">Hoch</span>
+                                                {% endif %}
+                                            </h6>
+                                            <small class="text-muted">{{ item.order.customer.display_name if item.order.customer else 'Unbekannt' }}</small>
+                                            <div class="mt-2">
+                                                <span class="badge bg-secondary">{{ item.order.items.count() }} Position(en)</span>
+                                                <span class="badge bg-info" title="Standardberechnung">{{ item.production_time_hours }}h</span>
+                                                {% if item.order.stitch_count %}
+                                                <span class="badge bg-light text-dark">{{ item.order.stitch_count }} Stiche</span>
+                                                {% endif %}
+                                                <span class="badge bg-warning text-dark ai-time-badge" data-order-id="{{ item.order.id }}" style="display: none;">
+                                                    <i class="bi bi-robot"></i> <span class="ai-time-value">...</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <form method="POST" action="{{ url_for('production.start_production', order_id=item.order.id) }}" class="d-inline">
+                                                <div class="mb-2">
+                                                    <select name="machine_id" class="form-select form-select-sm" required>
+                                                        <option value="">Maschine wählen</option>
+                                                        {% for machine_id, machine in machines.embroidery_machines.items() %}
+                                                        <option value="{{ machine_id }}">{{ machine.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <button type="submit" class="btn btn-sm btn-success">Produktion starten</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Garnbedarf -->
+                                    {% if item.thread_requirements %}
+                                    <div class="mt-3 border-top pt-2">
+                                        <small class="text-muted">Garnbedarf:</small>
+                                        {% for req in item.thread_requirements %}
+                                        <div class="d-flex justify-content-between align-items-center mt-1">
+                                            <span class="small">
+                                                {{ req.thread.color_name_de }} 
+                                                <span class="text-muted">({{ req.thread.manufacturer }} {{ req.thread.color_number }})</span>
+                                            </span>
+                                            <span class="small">
+                                                <span class="{{ 'text-danger' if not req.is_sufficient else 'text-success' }}">
+                                                    {{ req.meters_needed }}m ({{ req.cones_needed }} Konen)
+                                                </span>
+                                                <span class="text-muted ms-2">
+                                                    Lager: {{ req.current_stock }} K.
+                                                </span>
+                                                {% if req.is_low_stock %}
+                                                <i class="bi bi-exclamation-triangle-fill text-warning ms-1" title="Niedriger Bestand"></i>
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% else %}
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-clipboard-check fa-3x mb-3"></i>
+                                <p>Keine Stickerei-Aufträge in der Warteschlange</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DTF/Druck-Queue -->
+                <div class="col-lg-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="card-title mb-0">🖨️ DTF/Druck-Warteschlange</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if production_queue.dtf %}
+                            {% for item in production_queue.dtf %}
+                            <div class="card mb-3 border-{{ 'danger' if item.priority_weight == 1 else 'warning' if item.priority_weight == 2 else 'light' }}">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="card-title mb-1">
+                                                <a href="{{ url_for('orders.show', order_id=item.order.id) }}">{{ item.order.id }}</a>
+                                                {% if item.priority_weight == 1 %}
+                                                <span class="badge bg-danger ms-1">Eilig</span>
+                                                {% elif item.priority_weight == 2 %}
+                                                <span class="badge bg-warning ms-1">Hoch</span>
+                                                {% endif %}
+                                            </h6>
+                                            <small class="text-muted">{{ item.order.customer.display_name if item.order.customer else 'Unbekannt' }}</small>
+                                            <div class="mt-2">
+                                                <span class="badge bg-secondary">{{ item.order.items.count() }} Position(en)</span>
+                                                <span class="badge bg-info" title="Standardberechnung">{{ item.production_time_hours }}h</span>
+                                                {% if item.order.print_width_cm and item.order.print_height_cm %}
+                                                <span class="badge bg-light text-dark">{{ item.order.print_width_cm }}×{{ item.order.print_height_cm }}cm</span>
+                                                {% endif %}
+                                                <span class="badge bg-warning text-dark ai-time-badge" data-order-id="{{ item.order.id }}" style="display: none;">
+                                                    <i class="bi bi-robot"></i> <span class="ai-time-value">...</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <form method="POST" action="{{ url_for('production.start_production', order_id=item.order.id) }}" class="d-inline">
+                                                <div class="mb-2">
+                                                    <select name="machine_id" class="form-select form-select-sm" required>
+                                                        <option value="">Maschine wählen</option>
+                                                        {% for machine_id, machine in machines.dtf_machines.items() %}
+                                                        <option value="{{ machine_id }}">{{ machine.name }}</option>
+                                                        {% endfor %}
+                                                        {% for machine_id, machine in machines.printing_machines.items() %}
+                                                        <option value="{{ machine_id }}">{{ machine.name }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <button type="submit" class="btn btn-sm btn-success">Produktion starten</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% else %}
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-print fa-3x mb-3"></i>
+                                <p>Keine Druck-Aufträge in der Warteschlange</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verfügbare Maschinen -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">🔧 Verfügbare Maschinen</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for category, machines_in_category in machines.items() %}
+                                {% if machines_in_category %}
+                                <div class="col-md-6 mb-3">
+                                    <h6>
+                                        {% if category == 'embroidery_machines' %}🧵 Stickmaschinen
+                                        {% elif category == 'dtf_machines' %}🖨️ DTF-Maschinen
+                                        {% elif category == 'printing_machines' %}👕 Druckmaschinen
+                                        {% else %}⚙️ {{ category|title }}
+                                        {% endif %}
+                                    </h6>
+                                    {% for machine_id, machine in machines_in_category.items() %}
+                                    <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                                        <div>
+                                            <strong>{{ machine.name }}</strong>
+                                            {% if machine.location %}
+                                            <small class="text-muted">({{ machine.location }})</small>
+                                            {% endif %}
+                                            {% if machine.specs %}
+                                            <div class="small text-muted">
+                                                {% for spec_key, spec_value in machine.specs.items() %}
+                                                {{ spec_key }}: {{ spec_value }}{% if not loop.last %}, {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <span class="badge {{ 'bg-success' if machine.available else 'bg-danger' }}">
+                                            {{ 'Verfügbar' if machine.available else 'Belegt' }}
+                                        </span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// KI-Zeitvorhersagen laden (deaktiviert - API noch nicht implementiert)
+/*
+document.addEventListener('DOMContentLoaded', function() {
+    const badges = document.querySelectorAll('.ai-time-badge');
+    
+    badges.forEach(badge => {
+        const orderId = badge.dataset.orderId;
+        
+        // Lade KI-Vorhersage
+        fetch(`/production/api/time_prediction/${orderId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.ai_prediction_available) {
+                    const aiTimeSpan = badge.querySelector('.ai-time-value');
+                    aiTimeSpan.textContent = `${data.ai_time_hours}h`;
+                    
+                    // Zeige Differenz als Tooltip
+                    let tooltip = `KI-Vorhersage: ${data.ai_time_minutes} Min`;
+                    if (data.difference_percent !== 0) {
+                        const sign = data.difference_percent > 0 ? '+' : '';
+                        tooltip += ` (${sign}${data.difference_percent}%)`;
+                    }
+                    badge.title = tooltip;
+                    badge.style.display = 'inline-block';
+                    
+                    // Färbe Badge basierend auf Differenz
+                    if (Math.abs(data.difference_percent) > 20) {
+                        badge.classList.remove('bg-warning');
+                        badge.classList.add('bg-danger');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Fehler beim Laden der KI-Vorhersage:', error);
+            });
+    });
+    */
+    
+    // Keine weiteren Initialisierungen nötig
+});
+</script>
+{% endblock %}

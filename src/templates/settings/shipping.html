@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Versandeinstellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0"><i class="fas fa-truck"></i> Versandeinstellungen</h1>
+                <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <h5>Versandkosten</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="default_shipping_cost" class="form-label">Standard-Versandkosten (€)</label>
+                                    <input type="number" class="form-control" id="default_shipping_cost" 
+                                           name="default_shipping_cost" value="{{ settings.default_shipping_cost }}" 
+                                           step="0.01" min="0" required>
+                                    <small class="form-text text-muted">Normale Versandkosten innerhalb Deutschlands</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="express_shipping_cost" class="form-label">Express-Versandkosten (€)</label>
+                                    <input type="number" class="form-control" id="express_shipping_cost" 
+                                           name="express_shipping_cost" value="{{ settings.express_shipping_cost }}" 
+                                           step="0.01" min="0" required>
+                                    <small class="form-text text-muted">Kosten für Express-Versand</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="international_shipping_cost" class="form-label">Internationaler Versand (€)</label>
+                                    <input type="number" class="form-control" id="international_shipping_cost" 
+                                           name="international_shipping_cost" value="{{ settings.international_shipping_cost }}" 
+                                           step="0.01" min="0" required>
+                                    <small class="form-text text-muted">Versandkosten ins Ausland</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="free_shipping_threshold" class="form-label">Versandkostenfrei ab (€)</label>
+                                    <input type="number" class="form-control" id="free_shipping_threshold" 
+                                           name="free_shipping_threshold" value="{{ settings.free_shipping_threshold }}" 
+                                           step="0.01" min="0" required>
+                                    <small class="form-text text-muted">Bestellwert für kostenlosen Versand</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <h5>Versanddienstleister</h5>
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 
+                            Die Integration von Versanddienstleistern wird in einem zukünftigen Update implementiert.
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

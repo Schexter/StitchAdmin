@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Etikett - {{ article.name }}</title>
+    <style>
+        @page {
+            /* 62mm breite für Endlos-Etikettendrucker */
+            size: 62mm auto;
+            margin: 0;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            width: 62mm;
+            margin: 0;
+            padding: 0;
+            background: white;
+        }
+        
+        .label {
+            width: 62mm;
+            padding: 3mm;
+            page-break-after: always;
+            position: relative;
+            min-height: 40mm;
+        }
+        
+        /* Header mit Logo/Firmennamen */
+        .header {
+            text-align: center;
+            border-bottom: 1px solid #000;
+            padding-bottom: 2mm;
+            margin-bottom: 2mm;
+        }
+        
+        .company-name {
+            font-size: 14pt;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        
+        /* Artikel-Name */
+        .article-name {
+            font-size: 11pt;
+            font-weight: bold;
+            text-align: center;
+            margin: 2mm 0;
+            line-height: 1.2;
+            max-height: 10mm;
+            overflow: hidden;
+        }
+        
+        /* Artikel-Details Grid */
+        .details {
+            margin: 2mm 0;
+            font-size: 9pt;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 1mm 0;
+        }
+        
+        .detail-label {
+            font-weight: bold;
+            flex: 0 0 18mm;
+        }
+        
+        .detail-value {
+            flex: 1;
+            text-align: right;
+        }
+        
+        /* Preis-Bereich */
+        .price-section {
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+            margin: 3mm 0;
+            padding: 2mm 0;
+            text-align: center;
+        }
+        
+        .price-main {
+            font-size: 18pt;
+            font-weight: bold;
+            line-height: 1;
+        }
+        
+        .price-vat {
+            font-size: 8pt;
+            color: #666;
+            margin-top: 1mm;
+        }
+        
+        /* Barcode Bereich */
+        .barcode-section {
+            text-align: center;
+            margin: 3mm 0;
+        }
+        
+        .barcode {
+            font-family: 'Libre Barcode 128', monospace;
+            font-size: 36pt;
+            line-height: 1;
+            margin: 2mm 0;
+        }
+        
+        .article-number {
+            font-size: 10pt;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        
+        /* Material Icons */
+        .material-icons {
+            display: flex;
+            justify-content: center;
+            gap: 3mm;
+            margin: 2mm 0;
+            font-size: 8pt;
+        }
+        
+        .material-icon {
+            display: flex;
+            align-items: center;
+            gap: 1mm;
+        }
+        
+        /* Footer */
+        .footer {
+            font-size: 7pt;
+            text-align: center;
+            color: #666;
+            margin-top: 2mm;
+        }
+        
+        /* Druckoptimierungen */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+        }
+        
+        /* Canvas für Barcode */
+        .barcode-canvas {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="label">
+        <!-- Header -->
+        <div class="header">
+            <div class="company-name">STITCHADMIN</div>
+        </div>
+        
+        <!-- Artikel Name -->
+        <div class="article-name">
+            {{ article.name|truncate(60, True, '...') }}
+        </div>
+        
+        <!-- Details -->
+        <div class="details">
+            {% if article.color %}
+            <div class="detail-row">
+                <span class="detail-label">Farbe:</span>
+                <span class="detail-value">{{ article.color }}</span>
+            </div>
+            {% endif %}
+            
+            {% if article.size %}
+            <div class="detail-row">
+                <span class="detail-label">Größe:</span>
+                <span class="detail-value">{{ article.size }}</span>
+            </div>
+            {% endif %}
+            
+            {% if article.weight %}
+            <div class="detail-row">
+                <span class="detail-label">Gewicht:</span>
+                <span class="detail-value">{{ "%.1f"|format(article.weight * 1000) }}g</span>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Preis -->
+        <div class="price-section">
+            <div class="price-main">{{ "%.2f"|format((article.price or 0) * 1.19) }} €</div>
+            <div class="price-vat">inkl. 19% MwSt. ({{ "%.2f"|format(article.price or 0) }} € netto)</div>
+        </div>
+        
+        <!-- Material Icons -->
+        {% if article.material %}
+        <div class="material-icons">
+            <div class="material-icon">
+                <span>Material: {{ article.material }}</span>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Barcode/Artikelnummer -->
+        <div class="barcode-section">
+            {% if article.article_number %}
+                <div class="article-number">Art.Nr.: {{ article.article_number }}</div>
+                <canvas id="barcode" class="barcode-canvas"></canvas>
+            {% else %}
+                <div class="article-number">ID: {{ article.id }}</div>
+                <canvas id="barcode" class="barcode-canvas"></canvas>
+            {% endif %}
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            Erstellt: {{ now.strftime('%d.%m.%Y') }}
+        </div>
+    </div>
+    
+    <!-- JsBarcode Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    
+    <!-- Barcode Generation und automatischer Druck -->
+    <script>
+        window.onload = function() {
+            // Generiere Barcode
+            const barcodeValue = {% if article.article_number %}"{{ article.article_number }}"{% else %}"{{ article.id }}"{% endif %};
+            
+            try {
+                JsBarcode("#barcode", barcodeValue, {
+                    format: "CODE128",
+                    width: 1.5,
+                    height: 40,
+                    displayValue: false,  // Wert wird bereits separat angezeigt
+                    margin: 5,
+                    fontSize: 12
+                });
+            } catch (e) {
+                console.error("Barcode generation failed:", e);
+                // Fallback: Zeige Text
+                document.getElementById('barcode').style.display = 'none';
+            }
+            
+            // Kurze Verzögerung für vollständiges Rendering
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Garnverwaltung{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">🧵 Garnverwaltung</h1>
+                <div>
+                    <a href="{{ url_for('thread.new') }}" class="btn btn-success btn-touch me-2">
+                        <i class="fas fa-plus"></i> Neues Garn
+                    </a>
+                    <a href="{{ url_for('thread.import_threads') }}" class="btn btn-outline-primary btn-touch">
+                        <i class="fas fa-upload"></i> Import
+                    </a>
+                    <a href="{{ url_for('thread.import_threads') }}" class="btn btn-warning btn-touch">
+                        <i class="fas fa-file-pdf"></i> PDF Import
+                    </a>
+                </div>
+            </div>
+
+            <!-- Filter -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="search" class="form-label">Suche</label>
+                            <input type="text" class="form-control" name="search" id="search" 
+                                   value="{{ current_filters.search }}" 
+                                   placeholder="Nummer, Name oder Pantone">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="manufacturer" class="form-label">Hersteller</label>
+                            <select class="form-select" name="manufacturer" id="manufacturer">
+                                <option value="">Alle Hersteller</option>
+                                {% for manufacturer in manufacturers %}
+                                <option value="{{ manufacturer }}" {{ 'selected' if current_filters.manufacturer == manufacturer }}>{{ manufacturer }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="category" class="form-label">Kategorie</label>
+                            <select class="form-select" name="category" id="category">
+                                <option value="">Alle Kategorien</option>
+                                {% for category in categories %}
+                                <option value="{{ category }}" {{ 'selected' if current_filters.category == category }}>{{ category|title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label for="stock" class="form-label">Lager</label>
+                            <select class="form-select" name="stock" id="stock">
+                                <option value="">Alle</option>
+                                <option value="out" {{ 'selected' if current_filters.stock == 'out' }}>Nicht vorrätig</option>
+                                <option value="low" {{ 'selected' if current_filters.stock == 'low' }}>Niedriger Bestand</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-check mt-4" style="display: none;">
+                                <input class="form-check-input" type="checkbox" name="low_stock" id="low_stock" {{ 'checked' if current_filters.low_stock }}>
+                                <label class="form-check-label" for="low_stock">
+                                    Nur niedriger Bestand
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-1">
+                            <button type="submit" class="btn btn-primary mt-4 btn-touch w-100">
+                                <i class="fas fa-filter"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Debug Info -->
+            <div class="alert alert-info mb-3">
+                <strong>Debug Info:</strong> {{ threads|length }} Garne geladen
+            </div>
+            
+            {% if threads %}
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Farbe</th>
+                                    <th>Hersteller</th>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Material</th>
+                                    <th>Bestand</th>
+                                    <th>Lagerort</th>
+                                    <th>Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for thread_id, thread in threads.items() %}
+                                <tr class="{{ 'table-warning' if thread.stock and thread.stock.quantity <= thread.stock.min_stock else '' }}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="color-sample me-2" style="width: 20px; height: 20px; background-color: {{ thread.hex_color or '#cccccc' }}; border: 1px solid #ccc; border-radius: 3px;"></div>
+                                        </div>
+                                    </td>
+                                    <td>{{ thread.manufacturer }}</td>
+                                    <td><code>{{ thread.color_number }}</code></td>
+                                    <td>{{ thread.color_name_de or thread.color_name_en or '-' }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ thread.material|title if thread.material else thread.category|title }}</span>
+                                    </td>
+                                    <td>
+                                        {% if thread.stock %}
+                                            {% if thread.stock.quantity <= thread.stock.min_stock %}
+                                            <span class="text-danger fw-bold">{{ thread.stock.quantity }} Konen</span>
+                                            <small class="text-muted d-block">Min: {{ thread.stock.min_stock }}</small>
+                                            {% else %}
+                                            <span class="text-success">{{ thread.stock.quantity }} Konen</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ thread.stock.location if thread.stock else '-' }}</td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <a href="{{ url_for('thread.show', thread_id=thread.id) }}" class="btn btn-sm btn-outline-primary">Details</a>
+                                            <a href="{{ url_for('thread.show', thread_id=thread.id) }}" class="btn btn-sm btn-outline-warning">Bestand</a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <h4 class="alert-heading">Keine Garne gefunden</h4>
+                <p>Es wurden keine Garne gefunden, die den Filterkriterien entsprechen. Versuchen Sie andere Filter oder legen Sie neue Garne an.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

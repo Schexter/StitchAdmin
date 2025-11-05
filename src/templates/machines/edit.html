@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block title %}{{ machine.name }} bearbeiten{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">🔧 {{ machine.name }} bearbeiten</h1>
+                <a href="{{ url_for('machines.show', machine_id=machine.id) }}" class="btn btn-secondary btn-touch">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <!-- Grunddaten -->
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Grunddaten</h5>
+                                
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Maschinenname *</label>
+                                    <input type="text" class="form-control" id="name" name="name" required 
+                                           value="{{ machine.name }}">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="type" class="form-label">Maschinentyp *</label>
+                                    <select class="form-select" id="type" name="type" required onchange="toggleTypeFields()">
+                                        <option value="">Typ wählen</option>
+                                        <option value="embroidery" {{ 'selected' if machine.type == 'embroidery' }}>🧵 Stickmaschine</option>
+                                        <option value="dtf" {{ 'selected' if machine.type == 'dtf' }}>🖨️ DTF-Drucker</option>
+                                        <option value="dtg" {{ 'selected' if machine.type == 'dtg' }}>👕 DTG-Drucker</option>
+                                        <option value="vinyl" {{ 'selected' if machine.type == 'vinyl' }}>📋 Vinyl/Flex-Plotter</option>
+                                        <option value="sublimation" {{ 'selected' if machine.type == 'sublimation' }}>🌈 Sublimationsdrucker</option>
+                                        <option value="heat_press" {{ 'selected' if machine.type == 'heat_press' }}>🔥 Transferpresse</option>
+                                        <option value="other" {{ 'selected' if machine.type == 'other' }}>⚙️ Sonstige</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="status" class="form-label">Status</label>
+                                    <select class="form-select" id="status" name="status">
+                                        <option value="active" {{ 'selected' if machine.status == 'active' }}>Aktiv</option>
+                                        <option value="inactive" {{ 'selected' if machine.status == 'inactive' }}>Inaktiv</option>
+                                        <option value="maintenance" {{ 'selected' if machine.status == 'maintenance' }}>Wartung</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="manufacturer" class="form-label">Hersteller</label>
+                                    <input type="text" class="form-control" id="manufacturer" name="manufacturer" 
+                                           value="{{ machine.manufacturer or '' }}">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="model" class="form-label">Modell</label>
+                                    <input type="text" class="form-control" id="model" name="model" 
+                                           value="{{ machine.model or '' }}">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="serial_number" class="form-label">Seriennummer</label>
+                                    <input type="text" class="form-control" id="serial_number" name="serial_number"
+                                           value="{{ machine.serial_number or '' }}">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="purchase_date" class="form-label">Kaufdatum</label>
+                                    <input type="date" class="form-control" id="purchase_date" name="purchase_date"
+                                           value="{{ machine.purchase_date or '' }}">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="location" class="form-label">Standort</label>
+                                    <input type="text" class="form-control" id="location" name="location" 
+                                           value="{{ machine.location or '' }}">
+                                </div>
+                            </div>
+
+                            <!-- Technische Daten -->
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Technische Daten</h5>
+
+                                <!-- Stickmaschinen-spezifisch -->
+                                <div id="embroidery-fields" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="num_needles" class="form-label">Anzahl Nadeln</label>
+                                        <input type="number" class="form-control" id="num_needles" name="num_needles" 
+                                               min="1" max="40" value="{{ machine.num_needles or 15 }}">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="max_speed" class="form-label">Max. Geschwindigkeit (Stiche/min)</label>
+                                        <input type="number" class="form-control" id="max_speed" name="max_speed" 
+                                               min="100" max="3000" value="{{ machine.max_speed or 1000 }}">
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="mb-3">
+                                                <label for="max_embroidery_area_width" class="form-label">Max. Breite (mm)</label>
+                                                <input type="number" class="form-control" id="max_embroidery_area_width" 
+                                                       name="max_embroidery_area_width" min="50" max="1000" 
+                                                       value="{{ machine.max_embroidery_area_width or 400 }}">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="mb-3">
+                                                <label for="max_embroidery_area_height" class="form-label">Max. Höhe (mm)</label>
+                                                <input type="number" class="form-control" id="max_embroidery_area_height" 
+                                                       name="max_embroidery_area_height" min="50" max="1000" 
+                                                       value="{{ machine.max_embroidery_area_height or 400 }}">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="hoop_sizes" class="form-label">Verfügbare Rahmengrößen</label>
+                                        <input type="text" class="form-control" id="hoop_sizes" name="hoop_sizes" 
+                                               value="{{ machine.hoop_sizes|join(',') if machine.hoop_sizes else '' }}">
+                                        <small class="form-text text-muted">Größen durch Komma getrennt (in cm)</small>
+                                    </div>
+                                </div>
+
+                                <!-- DTF-Drucker-spezifisch -->
+                                <div id="dtf-fields" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="max_print_width" class="form-label">Max. Druckbreite (mm)</label>
+                                        <input type="number" class="form-control" id="max_print_width" name="max_print_width" 
+                                               min="100" max="1500" value="{{ machine.max_print_width or 600 }}">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="print_resolution" class="form-label">Druckauflösung</label>
+                                        <select class="form-select" id="print_resolution" name="print_resolution">
+                                            <option value="720x720" {{ 'selected' if machine.print_resolution == '720x720' }}>720x720 dpi</option>
+                                            <option value="1200x1200" {{ 'selected' if machine.print_resolution == '1200x1200' or not machine.print_resolution }}>1200x1200 dpi</option>
+                                            <option value="1440x1440" {{ 'selected' if machine.print_resolution == '1440x1440' }}>1440x1440 dpi</option>
+                                            <option value="2400x1200" {{ 'selected' if machine.print_resolution == '2400x1200' }}>2400x1200 dpi</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Betriebszeiten -->
+                                <div class="mt-4">
+                                    <h6>Betriebszeiten</h6>
+                                    
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="mb-3">
+                                                <label for="operating_hours_start" class="form-label">Beginn</label>
+                                                <input type="time" class="form-control" id="operating_hours_start" 
+                                                       name="operating_hours_start" value="{{ machine.operating_hours_start or '08:00' }}">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="mb-3">
+                                                <label for="operating_hours_end" class="form-label">Ende</label>
+                                                <input type="time" class="form-control" id="operating_hours_end" 
+                                                       name="operating_hours_end" value="{{ machine.operating_hours_end or '18:00' }}">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Arbeitstage</label>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="monday" id="monday" 
+                                                           {{ 'checked' if 'monday' in (machine.working_days or ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']) }}>
+                                                    <label class="form-check-label" for="monday">Montag</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="tuesday" id="tuesday"
+                                                           {{ 'checked' if 'tuesday' in (machine.working_days or ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']) }}>
+                                                    <label class="form-check-label" for="tuesday">Dienstag</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="wednesday" id="wednesday"
+                                                           {{ 'checked' if 'wednesday' in (machine.working_days or ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']) }}>
+                                                    <label class="form-check-label" for="wednesday">Mittwoch</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="thursday" id="thursday"
+                                                           {{ 'checked' if 'thursday' in (machine.working_days or ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']) }}>
+                                                    <label class="form-check-label" for="thursday">Donnerstag</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="friday" id="friday"
+                                                           {{ 'checked' if 'friday' in (machine.working_days or ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']) }}>
+                                                    <label class="form-check-label" for="friday">Freitag</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="saturday" id="saturday"
+                                                           {{ 'checked' if 'saturday' in (machine.working_days or []) }}>
+                                                    <label class="form-check-label" for="saturday">Samstag</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="sunday" id="sunday"
+                                                           {{ 'checked' if 'sunday' in (machine.working_days or []) }}>
+                                                    <label class="form-check-label" for="sunday">Sonntag</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Wartung -->
+                                <div class="mt-4">
+                                    <h6>Wartung</h6>
+                                    
+                                    <div class="mb-3">
+                                        <label for="last_maintenance" class="form-label">Letzte Wartung</label>
+                                        <input type="date" class="form-control" id="last_maintenance" name="last_maintenance"
+                                               value="{{ machine.last_maintenance or '' }}">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="next_maintenance" class="form-label">Nächste Wartung</label>
+                                        <input type="date" class="form-control" id="next_maintenance" name="next_maintenance"
+                                               value="{{ machine.next_maintenance or '' }}">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="maintenance_interval_days" class="form-label">Wartungsintervall (Tage)</label>
+                                        <input type="number" class="form-control" id="maintenance_interval_days" 
+                                               name="maintenance_interval_days" min="1" max="365" 
+                                               value="{{ machine.maintenance_interval_days or 90 }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="notes" class="form-label">Notizen</label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3">{{ machine.notes or '' }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('machines.show', machine_id=machine.id) }}" class="btn btn-secondary btn-touch">
+                                <i class="fas fa-times"></i> Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-success btn-touch">
+                                <i class="fas fa-save"></i> Änderungen speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleTypeFields() {
+    const type = document.getElementById('type').value;
+    const embroideryFields = document.getElementById('embroidery-fields');
+    const dtfFields = document.getElementById('dtf-fields');
+    
+    // Alle Felder ausblenden
+    embroideryFields.style.display = 'none';
+    dtfFields.style.display = 'none';
+    
+    // Entsprechende Felder einblenden
+    if (type === 'embroidery') {
+        embroideryFields.style.display = 'block';
+    } else if (type === 'dtf') {
+        dtfFields.style.display = 'block';
+    }
+}
+
+// Initial beim Laden der Seite
+document.addEventListener('DOMContentLoaded', function() {
+    toggleTypeFields();
+});
+</script>
+{% endblock %}

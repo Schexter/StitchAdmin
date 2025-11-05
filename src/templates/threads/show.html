@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}{{ thread.brand }}-{{ thread.color_code }} - Garndetails{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">
+                    🧵 {{ thread.brand }}-{{ thread.color_code }}
+                    {% if thread.color_name %}
+                    <small class="text-muted">({{ thread.color_name }})</small>
+                    {% endif %}
+                </h1>
+                <div>
+                    <a href="{{ url_for('thread.edit', thread_id=thread.id) }}" class="btn btn-warning btn-touch me-2">
+                        <i class="fas fa-edit"></i> Bearbeiten
+                    </a>
+                    <a href="{{ url_for('thread.index') }}" class="btn btn-secondary btn-touch">
+                        <i class="fas fa-arrow-left"></i> Zurück
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Garninfo -->
+                <div class="col-lg-8 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Garndetails</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <td class="fw-bold">Marke:</td>
+                                            <td>{{ thread.brand }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Farbnummer:</td>
+                                            <td><code>{{ thread.color_code }}</code></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Farbname:</td>
+                                            <td>{{ thread.color_name or '-' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Farbe:</td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="color-sample me-2" 
+                                                         style="width: 30px; height: 30px; background-color: {{ thread.color_hex }}; border: 2px solid #ccc; border-radius: 50%;"></div>
+                                                    {{ thread.color_hex }}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Material:</td>
+                                            <td>
+                                                <span class="badge bg-secondary">{{ thread.material|title }}</span>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Garnstärke:</td>
+                                            <td>{{ thread.weight }}wt</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <td class="fw-bold">Länge pro Kone:</td>
+                                            <td>{{ thread.length_per_cone|default('-') }} Meter</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Preis pro Kone:</td>
+                                            <td>{{ "%.2f"|format(thread.price_per_cone) }} €</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Lieferant:</td>
+                                            <td>{{ thread.supplier or '-' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Artikel-Nr.:</td>
+                                            <td>{{ thread.supplier_part_number or '-' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Waschtemperatur:</td>
+                                            <td>{{ thread.washable_temp or 40 }}°C</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Eigenschaften:</td>
+                                            <td>
+                                                {% if thread.suitable_for_embroidery %}
+                                                <span class="badge bg-success me-1">Stickerei</span>
+                                                {% endif %}
+                                                {% if thread.suitable_for_quilting %}
+                                                <span class="badge bg-info me-1">Quilting</span>
+                                                {% endif %}
+                                                {% if thread.colorfast %}
+                                                <span class="badge bg-primary me-1">Farbecht</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {% if thread.notes %}
+                            <div class="mt-3">
+                                <h6>Notizen:</h6>
+                                <p class="text-muted">{{ thread.notes|nl2br|safe }}</p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bestand & Aktionen -->
+                <div class="col-lg-4 mb-4">
+                    <div class="card mb-3">
+                        <div class="card-header 
+                            {% if stock.low_stock %}bg-danger text-white
+                            {% elif stock.quantity <= (stock.min_stock * 2) %}bg-warning text-dark
+                            {% else %}bg-success text-white{% endif %}">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-boxes"></i> Lagerbestand
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center mb-3">
+                                <div class="display-6 fw-bold 
+                                    {% if stock.low_stock %}text-danger
+                                    {% elif stock.quantity <= (stock.min_stock * 2) %}text-warning
+                                    {% else %}text-success{% endif %}">
+                                    {{ stock.quantity }}
+                                </div>
+                                <small class="text-muted">Konen verfügbar</small>
+                            </div>
+                            
+                            <hr>
+                            
+                            <p><strong>Mindestbestand:</strong> {{ stock.min_stock }} Konen</p>
+                            <p><strong>Lagerort:</strong> {{ stock.location or 'Unbekannt' }}</p>
+                            
+                            {% if stock.last_updated %}
+                            <p><small class="text-muted">
+                                Zuletzt aktualisiert: {{ stock.last_updated[:16].replace('T', ' ') }}
+                            </small></p>
+                            {% endif %}
+                            
+                            {% if stock.low_stock %}
+                            <div class="alert alert-danger mt-3">
+                                <i class="fas fa-exclamation-triangle"></i> 
+                                <strong>Niedriger Bestand!</strong><br>
+                                Nachbestellung empfohlen.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="card-title mb-0">Aktionen</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="{{ url_for('thread.manage_stock', thread_id=thread.id) }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-boxes"></i> Bestand verwalten
+                                </a>
+                                <a href="{{ url_for('thread.edit', thread_id=thread.id) }}" class="btn btn-outline-warning btn-sm">
+                                    <i class="fas fa-edit"></i> Garn bearbeiten
+                                </a>
+                                <button class="btn btn-outline-info btn-sm" onclick="alert('Bestellfunktion wird in einem zukünftigen Update verfügbar sein.')">
+                                    <i class="fas fa-shopping-cart"></i> Nachbestellen
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="confirmDelete()">
+                                    <i class="fas fa-trash"></i> Garn löschen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verwendungshistorie -->
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Verwendungshistorie</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-history fa-3x mb-3"></i>
+                                <h5>Verwendungshistorie</h5>
+                                <p>Diese Funktion wird in einem zukünftigen Update verfügbar sein.</p>
+                                <small>Hier werden alle Aufträge angezeigt, in denen dieses Garn verwendet wurde.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete() {
+    if (confirm('Möchten Sie dieses Garn wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+        alert('Löschfunktion wird in einem zukünftigen Update implementiert.');
+    }
+}
+</script>
+{% endblock %}

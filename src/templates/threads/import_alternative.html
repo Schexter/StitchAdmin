@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}PDF Import - Alternative{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h1>PDF Import - Alternative Version</h1>
+            <p>Falls der normale Import nicht funktioniert, nutzen Sie diese Alternative:</p>
+            
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data" action="{{ url_for('thread.import_threads') }}">
+                        <input type="hidden" name="import_type" value="pdf">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">PDF-Datei auswählen:</label>
+                            <input type="file" name="pdf_file" accept=".pdf" required 
+                                   style="display: block; width: 100%; padding: 20px; border: 2px solid #ffc107; background: #fff;">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-warning btn-lg">
+                            <i class="fas fa-file-pdf"></i> PDF analysieren
+                        </button>
+                        
+                        <a href="{{ url_for('thread.index') }}" class="btn btn-secondary btn-lg">
+                            Zurück
+                        </a>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="mt-4">
+                <h3>Debug-Info:</h3>
+                <pre id="debug"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Debug
+document.getElementById('debug').textContent = 'File-Inputs gefunden: ' + 
+    document.querySelectorAll('input[type="file"]').length;
+</script>
+{% endblock %}

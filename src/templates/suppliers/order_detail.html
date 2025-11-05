@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Bestellung {{ order.order_number }} - {{ supplier.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.index') }}">Lieferanten</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.show', supplier_id=supplier.id) }}">{{ supplier.name }}</a></li>
+                <li class="breadcrumb-item active">Bestellung {{ order.order_number }}</li>
+            </ol>
+        </nav>
+        
+        <h1>
+            Bestellung {{ order.order_number }}
+            <span class="badge bg-{{ 'secondary' if order.status == 'draft' else 'primary' if order.status == 'ordered' else 'success' if order.status == 'delivered' else 'warning' }}">
+                {{ order.status|title }}
+            </span>
+        </h1>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <!-- Bestelldetails -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Bestelldetails</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Bestelldatum:</strong> {{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</p>
+                        <p><strong>Liefertermin:</strong> {{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Lieferanten-Bestellnr.:</strong> {{ order.supplier_order_number or '-' }}</p>
+                        <p><strong>Versandart:</strong> {{ order.shipping_method or '-' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bestellpositionen -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Bestellpositionen</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Artikel-Nr.</th>
+                                <th>Beschreibung</th>
+                                <th>Menge</th>
+                                <th>Einheit</th>
+                                <th>Preis/Einheit</th>
+                                <th>Gesamt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in order.get_items() %}
+                            <tr>
+                                <td>{{ item.article_number or '-' }}</td>
+                                <td>{{ item.description }}</td>
+                                <td>{{ item.quantity }}</td>
+                                <td>{{ item.unit or 'Stück' }}</td>
+                                <td>{{ '%.2f'|format(item.unit_price)|replace('.', ',') }} €</td>
+                                <td>{{ '%.2f'|format((item.quantity|default(1) * item.unit_price|default(0)) - (item.discount|default(0)))|replace('.', ',') }} €</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="5" class="text-end"><strong>Zwischensumme:</strong></td>
+                                <td><strong>{{ '%.2f'|format(order.subtotal)|replace('.', ',') }} €</strong></td>
+                            </tr>
+                            {% if order.shipping_cost %}
+                            <tr>
+                                <td colspan="5" class="text-end">Versandkosten:</td>
+                                <td>{{ '%.2f'|format(order.shipping_cost)|replace('.', ',') }} €</td>
+                            </tr>
+                            {% endif %}
+                            {% if order.tax_amount %}
+                            <tr>
+                                <td colspan="5" class="text-end">MwSt.:</td>
+                                <td>{{ '%.2f'|format(order.tax_amount)|replace('.', ',') }} €</td>
+                            </tr>
+                            {% endif %}
+                            {% if order.discount_amount %}
+                            <tr>
+                                <td colspan="5" class="text-end">Rabatt:</td>
+                                <td>-{{ '%.2f'|format(order.discount_amount)|replace('.', ',') }} €</td>
+                            </tr>
+                            {% endif %}
+                            <tr class="table-primary">
+                                <td colspan="5" class="text-end"><strong>Gesamtbetrag:</strong></td>
+                                <td><strong>{{ '%.2f'|format(order.total_amount)|replace('.', ',') }} €</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Status -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Status</h5>
+            </div>
+            <div class="card-body">
+                {% if order.status == 'draft' %}
+                <form method="POST" action="{{ url_for('suppliers.mark_order_as_ordered', order_id=order.id) }}">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-paper-plane"></i> Als bestellt markieren
+                    </button>
+                </form>
+                {% elif order.status == 'ordered' %}
+                <p class="text-muted">Bestellung wurde abgesendet.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Aktionen -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Aktionen</h5>
+            </div>
+            <div class="card-body">
+                {% if supplier.webshop_url %}
+                <a href="{{ url_for('suppliers.open_webshop_for_order', supplier_id=supplier.id, order_id=order.id) }}" 
+                   class="btn btn-info w-100 mb-2" target="_blank">
+                    <i class="fas fa-shopping-cart me-2"></i>
+                    Im Webshop bestellen
+                </a>
+                {% endif %}
+                
+                <button type="button" class="btn btn-secondary w-100 mb-2" onclick="window.print()">
+                    <i class="fas fa-print me-2"></i>
+                    Drucken
+                </button>
+                
+                {% if supplier.email %}
+                <a href="mailto:{{ supplier.email }}?subject=Bestellung {{ order.order_number }}" 
+                   class="btn btn-secondary w-100">
+                    <i class="fas fa-envelope me-2"></i>
+                    Per E-Mail senden
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Notizen -->
+        {% if order.notes or order.internal_notes %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Notizen</h5>
+            </div>
+            <div class="card-body">
+                {% if order.notes %}
+                <h6>Bestellnotizen:</h6>
+                <p>{{ order.notes }}</p>
+                {% endif %}
+                {% if order.internal_notes %}
+                <h6>Interne Notizen:</h6>
+                <p>{{ order.internal_notes }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

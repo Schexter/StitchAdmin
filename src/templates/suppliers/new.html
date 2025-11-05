@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Neuer Lieferant{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.index') }}">Lieferanten</a></li>
+                <li class="breadcrumb-item active">Neuer Lieferant</li>
+            </ol>
+        </nav>
+        
+        <h1>Neuer Lieferant</h1>
+    </div>
+</div>
+
+<form method="POST">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Grunddaten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Grunddaten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="name" class="form-label">Firmenname *</label>
+                            <input type="text" class="form-control" id="name" name="name" required autofocus>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Status</label>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="active" name="active" checked>
+                                <label class="form-check-label" for="active">
+                                    Aktiv
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="preferred" name="preferred">
+                                <label class="form-check-label" for="preferred">
+                                    <i class="fas fa-star text-warning"></i> Bevorzugter Lieferant
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="contact_person" class="form-label">Kontaktperson</label>
+                            <input type="text" class="form-control" id="contact_person" name="contact_person">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="tax_id" class="form-label">Steuernummer</label>
+                            <input type="text" class="form-control" id="tax_id" name="tax_id">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="customer_number" class="form-label">Unsere Kundennummer</label>
+                            <input type="text" class="form-control" id="customer_number" name="customer_number" 
+                                   placeholder="Ihre Kundennummer bei diesem Lieferanten">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Kontaktdaten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Kontaktdaten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">E-Mail</label>
+                            <input type="email" class="form-control" id="email" name="email">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="website" class="form-label">Website</label>
+                            <input type="url" class="form-control" id="website" name="website" placeholder="https://">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="phone" class="form-label">Telefon</label>
+                            <input type="tel" class="form-control" id="phone" name="phone">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Adresse -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Adresse</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="street" class="form-label">Straße</label>
+                            <input type="text" class="form-control" id="street" name="street">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="postal_code" class="form-label">PLZ</label>
+                            <input type="text" class="form-control" id="postal_code" name="postal_code">
+                        </div>
+                        
+                        <div class="col-md-8 mb-3">
+                            <label for="city" class="form-label">Stadt</label>
+                            <input type="text" class="form-control" id="city" name="city">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="country" class="form-label">Land</label>
+                        <input type="text" class="form-control" id="country" name="country" value="Deutschland">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Retourenadresse -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Retourenadresse</h5>
+                    <small class="text-muted">Falls abweichend von der Hauptadresse</small>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="return_street" class="form-label">Straße</label>
+                            <input type="text" class="form-control" id="return_street" name="return_street">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="return_postal_code" class="form-label">PLZ</label>
+                            <input type="text" class="form-control" id="return_postal_code" name="return_postal_code">
+                        </div>
+                        
+                        <div class="col-md-8 mb-3">
+                            <label for="return_city" class="form-label">Stadt</label>
+                            <input type="text" class="form-control" id="return_city" name="return_city">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="return_country" class="form-label">Land</label>
+                            <input type="text" class="form-control" id="return_country" name="return_country">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="return_contact" class="form-label">Kontaktperson</label>
+                            <input type="text" class="form-control" id="return_contact" name="return_contact">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="return_phone" class="form-label">Telefon</label>
+                            <input type="tel" class="form-control" id="return_phone" name="return_phone">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="return_notes" class="form-label">Hinweise zur Retoure</label>
+                        <textarea class="form-control" id="return_notes" name="return_notes" rows="3" 
+                                  placeholder="z.B. RMA-Nummer erforderlich, Öffnungszeiten, etc."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Bestellkonditionen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Bestellkonditionen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="payment_terms" class="form-label">Zahlungsbedingungen</label>
+                        <input type="text" class="form-control" id="payment_terms" name="payment_terms" 
+                               value="30 Tage netto" placeholder="z.B. 30 Tage netto">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="delivery_time_days" class="form-label">Lieferzeit (Tage)</label>
+                        <input type="number" class="form-control" id="delivery_time_days" name="delivery_time_days" 
+                               min="0" placeholder="z.B. 3">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="minimum_order_value" class="form-label">Mindestbestellwert (€)</label>
+                        <input type="number" class="form-control" id="minimum_order_value" name="minimum_order_value" 
+                               min="0" step="0.01" placeholder="0.00">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aktionen -->
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary w-100 mb-2">
+                        <i class="fas fa-save me-2"></i>Lieferant erstellen
+                    </button>
+                    <a href="{{ url_for('suppliers.index') }}" class="btn btn-secondary w-100">
+                        <i class="fas fa-times me-2"></i>Abbrechen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

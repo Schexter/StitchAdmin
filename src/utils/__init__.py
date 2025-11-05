@@ -1,0 +1,1 @@
+# Utils Package\n# Erstellt von Hans Hahn - Alle Rechte vorbehalten\n

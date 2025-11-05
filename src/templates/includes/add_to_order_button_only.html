@@ -1,0 +1,9 @@
+<!-- Nur der Button, ohne Modal und JavaScript -->
+<button type="button" 
+        class="btn btn-success w-100 add-to-order-btn" 
+        data-article-id="{{ article.id }}"
+        data-article-name="{{ article.name }}"
+        data-article-number="{{ article.article_number }}"
+        onclick="addToOrder('{{ article.id }}', '{{ article.name }}', '{{ article.article_number }}')">
+    <i class="bi bi-cart-plus"></i> Zur Bestellung hinzufügen
+</button>

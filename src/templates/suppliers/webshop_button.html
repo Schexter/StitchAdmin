@@ -1,0 +1,91 @@
+<!-- Webshop-Button für Bestelldetails -->
+<!-- Fügen Sie dies in die order_detail.html ein, wo die Aktionsbuttons sind -->
+
+{% if supplier.webshop_url %}
+<a href="{{ url_for('suppliers.open_webshop_for_order', supplier_id=supplier.id, order_id=order.id) }}" 
+   class="btn btn-info mb-2 w-100" target="_blank">
+    <i class="fas fa-external-link-alt me-2"></i>
+    Im Webshop bestellen
+</a>
+{% endif %}
+
+<!-- Oder als Teil einer Button-Gruppe -->
+<div class="btn-group w-100 mb-2" role="group">
+    {% if supplier.webshop_url %}
+    <a href="{{ url_for('suppliers.open_webshop_for_order', supplier_id=supplier.id, order_id=order.id) }}" 
+       class="btn btn-outline-info" target="_blank" 
+       data-bs-toggle="tooltip" data-bs-placement="top" 
+       title="Öffnet den Webshop in einem neuen Tab">
+        <i class="fas fa-shopping-cart"></i>
+        Webshop
+    </a>
+    {% endif %}
+    
+    <button type="button" class="btn btn-outline-primary" onclick="window.print()">
+        <i class="fas fa-print"></i>
+        Drucken
+    </button>
+    
+    <a href="mailto:{{ supplier.email }}?subject=Bestellung {{ order.order_number }}" 
+       class="btn btn-outline-secondary">
+        <i class="fas fa-envelope"></i>
+        E-Mail
+    </a>
+</div>
+
+<!-- JavaScript für erweiterte Funktionen -->
+<script>
+// Sammle Bestelldaten für Auto-Fill
+function prepareWebshopData() {
+    const orderData = {
+        order_number: '{{ order.order_number }}',
+        items: [
+            {% for item in order.get_items() %}
+            {
+                article_number: '{{ item.article_number }}',
+                supplier_article_number: '{{ item.supplier_article_number }}',
+                description: '{{ item.description }}',
+                quantity: {{ item.quantity }},
+                unit_price: {{ item.unit_price }}
+            },
+            {% endfor %}
+        ]
+    };
+    
+    // Speichere in SessionStorage für Browser-Extension
+    sessionStorage.setItem('stitchadmin_order', JSON.stringify(orderData));
+}
+
+// Wenn Webshop-Button geklickt wird
+document.querySelector('a[href*="open_webshop"]')?.addEventListener('click', function(e) {
+    prepareWebshopData();
+    
+    {% if supplier.webshop_username %}
+    // Zeige Hinweis
+    const toast = new bootstrap.Toast(document.getElementById('webshopToast'));
+    toast.show();
+    {% endif %}
+});
+</script>
+
+<!-- Toast für Hinweise -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="webshopToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <i class="fas fa-info-circle text-info me-2"></i>
+            <strong class="me-auto">Webshop-Tipp</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            {% if supplier.webshop_username %}
+            <p class="mb-1"><strong>Benutzername:</strong> {{ supplier.webshop_username }}</p>
+            {% endif %}
+            {% if supplier.customer_number %}
+            <p class="mb-1"><strong>Kundennummer:</strong> {{ supplier.customer_number }}</p>
+            {% endif %}
+            {% if supplier.webshop_notes %}
+            <p class="mb-0"><small>{{ supplier.webshop_notes }}</small></p>
+            {% endif %}
+        </div>
+    </div>
+</div>

@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}Garnverwaltung - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="bi bi-palette-fill"></i> Garnverwaltung</h1>
+            <p class="lead">Verwalten Sie Ihre Garnfarben, importieren Sie Herstellerdaten und organisieren Sie Ihren Garnbestand.</p>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3 class="text-primary" id="totalColors">0</h3>
+                    <p class="text-muted mb-0">Garnfarben</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3 class="text-success" id="inStock">0</h3>
+                    <p class="text-muted mb-0">Auf Lager</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3 class="text-info" id="manufacturers">0</h3>
+                    <p class="text-muted mb-0">Hersteller</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3 class="text-warning" id="withPantone">0</h3>
+                    <p class="text-muted mb-0">Mit Pantone</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hauptaktionen -->
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 touch-card">
+                <div class="card-body text-center d-flex flex-column">
+                    <i class="bi bi-palette display-1 text-primary mb-3"></i>
+                    <h5 class="card-title">Farben verwalten</h5>
+                    <p class="card-text flex-grow-1">Durchsuchen und bearbeiten Sie Ihre Garnfarben-Datenbank.</p>
+                    <a href="{{ url_for('thread.colors') }}" class="btn btn-primary btn-lg touch-target">
+                        <i class="bi bi-arrow-right-circle"></i> Farben anzeigen
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 touch-card">
+                <div class="card-body text-center d-flex flex-column">
+                    <i class="bi bi-cloud-upload display-1 text-success mb-3"></i>
+                    <h5 class="card-title">Daten importieren</h5>
+                    <p class="card-text flex-grow-1">Importieren Sie Farbtabellen aus CSV, Excel oder PDF-Dateien.</p>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('thread.import_page') }}" class="btn btn-success btn-lg touch-target">
+                            <i class="bi bi-upload"></i> Import starten
+                        </a>
+                        <a href="{{ url_for('thread.web_scraper') }}" class="btn btn-warning btn-lg touch-target">
+                            <i class="bi bi-globe"></i> Web Scraper
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 touch-card">
+                <div class="card-body text-center d-flex flex-column">
+                    <i class="bi bi-arrow-left-right display-1 text-info mb-3"></i>
+                    <h5 class="card-title">Farbkonverter</h5>
+                    <p class="card-text flex-grow-1">Konvertieren Sie Farben zwischen verschiedenen Herstellern.</p>
+                    <a href="{{ url_for('thread.converter') }}" class="btn btn-info btn-lg touch-target">
+                        <i class="bi bi-shuffle"></i> Konverter öffnen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zusätzliche Tools -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <h3>Weitere Funktionen</h3>
+        </div>
+        
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-globe text-danger"></i> Online Import 
+                        <span class="badge bg-danger">NEU!</span>
+                    </h5>
+                    <p class="card-text">Holen Sie Garnfarben direkt von Hersteller-Websites - kein PDF-Parsing mehr!</p>
+                    <a href="{{ url_for('thread_online.index') }}" class="btn btn-danger">
+                        <i class="bi bi-cloud-download"></i> Web Fetcher starten
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-download text-primary"></i> Export
+                    </h5>
+                    <p class="card-text">Exportieren Sie Ihre Garnfarben-Datenbank als CSV-Datei.</p>
+                    <button class="btn btn-outline-primary" onclick="exportColors()">
+                        <i class="bi bi-file-earmark-spreadsheet"></i> Als CSV exportieren
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-bar-chart text-warning"></i> Statistiken
+                    </h5>
+                    <p class="card-text">Detaillierte Übersicht über Ihre Garnbestände und Hersteller.</p>
+                    <button class="btn btn-outline-warning" onclick="showStatistics()">
+                        <i class="bi bi-graph-up"></i> Statistiken anzeigen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistik Modal -->
+<div class="modal fade" id="statisticsModal" tabindex="-1" aria-labelledby="statisticsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statisticsModalLabel">Garnfarben Statistiken</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body" id="statisticsContent">
+                <!-- Wird dynamisch gefüllt -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Statistiken laden
+function loadStatistics() {
+    fetch('/threads/api/statistics')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const stats = data.statistics;
+                document.getElementById('totalColors').textContent = stats.total_colors;
+                document.getElementById('inStock').textContent = stats.in_stock;
+                document.getElementById('manufacturers').textContent = Object.keys(stats.manufacturers).length;
+                document.getElementById('withPantone').textContent = stats.with_pantone;
+            }
+        });
+}
+
+// Export
+function exportColors() {
+    window.location.href = '/threads/api/export/csv';
+}
+
+// Statistiken anzeigen
+function showStatistics() {
+    fetch('/threads/api/statistics')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const stats = data.statistics;
+                let html = '<div class="row">';
+                
+                // Hersteller-Statistik
+                html += '<div class="col-md-6">';
+                html += '<h6>Farben nach Hersteller</h6>';
+                html += '<table class="table table-sm">';
+                for (let [manufacturer, count] of Object.entries(stats.manufacturers)) {
+                    html += `<tr><td>${manufacturer}</td><td class="text-end">${count}</td></tr>`;
+                }
+                html += '</table></div>';
+                
+                // Kategorie-Statistik
+                html += '<div class="col-md-6">';
+                html += '<h6>Farben nach Kategorie</h6>';
+                html += '<table class="table table-sm">';
+                for (let [category, count] of Object.entries(stats.categories)) {
+                    html += `<tr><td>${category}</td><td class="text-end">${count}</td></tr>`;
+                }
+                html += '</table></div>';
+                
+                html += '</div>';
+                
+                // Weitere Statistiken
+                html += '<hr>';
+                html += '<div class="row text-center">';
+                html += `<div class="col-md-4"><strong>${stats.with_hex}</strong><br>Mit Hex-Wert</div>`;
+                html += `<div class="col-md-4"><strong>${stats.with_pantone}</strong><br>Mit Pantone</div>`;
+                html += `<div class="col-md-4"><strong>${stats.in_stock}</strong><br>Auf Lager</div>`;
+                html += '</div>';
+                
+                document.getElementById('statisticsContent').innerHTML = html;
+                
+                const modal = new bootstrap.Modal(document.getElementById('statisticsModal'));
+                modal.show();
+            }
+        });
+}
+
+// Beim Laden
+document.addEventListener('DOMContentLoaded', function() {
+    loadStatistics();
+});
+</script>
+
+<style>
+.touch-card {
+    transition: transform 0.2s;
+    cursor: pointer;
+}
+.touch-card:hover {
+    transform: translateY(-5px);
+}
+.touch-target {
+    min-height: 60px;
+    padding: 15px 30px;
+}
+</style>
+{% endblock %}

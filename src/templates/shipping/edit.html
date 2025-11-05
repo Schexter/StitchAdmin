@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Versand {{ shipment.id }} bearbeiten{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('shipping.index') }}">Versand</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('shipping.show', shipment_id=shipment.id) }}">{{ shipment.id }}</a></li>
+                <li class="breadcrumb-item active">Bearbeiten</li>
+            </ol>
+        </nav>
+        
+        <h1><i class="bi bi-truck"></i> Versand bearbeiten</h1>
+    </div>
+</div>
+
+<form method="POST">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Auftragsinfo (nur Anzeige) -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Auftragsinformation</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> 
+                        <strong>Auftrag:</strong> 
+                        {% if shipment.order %}
+                            <a href="{{ url_for('orders.show', order_id=shipment.order.id) }}">
+                                {{ shipment.order.order_number or shipment.order.id }}
+                            </a> - 
+                            {% if shipment.order.customer %}
+                                {{ shipment.order.customer.display_name }}
+                            {% endif %}
+                        {% else %}
+                            Kein Auftrag verknüpft
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Versanddetails -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Versanddetails</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="carrier" class="form-label">Versanddienstleister *</label>
+                            <select class="form-control" id="carrier" name="carrier" required>
+                                {% for carrier in carriers %}
+                                <option value="{{ carrier }}" {% if shipment.carrier == carrier %}selected{% endif %}>
+                                    {{ carrier }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="service" class="form-label">Service</label>
+                            <select class="form-control" id="service" name="service">
+                                <option value="Standard" {% if shipment.service == 'Standard' %}selected{% endif %}>Standard</option>
+                                <option value="Express" {% if shipment.service == 'Express' %}selected{% endif %}>Express</option>
+                                <option value="Economy" {% if shipment.service == 'Economy' %}selected{% endif %}>Economy</option>
+                                <option value="Overnight" {% if shipment.service == 'Overnight' %}selected{% endif %}>Overnight</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="tracking_number" class="form-label">Sendungsnummer</label>
+                            <input type="text" class="form-control" id="tracking_number" name="tracking_number" 
+                                   value="{{ shipment.tracking_number or '' }}"
+                                   placeholder="z.B. 00340434192837458932">
+                        </div>
+                    </div>
+                    
+                    <!-- Paketmaße -->
+                    <h6 class="mt-4 mb-3">Paketmaße</h6>
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="weight" class="form-label">Gewicht (kg)</label>
+                            <input type="number" class="form-control" id="weight" name="weight" 
+                                   value="{{ shipment.weight or '' }}"
+                                   step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="length" class="form-label">Länge (cm)</label>
+                            <input type="number" class="form-control" id="length" name="length" 
+                                   value="{{ shipment.length or '' }}"
+                                   step="1" min="0" placeholder="0">
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="width" class="form-label">Breite (cm)</label>
+                            <input type="number" class="form-control" id="width" name="width" 
+                                   value="{{ shipment.width or '' }}"
+                                   step="1" min="0" placeholder="0">
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="height" class="form-label">Höhe (cm)</label>
+                            <input type="number" class="form-control" id="height" name="height" 
+                                   value="{{ shipment.height or '' }}"
+                                   step="1" min="0" placeholder="0">
+                        </div>
+                    </div>
+                    
+                    <!-- Kosten -->
+                    <h6 class="mt-4 mb-3">Kosten</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="shipping_cost" class="form-label">Versandkosten (€)</label>
+                            <input type="number" class="form-control" id="shipping_cost" name="shipping_cost" 
+                                   value="{{ shipment.shipping_cost or '' }}"
+                                   step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="insurance_value" class="form-label">Versicherungswert (€)</label>
+                            <input type="number" class="form-control" id="insurance_value" name="insurance_value" 
+                                   value="{{ shipment.insurance_value or '' }}"
+                                   step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Empfängeradresse -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Empfängeradresse</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="recipient_name" class="form-label">Empfänger *</label>
+                        <input type="text" class="form-control" id="recipient_name" name="recipient_name" 
+                               value="{{ shipment.recipient_name }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="recipient_street" class="form-label">Straße & Hausnummer *</label>
+                        <input type="text" class="form-control" id="recipient_street" name="recipient_street" 
+                               value="{{ shipment.recipient_street }}" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-5 mb-3">
+                            <label for="recipient_postal_code" class="form-label">PLZ *</label>
+                            <input type="text" class="form-control" id="recipient_postal_code" name="recipient_postal_code" 
+                                   value="{{ shipment.recipient_postal_code }}" required>
+                        </div>
+                        
+                        <div class="col-md-7 mb-3">
+                            <label for="recipient_city" class="form-label">Ort *</label>
+                            <input type="text" class="form-control" id="recipient_city" name="recipient_city" 
+                                   value="{{ shipment.recipient_city }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="recipient_country" class="form-label">Land</label>
+                        <input type="text" class="form-control" id="recipient_country" name="recipient_country" 
+                               value="{{ shipment.recipient_country or 'Deutschland' }}">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status-Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Status</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1"><strong>Aktueller Status:</strong></p>
+                    <p>
+                        {% if shipment.status == 'created' %}
+                            <span class="badge bg-secondary">Erstellt</span>
+                        {% elif shipment.status == 'shipped' %}
+                            <span class="badge bg-primary">Versendet</span>
+                        {% elif shipment.status == 'delivered' %}
+                            <span class="badge bg-success">Zugestellt</span>
+                        {% endif %}
+                    </p>
+                    
+                    <p class="mb-1"><small class="text-muted">Erstellt am:</small></p>
+                    <p>{{ shipment.created_at|format_datetime }}</p>
+                </div>
+            </div>
+            
+            <!-- Aktionen -->
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-save"></i> Änderungen speichern
+                    </button>
+                    <a href="{{ url_for('shipping.show', shipment_id=shipment.id) }}" class="btn btn-secondary w-100">
+                        <i class="bi bi-x-circle"></i> Abbrechen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

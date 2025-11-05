@@ -16,8 +16,10 @@ from flask_login import LoginManager, login_user, logout_user, login_required, c
 if sys.platform == 'win32':
     os.environ['PYTHONIOENCODING'] = 'utf-8'
 
-# Füge src zum Python-Path hinzu
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Füge Projekt-Root zum Python-Path hinzu
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 
 def create_app():
@@ -41,24 +43,26 @@ def create_app():
     
     # Upload-Konfiguration
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
-    app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'instance', 'uploads')
+    app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'instance', 'uploads')
 
     # ==========================================
     # DATENBANK INITIALISIERUNG
     # ==========================================
     try:
-        from models import db, User, Customer, Article, Order, Machine, Thread, ActivityLog, Supplier
+        from src.models.models import db, User, Customer, Article, Order, Machine, Thread, ActivityLog, Supplier
         db.init_app(app)
         print("✅ Datenbank-Models erfolgreich importiert")
     except ImportError as e:
         print(f"❌ FEHLER beim Importieren der Models: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
     # ==========================================
     # CUSTOM FILTERS
     # ==========================================
     try:
-        from utils.filters import register_filters
+        from src.utils.filters import register_filters
         register_filters(app)
         print("✅ Custom Template-Filters registriert")
     except ImportError as e:
@@ -160,40 +164,46 @@ def create_app():
             return True
         except Exception as e:
             print(f"⚠️ {display_name} Blueprint nicht verfügbar: {e}")
+            import traceback
+            if app.config['DEBUG']:
+                traceback.print_exc()
             return False
 
     # Kern-Module
-    register_blueprint_safe('controllers.customer_controller_db', 'customer_bp', 'Kunden')
-    register_blueprint_safe('controllers.article_controller_db', 'article_bp', 'Artikel')
-    register_blueprint_safe('controllers.order_controller_db', 'order_bp', 'Aufträge')
-    register_blueprint_safe('controllers.machine_controller_db', 'machine_bp', 'Maschinen')
-    register_blueprint_safe('controllers.thread_controller_db', 'thread_bp', 'Garne')
-    register_blueprint_safe('controllers.production_controller_db', 'production_bp', 'Produktion')
-    register_blueprint_safe('controllers.shipping_controller_db', 'shipping_bp', 'Versand')
+    register_blueprint_safe('src.controllers.customer_controller_db', 'customer_bp', 'Kunden')
+    register_blueprint_safe('src.controllers.article_controller_db', 'article_bp', 'Artikel')
+    register_blueprint_safe('src.controllers.order_controller_db', 'order_bp', 'Aufträge')
+    register_blueprint_safe('src.controllers.machine_controller_db', 'machine_bp', 'Maschinen')
+    register_blueprint_safe('src.controllers.thread_controller_db', 'thread_bp', 'Garne')
+    register_blueprint_safe('src.controllers.production_controller_db', 'production_bp', 'Produktion')
+    register_blueprint_safe('src.controllers.shipping_controller_db', 'shipping_bp', 'Versand')
     
     # Verwaltungs-Module
-    register_blueprint_safe('controllers.supplier_controller_db', 'supplier_bp', 'Lieferanten')
-    register_blueprint_safe('controllers.user_controller_db', 'user_bp', 'Benutzer')
-    register_blueprint_safe('controllers.settings_controller_unified', 'settings_bp', 'Einstellungen')
-    register_blueprint_safe('controllers.activity_controller_db', 'activity_bp', 'Aktivitäten')
+    register_blueprint_safe('src.controllers.supplier_controller_db', 'supplier_bp', 'Lieferanten')
+    register_blueprint_safe('src.controllers.user_controller_db', 'user_bp', 'Benutzer')
+    register_blueprint_safe('src.controllers.settings_controller_unified', 'settings_bp', 'Einstellungen')
+    register_blueprint_safe('src.controllers.activity_controller_db', 'activity_bp', 'Aktivitäten')
     
     # Spezial-Module
-    register_blueprint_safe('controllers.design_workflow_controller', 'design_workflow_bp', 'Design-Workflow')
-    register_blueprint_safe('controllers.file_browser_controller', 'file_browser_bp', 'Datei-Browser')
+    register_blueprint_safe('src.controllers.design_workflow_controller', 'design_workflow_bp', 'Design-Workflow')
+    register_blueprint_safe('src.controllers.file_browser_controller', 'file_browser_bp', 'Datei-Browser')
     
     # API
-    register_blueprint_safe('controllers.api_controller', 'api_bp', 'API')
+    register_blueprint_safe('src.controllers.api_controller', 'api_bp', 'API')
     
     # Rechnungsmodul
     try:
-        from controllers.rechnungsmodul.kasse_controller import kasse_bp
-        from controllers.rechnungsmodul.rechnung_controller import rechnung_bp
+        from src.controllers.rechnungsmodul.kasse_controller import kasse_bp
+        from src.controllers.rechnungsmodul.rechnung_controller import rechnung_bp
         app.register_blueprint(kasse_bp)
         app.register_blueprint(rechnung_bp)
         blueprints_registered.extend(['Kasse', 'Rechnungen'])
         print("✅ Rechnungsmodul Blueprints registriert")
     except Exception as e:
         print(f"⚠️ Rechnungsmodul nicht verfügbar: {e}")
+        if app.config['DEBUG']:
+            import traceback
+            traceback.print_exc()
 
     # Auth Blueprint (wichtig!)
     try:
@@ -219,7 +229,7 @@ def create_app():
                 
                 flash('Ungültiger Benutzername oder Passwort', 'danger')
             
-            return render_template('auth/login.html')
+            return render_template('login.html')
         
         @auth_bp.route('/logout')
         @login_required
@@ -234,7 +244,7 @@ def create_app():
     except Exception as e:
         print(f"⚠️ Auth Blueprint Fehler: {e}")
 
-    print(f"\n📋 Registrierte Module: {', '.join(blueprints_registered)}\n")
+    print(f"\n📋 Registrierte Module ({len(blueprints_registered)}): {', '.join(blueprints_registered)}\n")
 
     # ==========================================
     # CONTEXT PROCESSORS
@@ -279,11 +289,12 @@ if __name__ == '__main__':
     
     if app is None:
         print("❌ FEHLER: App konnte nicht erstellt werden!")
+        print("Bitte prüfen Sie die Fehlermeldungen oben.")
         sys.exit(1)
     
     # Datenbank-Initialisierung
     with app.app_context():
-        from models import db, User
+        from src.models.models import db, User
         
         # Erstelle alle Tabellen
         print("🔄 Erstelle Datenbank-Tabellen...")
@@ -292,8 +303,7 @@ if __name__ == '__main__':
         
         # Führe Migrationen aus (falls vorhanden)
         try:
-            sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'scripts'))
-            from db_migration import migrate_database
+            from scripts.db_migration import migrate_database
             migrate_database(db)
             print("✅ Datenbank-Migrationen erfolgreich")
         except ImportError:
@@ -318,12 +328,13 @@ if __name__ == '__main__':
             print("ℹ️ Admin-User existiert bereits")
     
     # Starte Server
-    print("\n" + "="*50)
+    print("\n" + "="*60)
     print("🚀 StitchAdmin 2.0 gestartet!")
-    print("="*50)
-    print(f"📍 URL: http://localhost:5000")
-    print(f"👤 Login: admin / admin")
+    print("="*60)
+    print(f"📍 URL:         http://localhost:5000")
+    print(f"👤 Login:       admin / admin")
     print(f"🐛 Debug-Modus: {'Aktiv' if app.config['DEBUG'] else 'Inaktiv'}")
-    print("="*50 + "\n")
+    print(f"📊 Blueprints:  {len([x for x in app.blueprints])} registriert")
+    print("="*60 + "\n")
     
     app.run(host='0.0.0.0', port=5000, debug=app.config['DEBUG'])

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Maschinenverwaltung{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">🔧 Maschinenverwaltung</h1>
+                <a href="{{ url_for('machines.new') }}" class="btn btn-success btn-touch">
+                    <i class="fas fa-plus"></i> Neue Maschine
+                </a>
+            </div>
+
+            {% if machines %}
+            <div class="row">
+                {% for machine_id, machine in machines.items() %}
+                <div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">{{ machine.name }}</h5>
+                            {% if machine.current_status == 'busy' %}
+                            <span class="badge bg-danger">Belegt</span>
+                            {% else %}
+                            <span class="badge bg-success">Verfügbar</span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-2">
+                                <div class="col-4"><strong>Typ:</strong></div>
+                                <div class="col-8">
+                                    {% if machine.type == 'embroidery' %}🧵 Stickerei
+                                    {% elif machine.type == 'dtf' %}🖨️ DTF-Druck
+                                    {% elif machine.type == 'dtg' %}👕 DTG-Druck
+                                    {% elif machine.type == 'vinyl' %}📋 Vinyl/Flex
+                                    {% elif machine.type == 'sublimation' %}🌈 Sublimation
+                                    {% else %}⚙️ {{ machine.type }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            {% if machine.type == 'embroidery' %}
+                            <div class="row mb-2">
+                                <div class="col-4"><strong>Nadeln:</strong></div>
+                                <div class="col-8">{{ machine.num_needles }} Nadeln</div>
+                            </div>
+                            <div class="row mb-2">
+                                <div class="col-4"><strong>Max. Bereich:</strong></div>
+                                <div class="col-8">{{ machine.max_embroidery_area_width }}×{{ machine.max_embroidery_area_height }}mm</div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if machine.location %}
+                            <div class="row mb-2">
+                                <div class="col-4"><strong>Standort:</strong></div>
+                                <div class="col-8">{{ machine.location }}</div>
+                            </div>
+                            {% endif %}
+                            
+                            {% if machine.current_job %}
+                            <div class="alert alert-info mt-3">
+                                <small><strong>Aktueller Job:</strong><br>
+                                {{ machine.current_job.job_title }}</small>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer">
+                            <a href="{{ url_for('machines.show', machine_id=machine_id) }}" class="btn btn-primary btn-sm">Details</a>
+                            <a href="{{ url_for('machines.edit', machine_id=machine_id) }}" class="btn btn-outline-secondary btn-sm">Bearbeiten</a>
+                            <a href="{{ url_for('machines.schedule', machine_id=machine_id) }}" class="btn btn-outline-info btn-sm">Planung</a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <h4 class="alert-heading">Keine Maschinen vorhanden</h4>
+                <p>Es wurden noch keine Maschinen angelegt. Klicken Sie auf "Neue Maschine" um zu beginnen.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

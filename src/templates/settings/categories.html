@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Kategorien-Verwaltung - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0"><i class="bi bi-tags"></i> Kategorien-Verwaltung</h1>
+                <a href="{{ url_for('settings.articles') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Verwendete Kategorien</h5>
+                </div>
+                <div class="card-body">
+                    {% if categories %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Kategorie</th>
+                                        <th>Anzahl Artikel</th>
+                                        <th>Status</th>
+                                        <th>Aktionen</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for category in categories %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ category.name }}</strong>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info">{{ category.article_count }} Artikel</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success">Aktiv</span>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('articles.index', category=category.name) }}" 
+                                               class="btn btn-sm btn-outline-primary">
+                                                <i class="bi bi-eye"></i> Artikel anzeigen
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> Keine Kategorien gefunden.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Hinweise</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">
+                        <i class="bi bi-info-circle text-primary"></i> Kategorien werden automatisch aus den Artikeln erstellt.
+                    </p>
+                    <p class="mb-0 mt-2">
+                        <i class="bi bi-lightbulb text-warning"></i> Um eine neue Kategorie zu erstellen, fügen Sie sie einfach bei einem Artikel hinzu.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

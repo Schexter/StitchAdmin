@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Produktionsplanung - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-gear-wide-connected"></i> Produktionsplanung</h1>
+        <div class="mt-3">
+            <a href="{{ url_for('production.planning') }}" class="btn btn-primary btn-lg me-2">
+                <i class="bi bi-calendar3"></i> Produktionsplanung
+            </a>
+            <a href="{{ url_for('production.calendar') }}" class="btn btn-success btn-lg">
+                <i class="bi bi-calendar-week"></i> Kalenderansicht
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Produktions-KPIs -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-clipboard-data"></i> In Produktion
+                </h5>
+                <p class="card-text display-6">{{ stats.in_progress or 0 }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-check-circle"></i> Heute fertig
+                </h5>
+                <p class="card-text display-6">{{ stats.completed_today or 0 }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-hourglass-split"></i> Wartend
+                </h5>
+                <p class="card-text display-6">{{ stats.waiting or 0 }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-danger mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-exclamation-triangle"></i> Express
+                </h5>
+                <p class="card-text display-6">{{ stats.rush_orders or 0 }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Produktionsaufträge -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5><i class="bi bi-play-circle"></i> Laufende Produktionen</h5>
+            </div>
+            <div class="card-body">
+                {% if current_productions %}
+                    {% for order in current_productions[:10] %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                        <div>
+                            <strong>{{ order.order_number or order.id }}</strong><br>
+                            {% if order.customer %}
+                                <small>{{ order.customer.first_name }} {{ order.customer.last_name }}</small><br>
+                            {% endif %}
+                            <small class="text-muted">{{ order.description or 'Keine Beschreibung' }}</small>
+                            {% if order.order_type %}
+                                <br><small class="text-info">{{ order.order_type|title }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            {% if order.rush_order %}
+                                <span class="badge bg-danger">Express</span><br>
+                            {% endif %}
+                            {% if order.production_start %}
+                                <small>Seit: {{ order.production_start.strftime('%H:%M') }}</small><br>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('production.complete_production', order_id=order.id) }}" style="display: inline;">
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    <i class="bi bi-check-lg"></i> Fertig
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">Keine laufenden Produktionen</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5><i class="bi bi-hourglass-split"></i> Wartende Aufträge</h5>
+            </div>
+            <div class="card-body">
+                {% if waiting_orders %}
+                    {% for order in waiting_orders[:10] %}
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                        <div>
+                            <strong>{{ order.order_number or order.id }}</strong><br>
+                            {% if order.customer %}
+                                <small>{{ order.customer.first_name }} {{ order.customer.last_name }}</small><br>
+                            {% endif %}
+                            <small class="text-muted">{{ order.description or 'Keine Beschreibung' }}</small>
+                            {% if order.order_type %}
+                                <br><small class="text-info">{{ order.order_type|title }}</small>
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            {% if order.rush_order %}
+                                <span class="badge bg-danger">Express</span><br>
+                            {% endif %}
+                            <form method="POST" action="{{ url_for('production.start_production', order_id=order.id) }}" style="display: inline;">
+                                <button type="submit" class="btn btn-sm btn-primary">
+                                    <i class="bi bi-play-fill"></i> Start
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">Keine wartenden Aufträge</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Maschinenkapazität -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-cpu"></i> Maschinenkapazität</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for machine_id, status in machine_status.items() %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card {{ 'border-danger' if status.is_busy else 'border-success' }}">
+                            <div class="card-body">
+                                <h6>{{ status.machine.name }}</h6>
+                                <p class="mb-1"><small>Typ: {{ status.machine.type|title }}</small></p>
+                                {% if status.is_busy and status.current_order %}
+                                    <span class="badge bg-danger">Belegt</span>
+                                    <p class="mb-0 mt-2">
+                                        <small>Auftrag: {{ status.current_order.order_number or status.current_order.id }}</small>
+                                    </p>
+                                {% else %}
+                                    <span class="badge bg-success">Verfügbar</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-12">
+                        <p class="text-muted text-center">Keine aktiven Maschinen vorhanden</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
+    </a>
+</div>
+{% endblock %}

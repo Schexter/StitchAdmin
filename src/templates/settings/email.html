@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}E-Mail Einstellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-envelope"></i> E-Mail Einstellungen</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('settings.index') }}">Einstellungen</a></li>
+                <li class="breadcrumb-item active">E-Mail</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    <h5 class="card-title">SMTP-Server Konfiguration</h5>
+                    
+                    <div class="mb-3">
+                        <label for="smtp_server" class="form-label">SMTP-Server</label>
+                        <input type="text" class="form-control" id="smtp_server" name="smtp_server" 
+                               value="{{ settings.smtp_server }}" placeholder="smtp.gmail.com">
+                        <small class="text-muted">Hostname oder IP-Adresse des SMTP-Servers</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="smtp_port" class="form-label">SMTP-Port</label>
+                        <input type="number" class="form-control" id="smtp_port" name="smtp_port" 
+                               value="{{ settings.smtp_port }}" min="1" max="65535">
+                        <small class="text-muted">Standard: 587 (TLS) oder 465 (SSL)</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="smtp_username" class="form-label">SMTP-Benutzername</label>
+                        <input type="text" class="form-control" id="smtp_username" name="smtp_username" 
+                               value="{{ settings.smtp_username }}">
+                        <small class="text-muted">Benutzername für die SMTP-Authentifizierung</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="smtp_password" class="form-label">SMTP-Passwort</label>
+                        <input type="password" class="form-control" id="smtp_password" name="smtp_password" 
+                               placeholder="********">
+                        <small class="text-muted">Leer lassen um das aktuelle Passwort beizubehalten</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="smtp_from_email" class="form-label">Absender E-Mail</label>
+                        <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" 
+                               value="{{ settings.smtp_from_email }}" placeholder="noreply@example.com">
+                        <small class="text-muted">E-Mail-Adresse die als Absender verwendet wird</small>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="enable_email_notifications" name="enable_email_notifications"
+                               {% if settings.enable_email_notifications %}checked{% endif %}>
+                        <label class="form-check-label" for="enable_email_notifications">
+                            <strong>E-Mail-Benachrichtigungen aktivieren</strong>
+                        </label>
+                        <small class="text-muted d-block">Sendet E-Mails bei wichtigen Ereignissen</small>
+                    </div>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Speichern
+                        </button>
+                        <button type="button" class="btn btn-warning" onclick="testEmail()">
+                            <i class="bi bi-send"></i> Test-E-Mail senden
+                        </button>
+                        <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Abbrechen
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-info-circle"></i> E-Mail Beispiele</h5>
+                <p><strong>Gmail:</strong><br>
+                Server: smtp.gmail.com<br>
+                Port: 587 (TLS)<br>
+                Benötigt App-Passwort</p>
+                
+                <p><strong>Outlook:</strong><br>
+                Server: smtp-mail.outlook.com<br>
+                Port: 587 (TLS)</p>
+                
+                <p class="mb-0"><strong>Hinweis:</strong> Viele E-Mail-Provider benötigen App-spezifische Passwörter für SMTP.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function testEmail() {
+    alert('Test-E-Mail Funktion wird in der nächsten Version implementiert.');
+}
+</script>
+{% endblock %}

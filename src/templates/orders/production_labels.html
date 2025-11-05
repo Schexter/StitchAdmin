@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produktions-Etiketten {{ order.id }}</title>
+    <style>
+        @page {
+            size: 100mm 150mm;
+            margin: 1mm;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 8pt;
+            line-height: 1.1;
+            color: #000;
+            background: white;
+        }
+        
+        /* Container für ein Etikett */
+        .label-container {
+            width: 98mm;
+            height: 148mm;
+            border: 1px solid #000;
+            padding: 1mm;
+            margin-bottom: 2mm;
+            page-break-inside: avoid;
+            page-break-after: always;
+            background: white;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .label-container:last-child {
+            page-break-after: avoid;
+        }
+        
+        /* Header mit Auftragsnummer */
+        .label-header {
+            text-align: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 1mm;
+            margin-bottom: 1mm;
+            flex-shrink: 0;
+        }
+        
+        .order-number {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #000;
+            margin-bottom: 0.5mm;
+        }
+        
+        .order-date {
+            font-size: 7pt;
+            color: #666;
+        }
+        
+        /* Prioritäts-Banner */
+        .priority-banner {
+            background: #ff4444;
+            color: white;
+            text-align: center;
+            font-weight: bold;
+            padding: 1mm;
+            margin-bottom: 1mm;
+            font-size: 7pt;
+            flex-shrink: 0;
+        }
+        
+        /* Kunden-Info - Kompakt */
+        .customer-section {
+            background: #f0f8ff;
+            border-left: 3px solid #007bff;
+            padding: 1mm;
+            margin-bottom: 1mm;
+            flex-shrink: 0;
+        }
+        
+        .customer-name {
+            font-weight: bold;
+            font-size: 9pt;
+            margin-bottom: 0.5mm;
+            color: #000;
+        }
+        
+        .customer-details {
+            font-size: 6pt;
+            color: #555;
+            line-height: 1.1;
+        }
+        
+        /* Artikel-Info mit Bestandsanzeige */
+        .article-section {
+            background: #fff8dc;
+            border-left: 3px solid #ffc107;
+            padding: 1mm;
+            margin-bottom: 1mm;
+            flex-shrink: 0;
+        }
+        
+        .article-name {
+            font-weight: bold;
+            font-size: 9pt;
+            margin-bottom: 0.5mm;
+            color: #000;
+        }
+        
+        .article-specs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1mm;
+            font-size: 6pt;
+            margin-bottom: 1mm;
+        }
+        
+        .spec-item {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .spec-label {
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .spec-value {
+            color: #000;
+        }
+        
+        /* Bestandsanzeige */
+        .stock-section {
+            background: #f0f0f0;
+            border: 1px solid #999;
+            padding: 1mm;
+            margin-bottom: 1mm;
+            border-radius: 2mm;
+            flex-shrink: 0;
+        }
+        
+        .stock-title {
+            font-weight: bold;
+            font-size: 7pt;
+            margin-bottom: 0.5mm;
+            color: #333;
+        }
+        
+        .stock-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1mm;
+            font-size: 6pt;
+        }
+        
+        .stock-badge {
+            display: inline-block;
+            padding: 0.5mm 1mm;
+            border-radius: 2mm;
+            font-size: 6pt;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            margin-bottom: 0.5mm;
+        }
+        
+        .stock-available { background: #28a745; }
+        .stock-partial { background: #ffc107; color: #000; }
+        .stock-missing { background: #dc3545; }
+        .stock-ordered { background: #17a2b8; }
+        .stock-delivered { background: #6c757d; }
+        
+        /* Drei-Barcodes Bereich */
+        .codes-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1mm;
+            margin-bottom: 1mm;
+            flex-shrink: 0;
+        }
+        
+        .code-box {
+            text-align: center;
+            padding: 0.5mm;
+            border: 1px solid #ddd;
+            border-radius: 2mm;
+            background: #f9f9f9;
+        }
+        
+        .code-area {
+            width: 100%;
+            height: 10mm;
+            border: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 5pt;
+            color: #666;
+            background: white;
+            margin-bottom: 0.5mm;
+        }
+        
+        .code-label {
+            font-size: 5pt;
+            color: #666;
+            font-weight: bold;
+        }
+        
+        /* Veredelungs-Details */
+        .production-section {
+            background: #e8f5e8;
+            border-left: 3px solid #28a745;
+            padding: 1mm;
+            margin-bottom: 1mm;
+            flex-shrink: 0;
+        }
+        
+        .production-title {
+            font-weight: bold;
+            font-size: 8pt;
+            margin-bottom: 0.5mm;
+            color: #155724;
+        }
+        
+        .production-details {
+            font-size: 6pt;
+            line-height: 1.1;
+        }
+        
+        .production-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5mm;
+        }
+        
+        .production-label {
+            font-weight: bold;
+            color: #155724;
+        }
+        
+        .production-value {
+            color: #000;
+        }
+        
+        /* Workflow-Checkboxen - Kompakter */
+        .workflow-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 2mm;
+            padding: 1mm;
+            margin-bottom: 1mm;
+            flex-shrink: 0;
+        }
+        
+        .workflow-title {
+            font-weight: bold;
+            font-size: 7pt;
+            margin-bottom: 0.5mm;
+            color: #495057;
+        }
+        
+        .workflow-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5mm;
+        }
+        
+        .workflow-item {
+            display: flex;
+            align-items: center;
+            font-size: 6pt;
+            margin-bottom: 0.5mm;
+        }
+        
+        .checkbox {
+            width: 2.5mm;
+            height: 2.5mm;
+            border: 1px solid #000;
+            margin-right: 0.5mm;
+            flex-shrink: 0;
+        }
+        
+        .checkbox-label {
+            color: #495057;
+        }
+        
+        /* Barcode - Unten */
+        .barcode-section {
+            text-align: center;
+            padding: 1mm;
+            background: #f8f9fa;
+            border: 1px dashed #666;
+            border-radius: 2mm;
+            margin-top: auto;
+            flex-shrink: 0;
+        }
+        
+        .barcode-canvas {
+            max-width: 100%;
+            height: auto;
+            margin: 0.5mm 0;
+        }
+        
+        .barcode-number {
+            font-size: 6pt;
+            font-weight: bold;
+            color: #000;
+        }
+        
+        /* Footer */
+        .label-footer {
+            text-align: center;
+            font-size: 5pt;
+            color: #666;
+            margin-top: 0.5mm;
+            flex-shrink: 0;
+        }
+        
+        /* Typ-spezifische Farben */
+        .type-embroidery { border-left-color: #28a745; }
+        .type-printing { border-left-color: #007bff; }
+        .type-dtf { border-left-color: #dc3545; }
+        .type-combined { border-left-color: #6c757d; }
+        
+        /* Druckoptimierungen */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .label-container {
+                page-break-after: always;
+            }
+            
+            .label-container:last-child {
+                page-break-after: avoid;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+        }
+        
+        /* Zebra-Drucker spezifisch */
+        @media print and (max-width: 100mm) {
+            .label-container {
+                width: 100mm;
+                height: 150mm;
+                border: none;
+                margin: 0;
+                padding: 1.5mm;
+            }
+            
+            .order-number {
+                font-size: 11pt;
+            }
+            
+            .customer-name {
+                font-size: 8pt;
+            }
+            
+            .article-name {
+                font-size: 8pt;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Ein Etikett pro Artikel -->
+    {% for item in order.items %}
+    <div class="label-container">
+        <!-- Header mit Auftragsnummer -->
+        <div class="label-header">
+            <div class="order-number">{{ order.id }}</div>
+            <div class="order-date">{{ order.created_at.strftime('%d.%m.%Y') if order.created_at else now.strftime('%d.%m.%Y') }}</div>
+        </div>
+        
+        <!-- Prioritäts-Banner bei Eilauftrag -->
+        {% if order.rush_order %}
+        <div class="priority-banner">
+            ⚡ EILAUFTRAG - PRIORITÄT ⚡
+        </div>
+        {% endif %}
+        
+        <!-- Kunden-Info -->
+        <div class="customer-section">
+            <div class="customer-name">{{ order.customer.display_name if order.customer else 'Interner Auftrag' }}</div>
+            <div class="customer-details">
+                {% if order.customer %}
+                    {% if order.customer.phone %}📞 {{ order.customer.phone }}{% endif %}
+                    {% if order.customer.email %}<br>✉️ {{ order.customer.email }}{% endif %}
+                    {% if order.customer.city %}<br>📍 {{ order.customer.city }}{% endif %}
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Artikel-Info -->
+        <div class="article-section">
+            <div class="article-name">{{ item.article.name if item.article else 'Unbekannter Artikel' }}</div>
+            <div class="article-specs">
+                <div class="spec-item">
+                    <span class="spec-label">Art.Nr.:</span>
+                    <span class="spec-value">{{ item.article.article_number if item.article else '-' }}</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Menge:</span>
+                    <span class="spec-value" style="background: #ffeb3b; padding: 0.5mm; border-radius: 2mm; font-weight: bold;">{{ item.quantity }} St.</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Größe:</span>
+                    <span class="spec-value">{{ item.textile_size or (item.article.size if item.article else '-') }}</span>
+                </div>
+                <div class="spec-item">
+                    <span class="spec-label">Farbe:</span>
+                    <span class="spec-value">{{ item.textile_color or (item.article.color if item.article else '-') }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bestandsanzeige -->
+        <div class="stock-section">
+            <div class="stock-title">📦 Bestand & Verfügbarkeit</div>
+            <div class="stock-info">
+                <div>
+                    <strong>Aktueller Bestand:</strong><br>
+                    {{ item.article.stock or 0 if item.article else 'Unbekannt' }} Stück
+                </div>
+                <div>
+                    <strong>Status:</strong><br>
+                    {% if item.article %}
+                        {% set stock_diff = (item.article.stock or 0) - item.quantity %}
+                        {% if stock_diff >= 0 %}
+                            <span class="stock-badge stock-available">VORRÄTIG</span>
+                        {% else %}
+                            <span class="stock-badge stock-missing">{{ -stock_diff }} FEHLEN</span>
+                        {% endif %}
+                    {% else %}
+                        <span class="stock-badge stock-missing">NICHT GEFUNDEN</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Bestellstatus -->
+            {% if item.supplier_order_status != 'none' %}
+            <div style="margin-top: 1mm; font-size: 6pt;">
+                <strong>Bestellung:</strong>
+                {% if item.supplier_order_status == 'to_order' %}
+                    <span class="stock-badge stock-ordered">ZU BESTELLEN</span>
+                {% elif item.supplier_order_status == 'ordered' %}
+                    <span class="stock-badge stock-ordered">BESTELLT</span>
+                    {% if item.supplier_expected_date %}
+                        <br>Erwartet: {{ item.supplier_expected_date.strftime('%d.%m.%Y') }}
+                    {% endif %}
+                {% elif item.supplier_order_status == 'delivered' %}
+                    <span class="stock-badge stock-delivered">GELIEFERT</span>
+                    {% if item.supplier_delivered_date %}
+                        <br>Am: {{ item.supplier_delivered_date.strftime('%d.%m.%Y') }}
+                    {% endif %}
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Drei-Barcodes Bereich -->
+        <div class="codes-section">
+            <div class="code-box">
+                <div class="code-area">
+                    <canvas id="barcode-order-{{ loop.index }}" width="85" height="25"></canvas>
+                </div>
+                <div class="code-label">AUFTRAG</div>
+            </div>
+            <div class="code-box">
+                <div class="code-area">
+                    <canvas id="barcode-design-{{ loop.index }}" width="85" height="25"></canvas>
+                </div>
+                <div class="code-label">DESIGN</div>
+            </div>
+            <div class="code-box">
+                <div class="code-area">
+                    <canvas id="barcode-article-{{ loop.index }}" width="85" height="25"></canvas>
+                </div>
+                <div class="code-label">ARTIKEL</div>
+            </div>
+        </div>
+        
+        <!-- Veredelungs-Details -->
+        <div class="production-section type-{{ order.order_type }}">
+            <div class="production-title">
+                {% if order.order_type == 'embroidery' %}🧵 BESTICKUNG
+                {% elif order.order_type == 'printing' %}🖨️ TEXTILDRUCK
+                {% elif order.order_type == 'dtf' %}🔥 DTF-DRUCK
+                {% elif order.order_type == 'combined' %}🔄 KOMBINIERT
+                {% else %}{{ order.order_type|upper }}{% endif %}
+            </div>
+            <div class="production-details">
+                {% if order.order_type in ['embroidery', 'combined'] %}
+                    {% if order.embroidery_position %}
+                    <div class="production-row">
+                        <span class="production-label">Position:</span>
+                        <span class="production-value">{{ order.embroidery_position }}</span>
+                    </div>
+                    {% endif %}
+                    {% if order.embroidery_size %}
+                    <div class="production-row">
+                        <span class="production-label">Größe:</span>
+                        <span class="production-value">{{ order.embroidery_size }}</span>
+                    </div>
+                    {% endif %}
+                    {% if order.stitch_count %}
+                    <div class="production-row">
+                        <span class="production-label">Stiche:</span>
+                        <span class="production-value">{{ '{:,}'.format(order.stitch_count) }}</span>
+                    </div>
+                    {% endif %}
+                {% endif %}
+                
+                {% if order.order_type in ['printing', 'dtf', 'combined'] %}
+                    {% if order.print_method %}
+                    <div class="production-row">
+                        <span class="production-label">Verfahren:</span>
+                        <span class="production-value">{{ order.print_method }}</span>
+                    </div>
+                    {% endif %}
+                    {% if order.print_width_cm and order.print_height_cm %}
+                    <div class="production-row">
+                        <span class="production-label">Größe:</span>
+                        <span class="production-value">{{ order.print_width_cm }} × {{ order.print_height_cm }} cm</span>
+                    </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Workflow-Checkboxen -->
+        <div class="workflow-section">
+            <div class="workflow-title">Produktions-Schritte:</div>
+            <div class="workflow-grid">
+                <div class="workflow-item">
+                    <div class="checkbox"></div>
+                    <div class="checkbox-label">Artikel bereit</div>
+                </div>
+                <div class="workflow-item">
+                    <div class="checkbox"></div>
+                    <div class="checkbox-label">Design OK</div>
+                </div>
+                <div class="workflow-item">
+                    <div class="checkbox"></div>
+                    <div class="checkbox-label">Produktion</div>
+                </div>
+                <div class="workflow-item">
+                    <div class="checkbox"></div>
+                    <div class="checkbox-label">Qualität OK</div>
+                </div>
+                <div class="workflow-item">
+                    <div class="checkbox"></div>
+                    <div class="checkbox-label">Verpackung</div>
+                </div>
+                <div class="workflow-item">
+                    <div class="checkbox"></div>
+                    <div class="checkbox-label">Versand</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Barcode -->
+        <div class="barcode-section">
+            <canvas id="barcode-{{ loop.index }}" class="barcode-canvas" width="160" height="35"></canvas>
+            <div class="barcode-number">{{ order.id }}-{{ '%02d'|format(loop.index) }}</div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="label-footer">
+            Artikel {{ loop.index }} von {{ order.items.count() }} | {{ now.strftime('%d.%m.%Y %H:%M') }} | Erstellt von: Hans Hahn - Alle Rechte vorbehalten
+        </div>
+    </div>
+    {% endfor %}
+    
+    <!-- JsBarcode Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    
+    <script>
+        window.onload = function() {
+            // Barcodes für alle Artikel generieren
+            {% for item in order.items %}
+            (function(index) {
+                // Barcode für Auftrag
+                try {
+                    JsBarcode("#barcode-order-" + index, "{{ order.id }}", {
+                        format: "CODE128",
+                        width: 1,
+                        height: 20,
+                        displayValue: false,
+                        margin: 1,
+                        fontSize: 6
+                    });
+                } catch (e) {
+                    console.error("Order Barcode generation failed for item " + index + ":", e);
+                    document.getElementById('barcode-order-' + index).innerHTML = '<span>Barcode Fehler</span>';
+                }
+                
+                // Barcode für Design
+                {% if order.design_file_path %}
+                try {
+                    const designCode = "D{{ order.id }}"; // Design-Präfix + Auftrags-ID
+                    JsBarcode("#barcode-design-" + index, designCode, {
+                        format: "CODE128",
+                        width: 1,
+                        height: 20,
+                        displayValue: false,
+                        margin: 1,
+                        fontSize: 6
+                    });
+                } catch (e) {
+                    console.error("Design Barcode generation failed for item " + index + ":", e);
+                    document.getElementById('barcode-design-' + index).innerHTML = '<span>Barcode Fehler</span>';
+                }
+                {% else %}
+                document.getElementById('barcode-design-' + index).innerHTML = '<span style="font-size: 5pt;">Kein Design</span>';
+                {% endif %}
+                
+                // Barcode für Artikel
+                {% if item.article %}
+                try {
+                    const articleCode = "A{{ item.article.id if item.article else loop.index }}"; // Artikel-Präfix + Artikel-ID
+                    JsBarcode("#barcode-article-" + index, articleCode, {
+                        format: "CODE128",
+                        width: 1,
+                        height: 20,
+                        displayValue: false,
+                        margin: 1,
+                        fontSize: 6
+                    });
+                } catch (e) {
+                    console.error("Article Barcode generation failed for item " + index + ":", e);
+                    document.getElementById('barcode-article-' + index).innerHTML = '<span>Barcode Fehler</span>';
+                }
+                {% else %}
+                document.getElementById('barcode-article-' + index).innerHTML = '<span style="font-size: 5pt;">Kein Artikel</span>';
+                {% endif %}
+                
+                // Haupt-Barcode für Tracking
+                try {
+                    JsBarcode("#barcode-" + index, "{{ order.id }}-" + String(index).padStart(2, '0'), {
+                        format: "CODE128",
+                        width: 1.2,
+                        height: 25,
+                        displayValue: false,
+                        margin: 1,
+                        fontSize: 8
+                    });
+                } catch (e) {
+                    console.error("Main Barcode generation failed for item " + index + ":", e);
+                    document.getElementById('barcode-' + index).style.display = 'none';
+                }
+            })({{ loop.index }});
+            {% endfor %}
+            
+            // Auto-Print wenn Parameter gesetzt
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('autoprint') === '1') {
+                setTimeout(function() {
+                    window.print();
+                }, 2000); // Zeit für Barcode-Generierung
+            }
+        }
+    </script>
+</body>
+</html>

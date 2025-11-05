@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Kassensystem - Fehler{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h2>⚠️ Kassensystem-Fehler</h2>
+                    <div class="alert alert-danger">
+                        <strong>Fehler:</strong> {{ error }}
+                    </div>
+                    <p>Das Kassensystem befindet sich noch in der Entwicklungsphase.</p>
+                    <a href="{{ url_for('kasse.kassen_index') }}" class="btn btn-secondary">
+                        ← Zurück zum Kassensystem
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

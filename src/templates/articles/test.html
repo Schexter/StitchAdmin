@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Template</title>
+</head>
+<body>
+    <h1>Test Template - Direct Check</h1>
+    <p>This is a test to see if templates are loading correctly.</p>
+    <p>Current time: {{ datetime.now() }}</p>
+    <hr>
+    <h2>Template Variables:</h2>
+    <ul>
+        <li>article exists: {{ article is defined }}</li>
+        <li>price_factors exists: {{ price_factors is defined }}</li>
+        <li>product_categories exists: {{ product_categories is defined }}</li>
+        <li>brands exists: {{ brands is defined }}</li>
+    </ul>
+    {% if article %}
+    <h2>Article Fields:</h2>
+    <ul>
+        <li>ID: {{ article.id }}</li>
+        <li>Name: {{ article.name }}</li>
+        <li>purchase_price_single: {{ article.purchase_price_single }}</li>
+        <li>purchase_price_carton: {{ article.purchase_price_carton }}</li>
+        <li>purchase_price_10carton: {{ article.purchase_price_10carton }}</li>
+        <li>product_type: {{ article.product_type }}</li>
+        <li>manufacturer_number: {{ article.manufacturer_number }}</li>
+    </ul>
+    {% endif %}
+</body>
+</html>

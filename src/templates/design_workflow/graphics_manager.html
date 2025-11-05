@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block title %}Grafikmanager - Bestellung {{ order.id }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Grafikmanager - Bestellung {{ order.id }}</h4>
+                </div>
+                <div class="card-body">
+                    {% if link_data %}
+                    <!-- Link-Informationen -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="alert alert-info">
+                                <h5><i class="bi bi-link-45deg"></i> Design-Link</h5>
+                                <p class="mb-2">
+                                    <strong>URL:</strong> 
+                                    <a href="{{ link_data.url }}" target="_blank" class="text-break">
+                                        {{ link_data.url }}
+                                    </a>
+                                </p>
+                                <p class="mb-2">
+                                    <strong>Plattform:</strong> 
+                                    <span class="badge bg-secondary">{{ link_data.link_info.platform_type|title }}</span>
+                                </p>
+                                <p class="mb-0">
+                                    <strong>Status:</strong> 
+                                    <span class="badge bg-warning">{{ link_data.status|title }}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Workflow-Schritte -->
+                    {% if task_data and task_data.workflow_steps %}
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Workflow-Schritte</h5>
+                            <div class="timeline">
+                                {% for step in task_data.workflow_steps %}
+                                <div class="timeline-item">
+                                    <div class="timeline-marker 
+                                        {% if step.status == 'completed' %}bg-success
+                                        {% elif step.status == 'in_progress' %}bg-warning
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ step.step }}
+                                    </div>
+                                    <div class="timeline-content">
+                                        <h6>{{ step.title }}</h6>
+                                        <p class="text-muted">{{ step.description }}</p>
+                                        {% if step.status == 'completed' %}
+                                        <small class="text-success">
+                                            <i class="bi bi-check-circle"></i> Abgeschlossen
+                                            {% if step.completed_at %}
+                                            - {{ step.completed_at[:10] }}
+                                            {% endif %}
+                                        </small>
+                                        {% elif step.status == 'in_progress' %}
+                                        <small class="text-warning">
+                                            <i class="bi bi-clock"></i> In Bearbeitung
+                                        </small>
+                                        {% else %}
+                                        <small class="text-muted">
+                                            <i class="bi bi-circle"></i> Ausstehend
+                                        </small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Bearbeitungsformular -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <form method="POST" enctype="multipart/form-data" 
+                                  action="{{ url_for('design_workflow.update_graphics_manager_task', order_id=order.id) }}">
+                                
+                                <!-- Status-Update -->
+                                <div class="mb-3">
+                                    <label for="task_status" class="form-label">Status aktualisieren</label>
+                                    <select class="form-select" id="task_status" name="task_status">
+                                        <option value="pending" {% if task_data and task_data.status == 'pending' %}selected{% endif %}>
+                                            Ausstehend
+                                        </option>
+                                        <option value="in_progress" {% if task_data and task_data.status == 'in_progress' %}selected{% endif %}>
+                                            In Bearbeitung
+                                        </option>
+                                        <option value="waiting_for_customer" {% if task_data and task_data.status == 'waiting_for_customer' %}selected{% endif %}>
+                                            Wartet auf Kunde
+                                        </option>
+                                        <option value="ready_for_review" {% if task_data and task_data.status == 'ready_for_review' %}selected{% endif %}>
+                                            Bereit zur Überprüfung
+                                        </option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Notizen -->
+                                <div class="mb-3">
+                                    <label for="notes" class="form-label">Notizen</label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                              placeholder="Bearbeitungsnotizen..."></textarea>
+                                </div>
+                                
+                                <button type="submit" name="action" value="update_status" class="btn btn-primary">
+                                    <i class="bi bi-save"></i> Status aktualisieren
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Datei-Upload für verarbeitete Datei -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Verarbeitete Datei hochladen</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST" enctype="multipart/form-data" 
+                                          action="{{ url_for('design_workflow.update_graphics_manager_task', order_id=order.id) }}">
+                                        
+                                        <div class="mb-3">
+                                            <label for="processed_file" class="form-label">
+                                                <i class="bi bi-file-earmark-arrow-up"></i> Verarbeitete Design-Datei
+                                            </label>
+                                            <input type="file" class="form-control" id="processed_file" name="processed_file" 
+                                                   accept=".dst,.pes,.jef,.exp,.svg,.png,.jpg,.jpeg,.pdf" required>
+                                            <div class="form-text">
+                                                Hochladen der finalen, produktionsbereiten Datei
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="processing_notes" class="form-label">Bearbeitungshinweise</label>
+                                            <textarea class="form-control" id="processing_notes" name="processing_notes" 
+                                                      rows="3" placeholder="Was wurde an der Datei geändert?"></textarea>
+                                        </div>
+                                        
+                                        <button type="submit" name="action" value="complete" class="btn btn-success">
+                                            <i class="bi bi-check-circle"></i> Aufgabe abschließen
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {% else %}
+                    <!-- Kein Link vorhanden -->
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Keine Link-Daten für diese Bestellung gefunden.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Bestellinfo -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5>Bestellinfo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-sm-5"><strong>Nummer:</strong></div>
+                        <div class="col-sm-7">{{ order.id }}</div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-5"><strong>Typ:</strong></div>
+                        <div class="col-sm-7">
+                            {% if order.order_type == 'embroidery' %}
+                                <span class="badge bg-primary">Bestickung</span>
+                            {% elif order.order_type == 'printing' %}
+                                <span class="badge bg-success">Textildruck</span>
+                            {% elif order.order_type == 'combined' %}
+                                <span class="badge bg-info">Kombiniert</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-5"><strong>Design-Status:</strong></div>
+                        <div class="col-sm-7">
+                            <span class="badge {{ order.design_status|design_status_badge }}">
+                                {{ order.design_status|design_status_text }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aufgaben-Info -->
+            {% if task_data %}
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5>Aufgaben-Info</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-2">
+                        <div class="col-sm-5"><strong>Erstellt:</strong></div>
+                        <div class="col-sm-7">
+                            <small class="text-muted">{{ task_data.created_at[:10] }}</small>
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-5"><strong>Von:</strong></div>
+                        <div class="col-sm-7">
+                            <small class="text-muted">{{ task_data.created_by or 'System' }}</small>
+                        </div>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col-sm-5"><strong>Priorität:</strong></div>
+                        <div class="col-sm-7">
+                            <span class="badge 
+                                {% if task_data.priority == 'high' %}bg-danger
+                                {% elif task_data.priority == 'medium' %}bg-warning
+                                {% else %}bg-secondary{% endif %}">
+                                {{ task_data.priority|title }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Anforderungen -->
+            {% if task_data and task_data.requirements %}
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5>Anforderungen</h5>
+                </div>
+                <div class="card-body">
+                    {% for req in task_data.requirements %}
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ req.title }}</strong>
+                            {% if req.mandatory %}
+                            <span class="badge bg-danger">Pflicht</span>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted">{{ req.description }}</small>
+                    </div>
+                    {% if not loop.last %}<hr>{% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Hilfe -->
+            <div class="card">
+                <div class="card-header">
+                    <h5>Hilfe</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Workflow</h6>
+                    <ol class="small">
+                        <li>Link analysieren und herunterladen</li>
+                        <li>Datei für Produktion optimieren</li>
+                        <li>Verarbeitete Datei hochladen</li>
+                        <li>Aufgabe als abgeschlossen markieren</li>
+                    </ol>
+                    
+                    <h6>Tipps</h6>
+                    <ul class="small">
+                        <li>Stickerei: DST-Format bevorzugt</li>
+                        <li>Druck: Vektordateien optimal</li>
+                        <li>Auflösung: Min. 300 DPI</li>
+                        <li>Farben: Produktionsgerecht reduzieren</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.timeline-content {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+.timeline-content h6 {
+    margin-bottom: 5px;
+    color: #495057;
+}
+
+.timeline-content p {
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+</style>
+{% endblock %}

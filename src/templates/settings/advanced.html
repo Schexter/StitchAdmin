@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block title %}Erweiterte Einstellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('settings.index') }}">Einstellungen</a></li>
+                <li class="breadcrumb-item active">Erweiterte Einstellungen</li>
+            </ol>
+        </nav>
+        
+        <h1><i class="bi bi-gear-wide-connected"></i> Erweiterte Einstellungen</h1>
+        <p class="text-muted">Konfiguration für MwSt-Sätze, Kalkulationsregeln und Import-Einstellungen</p>
+    </div>
+</div>
+
+<!-- Status-Übersicht -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-primary">{{ stats.total_tax_rates }}</h3>
+                <p class="mb-0">MwSt-Sätze</p>
+                <small class="text-muted">{{ stats.active_tax_rates }} aktiv</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-success">{{ stats.total_calculation_rules }}</h3>
+                <p class="mb-0">Kalkulationsregeln</p>
+                <small class="text-muted">{{ stats.active_calculation_rules }} aktiv</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                {% if stats.default_tax_rate %}
+                <h3 class="text-warning">{{ stats.default_tax_rate.rate }}%</h3>
+                <p class="mb-0">Standard MwSt</p>
+                <small class="text-muted">{{ stats.default_tax_rate.name }}</small>
+                {% else %}
+                <h3 class="text-secondary">-</h3>
+                <p class="mb-0">Standard MwSt</p>
+                <small class="text-muted">Nicht gesetzt</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                {% if stats.import_configured %}
+                <h3 class="text-info"><i class="bi bi-check-circle"></i></h3>
+                <p class="mb-0">Import</p>
+                <small class="text-muted">Konfiguriert</small>
+                {% else %}
+                <h3 class="text-secondary"><i class="bi bi-x-circle"></i></h3>
+                <p class="mb-0">Import</p>
+                <small class="text-muted">Nicht konfiguriert</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Schnell-Initialisierung -->
+{% if not stats.import_configured %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="alert alert-warning">
+            <h5><i class="bi bi-exclamation-triangle"></i> Erweiterte Einstellungen initialisieren</h5>
+            <p>Es scheint, als wären die erweiterten Einstellungen noch nicht konfiguriert. Möchten Sie sie mit Standard-Werten initialisieren?</p>
+            <button class="btn btn-warning" onclick="initAdvancedSettings()">
+                <i class="bi bi-gear"></i> Jetzt initialisieren
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Test-Bereich für Preiskalkulation -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-calculator"></i> Erweiterte Preiskalkulation testen</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label for="test_purchase_price" class="form-label">EK-Preis (€):</label>
+                            <input type="number" class="form-control" id="test_purchase_price" 
+                                   value="10.00" step="0.01" min="0">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label for="test_rule_id" class="form-label">Kalkulationsregel:</label>
+                            <select class="form-control" id="test_rule_id">
+                                <option value="">Standard</option>
+                                {% for rule in calculation_rules %}
+                                <option value="{{ rule.id }}">{{ rule.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-primary mt-4" onclick="testAdvancedCalculation()">
+                            <i class="bi bi-calculator"></i> Berechnen
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <div id="quick_result" class="mt-4">
+                            <!-- Schnellergebnis -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="advanced_calculation_result" class="mt-3" style="display: none;">
+                    <!-- Detailliertes Ergebnis wird hier angezeigt -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hinweis -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <h6><i class="bi bi-info-circle"></i> Erweiterte Einstellungen - Überblick</h6>
+            <p>Die erweiterte Preiskalkulation bietet folgende Möglichkeiten:</p>
+            <ul class="mb-0">
+                <li><strong>MwSt-Sätze:</strong> Konfigurierbare Mehrwertsteuersätze (19%, 7%, 0%, etc.) mit Gültigkeitszeiträumen</li>
+                <li><strong>Kalkulationsregeln:</strong> Kategorie- und lieferanten-spezifische Preiskalkulationen mit individuellen Faktoren</li>
+                <li><strong>Import-Einstellungen:</strong> Automatische VK-Berechnung beim L-Shop Excel-Import</li>
+                <li><strong>Rundungsregeln:</strong> Preise auf 1, 5 oder 10 Cent runden</li>
+                <li><strong>Min/Max-Grenzen:</strong> Mindestpreise und maximale Aufschläge definieren</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+// Erstellt von Hans Hahn - Alle Rechte vorbehalten
+
+function testAdvancedCalculation() {
+    const purchasePrice = parseFloat(document.getElementById('test_purchase_price').value);
+    const ruleId = document.getElementById('test_rule_id').value;
+    
+    if (!purchasePrice || purchasePrice <= 0) {
+        alert('Bitte geben Sie einen gültigen EK-Preis ein.');
+        return;
+    }
+    
+    const requestData = {
+        purchase_price: purchasePrice
+    };
+    
+    if (ruleId) {
+        requestData.rule_id = ruleId;
+    }
+    
+    fetch('{{ url_for("settings.test_calculation") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Schnellergebnis
+            const quickResult = document.getElementById('quick_result');
+            quickResult.innerHTML = `
+                <div class="text-success">
+                    <strong>${data.calculated_net.toFixed(2)} €</strong><br>
+                    <small>${data.recommended_net.toFixed(2)} €</small>
+                </div>
+            `;
+            
+            // Detailliertes Ergebnis
+            const resultDiv = document.getElementById('advanced_calculation_result');
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Eingabe:</strong><br>
+                            EK-Preis: ${data.purchase_price.toFixed(2)} €<br>
+                            <small class="text-muted">Regel: ${data.rule_used}</small>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>VK kalkuliert:</strong><br>
+                            ${data.calculated_net.toFixed(2).replace('.', ',')} € (netto)<br>
+                            ${data.calculated_gross.toFixed(2).replace('.', ',')} € (${data.tax_rate}% MwSt)<br>
+                            ${data.factors ? '<small class="text-muted">Faktor: ' + data.factors.calculated + 'x</small>' : ''}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>VK empfohlen:</strong><br>
+                            ${data.recommended_net.toFixed(2).replace('.', ',')} € (netto)<br>
+                            ${data.recommended_gross.toFixed(2).replace('.', ',')} € (${data.tax_rate}% MwSt)<br>
+                            ${data.factors ? '<small class="text-muted">Faktor: ' + data.factors.recommended + 'x</small>' : ''}
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Aufschläge:</strong><br>
+                            Kalkuliert: ${data.factors ? ((data.factors.calculated - 1) * 100).toFixed(0) + '%' : 'N/A'}<br>
+                            Empfohlen: ${data.factors ? ((data.factors.recommended - 1) * 100).toFixed(0) + '%' : 'N/A'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            resultDiv.style.display = 'block';
+        } else {
+            alert('Fehler bei der Berechnung: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Fehler bei der Verbindung zum Server');
+    });
+}
+
+function initAdvancedSettings() {
+    if (confirm('Sollen die erweiterten Einstellungen mit Standard-Werten initialisiert werden?')) {
+        fetch('{{ url_for("settings.init_advanced_settings") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Erweiterte Einstellungen wurden erfolgreich initialisiert!');
+                location.reload();
+            } else {
+                alert('Fehler: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Fehler bei der Verbindung zum Server');
+        });
+    }
+}
+</script>
+{% endblock %}

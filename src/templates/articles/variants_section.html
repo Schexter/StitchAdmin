@@ -1,0 +1,179 @@
+<!-- Artikel-Varianten Management Interface -->
+<!-- Wird in der Article-Detail-Ansicht eingebunden -->
+
+<div class="card mt-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="fas fa-tags"></i> Artikel-Varianten
+            {% if article.has_variants %}
+                <span class="badge bg-info">{{ article.variants.count() }} Varianten</span>
+            {% else %}
+                <span class="badge bg-secondary">Keine Varianten</span>
+            {% endif %}
+        </h5>
+        <div>
+            {% if article.has_variants %}
+            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addVariantModal">
+                <i class="fas fa-plus"></i> Variante hinzufügen
+            </button>
+            {% endif %}
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="refreshVariants()">
+                <i class="fas fa-sync"></i> Aktualisieren
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if article.has_variants %}
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>StitchAdmin Artikelnummer:</strong> {{ article.article_number }}<br>
+                        <strong>L-Shop Artikelnummer:</strong> {{ article.supplier_article_number or 'Nicht verfügbar' }}
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="text-end">
+                        <h6 class="text-muted mb-1">Preisspanne</h6>
+                        {% set price_range = article.calculate_price_range() %}
+                        {% if price_range.min == price_range.max %}
+                            <h5 class="text-success mb-0">{{ "%.2f"|format(price_range.min) }} €</h5>
+                        {% else %}
+                            <h5 class="text-success mb-0">{{ "%.2f"|format(price_range.min) }} - {{ "%.2f"|format(price_range.max) }} €</h5>
+                        {% endif %}
+                        <small class="text-muted">Ø {{ "%.2f"|format(price_range.avg) }} €</small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Varianten-Tabelle -->
+            <div class="table-responsive">
+                <table class="table table-hover" id="variantsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 40px;"></th>
+                            <th>Varianten-Nr.</th>
+                            <th>Farbe</th>
+                            <th>Größe</th>
+                            <th>EK Einzel</th>
+                            <th>EK Karton</th>
+                            <th>VK aktuell</th>
+                            <th>Bestand</th>
+                            <th>Status</th>
+                            <th style="width: 100px;">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for variant in article.get_all_variants() %}
+                        <tr data-variant-id="{{ variant.id }}" 
+                            {% if variant.is_main_variant %}class="table-warning"{% endif %}>
+                            <td>
+                                {% if variant.is_main_variant %}
+                                    <i class="fas fa-star text-warning" title="Haupt-Variante"></i>
+                                {% else %}
+                                    <span class="badge bg-light text-dark">{{ loop.index }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <code class="text-primary">{{ variant.variant_number }}</code>
+                                {% if variant.manufacturer_number %}
+                                    <br><small class="text-muted">Herst.: {{ variant.manufacturer_number }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if variant.color %}
+                                    <span class="badge bg-secondary">{{ variant.color }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if variant.size %}
+                                    <span class="badge bg-light text-dark">{{ variant.size }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if variant.purchase_price_single > 0 %}
+                                    <span class="text-success">{{ "%.2f"|format(variant.purchase_price_single) }} €</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if variant.purchase_price_carton > 0 %}
+                                    <span class="text-info">{{ "%.2f"|format(variant.purchase_price_carton) }} €</span>
+                                    {% if variant.units_per_carton %}
+                                        <br><small class="text-muted">{{ variant.units_per_carton }} Stk/Krt</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if variant.price > 0 %}
+                                    <strong class="text-success">{{ "%.2f"|format(variant.price) }} €</strong>
+                                    <br><small class="text-muted">Brutto: {{ "%.2f"|format(variant.price * 1.19) }} €</small>
+                                {% else %}
+                                    <span class="text-warning">Nicht gesetzt</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if variant.stock > 0 %}
+                                    <span class="badge bg-success">{{ variant.stock }}</span>
+                                {% elif variant.stock == 0 %}
+                                    <span class="badge bg-warning">0</span>
+                                {% else %}
+                                    <span class="badge bg-danger">{{ variant.stock }}</span>
+                                {% endif %}
+                                {% if variant.min_stock > 0 %}
+                                    <br><small class="text-muted">Min: {{ variant.min_stock }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if variant.active %}
+                                    <span class="badge bg-success">Aktiv</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inaktiv</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-outline-primary" 
+                                            onclick="editVariant('{{ variant.id }}')" title="Bearbeiten">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" 
+                                            onclick="copyVariant('{{ variant.id }}')" title="Kopieren">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                    {% if not variant.is_main_variant %}
+                                    <button type="button" class="btn btn-outline-danger" 
+                                            onclick="deleteVariant('{{ variant.id }}')" title="Löschen">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        {% else %}
+            <!-- Keine Varianten vorhanden -->
+            <div class="text-center py-5">
+                <i class="fas fa-tags fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">Dieser Artikel hat keine Varianten</h5>
+                <p class="text-muted mb-4">
+                    Varianten ermöglichen es, Artikel in verschiedenen Farben, Größen oder anderen Eigenschaften zu verwalten.
+                </p>
+                <button type="button" class="btn btn-primary" onclick="convertToVariantGroup()">
+                    <i class="fas fa-magic"></i> Zu Varianten-Artikel umwandeln
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>

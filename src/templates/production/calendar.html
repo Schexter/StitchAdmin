@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+
+{% block title %}Produktionskalender{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">📅 Produktionskalender</h1>
+                <div>
+                    <div class="btn-group me-2">
+                        <a href="{{ url_for('production.calendar', week=week_offset-1) }}" class="btn btn-outline-primary">
+                            <i class="fas fa-chevron-left"></i> Vorherige Woche
+                        </a>
+                        <a href="{{ url_for('production.calendar', week=0) }}" class="btn btn-outline-primary">
+                            Heute
+                        </a>
+                        <a href="{{ url_for('production.calendar', week=week_offset+1) }}" class="btn btn-outline-primary">
+                            Nächste Woche <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </div>
+                    <a href="{{ url_for('production.planning') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-list"></i> Listenansicht
+                    </a>
+                </div>
+            </div>
+
+            <!-- Wochen-Info -->
+            <div class="alert alert-info mb-3">
+                <i class="fas fa-info-circle"></i> 
+                Woche vom <strong>{{ week_start.strftime('%d.%m.%Y') }}</strong> 
+                bis <strong>{{ week_end.strftime('%d.%m.%Y') }}</strong>
+                <span class="float-end">
+                    Ablenkungsfaktor: {{ (settings.distraction_factor * 100)|int }}% 
+                    <small class="text-muted">({{ (100 - settings.distraction_factor * 100)|int }}% Puffer)</small>
+                </span>
+            </div>
+
+            <div class="row">
+                <!-- Wartende Aufträge (Drag Source) -->
+                <div class="col-lg-3 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-warning text-dark">
+                            <h5 class="card-title mb-0">⏳ Wartende Aufträge</h5>
+                        </div>
+                        <div class="card-body" style="max-height: 800px; overflow-y: auto;">
+                            <div id="waiting-orders">
+                                {% for order in waiting_orders %}
+                                <div class="draggable-order card mb-2 border-{{ 'danger' if order.rush_order else 'primary' }}" 
+                                     data-order-id="{{ order.id }}"
+                                     data-duration="{{ 2 if not order.stitch_count else (order.stitch_count / 10000)|round(1) }}"
+                                     data-type="{{ order.order_type }}">
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title mb-1">
+                                            {{ order.id }}
+                                            {% if order.rush_order %}
+                                            <span class="badge bg-danger float-end">Eilig</span>
+                                            {% endif %}
+                                        </h6>
+                                        <small class="text-muted d-block">
+                                            {{ order.customer.display_name if order.customer else 'Unbekannt' }}
+                                        </small>
+                                        <small class="text-muted">
+                                            <i class="fas fa-clock"></i> ~{{ 2 if not order.stitch_count else (order.stitch_count / 10000)|round(1) }}h
+                                        </small>
+                                        {% if order.order_type == 'embroidery' %}
+                                        <span class="badge bg-primary">Stickerei</span>
+                                        {% elif order.order_type == 'dtf' %}
+                                        <span class="badge bg-success">DTF</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kalender -->
+                <div class="col-lg-9">
+                    <div class="calendar-container">
+                        <table class="table table-bordered calendar-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 120px;">Maschine</th>
+                                    {% for day_offset in range(7) %}
+                                    {% set current_date = week_start + timedelta(days=day_offset) %}
+                                    <th class="text-center {% if current_date == today %}bg-light{% endif %}">
+                                        {{ ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][current_date.weekday()] }}<br>
+                                        <small>{{ current_date.strftime('%d.%m') }}</small>
+                                    </th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for machine in machines %}
+                                <tr>
+                                    <td class="machine-label">
+                                        <strong>{{ machine.name }}</strong><br>
+                                        <small class="text-muted">
+                                            {% if machine.type == 'embroidery' %}🧵 Stickerei
+                                            {% elif machine.type == 'dtf' %}🖨️ DTF
+                                            {% else %}⚙️ {{ machine.type|title }}
+                                            {% endif %}
+                                        </small>
+                                    </td>
+                                    {% for day_offset in range(7) %}
+                                    {% set current_date = week_start + timedelta(days=day_offset) %}
+                                    {% set is_weekend = current_date.weekday() >= 5 %}
+                                    <td class="calendar-day {% if is_weekend %}weekend{% endif %}" 
+                                        data-date="{{ current_date }}"
+                                        data-machine-id="{{ machine.id }}">
+                                        <div class="day-container">
+                                            <!-- Zeitraster -->
+                                            <div class="time-grid">
+                                                {% for hour in range(settings.work_start, settings.work_end + 1) %}
+                                                <div class="hour-slot" data-hour="{{ hour }}">
+                                                    {% if hour == settings.lunch_start %}
+                                                    <div class="lunch-break"></div>
+                                                    {% endif %}
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                            
+                                            <!-- Geplante Produktionen -->
+                                            <div class="schedules-container">
+                                                {% for schedule in calendar_data[current_date][machine.id] %}
+                                                {% set start_hour = schedule.scheduled_start.hour %}
+                                                {% set start_minute = schedule.scheduled_start.minute %}
+                                                {% set duration_hours = ((schedule.scheduled_end - schedule.scheduled_start).total_seconds() / 3600) %}
+                                                {% set top_position = ((start_hour - settings.work_start) * 60 + start_minute) %}
+                                                {% set height = duration_hours * 60 %}
+                                                
+                                                <div class="scheduled-item draggable-schedule" 
+                                                     data-schedule-id="{{ schedule.id }}"
+                                                     style="top: {{ top_position }}px; height: {{ height }}px;">
+                                                    <div class="schedule-content">
+                                                        <strong>{{ schedule.order.id }}</strong><br>
+                                                        <small>{{ schedule.scheduled_start.strftime('%H:%M') }} - {{ schedule.scheduled_end.strftime('%H:%M') }}</small>
+                                                        {% if schedule.order.rush_order %}
+                                                        <span class="badge bg-danger">!</span>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.calendar-table {
+    table-layout: fixed;
+}
+
+.calendar-day {
+    position: relative;
+    height: 600px;
+    padding: 0;
+    vertical-align: top;
+    background: #fff;
+}
+
+.calendar-day.weekend {
+    background: #f8f9fa;
+}
+
+.day-container {
+    position: relative;
+    height: 100%;
+    width: 100%;
+}
+
+.time-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+.hour-slot {
+    height: 60px;
+    border-bottom: 1px dotted #dee2e6;
+    position: relative;
+}
+
+.lunch-break {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: repeating-linear-gradient(
+        45deg,
+        #f8f9fa,
+        #f8f9fa 10px,
+        #e9ecef 10px,
+        #e9ecef 20px
+    );
+    opacity: 0.5;
+}
+
+.schedules-container {
+    position: absolute;
+    top: 0;
+    left: 2px;
+    right: 2px;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.scheduled-item {
+    position: absolute;
+    left: 0;
+    right: 0;
+    background: #007bff;
+    color: white;
+    border-radius: 4px;
+    padding: 4px;
+    margin: 1px;
+    cursor: move;
+    pointer-events: all;
+    overflow: hidden;
+    font-size: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.scheduled-item:hover {
+    z-index: 10;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.schedule-content {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.draggable-order {
+    cursor: move;
+}
+
+.draggable-order:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.machine-label {
+    background: #f8f9fa;
+    font-weight: 500;
+}
+
+/* Drag & Drop Styles */
+.drag-over {
+    background: #e3f2fd !important;
+}
+
+.dragging {
+    opacity: 0.5;
+}
+
+.drop-preview {
+    position: absolute;
+    background: rgba(0, 123, 255, 0.3);
+    border: 2px dashed #007bff;
+    border-radius: 4px;
+    pointer-events: none;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const workStart = {{ settings.work_start }};
+    const workEnd = {{ settings.work_end }};
+    const distractionFactor = {{ settings.distraction_factor }};
+    
+    // Drag & Drop für wartende Aufträge
+    const orders = document.querySelectorAll('.draggable-order');
+    orders.forEach(order => {
+        order.draggable = true;
+        
+        order.addEventListener('dragstart', function(e) {
+            e.dataTransfer.effectAllowed = 'copy';
+            e.dataTransfer.setData('order-id', this.dataset.orderId);
+            e.dataTransfer.setData('duration', this.dataset.duration);
+            e.dataTransfer.setData('type', this.dataset.type);
+            this.classList.add('dragging');
+        });
+        
+        order.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+        });
+    });
+    
+    // Drag & Drop für geplante Items
+    const schedules = document.querySelectorAll('.draggable-schedule');
+    schedules.forEach(schedule => {
+        schedule.draggable = true;
+        
+        schedule.addEventListener('dragstart', function(e) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('schedule-id', this.dataset.scheduleId);
+            e.dataTransfer.setData('is-schedule', 'true');
+            this.classList.add('dragging');
+        });
+        
+        schedule.addEventListener('dragend', function(e) {
+            this.classList.remove('dragging');
+        });
+    });
+    
+    // Drop-Zonen (Kalendertage)
+    const calendarDays = document.querySelectorAll('.calendar-day');
+    calendarDays.forEach(day => {
+        day.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            this.classList.add('drag-over');
+            
+            // Zeige Drop-Preview
+            showDropPreview(e, this);
+        });
+        
+        day.addEventListener('dragleave', function(e) {
+            if (e.target === this) {
+                this.classList.remove('drag-over');
+                removeDropPreview();
+            }
+        });
+        
+        day.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            removeDropPreview();
+            
+            const isSchedule = e.dataTransfer.getData('is-schedule') === 'true';
+            const machineId = this.dataset.machineId;
+            const date = this.dataset.date;
+            
+            // Berechne Zeit basierend auf Mausposition
+            const rect = this.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const hourOffset = Math.floor(y / 60);
+            const minuteOffset = Math.floor((y % 60) / 60 * 60);
+            const hour = workStart + hourOffset;
+            const minute = minuteOffset;
+            
+            const startTime = `${date} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+            
+            if (isSchedule) {
+                // Verschiebe existierende Planung
+                const scheduleId = e.dataTransfer.getData('schedule-id');
+                moveSchedule(scheduleId, machineId, startTime);
+            } else {
+                // Plane neuen Auftrag
+                const orderId = e.dataTransfer.getData('order-id');
+                const duration = parseFloat(e.dataTransfer.getData('duration'));
+                scheduleOrder(orderId, machineId, startTime, duration);
+            }
+        });
+    });
+    
+    function showDropPreview(e, dayElement) {
+        removeDropPreview();
+        
+        const rect = dayElement.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const duration = parseFloat(e.dataTransfer.getData('duration') || 2);
+        
+        const preview = document.createElement('div');
+        preview.className = 'drop-preview';
+        preview.style.top = y + 'px';
+        preview.style.height = (duration * 60) + 'px';
+        preview.id = 'drop-preview';
+        
+        dayElement.querySelector('.schedules-container').appendChild(preview);
+    }
+    
+    function removeDropPreview() {
+        const preview = document.getElementById('drop-preview');
+        if (preview) {
+            preview.remove();
+        }
+    }
+    
+    function moveSchedule(scheduleId, machineId, startTime) {
+        fetch('/production/api/schedule/move', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                schedule_id: scheduleId,
+                machine_id: machineId,
+                new_start: startTime
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+            }
+        });
+    }
+    
+    function scheduleOrder(orderId, machineId, startTime, duration) {
+        fetch('/production/api/order/schedule', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                order_id: orderId,
+                machine_id: machineId,
+                start_time: startTime,
+                duration_hours: duration
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

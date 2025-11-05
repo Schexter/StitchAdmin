@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Startseite - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1>Willkommen bei StitchAdmin</h1>
+        <p class="lead">Ihre zentrale Verwaltungsplattform für Stickerei und Textildruck</p>
+        
+        {% if not current_user.is_authenticated %}
+        <div class="mt-4">
+            <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">
+                <i class="bi bi-box-arrow-in-right"></i> Anmelden
+            </a>
+        </div>
+        {% else %}
+        <div class="mt-4">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-success btn-lg">
+                <i class="bi bi-speedometer2"></i> Zum Dashboard
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

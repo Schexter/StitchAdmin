@@ -1,0 +1,522 @@
+<!-- File Browser Modal -->
+<div class="modal fade" id="fileBrowserModal" tabindex="-1" aria-labelledby="fileBrowserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="fileBrowserModalLabel">
+                    <i class="bi bi-folder-open"></i> Design-Datei auswählen
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Breadcrumb Navigation -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb" id="breadcrumbNav">
+                        <li class="breadcrumb-item active">Laden...</li>
+                    </ol>
+                </nav>
+                
+                <!-- Toolbar -->
+                <div class="d-flex justify-content-between mb-3">
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary" id="refreshBtn">
+                            <i class="bi bi-arrow-clockwise"></i> Aktualisieren
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="homeBtn">
+                            <i class="bi bi-house"></i> Designs
+                        </button>
+                    </div>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-info" id="viewListBtn">
+                            <i class="bi bi-list"></i> Liste
+                        </button>
+                        <button type="button" class="btn btn-outline-info active" id="viewGridBtn">
+                            <i class="bi bi-grid"></i> Raster
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Aktueller Pfad -->
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-folder"></i></span>
+                        <input type="text" class="form-control" id="currentPath" readonly>
+                        <button class="btn btn-outline-secondary" type="button" id="goToPathBtn">
+                            <i class="bi bi-arrow-right"></i> Gehe zu
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Loading Indicator -->
+                <div id="loadingIndicator" class="text-center py-4" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Laden...</span>
+                    </div>
+                    <div class="mt-2">Verzeichnis wird geladen...</div>
+                </div>
+                
+                <!-- Error Display -->
+                <div id="errorDisplay" class="alert alert-danger" style="display: none;"></div>
+                
+                <!-- File Browser Content -->
+                <div id="fileBrowserContent">
+                    <!-- Grid View -->
+                    <div id="gridView" class="row g-2">
+                        <!-- Dynamisch gefüllt -->
+                    </div>
+                    
+                    <!-- List View -->
+                    <div id="listView" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Typ</th>
+                                        <th>Größe</th>
+                                        <th>Geändert</th>
+                                        <th>Aktionen</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fileTableBody">
+                                    <!-- Dynamisch gefüllt -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Ausgewählte Datei -->
+                <div id="selectedFileInfo" class="alert alert-info mt-3" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi bi-file-earmark-check"></i>
+                            <strong>Ausgewählt:</strong> <span id="selectedFileName"></span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="clearSelectionBtn">
+                            <i class="bi bi-x"></i> Auswahl aufheben
+                        </button>
+                    </div>
+                    <div class="mt-2">
+                        <small><strong>Pfad:</strong> <span id="selectedFilePath"></span></small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Abbrechen
+                </button>
+                <button type="button" class="btn btn-primary" id="selectFileBtn" disabled>
+                    <i class="bi bi-check-circle"></i> Datei auswählen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.file-item {
+    cursor: pointer;
+    transition: all 0.2s;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    border: 2px solid transparent;
+    background: #f8f9fa;
+}
+
+.file-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    background: #e9ecef;
+}
+
+.file-item.selected {
+    border-color: #0d6efd;
+    background: #e7f3ff;
+}
+
+.file-item .file-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.file-item .file-name {
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    word-break: break-word;
+}
+
+.file-item .file-info {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.directory-item {
+    color: #0d6efd;
+}
+
+.directory-item .file-icon {
+    color: #ffc107;
+}
+
+.design-file-item {
+    color: #198754;
+}
+
+.design-file-item .file-icon {
+    color: #dc3545;
+}
+
+.parent-directory {
+    color: #6c757d;
+}
+
+.breadcrumb-item.active {
+    color: #0d6efd;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.file-actions {
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.file-actions:hover {
+    opacity: 1;
+}
+</style>
+
+<script>
+class FileBrowser {
+    constructor() {
+        this.currentPath = '';
+        this.selectedFile = null;
+        this.viewMode = 'grid';
+        this.callback = null;
+        this.init();
+    }
+    
+    init() {
+        this.attachEventListeners();
+        this.loadDefaultPath();
+    }
+    
+    attachEventListeners() {
+        // View Mode Toggle
+        document.getElementById('viewListBtn').addEventListener('click', () => this.setViewMode('list'));
+        document.getElementById('viewGridBtn').addEventListener('click', () => this.setViewMode('grid'));
+        
+        // Toolbar Buttons
+        document.getElementById('refreshBtn').addEventListener('click', () => this.loadDirectory(this.currentPath));
+        document.getElementById('homeBtn').addEventListener('click', () => this.loadDefaultPath());
+        document.getElementById('goToPathBtn').addEventListener('click', () => this.goToPath());
+        
+        // Selection
+        document.getElementById('clearSelectionBtn').addEventListener('click', () => this.clearSelection());
+        document.getElementById('selectFileBtn').addEventListener('click', () => this.confirmSelection());
+        
+        // Breadcrumb Navigation
+        document.getElementById('breadcrumbNav').addEventListener('click', (e) => {
+            if (e.target.dataset.path) {
+                this.loadDirectory(e.target.dataset.path);
+            }
+        });
+    }
+    
+    setViewMode(mode) {
+        this.viewMode = mode;
+        
+        // Update buttons
+        document.getElementById('viewListBtn').classList.toggle('active', mode === 'list');
+        document.getElementById('viewGridBtn').classList.toggle('active', mode === 'grid');
+        
+        // Update views
+        document.getElementById('gridView').style.display = mode === 'grid' ? 'block' : 'none';
+        document.getElementById('listView').style.display = mode === 'list' ? 'block' : 'none';
+    }
+    
+    loadDefaultPath() {
+        this.loadDirectory('');
+    }
+    
+    goToPath() {
+        const path = document.getElementById('currentPath').value;
+        if (path) {
+            this.loadDirectory(path);
+        }
+    }
+    
+    loadDirectory(path) {
+        this.showLoading();
+        this.hideError();
+        
+        fetch(`/file_browser/browse?path=${encodeURIComponent(path)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    this.showError(data.error);
+                } else {
+                    this.renderDirectory(data);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                this.showError('Fehler beim Laden des Verzeichnisses');
+            })
+            .finally(() => {
+                this.hideLoading();
+            });
+    }
+    
+    renderDirectory(data) {
+        this.currentPath = data.current_path;
+        document.getElementById('currentPath').value = this.currentPath;
+        
+        // Update breadcrumbs
+        this.renderBreadcrumbs(data.breadcrumbs);
+        
+        // Render items
+        if (this.viewMode === 'grid') {
+            this.renderGridView(data.items);
+        } else {
+            this.renderListView(data.items);
+        }
+        
+        // Clear selection
+        this.clearSelection();
+    }
+    
+    renderBreadcrumbs(breadcrumbs) {
+        const nav = document.getElementById('breadcrumbNav');
+        nav.innerHTML = '';
+        
+        // Home
+        const homeItem = document.createElement('li');
+        homeItem.className = 'breadcrumb-item';
+        homeItem.innerHTML = '<a href="#" data-path=""><i class="bi bi-house"></i> Designs</a>';
+        nav.appendChild(homeItem);
+        
+        // Breadcrumbs
+        breadcrumbs.forEach((crumb, index) => {
+            const item = document.createElement('li');
+            item.className = 'breadcrumb-item';
+            
+            if (index === breadcrumbs.length - 1) {
+                item.classList.add('active');
+                item.textContent = crumb.name;
+            } else {
+                item.innerHTML = `<a href="#" data-path="${crumb.path}">${crumb.name}</a>`;
+            }
+            
+            nav.appendChild(item);
+        });
+    }
+    
+    renderGridView(items) {
+        const gridView = document.getElementById('gridView');
+        gridView.innerHTML = '';
+        
+        items.forEach(item => {
+            const col = document.createElement('div');
+            col.className = 'col-md-2 col-sm-3 col-4';
+            
+            const fileItem = document.createElement('div');
+            fileItem.className = `file-item ${item.type === 'directory' ? 'directory-item' : 'design-file-item'}`;
+            if (item.is_parent) fileItem.classList.add('parent-directory');
+            
+            fileItem.innerHTML = `
+                <div class="file-icon">
+                    <i class="bi ${item.icon}"></i>
+                </div>
+                <div class="file-name">${item.name}</div>
+                <div class="file-info">
+                    ${item.type === 'file' ? `${item.size_mb} MB` : 'Ordner'}
+                </div>
+            `;
+            
+            fileItem.addEventListener('click', () => this.handleItemClick(item));
+            if (item.type === 'directory') {
+                fileItem.addEventListener('dblclick', () => this.loadDirectory(item.path));
+            }
+            
+            col.appendChild(fileItem);
+            gridView.appendChild(col);
+        });
+    }
+    
+    renderListView(items) {
+        const tbody = document.getElementById('fileTableBody');
+        tbody.innerHTML = '';
+        
+        items.forEach(item => {
+            const row = document.createElement('tr');
+            row.className = 'file-row';
+            row.style.cursor = 'pointer';
+            
+            const modifiedDate = item.modified ? new Date(item.modified * 1000).toLocaleDateString('de-DE') : '-';
+            const size = item.type === 'file' ? `${item.size_mb} MB` : '-';
+            
+            row.innerHTML = `
+                <td>
+                    <i class="bi ${item.icon} me-2"></i>
+                    ${item.name}
+                </td>
+                <td>
+                    <span class="badge ${item.type === 'directory' ? 'bg-primary' : 'bg-success'}">
+                        ${item.type === 'directory' ? 'Ordner' : 'Datei'}
+                    </span>
+                </td>
+                <td>${size}</td>
+                <td>${modifiedDate}</td>
+                <td>
+                    <div class="file-actions">
+                        ${item.type === 'directory' ? 
+                            '<button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); fileBrowser.loadDirectory(\'' + item.path + '\')"><i class="bi bi-folder-open"></i></button>' :
+                            '<button class="btn btn-sm btn-outline-info" onclick="event.stopPropagation(); fileBrowser.showFileInfo(\'' + item.path + '\')"><i class="bi bi-info-circle"></i></button>'
+                        }
+                    </div>
+                </td>
+            `;
+            
+            row.addEventListener('click', () => this.handleItemClick(item));
+            if (item.type === 'directory') {
+                row.addEventListener('dblclick', () => this.loadDirectory(item.path));
+            }
+            
+            tbody.appendChild(row);
+        });
+    }
+    
+    handleItemClick(item) {
+        if (item.type === 'directory') {
+            // Directory: Load on single click
+            this.loadDirectory(item.path);
+        } else {
+            // File: Select
+            this.selectFile(item);
+        }
+    }
+    
+    selectFile(file) {
+        this.selectedFile = file;
+        
+        // Update UI
+        document.getElementById('selectedFileName').textContent = file.name;
+        document.getElementById('selectedFilePath').textContent = file.path;
+        document.getElementById('selectedFileInfo').style.display = 'block';
+        document.getElementById('selectFileBtn').disabled = false;
+        
+        // Update visual selection
+        document.querySelectorAll('.file-item, .file-row').forEach(item => {
+            item.classList.remove('selected');
+        });
+        
+        // Find and highlight selected item
+        const items = document.querySelectorAll('.file-item, .file-row');
+        items.forEach(item => {
+            if (item.textContent.includes(file.name)) {
+                item.classList.add('selected');
+            }
+        });
+    }
+    
+    clearSelection() {
+        this.selectedFile = null;
+        document.getElementById('selectedFileInfo').style.display = 'none';
+        document.getElementById('selectFileBtn').disabled = true;
+        
+        document.querySelectorAll('.file-item, .file-row').forEach(item => {
+            item.classList.remove('selected');
+        });
+    }
+    
+    confirmSelection() {
+        if (this.selectedFile && this.callback) {
+            this.callback(this.selectedFile);
+            this.closeModal();
+        }
+    }
+    
+    showFileInfo(path) {
+        fetch(`/file_browser/get_file_info?path=${encodeURIComponent(path)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Fehler: ' + data.error);
+                } else {
+                    this.displayFileInfo(data);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Fehler beim Laden der Datei-Informationen');
+            });
+    }
+    
+    displayFileInfo(info) {
+        let message = `Datei: ${info.name}\\n`;
+        message += `Pfad: ${info.path}\\n`;
+        message += `Größe: ${info.size_mb} MB\\n`;
+        message += `Geändert: ${new Date(info.modified * 1000).toLocaleString('de-DE')}\\n`;
+        
+        if (info.analysis && info.analysis.success) {
+            message += `\\nDesign-Analyse:\\n`;
+            if (info.analysis.stitch_count) {
+                message += `- Stichzahl: ${info.analysis.stitch_count}\\n`;
+                message += `- Abmessungen: ${info.analysis.width_mm} × ${info.analysis.height_mm} mm\\n`;
+            }
+            if (info.analysis.width_cm) {
+                message += `- Druckgröße: ${info.analysis.width_cm} × ${info.analysis.height_cm} cm\\n`;
+            }
+        }
+        
+        alert(message);
+    }
+    
+    showLoading() {
+        document.getElementById('loadingIndicator').style.display = 'block';
+        document.getElementById('fileBrowserContent').style.display = 'none';
+    }
+    
+    hideLoading() {
+        document.getElementById('loadingIndicator').style.display = 'none';
+        document.getElementById('fileBrowserContent').style.display = 'block';
+    }
+    
+    showError(message) {
+        const errorDiv = document.getElementById('errorDisplay');
+        errorDiv.textContent = message;
+        errorDiv.style.display = 'block';
+    }
+    
+    hideError() {
+        document.getElementById('errorDisplay').style.display = 'none';
+    }
+    
+    openModal(callback) {
+        this.callback = callback;
+        this.clearSelection();
+        this.loadDefaultPath();
+        
+        const modal = new bootstrap.Modal(document.getElementById('fileBrowserModal'));
+        modal.show();
+    }
+    
+    closeModal() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('fileBrowserModal'));
+        if (modal) {
+            modal.hide();
+        }
+    }
+}
+
+// Global instance
+let fileBrowser = new FileBrowser();
+</script>
+
+<!-- Erstellt von Hans Hahn - Alle Rechte vorbehalten -->

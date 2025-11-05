@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block title %}Artikel-Einstellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('settings.index') }}">Einstellungen</a></li>
+                <li class="breadcrumb-item active">Artikel-Einstellungen</li>
+            </ol>
+        </nav>
+        
+        <h1><i class="bi bi-box-seam"></i> Artikel-Einstellungen</h1>
+        <p class="text-muted">Konfiguration für Artikel-Verwaltung und Preiskalkulation</p>
+    </div>
+</div>
+
+<!-- Statistiken -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-primary">{{ stats.total_categories }}</h3>
+                <p class="mb-0">Kategorien</p>
+                <small class="text-muted">{{ stats.active_categories }} aktiv</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-success">{{ stats.total_brands }}</h3>
+                <p class="mb-0">Marken</p>
+                <small class="text-muted">{{ stats.active_brands }} aktiv</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-warning">{{ stats.total_suppliers }}</h3>
+                <p class="mb-0">Lieferanten</p>
+                <small class="text-muted">{{ stats.active_suppliers }} aktiv</small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h3 class="text-info">{{ legacy_settings.price_factor_calculated }}x</h3>
+                <p class="mb-0">Kalkulationsfaktor</p>
+                <small class="text-muted">{{ legacy_settings.price_factor_recommended }}x empfohlen</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Einstellungs-Bereiche -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-calculator"></i> Preiskalkulation</h5>
+            </div>
+            <div class="card-body">
+                <p>Grundlegende Faktoren für die automatische VK-Preis-Berechnung.</p>
+                
+                <div class="mb-3">
+                    <strong>Aktuell:</strong><br>
+                    Kalkuliert: EK × {{ legacy_settings.price_factor_calculated }}<br>
+                    Empfohlen: EK × {{ legacy_settings.price_factor_recommended }}
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('settings.articles_pricing') }}" class="btn btn-primary">
+                        <i class="bi bi-gear"></i> Faktoren anpassen
+                    </a>
+                    
+                    {% if advanced_available %}
+                    <a href="{{ url_for('settings.advanced') }}" class="btn btn-outline-info">
+                        <i class="bi bi-gear-wide"></i> Erweiterte Regeln
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-tags"></i> Kategorien & Marken</h5>
+            </div>
+            <div class="card-body">
+                <p>Verwaltung von Produktkategorien und Marken für die Artikel-Organisation.</p>
+                
+                {% if advanced_available %}
+                <div class="d-grid gap-2">
+                    <a href="/settings/categories" class="btn btn-success">
+                        <i class="bi bi-folder"></i> Kategorien verwalten
+                    </a>
+                    <a href="/settings/brands" class="btn btn-outline-success">
+                        <i class="bi bi-award"></i> Marken verwalten
+                    </a>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> 
+                    Erweiterte Kategorie- und Marken-Verwaltung ist nicht verfügbar.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-truck"></i> Lieferanten</h5>
+            </div>
+            <div class="card-body">
+                <p>Verwaltung der Lieferanten für Artikel und Bestellungen.</p>
+                
+                <div class="d-grid gap-2">
+                    <a href="/suppliers" class="btn btn-warning">
+                        <i class="bi bi-building"></i> Lieferanten verwalten
+                    </a>
+                    <a href="/suppliers/new" class="btn btn-outline-warning">
+                        <i class="bi bi-plus-circle"></i> Neuen Lieferanten anlegen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-file-earmark-excel"></i> Import-Einstellungen</h5>
+            </div>
+            <div class="card-body">
+                <p>Konfiguration für den Import von Artikel-Daten aus Excel-Dateien.</p>
+                
+                {% if advanced_available %}
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('settings.advanced') }}" class="btn btn-info">
+                        <i class="bi bi-gear"></i> Import konfigurieren
+                    </a>
+                    <a href="/articles/import/lshop" class="btn btn-outline-info">
+                        <i class="bi bi-upload"></i> L-Shop Import starten
+                    </a>
+                </div>
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> 
+                    Erweiterte Import-Einstellungen sind nicht verfügbar.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test-Bereich -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-calculator"></i> Preiskalkulation testen</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="test_ek_single" class="form-label">EK Einzelpreis (€):</label>
+                            <input type="number" class="form-control" id="test_ek_single" 
+                                   value="10.00" step="0.01" min="0">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="test_ek_carton" class="form-label">EK Kartonpreis (€):</label>
+                            <input type="number" class="form-control" id="test_ek_carton" 
+                                   value="8.50" step="0.01" min="0">
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3">
+                            <label for="test_ek_10carton" class="form-label">EK 10-Karton-Preis (€):</label>
+                            <input type="number" class="form-control" id="test_ek_10carton" 
+                                   value="7.80" step="0.01" min="0">
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="testArticleCalculation()">
+                    <i class="bi bi-calculator"></i> Preise berechnen
+                </button>
+                
+                <div id="article_calculation_result" class="mt-3" style="display: none;">
+                    <!-- Ergebnis wird hier angezeigt -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Erstellt von Hans Hahn - Alle Rechte vorbehalten
+
+function testArticleCalculation() {
+    const single = parseFloat(document.getElementById('test_ek_single').value) || 0;
+    const carton = parseFloat(document.getElementById('test_ek_carton').value) || 0;
+    const tenCarton = parseFloat(document.getElementById('test_ek_10carton').value) || 0;
+    
+    // Finde den besten (niedrigsten) Preis
+    const prices = [single, carton, tenCarton].filter(p => p > 0);
+    if (prices.length === 0) {
+        alert('Bitte geben Sie mindestens einen EK-Preis ein.');
+        return;
+    }
+    
+    const bestPrice = Math.min(...prices);
+    
+    fetch('{{ url_for("settings.test_calculation") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            purchase_price: bestPrice
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const resultDiv = document.getElementById('article_calculation_result');
+            resultDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Eingaben:</strong><br>
+                            Einzelpreis: ${single.toFixed(2)} €<br>
+                            Kartonpreis: ${carton.toFixed(2)} €<br>
+                            10-Karton: ${tenCarton.toFixed(2)} €<br>
+                            <strong>Bester EK: ${bestPrice.toFixed(2)} €</strong>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>VK kalkuliert:</strong><br>
+                            ${data.calculated_net.toFixed(2).replace('.', ',')} € (netto)<br>
+                            ${data.calculated_gross.toFixed(2).replace('.', ',')} € (${data.tax_rate}% MwSt)<br>
+                            <small class="text-muted">Faktor: ${data.factors ? data.factors.calculated : '{{ legacy_settings.price_factor_calculated }}'}x</small>
+                        </div>
+                        <div class="col-md-4">
+                            <strong>VK empfohlen:</strong><br>
+                            ${data.recommended_net.toFixed(2).replace('.', ',')} € (netto)<br>
+                            ${data.recommended_gross.toFixed(2).replace('.', ',')} € (${data.tax_rate}% MwSt)<br>
+                            <small class="text-muted">Faktor: ${data.factors ? data.factors.recommended : '{{ legacy_settings.price_factor_recommended }}'}x</small>
+                        </div>
+                        <div class="col-md-1">
+                            <small class="text-muted">Regel: ${data.rule_used}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            resultDiv.style.display = 'block';
+        } else {
+            alert('Fehler bei der Berechnung: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Fehler bei der Verbindung zum Server');
+    });
+}
+</script>
+{% endblock %}

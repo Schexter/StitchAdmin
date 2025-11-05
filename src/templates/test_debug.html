@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Debug Test{% endblock %}
+
+{% block content %}
+<h1>Debug Information</h1>
+
+<h2>Template Variables:</h2>
+<pre>
+price_factors: {{ price_factors }}
+product_categories: {{ product_categories }}
+brands: {{ brands }}
+</pre>
+
+<h2>Article Fields:</h2>
+{% if article %}
+<pre>
+article.purchase_price_single: {{ article.purchase_price_single }}
+article.purchase_price_carton: {{ article.purchase_price_carton }}
+article.purchase_price_10carton: {{ article.purchase_price_10carton }}
+article.category_id: {{ article.category_id }}
+article.brand_id: {{ article.brand_id }}
+article.product_type: {{ article.product_type }}
+article.manufacturer_number: {{ article.manufacturer_number }}
+</pre>
+{% else %}
+<p>No article provided</p>
+{% endif %}
+{% endblock %}

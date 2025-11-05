@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}{{ supplier.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.index') }}">Lieferanten</a></li>
+                <li class="breadcrumb-item active">{{ supplier.name }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col">
+        <h1>
+            {{ supplier.name }}
+            {% if not supplier.active %}
+                <span class="badge bg-secondary">Inaktiv</span>
+            {% endif %}
+            {% if supplier.preferred %}
+                <span class="badge bg-warning text-dark">
+                    <i class="fas fa-star"></i> Bevorzugt
+                </span>
+            {% endif %}
+        </h1>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('suppliers.edit', supplier_id=supplier.id) }}" class="btn btn-secondary">
+            <i class="fas fa-edit me-2"></i>Bearbeiten
+        </a>
+        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+            <i class="fas fa-trash me-2"></i>Löschen
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Grunddaten -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Grunddaten</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>ID:</strong> {{ supplier.id }}</p>
+                        <p><strong>Kontaktperson:</strong> {{ supplier.contact_person or '-' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Steuernummer:</strong> {{ supplier.tax_id or '-' }}</p>
+                        <p><strong>Kundennummer:</strong> {{ supplier.customer_number or '-' }}</p>
+                        <p><strong>Status:</strong> 
+                            {% if supplier.active %}
+                                <span class="badge bg-success">Aktiv</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inaktiv</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Kontaktdaten -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Kontaktdaten</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>E-Mail:</strong> 
+                            {% if supplier.email %}
+                                <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </p>
+                        <p><strong>Telefon:</strong> {{ supplier.phone or '-' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Website:</strong> 
+                            {% if supplier.website %}
+                                <a href="{{ supplier.website }}" target="_blank">{{ supplier.website }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Adresse -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Adresse</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    {% if supplier.street %}{{ supplier.street }}<br>{% endif %}
+                    {% if supplier.postal_code or supplier.city %}
+                        {{ supplier.postal_code }} {{ supplier.city }}<br>
+                    {% endif %}
+                    {{ supplier.country or 'Deutschland' }}
+                </p>
+            </div>
+        </div>
+        
+        <!-- Retourenadresse -->
+        {% if supplier.return_street or supplier.return_city or supplier.return_contact %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Retourenadresse</h5>
+            </div>
+            <div class="card-body">
+                <p>
+                    {% if supplier.return_street %}{{ supplier.return_street }}<br>{% endif %}
+                    {% if supplier.return_postal_code or supplier.return_city %}
+                        {{ supplier.return_postal_code }} {{ supplier.return_city }}<br>
+                    {% endif %}
+                    {% if supplier.return_country %}{{ supplier.return_country }}<br>{% endif %}
+                </p>
+                {% if supplier.return_contact %}
+                    <p><strong>Kontakt:</strong> {{ supplier.return_contact }}</p>
+                {% endif %}
+                {% if supplier.return_phone %}
+                    <p><strong>Telefon:</strong> {{ supplier.return_phone }}</p>
+                {% endif %}
+                {% if supplier.return_notes %}
+                    <div class="alert alert-info mt-3">
+                        <small><strong>Hinweise:</strong><br>{{ supplier.return_notes }}</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="col-md-4">
+        <!-- Bestellkonditionen -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Bestellkonditionen</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Zahlungsbedingungen:</strong> {{ supplier.payment_terms or '30 Tage netto' }}</p>
+                <p><strong>Lieferzeit:</strong> 
+                    {% if supplier.delivery_time_days %}
+                        {{ supplier.delivery_time_days }} Tage
+                    {% else %}
+                        -
+                    {% endif %}
+                </p>
+                <p><strong>Mindestbestellwert:</strong> 
+                    {% if supplier.minimum_order_value %}
+                        {{ "%.2f"|format(supplier.minimum_order_value) }} €
+                    {% else %}
+                        -
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        
+        <!-- Statistiken -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Statistiken</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>Anzahl Bestellungen:</strong> {{ total_orders }}</p>
+                <p><strong>Gesamtvolumen:</strong> {{ "%.2f"|format(total_amount) }} €</p>
+                <p><strong>Erstellt am:</strong> {{ supplier.created_at.strftime('%d.%m.%Y') if supplier.created_at else '-' }}</p>
+            </div>
+        </div>
+        
+        <!-- Aktionen -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Aktionen</h5>
+            </div>
+            <div class="card-body">
+                <a href="{{ url_for('suppliers.new_order', supplier_id=supplier.id) }}" class="btn btn-primary w-100 mb-2">
+                    <i class="fas fa-plus me-2"></i>Neue Bestellung
+                </a>
+                <a href="{{ url_for('suppliers.orders', supplier_id=supplier.id) }}" class="btn btn-outline-primary w-100">
+                    <i class="fas fa-list me-2"></i>Alle Bestellungen
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Letzte Bestellungen -->
+{% if recent_orders %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Letzte Bestellungen</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Bestellnummer</th>
+                        <th>Datum</th>
+                        <th>Liefertermin</th>
+                        <th>Status</th>
+                        <th class="text-end">Betrag</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr>
+                        <td>{{ order.order_number or order.id }}</td>
+                        <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</td>
+                        <td>{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</td>
+                        <td>
+                            {% if order.status == 'draft' %}
+                                <span class="badge bg-secondary">Entwurf</span>
+                            {% elif order.status == 'ordered' %}
+                                <span class="badge bg-primary">Bestellt</span>
+                            {% elif order.status == 'delivered' %}
+                                <span class="badge bg-success">Geliefert</span>
+                            {% else %}
+                                <span class="badge bg-info">{{ order.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">{{ "%.2f"|format(order.total_amount) }} €</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Lösch-Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Lieferant löschen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Möchten Sie den Lieferanten "{{ supplier.name }}" wirklich löschen?</p>
+                <p class="text-danger">Diese Aktion kann nicht rückgängig gemacht werden!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <form method="POST" action="{{ url_for('suppliers.delete', supplier_id=supplier.id) }}" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">Löschen</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

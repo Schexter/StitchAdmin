@@ -1,0 +1,356 @@
+{% extends "base.html" %}
+
+{% block title %}Garne importieren{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">📤 Garne importieren</h1>
+                <a href="{{ url_for('thread.index') }}" class="btn btn-secondary btn-touch">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </a>
+            </div>
+
+            <!-- Tab Navigation -->
+            <ul class="nav nav-tabs mb-4" id="importTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="csv-tab" data-bs-toggle="tab" data-bs-target="#csv-content" type="button" role="tab">
+                        <i class="fas fa-file-csv"></i> CSV Import
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="pdf-tab" data-bs-toggle="tab" data-bs-target="#pdf-content" type="button" role="tab">
+                        <i class="fas fa-file-pdf"></i> PDF Import
+                    </button>
+                </li>
+            </ul>
+
+            <!-- Tab Content -->
+            <div class="tab-content" id="importTabContent">
+                <!-- CSV Import Tab -->
+                <div class="tab-pane fade show active" id="csv-content" role="tabpanel" aria-labelledby="csv-tab">
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title mb-0">CSV-Import</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST" enctype="multipart/form-data" action="{{ url_for('thread.import_threads') }}" id="csvForm">
+                                        <input type="hidden" name="import_type" value="csv">
+                                        
+                                        <div class="mb-4">
+                                            <label for="file" class="form-label">CSV-Datei auswählen *</label>
+                                            <input type="file" class="form-control form-control-lg" id="file" name="file" 
+                                                   accept=".csv" required style="min-height: 60px;">
+                                            <small class="form-text text-muted">
+                                                Die Datei muss im CSV-Format (.csv) vorliegen und UTF-8 kodiert sein.
+                                            </small>
+                                        </div>
+
+                                        <div class="alert alert-info">
+                                            <h6 class="alert-heading">Hinweise zum Import:</h6>
+                                            <ul class="mb-0">
+                                                <li>Bereits vorhandene Garne (gleiche Marke + Farbnummer) werden übersprungen</li>
+                                                <li>Ungültige Zeilen werden ignoriert</li>
+                                                <li>Der Import-Vorgang kann nicht rückgängig gemacht werden</li>
+                                                <li>Empfehlung: Erstellen Sie vorher ein Backup Ihrer Daten</li>
+                                            </ul>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between">
+                                            <a href="{{ url_for('thread.index') }}" class="btn btn-secondary btn-touch">
+                                                <i class="fas fa-times"></i> Abbrechen
+                                            </a>
+                                            <button type="submit" class="btn btn-success btn-touch">
+                                                <i class="fas fa-upload"></i> CSV importieren
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">CSV-Format</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p>Die CSV-Datei muss folgende Spalten enthalten:</p>
+                                    
+                                    <table class="table table-sm table-borderless">
+                                        <tr>
+                                            <td class="fw-bold">manufacturer</td>
+                                            <td><span class="badge bg-danger">Pflicht</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">color_number</td>
+                                            <td><span class="badge bg-danger">Pflicht</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>color_name_de</td>
+                                            <td><span class="badge bg-secondary">Optional</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>color_name_en</td>
+                                            <td><span class="badge bg-secondary">Optional</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>hex_color</td>
+                                            <td><span class="badge bg-secondary">Optional</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>pantone</td>
+                                            <td><span class="badge bg-secondary">Optional</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>category</td>
+                                            <td><span class="badge bg-secondary">Optional</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>price</td>
+                                            <td><span class="badge bg-secondary">Optional</span></td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="card mt-3">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">Beispiel CSV</h6>
+                                </div>
+                                <div class="card-body">
+                                    <button type="button" class="btn btn-outline-primary btn-sm w-100" onclick="downloadExample()">
+                                        <i class="fas fa-download"></i> Beispiel-CSV herunterladen
+                                    </button>
+                                    
+                                    <hr>
+                                    
+                                    <small class="text-muted">Beispielinhalt:</small>
+                                    <pre class="small mt-2 bg-light p-2 rounded"><code>manufacturer,color_number,color_name_de,hex_color
+Madeira,1001,Schneeweiß,#FFFFFF
+Madeira,1147,Königsblau,#003366
+Gütermann,5005,Schwarz,#000000</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- PDF Import Tab -->
+                <div class="tab-pane fade" id="pdf-content" role="tabpanel" aria-labelledby="pdf-tab">
+                    <div class="row">
+                        <div class="col-lg-8">
+                            <div class="card">
+                                <div class="card-header bg-warning text-dark">
+                                    <h5 class="card-title mb-0">
+                                        <i class="fas fa-file-pdf"></i> PDF-Import (Beta)
+                                    </h5>
+                                </div>
+                                <div class="card-body">
+                                    <form method="POST" enctype="multipart/form-data" action="{{ url_for('thread.import_threads') }}" id="pdfForm">
+                                        <input type="hidden" name="import_type" value="pdf">
+                                        
+                                        <div class="mb-4">
+                                            <label for="pdf_file" class="form-label">PDF-Datei auswählen *</label>
+                                            <input type="file" class="form-control form-control-lg" id="pdf_file" name="file" 
+                                                   accept=".pdf" required style="min-height: 60px;">
+                                            <small class="form-text text-muted">
+                                                Wählen Sie eine PDF-Farbtabelle von Madeira, Gunold oder anderen Herstellern.
+                                            </small>
+                                        </div>
+
+                                        <!-- Fortschrittsanzeige -->
+                                        <div id="pdfProgress" class="d-none">
+                                            <div class="alert alert-info">
+                                                <h6 class="alert-heading">
+                                                    <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                                    PDF wird analysiert...
+                                                </h6>
+                                                <div class="progress mt-2">
+                                                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                                         role="progressbar" style="width: 100%"></div>
+                                                </div>
+                                                <small class="d-block mt-2">
+                                                    Dies kann einige Sekunden dauern. Bitte warten...
+                                                </small>
+                                            </div>
+                                        </div>
+
+                                        <div class="alert alert-warning">
+                                            <h6 class="alert-heading">
+                                                <i class="fas fa-exclamation-triangle"></i> PDF-Import Hinweise:
+                                            </h6>
+                                            <ul class="mb-0">
+                                                <li>Der PDF-Import ist experimentell und funktioniert am besten mit Standard-Farbtabellen</li>
+                                                <li>Unterstützte Hersteller: Madeira, Gunold, Gütermann, Brother</li>
+                                                <li>Die Extraktion kann 10-30 Sekunden dauern</li>
+                                                <li>Nicht alle Farben können möglicherweise extrahiert werden</li>
+                                            </ul>
+                                        </div>
+
+                                        <div class="d-flex justify-content-between">
+                                            <a href="{{ url_for('thread.index') }}" class="btn btn-secondary btn-touch">
+                                                <i class="fas fa-times"></i> Abbrechen
+                                            </a>
+                                            <button type="submit" class="btn btn-warning btn-touch" id="pdfSubmitBtn">
+                                                <i class="fas fa-file-pdf"></i> PDF analysieren
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">Unterstützte PDF-Formate</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p>Der PDF-Analyzer kann folgende Informationen extrahieren:</p>
+                                    
+                                    <ul class="list-unstyled">
+                                        <li><i class="fas fa-check text-success"></i> Farbnummer</li>
+                                        <li><i class="fas fa-check text-success"></i> Farbname (DE/EN)</li>
+                                        <li><i class="fas fa-check text-success"></i> Hex-Farbwerte</li>
+                                        <li><i class="fas fa-check text-success"></i> Pantone-Referenzen</li>
+                                        <li><i class="fas fa-check text-success"></i> RGB-Werte</li>
+                                    </ul>
+                                    
+                                    <hr>
+                                    
+                                    <h6>Tipps für bessere Ergebnisse:</h6>
+                                    <ul class="small">
+                                        <li>Verwenden Sie offizielle Hersteller-PDFs</li>
+                                        <li>PDFs mit Tabellen funktionieren am besten</li>
+                                        <li>Vermeiden Sie gescannte/fotografierte PDFs</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            
+                            <div class="card mt-3">
+                                <div class="card-header bg-info text-white">
+                                    <h6 class="card-title mb-0">Import-Status</h6>
+                                </div>
+                                <div class="card-body" id="importStatus">
+                                    <p class="text-muted mb-0">
+                                        <i class="fas fa-info-circle"></i> Noch kein Import gestartet
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Download Beispiel CSV
+function downloadExample() {
+    const csvContent = `manufacturer,color_number,color_name_de,hex_color,category,price
+Madeira,1001,Schneeweiß,#FFFFFF,Standard,3.50
+Madeira,1147,Königsblau,#003366,Standard,3.50
+Gütermann,5005,Schwarz,#000000,Standard,3.50
+Brother,001,Weiß,#FFFFFF,Standard,3.50
+Brother,002,Rot,#CC0000,Standard,3.50`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'garnimport_beispiel.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+// PDF-Import Progress
+document.addEventListener('DOMContentLoaded', function() {
+    const pdfForm = document.getElementById('pdfForm');
+    const pdfProgress = document.getElementById('pdfProgress');
+    const pdfSubmitBtn = document.getElementById('pdfSubmitBtn');
+    const importStatus = document.getElementById('importStatus');
+    
+    if (pdfForm) {
+        pdfForm.addEventListener('submit', function(e) {
+            // Zeige Fortschrittsanzeige
+            pdfProgress.classList.remove('d-none');
+            pdfSubmitBtn.disabled = true;
+            pdfSubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Analysiere...';
+            
+            // Update Status
+            importStatus.innerHTML = `
+                <div class="text-warning">
+                    <i class="fas fa-hourglass-half fa-spin"></i> PDF wird analysiert...
+                </div>
+                <small class="text-muted">Bitte haben Sie einen Moment Geduld.</small>
+            `;
+        });
+    }
+    
+    // CSV Form
+    const csvForm = document.getElementById('csvForm');
+    if (csvForm) {
+        csvForm.addEventListener('submit', function(e) {
+            const submitBtn = csvForm.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Importiere...';
+        });
+    }
+});
+</script>
+
+<style>
+/* Touch-friendly File Inputs */
+input[type="file"] {
+    cursor: pointer;
+}
+
+.btn-touch {
+    min-height: 60px;
+    padding: 15px 30px;
+    font-size: 18px;
+}
+
+/* Bessere Tab-Darstellung */
+.nav-tabs .nav-link {
+    font-size: 16px;
+    padding: 12px 24px;
+}
+
+.nav-tabs .nav-link.active {
+    font-weight: bold;
+}
+
+/* Cards */
+.card-header {
+    font-weight: 600;
+}
+
+/* Alerts */
+.alert ul {
+    margin-bottom: 0;
+    padding-left: 20px;
+}
+
+/* Progress */
+.progress {
+    height: 25px;
+}
+
+.progress-bar {
+    font-size: 14px;
+}
+</style>
+
+{% endblock %}

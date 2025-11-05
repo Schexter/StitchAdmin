@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block title %}Advanced Web Scraper - Garnfarben{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="bi bi-globe"></i> Advanced Web Scraper</h1>
+            <p class="lead">Extrahieren Sie Garnfarben direkt von Hersteller-Websites - intelligent und automatisch!</p>
+        </div>
+    </div>
+
+    <!-- URL-Analyse -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-search"></i> URL analysieren</h5>
+        </div>
+        <div class="card-body">
+            <form id="analyzeForm">
+                <div class="row">
+                    <div class="col-md-8 mb-3">
+                        <label for="urlInput" class="form-label">Website-URL</label>
+                        <input type="url" class="form-control" id="urlInput" 
+                               placeholder="https://www.madeira.com/en/products/embroidery-thread"
+                               required>
+                        <small class="text-muted">Geben Sie die URL einer Produktseite oder Farbkarte ein</small>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">&nbsp;</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="deepScan" value="1">
+                            <label class="form-check-label" for="deepScan">
+                                Deep Scan (folgt Produktlinks)
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-lg touch-target w-100 mt-3">
+                            <i class="bi bi-search"></i> Analysieren
+                        </button>
+                    </div>
+                </div>
+            </form>
+            
+            <!-- Beispiel-URLs -->
+            <div class="mt-3">
+                <small class="text-muted">Beispiel-URLs:</small>
+                <div class="btn-group btn-group-sm" role="group">
+                    <button type="button" class="btn btn-outline-secondary" 
+                            onclick="setExampleUrl('https://www.madeira.com/en/products/embroidery-thread/classic-rayon')">
+                        Madeira Rayon
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary"
+                            onclick="setExampleUrl('https://shop.madeira.de/de/stickgarne')">
+                        Madeira Shop
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary"
+                            onclick="setExampleUrl('https://www.gunold.de/produkte/stickgarne/poly')">
+                        Gunold Poly
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary"
+                            onclick="setExampleUrl('https://www.mettler.com/de/produkte/naehfaden')">
+                        Mettler
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analyse-Ergebnisse -->
+    <div class="card mb-4" id="resultsCard" style="display: none;">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-list-check"></i> Analyse-Ergebnisse</h5>
+            <div>
+                <span class="badge bg-primary" id="colorsFoundBadge">0 Farben</span>
+                <span class="badge bg-info" id="statusBadge">Bereit</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Zusammenfassung -->
+            <div class="alert alert-info" id="summaryAlert">
+                <i class="bi bi-info-circle"></i> <span id="summaryText">Analyse läuft...</span>
+            </div>
+            
+            <!-- Hersteller-Auswahl für Import -->
+            <div class="row mb-3" id="manufacturerSelect" style="display: none;">
+                <div class="col-md-6">
+                    <label for="manufacturerInput" class="form-label">Hersteller für Import</label>
+                    <select class="form-control" id="manufacturerInput">
+                        <option value="">-- Hersteller wählen --</option>
+                        <option value="Madeira">Madeira</option>
+                        <option value="Gunold">Gunold</option>
+                        <option value="Mettler">Mettler</option>
+                        <option value="Amann">Amann Mettler</option>
+                        <option value="Gütermann">Gütermann</option>
+                        <option value="Isacord">Isacord</option>
+                        <option value="Brother">Brother</option>
+                        <option value="Andere">Andere</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">&nbsp;</label>
+                    <button class="btn btn-success btn-lg touch-target w-100" onclick="importColors()">
+                        <i class="bi bi-download"></i> Ausgewählte importieren
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Farben-Tabelle -->
+            <div class="table-responsive" id="colorsTableContainer" style="display: none;">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th width="50">
+                                <input type="checkbox" id="selectAllColors" onchange="toggleAllColors()">
+                            </th>
+                            <th>Nummer</th>
+                            <th>Name</th>
+                            <th>Farbe</th>
+                            <th>Preis</th>
+                            <th>Link</th>
+                        </tr>
+                    </thead>
+                    <tbody id="colorsTableBody">
+                        <!-- Wird dynamisch gefüllt -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Weitere Links -->
+            <div class="mt-4" id="linksSection" style="display: none;">
+                <h6>Weitere relevante Links gefunden:</h6>
+                <div id="linksList" class="list-group">
+                    <!-- Wird dynamisch gefüllt -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div class="text-center" id="loadingSpinner" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Lädt...</span>
+        </div>
+        <p class="mt-2">Analysiere Website...</p>
+    </div>
+</div>
+
+<script>
+let currentColors = [];
+
+// Beispiel-URL setzen
+function setExampleUrl(url) {
+    document.getElementById('urlInput').value = url;
+}
+
+// Alle Farben auswählen/abwählen
+function toggleAllColors() {
+    const selectAll = document.getElementById('selectAllColors').checked;
+    const checkboxes = document.querySelectorAll('.color-checkbox');
+    checkboxes.forEach(cb => cb.checked = selectAll);
+}
+
+// Formular absenden
+document.getElementById('analyzeForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const url = document.getElementById('urlInput').value;
+    const deepScan = document.getElementById('deepScan').checked;
+    
+    // UI vorbereiten
+    document.getElementById('resultsCard').style.display = 'block';
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('colorsTableContainer').style.display = 'none';
+    document.getElementById('manufacturerSelect').style.display = 'none';
+    document.getElementById('linksSection').style.display = 'none';
+    document.getElementById('statusBadge').textContent = 'Analysiere...';
+    document.getElementById('statusBadge').className = 'badge bg-warning';
+    
+    try {
+        const response = await fetch('/threads/api/web-scraper/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ url, deep_scan: deepScan })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayResults(data);
+        } else {
+            showError(data.message || 'Fehler bei der Analyse');
+        }
+    } catch (error) {
+        showError('Netzwerkfehler: ' + error.message);
+    } finally {
+        document.getElementById('loadingSpinner').style.display = 'none';
+    }
+});
+
+// Ergebnisse anzeigen
+function displayResults(data) {
+    currentColors = data.colors || [];
+    
+    // Status aktualisieren
+    document.getElementById('statusBadge').textContent = 'Abgeschlossen';
+    document.getElementById('statusBadge').className = 'badge bg-success';
+    document.getElementById('colorsFoundBadge').textContent = `${data.colors_found} Farben`;
+    
+    // Zusammenfassung
+    let summaryText = `Analyse abgeschlossen! ${data.colors_found} Farben gefunden.`;
+    if (data.summary) {
+        summaryText += ` (${data.summary.products_found || 0} Produkte, ${data.summary.links_found || 0} Links)`;
+    }
+    document.getElementById('summaryText').textContent = summaryText;
+    document.getElementById('summaryAlert').className = 'alert alert-success';
+    
+    // Farben-Tabelle füllen
+    if (currentColors.length > 0) {
+        document.getElementById('colorsTableContainer').style.display = 'block';
+        document.getElementById('manufacturerSelect').style.display = 'block';
+        
+        const tbody = document.getElementById('colorsTableBody');
+        tbody.innerHTML = '';
+        
+        currentColors.forEach((color, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <input type="checkbox" class="color-checkbox" value="${index}" checked>
+                </td>
+                <td><strong>${color.color_number || '-'}</strong></td>
+                <td>${color.color_name || '-'}</td>
+                <td>
+                    ${color.hex_color ? `
+                        <span class="badge" style="background-color: ${color.hex_color}; color: ${getContrastColor(color.hex_color)}">
+                            ${color.hex_color}
+                        </span>
+                    ` : '-'}
+                </td>
+                <td>${color.price || '-'}</td>
+                <td>
+                    ${color.url ? `<a href="${color.url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                    </a>` : '-'}
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+    
+    // Weitere Links
+    if (data.links && data.links.length > 0) {
+        document.getElementById('linksSection').style.display = 'block';
+        const linksList = document.getElementById('linksList');
+        linksList.innerHTML = '';
+        
+        data.links.slice(0, 10).forEach(link => {
+            const linkEl = document.createElement('a');
+            linkEl.href = '#';
+            linkEl.className = 'list-group-item list-group-item-action';
+            linkEl.innerHTML = `
+                <i class="bi bi-link-45deg"></i> ${link}
+                <button class="btn btn-sm btn-primary float-end" onclick="analyzeLink('${link}'); return false;">
+                    Analysieren
+                </button>
+            `;
+            linksList.appendChild(linkEl);
+        });
+    }
+}
+
+// Kontrastfarbe berechnen
+function getContrastColor(hexcolor) {
+    if (!hexcolor) return '#000000';
+    hexcolor = hexcolor.replace('#', '');
+    const r = parseInt(hexcolor.substr(0,2), 16);
+    const g = parseInt(hexcolor.substr(2,2), 16);
+    const b = parseInt(hexcolor.substr(4,2), 16);
+    const yiq = ((r*299)+(g*587)+(b*114))/1000;
+    return (yiq >= 128) ? '#000000' : '#FFFFFF';
+}
+
+// Link analysieren
+function analyzeLink(url) {
+    document.getElementById('urlInput').value = url;
+    document.getElementById('analyzeForm').dispatchEvent(new Event('submit'));
+}
+
+// Farben importieren
+async function importColors() {
+    const manufacturer = document.getElementById('manufacturerInput').value;
+    if (!manufacturer) {
+        alert('Bitte wählen Sie einen Hersteller aus!');
+        return;
+    }
+    
+    // Ausgewählte Farben sammeln
+    const selectedColors = [];
+    const checkboxes = document.querySelectorAll('.color-checkbox:checked');
+    checkboxes.forEach(cb => {
+        const index = parseInt(cb.value);
+        if (currentColors[index]) {
+            selectedColors.push(currentColors[index]);
+        }
+    });
+    
+    if (selectedColors.length === 0) {
+        alert('Bitte wählen Sie mindestens eine Farbe aus!');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/threads/api/web-scraper/import', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                colors: selectedColors,
+                manufacturer: manufacturer
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message);
+            // Optional: Zur Farben-Übersicht wechseln
+            if (confirm('Möchten Sie zur Farben-Übersicht wechseln?')) {
+                window.location.href = '/threads/colors';
+            }
+        } else {
+            alert('Fehler beim Import: ' + data.message);
+        }
+    } catch (error) {
+        alert('Netzwerkfehler: ' + error.message);
+    }
+}
+
+// Fehler anzeigen
+function showError(message) {
+    document.getElementById('summaryText').textContent = 'Fehler: ' + message;
+    document.getElementById('summaryAlert').className = 'alert alert-danger';
+    document.getElementById('statusBadge').textContent = 'Fehler';
+    document.getElementById('statusBadge').className = 'badge bg-danger';
+}
+</script>
+
+<style>
+.touch-target {
+    min-height: 60px;
+    padding: 15px 30px;
+}
+</style>
+{% endblock %}

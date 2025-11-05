@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Bestellungen - {{ supplier.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.index') }}">Lieferanten</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.show', supplier_id=supplier.id) }}">{{ supplier.name }}</a></li>
+                <li class="breadcrumb-item active">Bestellungen</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col">
+        <h1>Bestellungen bei {{ supplier.name }}</h1>
+    </div>
+    <div class="col-auto">
+        <a href="{{ url_for('suppliers.new_order', supplier_id=supplier.id) }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Neue Bestellung
+        </a>
+    </div>
+</div>
+
+<!-- Bestellungen-Tabelle -->
+<div class="card">
+    <div class="card-body">
+        {% if orders %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Bestellnummer</th>
+                        <th>Datum</th>
+                        <th>Liefertermin</th>
+                        <th>Status</th>
+                        <th>Artikel</th>
+                        <th class="text-end">Betrag</th>
+                        <th class="text-end">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td>
+                            <strong>{{ order.order_number or order.id }}</strong>
+                        </td>
+                        <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</td>
+                        <td>{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</td>
+                        <td>
+                            {% if order.status == 'draft' %}
+                                <span class="badge bg-secondary">Entwurf</span>
+                            {% elif order.status == 'ordered' %}
+                                <span class="badge bg-primary">Bestellt</span>
+                            {% elif order.status == 'delivered' %}
+                                <span class="badge bg-success">Geliefert</span>
+                            {% elif order.status == 'cancelled' %}
+                                <span class="badge bg-danger">Storniert</span>
+                            {% else %}
+                                <span class="badge bg-info">{{ order.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order.items %}
+                                <small>{{ order.items|length }} Artikel</small>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <strong>{{ "%.2f"|format(order.total_amount) }} €</strong>
+                            {% if order.shipping_cost %}
+                                <br><small class="text-muted">+ {{ "%.2f"|format(order.shipping_cost) }} € Versand</small>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-sm btn-outline-primary" title="Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                {% if order.status == 'draft' %}
+                                    <button class="btn btn-sm btn-outline-success" title="Bestellen">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        {% if pagination.pages > 1 %}
+        <nav aria-label="Seitennavigation">
+            <ul class="pagination justify-content-center">
+                <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('suppliers.orders', supplier_id=supplier.id, page=pagination.prev_num) }}">
+                        Zurück
+                    </a>
+                </li>
+                
+                {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+                    {% if page_num %}
+                        <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                            <a class="page-link" href="{{ url_for('suppliers.orders', supplier_id=supplier.id, page=page_num) }}">
+                                {{ page_num }}
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                {% endfor %}
+                
+                <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('suppliers.orders', supplier_id=supplier.id, page=pagination.next_num) }}">
+                        Weiter
+                    </a>
+                </li>
+            </ul>
+        </nav>
+        {% endif %}
+        {% else %}
+        <div class="text-center py-5">
+            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+            <p class="text-muted">Noch keine Bestellungen bei diesem Lieferanten.</p>
+            <a href="{{ url_for('suppliers.new_order', supplier_id=supplier.id) }}" class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Erste Bestellung erstellen
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

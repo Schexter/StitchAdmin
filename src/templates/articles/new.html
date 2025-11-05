@@ -1,0 +1,501 @@
+{% extends "base.html" %}
+
+{% block title %}Neuer Artikel - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('articles.index') }}">Artikel</a></li>
+                <li class="breadcrumb-item active">Neuer Artikel</li>
+            </ol>
+        </nav>
+        
+        <h1><i class="bi bi-plus-circle"></i> Neuer Artikel</h1>
+        <p class="text-muted">L-Shop kompatible Artikel-Erstellung mit erweiterten Funktionen</p>
+    </div>
+</div>
+
+<form method="POST">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Basis-Informationen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Basis-Informationen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="name" class="form-label">Artikelname *</label>
+                            <input type="text" class="form-control" id="name" name="name" required autofocus>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="article_number" class="form-label">L-Shop Artikelnummer</label>
+                            <input type="text" class="form-control" id="article_number" name="article_number">
+                            <small class="text-muted">Leer lassen für automatische ID</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Beschreibung</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="product_type" class="form-label">Produkttyp</label>
+                            <input type="text" class="form-control" id="product_type" name="product_type" 
+                                   placeholder="z.B. T-Shirt, Polo, Hoodie">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="manufacturer_number" class="form-label">Herstellernummer</label>
+                            <input type="text" class="form-control" id="manufacturer_number" name="manufacturer_number">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="supplier_article_number" class="form-label">Lieferanten-Art.-Nr.</label>
+                            <input type="text" class="form-control" id="supplier_article_number" 
+                                   name="supplier_article_number">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Kategorisierung -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-tags"></i> Kategorisierung</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="category_id" class="form-label">Produktkategorie</label>
+                            <select class="form-control" id="category_id" name="category_id">
+                                <option value="">-- Kategorie wählen --</option>
+                                {% for category in product_categories %}
+                                <option value="{{ category.id }}">
+                                    {{ category.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Oder klassische Kategorie eingeben:</small>
+                            <input type="text" class="form-control mt-1" name="category" 
+                                   placeholder="Freie Kategorie-Eingabe">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="brand_id" class="form-label">Marke/Hersteller</label>
+                            <select class="form-control" id="brand_id" name="brand_id">
+                                <option value="">-- Marke wählen --</option>
+                                {% for brand in brands %}
+                                <option value="{{ brand.id }}">
+                                    {{ brand.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Oder freie Eingabe:</small>
+                            <input type="text" class="form-control mt-1" name="brand" 
+                                   placeholder="Freie Marken-Eingabe">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- L-Shop Einkaufspreise -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-cart"></i> L-Shop Einkaufspreise</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="purchase_price_single" class="form-label">EK Einzelpreis (€)</label>
+                            <input type="text" class="form-control" id="purchase_price_single" 
+                                   name="purchase_price_single" placeholder="0,00" 
+                                   pattern="[0-9]+([,\.][0-9]{1,2})?" onblur="formatPrice(this)">
+                            <small class="text-muted">Preis pro Stück</small>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="purchase_price_carton" class="form-label">EK Kartonpreis (€)</label>
+                            <input type="text" class="form-control" id="purchase_price_carton" 
+                                   name="purchase_price_carton" placeholder="0,00" 
+                                   pattern="[0-9]+([,\.][0-9]{1,2})?" onblur="formatPrice(this)">
+                            <small class="text-muted">Preis pro Karton</small>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="purchase_price_10carton" class="form-label">EK 10-Karton-Preis (€)</label>
+                            <input type="text" class="form-control" id="purchase_price_10carton" 
+                                   name="purchase_price_10carton" placeholder="0,00" 
+                                   pattern="[0-9]+([,\.][0-9]{1,2})?" onblur="formatPrice(this)">
+                            <small class="text-muted">Preis für 10 Kartons</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Packaging Info -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="units_per_carton" class="form-label">Stück pro Karton</label>
+                            <input type="number" class="form-control" id="units_per_carton" 
+                                   name="units_per_carton" min="1" placeholder="z.B. 25">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="has_variants" class="form-label">Varianten verfügbar</label>
+                            <div class="form-check mt-2">
+                                <input type="checkbox" class="form-check-input" id="has_variants" name="has_variants">
+                                <label class="form-check-label" for="has_variants">
+                                    Artikel hat Größen-/Farbvarianten
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Verkaufspreise (Kalkulation) -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-calculator"></i> Verkaufspreise (netto)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="price_calculated" class="form-label">VK kalkuliert (€)</label>
+                            <input type="text" class="form-control" id="price_calculated" 
+                                   name="price_calculated" readonly placeholder="Auto-berechnet">
+                            <small class="text-muted">Faktor: {{ price_factors.calculated if price_factors else '1.5' }}</small>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="price_recommended" class="form-label">VK empfohlen (€)</label>
+                            <input type="text" class="form-control" id="price_recommended" 
+                                   name="price_recommended" readonly placeholder="Auto-berechnet">
+                            <small class="text-muted">Faktor: {{ price_factors.recommended if price_factors else '2.0' }}</small>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="price" class="form-label">VK aktuell (€) *</label>
+                            <input type="text" class="form-control" id="price" name="price" 
+                                   placeholder="0,00" required pattern="[0-9]+([,\.][0-9]{1,2})?" 
+                                   onblur="formatPrice(this)">
+                            <small class="text-muted">Manuell überschreibbar</small>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Die VK-Preise werden automatisch basierend auf dem niedrigsten EK-Preis berechnet.
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Produkteigenschaften -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> Produkteigenschaften</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="size" class="form-label">Größe/Abmessung</label>
+                            <input type="text" class="form-control" id="size" name="size" 
+                                   placeholder="z.B. S, M, L, XL oder 100x150cm">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="color" class="form-label">Farbe</label>
+                            <input type="text" class="form-control" id="color" name="color" 
+                                   placeholder="z.B. Weiß, Navy, Rot gemustert">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="weight" class="form-label">Gewicht (kg)</label>
+                            <input type="number" class="form-control" id="weight" name="weight" 
+                                   value="0" step="0.001" min="0" placeholder="z.B. 0.250">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="material" class="form-label">Material / Zusammensetzung</label>
+                        <input type="text" class="form-control" id="material" name="material" 
+                               placeholder="z.B. 100% Baumwolle, 65% Polyester / 35% Baumwolle">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Lieferanten-Informationen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-truck"></i> Lieferanten-Informationen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="supplier" class="form-label">Hauptlieferant</label>
+                            <select class="form-control" id="supplier" name="supplier">
+                                <option value="">-- Lieferant wählen --</option>
+                                {% for supplier in suppliers %}
+                                <option value="{{ supplier.name }}">
+                                    {{ supplier.name }} ({{ supplier.id }})
+                                </option>
+                                {% endfor %}
+                                <option value="L-SHOP">L-SHOP (Standard)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="location" class="form-label">Lagerort</label>
+                            <input type="text" class="form-control" id="location" name="location" 
+                                   placeholder="z.B. Regal A-3, Lager Süd">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Katalog-Referenzen -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-book"></i> Katalog-Referenzen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="catalog_page_texstyles" class="form-label">Seite Texstyles</label>
+                            <input type="number" class="form-control" id="catalog_page_texstyles" 
+                                   name="catalog_page_texstyles" min="1" placeholder="z.B. 25">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="catalog_page_corporate" class="form-label">Seite Corporate</label>
+                            <input type="number" class="form-control" id="catalog_page_corporate" 
+                                   name="catalog_page_corporate" min="1" placeholder="z.B. 42">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="catalog_page_wahlbuch" class="form-label">Seite Wahlbuch</label>
+                            <input type="number" class="form-control" id="catalog_page_wahlbuch" 
+                                   name="catalog_page_wahlbuch" min="1" placeholder="z.B. 18">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Lagerbestand -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-box"></i> Lagerbestand</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="stock" class="form-label">Anfangsbestand</label>
+                        <input type="number" class="form-control" id="stock" name="stock" 
+                               value="0" min="0">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="min_stock" class="form-label">Mindestbestand</label>
+                        <input type="number" class="form-control" id="min_stock" name="min_stock" 
+                               value="0" min="0">
+                        <small class="text-muted">Warnung bei Unterschreitung</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Preiskalkulation Live -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-calculator"></i> Live-Kalkulation</h5>
+                </div>
+                <div class="card-body">
+                    <div id="price-preview">
+                        <p class="text-muted">Geben Sie EK-Preise ein für Live-Vorschau</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-toggle-on"></i> Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="active" name="active" checked>
+                        <label class="form-check-label" for="active">
+                            <strong>Artikel ist aktiv</strong>
+                        </label>
+                        <small class="form-text text-muted d-block">
+                            Aktive Artikel sind im System verfügbar
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aktionen -->
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-save"></i> Artikel erstellen
+                    </button>
+                    <a href="{{ url_for('articles.index') }}" class="btn btn-secondary w-100 mb-2">
+                        <i class="bi bi-x-circle"></i> Abbrechen
+                    </a>
+                    <button type="button" class="btn btn-outline-info w-100" onclick="calculatePrices()">
+                        <i class="bi bi-calculator"></i> Preise neu berechnen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+// Erstellt von Hans Hahn - Alle Rechte vorbehalten
+
+// Preiskalkulationsfaktoren mit dynamischer MwSt
+const PRICE_FACTORS = {
+    calculated: {{ price_factors.calculated if price_factors else 1.5 }},
+    recommended: {{ price_factors.recommended if price_factors else 2.0 }},
+    tax_rate: {{ price_factors.tax_rate if price_factors and price_factors.tax_rate else 19.0 }}
+};
+
+// Preis-Formatierung
+function formatPrice(input) {
+    let value = input.value.replace(',', '.');
+    if (value && !isNaN(value)) {
+        input.value = parseFloat(value).toFixed(2).replace('.', ',');
+        updatePriceCalculation();
+    }
+}
+
+// Live-Preiskalkulation
+function updatePriceCalculation() {
+    const single = parseFloat(document.getElementById('purchase_price_single').value.replace(',', '.') || 0);
+    const carton = parseFloat(document.getElementById('purchase_price_carton').value.replace(',', '.') || 0);
+    const tenCarton = parseFloat(document.getElementById('purchase_price_10carton').value.replace(',', '.') || 0);
+    
+    // Niedrigsten Preis ermitteln (größer als 0)
+    let basePrice = 0;
+    if (single > 0) basePrice = single;
+    if (carton > 0 && (basePrice === 0 || carton < basePrice)) basePrice = carton;
+    if (tenCarton > 0 && (basePrice === 0 || tenCarton < basePrice)) basePrice = tenCarton;
+    
+    if (basePrice > 0) {
+        const calculated = (basePrice * PRICE_FACTORS.calculated).toFixed(2);
+        const recommended = (basePrice * PRICE_FACTORS.recommended).toFixed(2);
+        
+        // Felder aktualisieren
+        document.getElementById('price_calculated').value = calculated.replace('.', ',');
+        document.getElementById('price_recommended').value = recommended.replace('.', ',');
+        
+        // Wenn noch kein aktueller VK-Preis gesetzt, dann kalkulierten Preis übernehmen
+        if (!document.getElementById('price').value) {
+            document.getElementById('price').value = calculated.replace('.', ',');
+        }
+        
+        // Live-Vorschau aktualisieren
+        updatePricePreview(basePrice, calculated, recommended);
+    }
+}
+
+function updatePricePreview(basePrice, calculated, recommended) {
+    const preview = document.getElementById('price-preview');
+    const taxMultiplier = 1 + (PRICE_FACTORS.tax_rate / 100);
+    const calculatedWithTax = (calculated * taxMultiplier).toFixed(2);
+    const recommendedWithTax = (recommended * taxMultiplier).toFixed(2);
+    
+    preview.innerHTML = `
+        <div class="mb-2">
+            <strong>Basis EK:</strong> ${basePrice.toFixed(2).replace('.', ',')} €
+        </div>
+        <div class="mb-2">
+            <strong>VK kalkuliert:</strong><br>
+            ${calculated.replace('.', ',')} € (netto)<br>
+            ${calculatedWithTax.replace('.', ',')} € (${PRICE_FACTORS.tax_rate}% MwSt)
+        </div>
+        <div class="mb-2">
+            <strong>VK empfohlen:</strong><br>
+            ${recommended.replace('.', ',')} € (netto)<br>
+            ${recommendedWithTax.replace('.', ',')} € (${PRICE_FACTORS.tax_rate}% MwSt)
+        </div>
+        <div class="text-muted small">
+            Faktoren: ${PRICE_FACTORS.calculated}x / ${PRICE_FACTORS.recommended}x
+        </div>
+    `;
+}
+
+function calculatePrices() {
+    updatePriceCalculation();
+    // Zeige Bestätigung
+    const toast = document.createElement('div');
+    toast.className = 'alert alert-success alert-dismissible fade show position-fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.innerHTML = `
+        <i class="bi bi-check-circle"></i> Preise neu berechnet!
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// Event Listeners für Preisfelder
+document.addEventListener('DOMContentLoaded', function() {
+    ['purchase_price_single', 'purchase_price_carton', 'purchase_price_10carton'].forEach(id => {
+        const field = document.getElementById(id);
+        if (field) {
+            field.addEventListener('blur', function() {
+                formatPrice(this);
+            });
+            field.addEventListener('input', updatePriceCalculation);
+        }
+    });
+    
+    // Preis-Feld formatieren
+    const priceField = document.getElementById('price');
+    if (priceField) {
+        priceField.addEventListener('blur', function() {
+            formatPrice(this);
+        });
+    }
+});
+</script>
+
+<style>
+/* Erstellt von Hans Hahn - Alle Rechte vorbehalten */
+.card-header h5 {
+    margin-bottom: 0;
+}
+
+.form-label {
+    font-weight: 600;
+}
+
+.alert-info {
+    border-left: 4px solid #0dcaf0;
+}
+
+#price-preview {
+    font-size: 0.9em;
+}
+
+#price-preview .mb-2:last-child {
+    margin-bottom: 0 !important;
+}
+
+.btn-outline-info {
+    font-size: 0.9em;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,949 @@
+{% extends "base.html" %}
+
+{% block title %}Neue Bestellung - {{ supplier.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .article-search {
+        width: 100%;
+    }
+    .select2-container--default .select2-selection--single {
+        height: 31px;
+        padding: 2px 12px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: 27px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 29px;
+    }
+    .position-row td {
+        vertical-align: middle;
+    }
+</style>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.index') }}">Lieferanten</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.show', supplier_id=supplier.id) }}">{{ supplier.name }}</a></li>
+                <li class="breadcrumb-item active">Neue Bestellung</li>
+            </ol>
+        </nav>
+        
+        <h1>Neue Bestellung bei {{ supplier.name }}</h1>
+    </div>
+</div>
+
+<form method="POST" id="orderForm">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Bestelldetails -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Bestelldetails</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="order_number" class="form-label">Unsere Bestellnummer</label>
+                            <input type="text" class="form-control" id="order_number" name="order_number" 
+                                   placeholder="Automatisch generiert">
+                            <small class="text-muted">Leer lassen für automatische Nummer</small>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="order_date" class="form-label">Bestelldatum *</label>
+                            <input type="date" class="form-control" id="order_date" name="order_date" 
+                                   value="{{ now.strftime('%Y-%m-%d') }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="delivery_date" class="form-label">Erwarteter Liefertermin</label>
+                            <input type="date" class="form-control" id="delivery_date" name="delivery_date">
+                            {% if supplier.delivery_time_days %}
+                                <small class="text-muted">Normale Lieferzeit: {{ supplier.delivery_time_days }} Tage</small>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="supplier_order_number" class="form-label">Bestellnummer des Lieferanten</label>
+                            <input type="text" class="form-control" id="supplier_order_number" name="supplier_order_number"
+                                   placeholder="Falls bereits bekannt">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="shipping_method" class="form-label">Versandart</label>
+                            <select class="form-select" id="shipping_method" name="shipping_method">
+                                <option value="">-- Bitte wählen --</option>
+                                <option value="standard">Standard</option>
+                                <option value="express">Express</option>
+                                <option value="overnight">Overnight</option>
+                                <option value="pickup">Abholung</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="payment_method" class="form-label">Zahlungsart</label>
+                            <select class="form-select" id="payment_method" name="payment_method">
+                                <option value="invoice">Rechnung</option>
+                                <option value="credit_card">Kreditkarte</option>
+                                <option value="paypal">PayPal</option>
+                                <option value="bank_transfer">Überweisung</option>
+                                <option value="cash">Bar</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Artikel aus offenen Aufträgen -->
+            {% if orders_with_items %}
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shopping-basket me-2"></i>
+                        Artikel aus offenen Aufträgen
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        Diese Artikel aus offenen Aufträgen können bei {{ supplier.name }} bestellt werden:
+                    </p>
+                    
+                    {% for order_id, order_data in orders_with_items.items() %}
+                    <div class="border rounded p-3 mb-3">
+                        <h6 class="mb-2">
+                            <i class="fas fa-file-invoice me-1"></i>
+                            Auftrag {{ order_data.order.order_number }} - {{ order_data.order.customer_name }}
+                            <small class="text-muted">vom {{ order_data.order.order_date.strftime('%d.%m.%Y') if order_data.order.order_date else '-' }}</small>
+                        </h6>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th width="40"></th>
+                                        <th>Artikel</th>
+                                        <th>Bestellt</th>
+                                        <th>Lager</th>
+                                        <th>Benötigt</th>
+                                        <th>Preis/Stück</th>
+                                        <th>Gesamt</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item_data in order_data['items'] %}
+                                    <tr>
+                                        <td>
+                                            <button type="button" class="btn btn-sm btn-success" 
+                                                    onclick="addItemFromOrder(
+                                                        '{{ item_data.article.article_number or item_data.article.id }}',
+                                                        '{{ item_data.article.name }}',
+                                                        {{ item_data.needed_quantity }},
+                                                        {{ item_data.article.purchase_price_single or 0 }},
+                                                        '{{ item_data.article.supplier_article_number or '' }}',
+                                                        {{ item_data.order_item.id }}
+                                                    )"
+                                                    id="add_btn_{{ item_data.order_item.id }}">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </td>
+                                        <td>
+                                            <strong>{{ item_data.article.name }}</strong><br>
+                                            <small class="text-muted">
+                                                {% if item_data.article.article_number %}
+                                                    Art.Nr: {{ item_data.article.article_number }}
+                                                {% endif %}
+                                                {% if item_data.article.supplier_article_number %}
+                                                    | Lief.Nr: {{ item_data.article.supplier_article_number }}
+                                                {% endif %}
+                                            </small>
+                                        </td>
+                                        <td>{{ item_data.order_item.quantity }}</td>
+                                        <td>
+                                            <span class="badge bg-{{ 'danger' if item_data.available_stock == 0 else 'warning' }}">
+                                                {{ item_data.available_stock }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <strong>{{ item_data.needed_quantity }}</strong>
+                                        </td>
+                                        <td>{{ '%.2f'|format(item_data.article.purchase_price_single or 0)|replace('.', ',') }} €</td>
+                                        <td>{{ '%.2f'|format((item_data.article.purchase_price_single or 0) * item_data.needed_quantity)|replace('.', ',') }} €</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Bestellpositionen -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Bestellpositionen</h5>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="addOrderItem()">
+                        <i class="fas fa-plus me-2"></i>Position hinzufügen
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table" id="itemsTable">
+                            <thead>
+                                <tr>
+                                    <th>Artikel-Nr.</th>
+                                    <th>Beschreibung</th>
+                                    <th style="width: 100px;">Menge</th>
+                                    <th style="width: 100px;">Einheit</th>
+                                    <th style="width: 120px;">Preis/Einheit</th>
+                                    <th style="width: 100px;">Rabatt %</th>
+                                    <th style="width: 120px;">Gesamt</th>
+                                    <th style="width: 50px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="itemsTableBody">
+                                <!-- Dynamisch generierte Zeilen -->
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="6" class="text-end"><strong>Zwischensumme:</strong></td>
+                                    <td><strong id="subtotal">0.00 €</strong></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="6" class="text-end">Versandkosten:</td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm" 
+                                               id="shipping_cost" name="shipping_cost" 
+                                               min="0" step="0.01" value="0" onchange="calculateTotal()">
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="6" class="text-end">MwSt. (19%):</td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm" 
+                                               id="tax_amount" name="tax_amount" 
+                                               min="0" step="0.01" value="0" onchange="calculateTotal()">
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="6" class="text-end">Rabatt:</td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm" 
+                                               id="discount_amount" name="discount_amount" 
+                                               min="0" step="0.01" value="0" onchange="calculateTotal()">
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                <tr class="table-primary">
+                                    <td colspan="6" class="text-end"><strong>Gesamtbetrag:</strong></td>
+                                    <td><strong id="total_amount_display">0.00 €</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Lieferadresse -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        Lieferadresse
+                        <small class="text-muted ms-2">Falls abweichend von Standardadresse</small>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="useAlternateAddress" 
+                               onchange="toggleDeliveryAddress()">
+                        <label class="form-check-label" for="useAlternateAddress">
+                            Abweichende Lieferadresse verwenden
+                        </label>
+                    </div>
+                    
+                    <div id="deliveryAddressFields" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="delivery_name" class="form-label">Empfänger</label>
+                                <input type="text" class="form-control" id="delivery_name" name="delivery_name">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="delivery_street" class="form-label">Straße</label>
+                                <input type="text" class="form-control" id="delivery_street" name="delivery_street">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="delivery_postal_code" class="form-label">PLZ</label>
+                                <input type="text" class="form-control" id="delivery_postal_code" name="delivery_postal_code">
+                            </div>
+                            
+                            <div class="col-md-8 mb-3">
+                                <label for="delivery_city" class="form-label">Stadt</label>
+                                <input type="text" class="form-control" id="delivery_city" name="delivery_city">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="delivery_country" class="form-label">Land</label>
+                                <input type="text" class="form-control" id="delivery_country" name="delivery_country" 
+                                       value="Deutschland">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Notizen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Notizen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Bestellnotizen</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                  placeholder="Notizen, die an den Lieferanten gesendet werden"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="internal_notes" class="form-label">Interne Notizen</label>
+                        <textarea class="form-control" id="internal_notes" name="internal_notes" rows="3" 
+                                  placeholder="Interne Notizen (nicht für den Lieferanten sichtbar)"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Lieferanten-Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Lieferanten-Info</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>{{ supplier.name }}</strong></p>
+                    {% if supplier.customer_number %}
+                        <p class="mb-1"><small><strong>Unsere Kundennummer:</strong> {{ supplier.customer_number }}</small></p>
+                    {% endif %}
+                    {% if supplier.contact_person %}
+                        <p class="mb-1"><small>{{ supplier.contact_person }}</small></p>
+                    {% endif %}
+                    {% if supplier.email %}
+                        <p class="mb-1"><small><a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a></small></p>
+                    {% endif %}
+                    {% if supplier.phone %}
+                        <p class="mb-1"><small>{{ supplier.phone }}</small></p>
+                    {% endif %}
+                    <hr>
+                    <p class="mb-1"><small><strong>Zahlungsbedingungen:</strong> {{ supplier.payment_terms or '30 Tage netto' }}</small></p>
+                    {% if supplier.minimum_order_value %}
+                        <p class="mb-1"><small><strong>Mindestbestellwert:</strong> {{ "%.2f"|format(supplier.minimum_order_value) }} €</small></p>
+                    {% endif %}
+                    
+                    {% if supplier.return_street or supplier.return_contact %}
+                    <hr>
+                    <p class="mb-1"><small><strong>Retourenadresse:</strong></small></p>
+                    {% if supplier.return_contact %}
+                        <p class="mb-1"><small>{{ supplier.return_contact }}</small></p>
+                    {% endif %}
+                    {% if supplier.return_street %}
+                        <p class="mb-1"><small>{{ supplier.return_street }}</small></p>
+                    {% endif %}
+                    {% if supplier.return_postal_code or supplier.return_city %}
+                        <p class="mb-1"><small>{{ supplier.return_postal_code }} {{ supplier.return_city }}</small></p>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Zusammenfassung -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Zusammenfassung</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Positionen:</span>
+                        <span id="itemCount">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Zwischensumme:</span>
+                        <span id="summarySubtotal">0.00 €</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Versand:</span>
+                        <span id="summaryShipping">0.00 €</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>MwSt.:</span>
+                        <span id="summaryTax">0.00 €</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Rabatt:</span>
+                        <span id="summaryDiscount">-0.00 €</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between">
+                        <strong>Gesamt:</strong>
+                        <strong id="summaryTotal">0.00 €</strong>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aktionen -->
+            <div class="card">
+                <div class="card-body">
+                    <input type="hidden" id="subtotal_hidden" name="subtotal" value="0">
+                    <input type="hidden" id="total_amount" name="total_amount" value="0">
+                    <input type="hidden" id="items_json" name="items_json" value="[]">
+                    
+                    <button type="submit" name="action" value="draft" class="btn btn-secondary w-100 mb-2">
+                        <i class="fas fa-save me-2"></i>Als Entwurf speichern
+                    </button>
+                    <button type="submit" name="action" value="order" class="btn btn-primary w-100 mb-2">
+                        <i class="fas fa-paper-plane me-2"></i>Bestellung absenden
+                    </button>
+                    <a href="{{ url_for('suppliers.show', supplier_id=supplier.id) }}" class="btn btn-outline-secondary w-100">
+                        <i class="fas fa-times me-2"></i>Abbrechen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<!-- jQuery (muss VOR dem anderen Code geladen werden) -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<!-- Select2 Script -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+let itemCounter = 0;
+let items = [];
+let linkedOrderItems = {}; // Track which order items are linked
+
+function addItemFromOrder(articleNumber, description, quantity, unitPrice, supplierArticleNumber, orderItemId) {
+    // Check if this order item was already added
+    if (linkedOrderItems[orderItemId]) {
+        alert('Dieser Artikel wurde bereits hinzugefügt!');
+        return;
+    }
+    
+    // Suche nach einer leeren Position (wo Preis = 0 oder Beschreibung leer ist)
+    const tbody = document.getElementById('itemsTableBody');
+    let targetRow = null;
+    let targetItemNumber = null;
+    
+    // Durchsuche bestehende Zeilen nach einer leeren Position
+    for (let i = 1; i <= itemCounter; i++) {
+        const descInput = document.getElementById(`description_${i}`);
+        const priceInput = document.getElementById(`unit_price_${i}`);
+        const row = document.getElementById(`item_${i}`);
+        
+        // Prüfe ob die Zeile noch existiert und leer ist
+        if (row && descInput && priceInput) {
+            const descValue = descInput.value.trim();
+            const priceValue = parseFloat(priceInput.value) || 0;
+            
+            if (descValue === '' || priceValue === 0) {
+                targetRow = row;
+                targetItemNumber = i;
+                break;
+            }
+        }
+    }
+    
+    // Wenn keine leere Position gefunden, erstelle neue Zeile
+    if (!targetRow) {
+        itemCounter++;
+        targetItemNumber = itemCounter;
+        targetRow = tbody.insertRow();
+        targetRow.id = `item_${itemCounter}`;
+    }
+    
+    targetRow.setAttribute('data-order-item-id', orderItemId);
+    
+    // Fülle die Zeile (entweder überschreibe bestehende oder fülle neue)
+    targetRow.innerHTML = `
+        <td>
+            <input type="text" class="form-control form-control-sm" 
+                   id="article_number_${targetItemNumber}" value="${articleNumber}" placeholder="Artikel-Nr.">
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm" 
+                   id="description_${targetItemNumber}" value="${description}" placeholder="Beschreibung" required>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" 
+                   id="quantity_${targetItemNumber}" value="${quantity}" min="1" onchange="calculateLineTotal(${targetItemNumber})">
+        </td>
+        <td>
+            <select class="form-select form-select-sm" id="unit_${targetItemNumber}">
+                <option value="Stück" selected>Stück</option>
+                <option value="Meter">Meter</option>
+                <option value="kg">kg</option>
+                <option value="Liter">Liter</option>
+                <option value="Karton">Karton</option>
+            </select>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" 
+                   id="unit_price_${targetItemNumber}" value="${unitPrice}" min="0" step="0.01" onchange="calculateLineTotal(${targetItemNumber})">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" 
+                   id="discount_${targetItemNumber}" value="0" min="0" max="100" step="0.1" onchange="calculateLineTotal(${targetItemNumber})">
+        </td>
+        <td>
+            <span id="line_total_${targetItemNumber}">0.00 €</span>
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeOrderItem(${targetItemNumber})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    // Add supplier article number if available
+    if (supplierArticleNumber) {
+        const articleNumberInput = document.getElementById(`article_number_${targetItemNumber}`);
+        articleNumberInput.setAttribute('data-supplier-article-number', supplierArticleNumber);
+        articleNumberInput.setAttribute('title', `Lieferanten-Nr: ${supplierArticleNumber}`);
+    }
+    
+    // Track this order item
+    linkedOrderItems[orderItemId] = targetItemNumber;
+    
+    // Disable the add button
+    const addBtn = document.getElementById(`add_btn_${orderItemId}`);
+    if (addBtn) {
+        addBtn.disabled = true;
+        addBtn.innerHTML = '<i class="fas fa-check"></i>';
+        addBtn.classList.remove('btn-success');
+        addBtn.classList.add('btn-secondary');
+    }
+    
+    // Calculate initial total
+    calculateLineTotal(targetItemNumber);
+    updateItemCount();
+}
+
+function addOrderItem() {
+    itemCounter++;
+    const tbody = document.getElementById('itemsTableBody');
+    const row = tbody.insertRow();
+    row.id = `item_${itemCounter}`;
+    
+    row.innerHTML = `
+        <td colspan="2">
+            <div class="input-group input-group-sm">
+                <select class="form-select form-select-sm article-search" 
+                        id="article_select_${itemCounter}" 
+                        onchange="loadArticleDetails(${itemCounter})">
+                    <option value="">-- Artikel auswählen oder suchen --</option>
+                </select>
+                <button type="button" class="btn btn-sm btn-outline-secondary" 
+                        onclick="toggleAllArticles(${itemCounter})" 
+                        id="toggle_filter_${itemCounter}"
+                        title="Alle Artikel anzeigen">
+                    <i class="bi bi-funnel-fill"></i>
+                </button>
+            </div>
+            <input type="hidden" id="article_number_${itemCounter}">
+            <input type="hidden" id="description_${itemCounter}">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" 
+                   id="quantity_${itemCounter}" value="1" min="1" onchange="calculateLineTotal(${itemCounter})">
+        </td>
+        <td>
+            <select class="form-select form-select-sm" id="unit_${itemCounter}">
+                <option value="Stück">Stück</option>
+                <option value="Meter">Meter</option>
+                <option value="kg">kg</option>
+                <option value="Liter">Liter</option>
+                <option value="Karton">Karton</option>
+            </select>
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" 
+                   id="unit_price_${itemCounter}" value="0" min="0" step="0.01" onchange="calculateLineTotal(${itemCounter})">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm" 
+                   id="discount_${itemCounter}" value="0" min="0" max="100" step="0.1" onchange="calculateLineTotal(${itemCounter})">
+        </td>
+        <td>
+            <span id="line_total_${itemCounter}">0.00 €</span>
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeOrderItem(${itemCounter})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    updateItemCount();
+}
+
+function removeOrderItem(itemId) {
+    const row = document.getElementById(`item_${itemId}`);
+    
+    // Check if this was a linked order item
+    const orderItemId = row.getAttribute('data-order-item-id');
+    if (orderItemId && linkedOrderItems[orderItemId]) {
+        // Re-enable the add button
+        const addBtn = document.getElementById(`add_btn_${orderItemId}`);
+        if (addBtn) {
+            addBtn.disabled = false;
+            addBtn.innerHTML = '<i class="fas fa-plus"></i>';
+            addBtn.classList.remove('btn-secondary');
+            addBtn.classList.add('btn-success');
+        }
+        // Remove from tracking
+        delete linkedOrderItems[orderItemId];
+    }
+    
+    row.remove();
+    calculateTotal();
+    updateItemCount();
+}
+
+function calculateLineTotal(itemId) {
+    const quantity = parseFloat(document.getElementById(`quantity_${itemId}`).value) || 0;
+    const unitPrice = parseFloat(document.getElementById(`unit_price_${itemId}`).value) || 0;
+    const discount = parseFloat(document.getElementById(`discount_${itemId}`).value) || 0;
+    
+    const baseTotal = quantity * unitPrice;
+    const lineTotal = baseTotal * (1 - discount / 100);
+    
+    document.getElementById(`line_total_${itemId}`).innerText = lineTotal.toFixed(2) + ' €';
+    
+    calculateTotal();
+}
+
+function calculateTotal() {
+    let subtotal = 0;
+    
+    // Berechne Zwischensumme
+    const rows = document.querySelectorAll('#itemsTableBody tr');
+    rows.forEach(row => {
+        const itemId = row.id.replace('item_', '');
+        const quantity = parseFloat(document.getElementById(`quantity_${itemId}`).value) || 0;
+        const unitPrice = parseFloat(document.getElementById(`unit_price_${itemId}`).value) || 0;
+        const discount = parseFloat(document.getElementById(`discount_${itemId}`).value) || 0;
+        
+        const baseTotal = quantity * unitPrice;
+        const lineTotal = baseTotal * (1 - discount / 100);
+        subtotal += lineTotal;
+    });
+    
+    // Hole andere Werte
+    const shippingCost = parseFloat(document.getElementById('shipping_cost').value) || 0;
+    const taxAmount = parseFloat(document.getElementById('tax_amount').value) || 0;
+    const discountAmount = parseFloat(document.getElementById('discount_amount').value) || 0;
+    
+    // Berechne Gesamtsumme
+    const total = subtotal + shippingCost + taxAmount - discountAmount;
+    
+    // Aktualisiere Anzeige
+    document.getElementById('subtotal').innerText = subtotal.toFixed(2) + ' €';
+    document.getElementById('total_amount_display').innerText = total.toFixed(2) + ' €';
+    
+    // Aktualisiere Zusammenfassung
+    document.getElementById('summarySubtotal').innerText = subtotal.toFixed(2) + ' €';
+    document.getElementById('summaryShipping').innerText = shippingCost.toFixed(2) + ' €';
+    document.getElementById('summaryTax').innerText = taxAmount.toFixed(2) + ' €';
+    document.getElementById('summaryDiscount').innerText = '-' + discountAmount.toFixed(2) + ' €';
+    document.getElementById('summaryTotal').innerText = total.toFixed(2) + ' €';
+    
+    // Aktualisiere Hidden Fields
+    document.getElementById('subtotal_hidden').value = subtotal.toFixed(2);
+    document.getElementById('total_amount').value = total.toFixed(2);
+    
+    // Wenn kein Steuerbetrag manuell eingegeben wurde, berechne 19% MwSt.
+    if (taxAmount === 0 && document.getElementById('tax_amount').value === '') {
+        const calculatedTax = subtotal * 0.19;
+        document.getElementById('tax_amount').value = calculatedTax.toFixed(2);
+        calculateTotal(); // Rekursiv aufrufen mit neuem Steuerwert
+    }
+}
+
+function updateItemCount() {
+    const rows = document.querySelectorAll('#itemsTableBody tr');
+    document.getElementById('itemCount').innerText = rows.length;
+}
+
+function toggleDeliveryAddress() {
+    const fields = document.getElementById('deliveryAddressFields');
+    const checkbox = document.getElementById('useAlternateAddress');
+    fields.style.display = checkbox.checked ? 'block' : 'none';
+}
+
+// Sammle alle Items vor dem Absenden
+document.getElementById('orderForm').addEventListener('submit', function(e) {
+    const items = [];
+    const linkedItems = [];
+    const rows = document.querySelectorAll('#itemsTableBody tr');
+    
+    rows.forEach(row => {
+        const itemId = row.id.replace('item_', '');
+        const orderItemId = row.getAttribute('data-order-item-id');
+        
+        const item = {
+            article_number: document.getElementById(`article_number_${itemId}`).value,
+            description: document.getElementById(`description_${itemId}`).value,
+            quantity: parseInt(document.getElementById(`quantity_${itemId}`).value) || 0,
+            unit: document.getElementById(`unit_${itemId}`).value,
+            unit_price: parseFloat(document.getElementById(`unit_price_${itemId}`).value) || 0,
+            discount_percent: parseFloat(document.getElementById(`discount_${itemId}`).value) || 0,
+            supplier_article_number: document.getElementById(`article_number_${itemId}`).getAttribute('data-supplier-article-number') || ''
+        };
+        
+        if (item.description) {
+            items.push(item);
+            
+            // Track linked order items
+            if (orderItemId) {
+                linkedItems.push({
+                    order_item_id: orderItemId,
+                    quantity: item.quantity
+                });
+            }
+        }
+    });
+    
+    document.getElementById('items_json').value = JSON.stringify(items);
+    
+    // Add linked order items as hidden field
+    const linkedItemsInput = document.createElement('input');
+    linkedItemsInput.type = 'hidden';
+    linkedItemsInput.name = 'linked_order_items';
+    linkedItemsInput.value = JSON.stringify(linkedItems);
+    this.appendChild(linkedItemsInput);
+    
+    if (items.length === 0) {
+        e.preventDefault();
+        alert('Bitte fügen Sie mindestens eine Bestellposition hinzu.');
+    }
+});
+
+// Artikel-Suche Funktionen
+let allArticles = [];
+let supplierOnlyFilter = true;
+
+// Lade alle Artikel beim Start
+// Verwende relative URL, die automatisch die richtige Domain/IP nutzt
+fetch('{{ url_for("api.get_articles", supplier_id=supplier.id) }}')
+    .then(response => {
+        console.log('API Response Status:', response.status);
+        console.log('API Response URL:', response.url);
+        
+        // Prüfe ob Response OK ist
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        // Prüfe Content-Type
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            throw new TypeError("Response ist kein JSON!");
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        console.log('API Response Data:', data);
+        
+        if (!data.success) {
+            throw new Error(data.error || 'API-Fehler');
+        }
+        
+        allArticles = data.articles || [];
+        console.log('Geladene Artikel:', allArticles.length);
+        console.log('Erste 3 Artikel:', allArticles.slice(0, 3));
+        
+        // Füge erste Zeile hinzu NACHDEM Artikel geladen sind
+        addOrderItem();
+        
+        // Initialisiere Select2 nach kurzer Verzögerung
+        setTimeout(() => {
+            initializeArticleSelects();
+        }, 100);
+    })
+    .catch(error => {
+        console.error('Fehler beim Laden der Artikel:', error);
+        console.error('Fehlertyp:', error.name);
+        console.error('Fehlermeldung:', error.message);
+        
+        // Zeige Fehlermeldung
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'alert alert-warning alert-dismissible fade show';
+        alertDiv.innerHTML = `
+            <strong>Warnung:</strong> Artikel konnten nicht geladen werden. 
+            ${error.message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.querySelector('.container-fluid').insertBefore(alertDiv, document.querySelector('.card'));
+        
+        // Trotzdem eine Zeile hinzufügen
+        addOrderItem();
+    });
+
+function initializeArticleSelects() {
+    console.log('Initialisiere Artikel-Selects...');
+    document.querySelectorAll('.article-search').forEach(select => {
+        console.log('Gefundenes Select:', select.id);
+        if (!$(select).hasClass('select2-hidden-accessible')) {
+            $(select).select2({
+                theme: 'bootstrap-5',
+                placeholder: 'Artikel suchen...',
+                allowClear: true,
+                width: '100%',
+                language: {
+                    noResults: function() {
+                        return 'Keine Artikel gefunden';
+                    },
+                    searching: function() {
+                        return 'Suche...';
+                    }
+                }
+            });
+            
+            // Fülle das Select mit Artikeln
+            const itemNumber = select.id.replace('article_select_', '');
+            populateArticleSelect(itemNumber);
+        }
+    });
+}
+
+function populateArticleSelect(itemNumber) {
+    const select = document.getElementById(`article_select_${itemNumber}`);
+    const supplierId = '{{ supplier.id }}';
+    
+    // Leere das Select
+    $(select).empty();
+    $(select).append('<option value="">-- Artikel auswählen oder suchen --</option>');
+    
+    // Filtere Artikel
+    let filteredArticles = allArticles;
+    if (supplierOnlyFilter) {
+        filteredArticles = allArticles.filter(article => {
+            // Prüfe verschiedene Möglichkeiten
+            const hasSupplier = article.supplier && article.supplier !== '';
+            const matchesName = article.supplier === '{{ supplier.name }}';
+            const matchesId = article.supplier_id === supplierId;
+            const inSuppliersList = article.suppliers && article.suppliers.includes(supplierId);
+            
+            return hasSupplier && (matchesName || matchesId || inSuppliersList);
+        });
+        
+        console.log('Filter aktiv - Gefilterte Artikel:', filteredArticles.length);
+        
+        // Wenn keine Artikel für diesen Lieferanten, zeige Info
+        if (filteredArticles.length === 0 && allArticles.length > 0) {
+            console.log('Keine Artikel für Lieferant {{ supplier.name }} gefunden');
+            // Automatisch auf alle Artikel umschalten
+            if (confirm('Keine Artikel für diesen Lieferanten gefunden. Möchten Sie alle Artikel anzeigen?')) {
+                toggleAllArticles(itemNumber);
+                return;
+            }
+        }
+    }
+    
+    // Füge Artikel hinzu
+    filteredArticles.forEach(article => {
+        const option = new Option(
+            `${article.article_number} - ${article.name} (${article.purchase_price ? article.purchase_price.toFixed(2) : '0.00'} €)`,
+            article.id
+        );
+        option.dataset.articleNumber = article.article_number;
+        option.dataset.name = article.name;
+        option.dataset.price = article.purchase_price || 0;
+        option.dataset.supplierArticleNumber = article.supplier_article_number || '';
+        $(select).append(option);
+    });
+    
+    // Trigger change um Select2 zu aktualisieren
+    $(select).trigger('change');
+}
+
+function toggleAllArticles(itemNumber) {
+    supplierOnlyFilter = !supplierOnlyFilter;
+    const btn = document.getElementById(`toggle_filter_${itemNumber}`);
+    
+    if (supplierOnlyFilter) {
+        btn.innerHTML = '<i class="bi bi-funnel-fill"></i>';
+        btn.title = 'Alle Artikel anzeigen';
+    } else {
+        btn.innerHTML = '<i class="bi bi-funnel"></i>';
+        btn.title = 'Nur Lieferanten-Artikel';
+    }
+    
+    // Aktualisiere alle Selects
+    for (let i = 1; i <= itemCounter; i++) {
+        if (document.getElementById(`article_select_${i}`)) {
+            populateArticleSelect(i);
+        }
+    }
+}
+
+function loadArticleDetails(itemNumber) {
+    const select = document.getElementById(`article_select_${itemNumber}`);
+    const selectedOption = select.options[select.selectedIndex];
+    
+    if (selectedOption.value) {
+        // Setze die versteckten Felder
+        document.getElementById(`article_number_${itemNumber}`).value = selectedOption.dataset.articleNumber || '';
+        document.getElementById(`description_${itemNumber}`).value = selectedOption.dataset.name || '';
+        
+        // Finde die entsprechenden Input-Felder in der Zeile
+        const row = document.getElementById(`item_${itemNumber}`);
+        const quantityInput = row.querySelector(`#quantity_${itemNumber}`);
+        const priceInput = row.querySelector(`#unit_price_${itemNumber}`);
+        
+        if (priceInput) {
+            priceInput.value = selectedOption.dataset.price || 0;
+        }
+        
+        // Berechne Total
+        calculateLineTotal(itemNumber);
+    }
+}
+
+// Modifiziere die bestehende addOrderItem Funktion
+const originalAddOrderItem = addOrderItem;
+addOrderItem = function() {
+    originalAddOrderItem();
+    // Initialisiere Select2 für die neue Zeile
+    setTimeout(() => {
+        initializeArticleSelects();
+    }, 100);
+};
+</script>
+{% endblock %}

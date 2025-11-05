@@ -1,0 +1,102 @@
+<!-- Webshop-Integration Kartenbereich -->
+<!-- Fügen Sie dies nach den Zahlungsbedingungen und vor den Notizen ein -->
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-shopping-cart me-2"></i>Webshop-Integration
+            <small class="text-muted ms-2">Optional - für automatisches Bestellen</small>
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label for="webshop_url" class="form-label">Webshop URL</label>
+            <input type="url" class="form-control" id="webshop_url" name="webshop_url" 
+                   value="{{ supplier.webshop_url or '' }}" 
+                   placeholder="https://shop.lieferant.de">
+            <small class="text-muted">Haupt-URL des Online-Shops</small>
+        </div>
+        
+        <div class="mb-3">
+            <label for="webshop_article_url_pattern" class="form-label">Artikel-URL-Muster</label>
+            <input type="text" class="form-control" id="webshop_article_url_pattern" 
+                   name="webshop_article_url_pattern" 
+                   value="{{ supplier.webshop_article_url_pattern or '' }}" 
+                   placeholder="https://shop.lieferant.de/artikel/{article_number}">
+            <small class="text-muted">Verwenden Sie {article_number} als Platzhalter für die Artikelnummer</small>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="webshop_type" class="form-label">Shop-System</label>
+                <select class="form-select" id="webshop_type" name="webshop_type">
+                    <option value="">-- Bitte wählen --</option>
+                    <option value="generic" {% if supplier.webshop_type == 'generic' %}selected{% endif %}>
+                        Standard/Unbekannt
+                    </option>
+                    <option value="shopware" {% if supplier.webshop_type == 'shopware' %}selected{% endif %}>
+                        Shopware
+                    </option>
+                    <option value="woocommerce" {% if supplier.webshop_type == 'woocommerce' %}selected{% endif %}>
+                        WooCommerce
+                    </option>
+                    <option value="magento" {% if supplier.webshop_type == 'magento' %}selected{% endif %}>
+                        Magento
+                    </option>
+                    <option value="oxid" {% if supplier.webshop_type == 'oxid' %}selected{% endif %}>
+                        OXID eShop
+                    </option>
+                    <option value="prestashop" {% if supplier.webshop_type == 'prestashop' %}selected{% endif %}>
+                        PrestaShop
+                    </option>
+                </select>
+            </div>
+            
+            <div class="col-md-6 mb-3">
+                <label for="customer_number" class="form-label">Unsere Kundennummer</label>
+                <input type="text" class="form-control" id="customer_number" name="customer_number" 
+                       value="{{ supplier.customer_number or '' }}" 
+                       placeholder="z.B. 12345">
+                <small class="text-muted">Ihre Kundennummer beim Lieferanten</small>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="webshop_username" class="form-label">Benutzername</label>
+                <input type="text" class="form-control" id="webshop_username" name="webshop_username" 
+                       value="{{ supplier.webshop_username or '' }}" 
+                       placeholder="Login für den Webshop">
+            </div>
+            
+            <div class="col-md-6 mb-3">
+                <label for="webshop_password" class="form-label">
+                    Passwort
+                    {% if supplier.webshop_password_encrypted %}
+                        <span class="badge bg-success ms-2">Gespeichert</span>
+                    {% endif %}
+                </label>
+                <input type="password" class="form-control" id="webshop_password" 
+                       name="webshop_password" 
+                       placeholder="{% if supplier.webshop_password_encrypted %}Leer lassen für keine Änderung{% else %}Webshop-Passwort{% endif %}">
+                <small class="text-muted">Wird verschlüsselt gespeichert</small>
+            </div>
+        </div>
+        
+        <div class="mb-3">
+            <label for="webshop_notes" class="form-label">Webshop-Notizen</label>
+            <textarea class="form-control" id="webshop_notes" name="webshop_notes" rows="2" 
+                      placeholder="z.B. Sonderkonditionen, Rabattcodes, Besonderheiten beim Login">{{ supplier.webshop_notes or '' }}</textarea>
+        </div>
+        
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="auto_order_enabled" 
+                   name="auto_order_enabled" value="on"
+                   {% if supplier.auto_order_enabled %}checked{% endif %}>
+            <label class="form-check-label" for="auto_order_enabled">
+                Auto-Order aktivieren
+                <small class="text-muted">(Erweiterte Funktion - noch nicht implementiert)</small>
+            </label>
+        </div>
+    </div>
+</div>

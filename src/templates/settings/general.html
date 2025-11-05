@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}Allgemeine Einstellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0"><i class="fas fa-sliders-h"></i> Allgemeine Einstellungen</h1>
+                <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="site_name" class="form-label">Seitenname</label>
+                            <input type="text" class="form-control" id="site_name" name="site_name" 
+                                   value="{{ settings.site_name }}" required>
+                            <small class="form-text text-muted">Der Name Ihrer StitchAdmin-Installation</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="maintenance_mode" 
+                                       name="maintenance_mode" {{ 'checked' if settings.maintenance_mode }}>
+                                <label class="form-check-label" for="maintenance_mode">
+                                    Wartungsmodus aktivieren
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    Im Wartungsmodus können nur Administratoren auf das System zugreifen
+                                </small>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="session_timeout" class="form-label">Session-Timeout (Minuten)</label>
+                            <input type="number" class="form-control" id="session_timeout" name="session_timeout" 
+                                   value="{{ settings.session_timeout }}" min="5" max="1440" required>
+                            <small class="form-text text-muted">Nach dieser Zeit werden inaktive Benutzer automatisch abgemeldet</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="allow_registration" 
+                                       name="allow_registration" {{ 'checked' if settings.allow_registration }}>
+                                <label class="form-check-label" for="allow_registration">
+                                    Benutzer-Registrierung erlauben
+                                </label>
+                                <small class="form-text text-muted d-block">
+                                    Erlaubt neuen Benutzern, sich selbst zu registrieren
+                                </small>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

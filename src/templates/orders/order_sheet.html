@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auftragsblatt {{ order.id }} - {{ order.customer.display_name if order.customer else 'Unbekannt' }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 12mm;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 8pt;
+            line-height: 1.2;
+            color: #333;
+            background: white;
+        }
+        
+        /* Header - auf jeder Seite */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 3mm;
+            margin-bottom: 3mm;
+            border-bottom: 2px solid #0066cc;
+        }
+        
+        .company-info {
+            flex: 1;
+        }
+        
+        .company-name {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #0066cc;
+            margin-bottom: 1mm;
+        }
+        
+        .company-details {
+            font-size: 7pt;
+            color: #666;
+            line-height: 1.2;
+        }
+        
+        .order-info {
+            text-align: right;
+            min-width: 45mm;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        
+        .order-number {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #0066cc;
+            margin-bottom: 1mm;
+        }
+        
+        .order-meta {
+            font-size: 7pt;
+            color: #666;
+            text-align: right;
+        }
+        
+        /* Barcode-Bereich im Header */
+        .order-barcode {
+            width: 35mm;
+            height: 10mm;
+            border: 1px solid #ccc;
+            margin-top: 2mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+        }
+        
+        .barcode-canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        
+        /* Kompakte Hauptseite */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3mm;
+            margin-bottom: 3mm;
+        }
+        
+        .info-section {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 2px;
+            padding: 2mm;
+            margin-bottom: 2mm;
+        }
+        
+        .info-section h3 {
+            font-size: 8pt;
+            color: #0066cc;
+            margin-bottom: 1mm;
+            padding-bottom: 1mm;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .info-row {
+            display: flex;
+            margin-bottom: 0.5mm;
+            font-size: 7pt;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            min-width: 20mm;
+            color: #555;
+        }
+        
+        .info-value {
+            flex: 1;
+            color: #333;
+        }
+        
+        /* Status Badge */
+        .status-badge {
+            display: inline-block;
+            padding: 1mm 2mm;
+            border-radius: 6px;
+            font-size: 7pt;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            margin-bottom: 2mm;
+        }
+        
+        .status-new { background: #6c757d; }
+        .status-accepted { background: #28a745; }
+        .status-in-progress { background: #ffc107; color: #000; }
+        .status-ready { background: #17a2b8; }
+        .status-completed { background: #28a745; }
+        .status-cancelled { background: #dc3545; }
+        
+        .rush-order {
+            background: #ff4444;
+            color: white;
+            padding: 1mm 2mm;
+            border-radius: 4px;
+            font-size: 6pt;
+            margin-left: 2mm;
+        }
+        
+        /* Design-Bereich mit Barcode */
+        .design-section {
+            grid-column: span 2;
+            background: #e8f5e8;
+            border: 1px solid #28a745;
+            border-radius: 2px;
+            padding: 2mm;
+            margin-bottom: 2mm;
+        }
+        
+        .design-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2mm;
+        }
+        
+        .design-barcode {
+            width: 25mm;
+            height: 8mm;
+            border: 1px solid #28a745;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 2px;
+        }
+        
+        .design-barcode-canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        
+        .design-info {
+            flex: 1;
+            margin-right: 2mm;
+        }
+        
+        /* Artikel-Tabelle mit Bestandsanzeige */
+        .articles-section {
+            grid-column: span 2;
+            margin-bottom: 2mm;
+        }
+        
+        .articles-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 6pt;
+            margin-top: 1mm;
+        }
+        
+        .articles-table th,
+        .articles-table td {
+            border: 1px solid #dee2e6;
+            padding: 0.5mm;
+            text-align: left;
+        }
+        
+        .articles-table th {
+            background: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+            font-size: 6pt;
+        }
+        
+        .articles-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        /* Bestandsanzeige */
+        .stock-badge {
+            display: inline-block;
+            padding: 0.5mm 1mm;
+            border-radius: 2px;
+            font-size: 5pt;
+            font-weight: bold;
+            color: white;
+            text-align: center;
+        }
+        
+        .stock-available { background: #28a745; }
+        .stock-partial { background: #ffc107; color: #000; }
+        .stock-missing { background: #dc3545; }
+        .stock-ordered { background: #17a2b8; }
+        .stock-delivered { background: #6c757d; }
+        
+        /* Preis-Box */
+        .price-box {
+            background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%);
+            border: 1px solid #28a745;
+            border-radius: 2px;
+            padding: 2mm;
+            text-align: center;
+            grid-column: span 2;
+            margin-bottom: 2mm;
+        }
+        
+        .price-main {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #28a745;
+            margin-bottom: 1mm;
+        }
+        
+        .price-sub {
+            font-size: 6pt;
+            color: #666;
+        }
+        
+        /* Notizen-Bereich */
+        .notes-section {
+            grid-column: span 2;
+            background: #fffbf0;
+            border: 1px dashed #ffc107;
+            border-radius: 2px;
+            padding: 2mm;
+            margin-bottom: 2mm;
+            min-height: 15mm;
+        }
+        
+        .notes-section h3 {
+            font-size: 7pt;
+            color: #856404;
+            margin-bottom: 1mm;
+        }
+        
+        .note-lines {
+            height: 12mm;
+            background-image: 
+                linear-gradient(to bottom, transparent 0%, transparent 85%, #ddd 85%, #ddd 100%);
+            background-size: 100% 3mm;
+            background-repeat: repeat-y;
+        }
+        
+        /* Unterschriften - Kompakt */
+        .signature-section {
+            grid-column: span 2;
+            margin-top: 2mm;
+        }
+        
+        .signature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2mm;
+            margin-top: 2mm;
+        }
+        
+        .signature-box {
+            text-align: center;
+            padding: 1mm;
+            border: 1px solid #dee2e6;
+            border-radius: 2px;
+            min-height: 10mm;
+        }
+        
+        .signature-line {
+            border-bottom: 1px solid #333;
+            height: 6mm;
+            margin-bottom: 1mm;
+        }
+        
+        .signature-label {
+            font-size: 5pt;
+            color: #666;
+            line-height: 1.1;
+        }
+        
+        /* Footer */
+        .page-footer {
+            position: fixed;
+            bottom: 5mm;
+            left: 12mm;
+            right: 12mm;
+            font-size: 5pt;
+            color: #666;
+            text-align: center;
+            border-top: 1px solid #dee2e6;
+            padding-top: 1mm;
+        }
+        
+        /* Druckoptimierungen */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+        }
+        
+        /* Responsive für Vorschau */
+        @media screen and (max-width: 800px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .signature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header mit Barcode -->
+    <div class="page-header">
+        <div class="company-info">
+            <div class="company-name">STITCHADMIN</div>
+            <div class="company-details">
+                Erstellt von: Hans Hahn - Alle Rechte vorbehalten<br>
+                Musterstraße 123 • 12345 Musterstadt • Tel: +49 123 456789 • info@stitchadmin.de
+            </div>
+        </div>
+        <div class="order-info">
+            <div class="order-number">{{ order.id }}</div>
+            <div class="order-meta">
+                <strong>Auftragsblatt</strong><br>
+                {{ now.strftime('%d.%m.%Y %H:%M') }}<br>
+                {{ order.created_by or 'System' }}
+            </div>
+            <div class="order-barcode">
+                <canvas id="order-barcode" class="barcode-canvas" width="120" height="30"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Status -->
+    <div class="status-badge status-{{ order.status|replace('_', '-') }}">
+        {% if order.status == 'new' %}NEUER AUFTRAG{% 
+        elif order.status == 'accepted' %}ANGENOMMEN{% 
+        elif order.status == 'in_progress' %}IN BEARBEITUNG{% 
+        elif order.status == 'ready' %}FERTIG{% 
+        elif order.status == 'completed' %}ABGESCHLOSSEN{% 
+        elif order.status == 'cancelled' %}STORNIERT{% 
+        else %}{{ order.status|upper }}{% endif %}
+        {% if order.rush_order %}<span class="rush-order">EILAUFTRAG</span>{% endif %}
+    </div>
+    
+    <!-- Hauptinhalt - Alles auf einer Seite -->
+    <div class="main-content">
+        <!-- Kundeninformationen -->
+        <div class="info-section">
+            <h3>Kunde</h3>
+            {% if order.customer %}
+                <div class="info-row">
+                    <span class="info-label">Name:</span>
+                    <span class="info-value">{{ order.customer.display_name }}</span>
+                </div>
+                {% if order.customer.company_name %}
+                <div class="info-row">
+                    <span class="info-label">Firma:</span>
+                    <span class="info-value">{{ order.customer.company_name }}</span>
+                </div>
+                {% endif %}
+                <div class="info-row">
+                    <span class="info-label">E-Mail:</span>
+                    <span class="info-value">{{ order.customer.email or '-' }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Telefon:</span>
+                    <span class="info-value">{{ order.customer.phone or order.customer.mobile or '-' }}</span>
+                </div>
+                {% if order.customer.street %}
+                <div class="info-row">
+                    <span class="info-label">Adresse:</span>
+                    <span class="info-value">{{ order.customer.street }} {{ order.customer.house_number or '' }}, {{ order.customer.postal_code }} {{ order.customer.city }}</span>
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="info-row">
+                    <span class="info-label">Kunde:</span>
+                    <span class="info-value">Nicht zugewiesen</span>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Auftragsdaten -->
+        <div class="info-section">
+            <h3>Auftragsdaten</h3>
+            <div class="info-row">
+                <span class="info-label">Typ:</span>
+                <span class="info-value">
+                    {% if order.order_type == 'embroidery' %}🧵 Bestickung
+                    {% elif order.order_type == 'printing' %}🖨️ Textildruck
+                    {% elif order.order_type == 'dtf' %}🔥 DTF-Druck
+                    {% elif order.order_type == 'combined' %}🔄 Kombiniert
+                    {% else %}{{ order.order_type|title }}{% endif %}
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Erstellt:</span>
+                <span class="info-value">{{ order.created_at.strftime('%d.%m.%Y %H:%M') if order.created_at else '-' }}</span>
+            </div>
+            {% if order.due_date %}
+            <div class="info-row">
+                <span class="info-label">Liefertermin:</span>
+                <span class="info-value">{{ order.due_date.strftime('%d.%m.%Y') }}</span>
+            </div>
+            {% endif %}
+            <div class="info-row">
+                <span class="info-label">Artikel:</span>
+                <span class="info-value">{{ order.items.count() }} Position(en)</span>
+            </div>
+        </div>
+        
+        <!-- Design-Bereich mit Barcode -->
+        <div class="design-section">
+            <div class="design-header">
+                <div class="design-info">
+                    <h3>🎨 Design & Veredelung</h3>
+                    <div class="info-row">
+                        <span class="info-label">Beschreibung:</span>
+                        <span class="info-value">{{ order.design_description or order.description or '-' }}</span>
+                    </div>
+                    {% if order.design_file_path %}
+                    <div class="info-row">
+                        <span class="info-label">Datei:</span>
+                        <span class="info-value">{{ order.design_file_path.split('/')[-1] }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="design-barcode">
+                    <canvas id="design-barcode" class="design-barcode-canvas" width="80" height="25"></canvas>
+                </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; margin-top: 2mm;">
+                {% if order.order_type in ['embroidery', 'combined'] %}
+                <div>
+                    <h4 style="font-size: 7pt; color: #1976d2; margin-bottom: 1mm;">🧵 Bestickung</h4>
+                    <div class="info-row">
+                        <span class="info-label">Position:</span>
+                        <span class="info-value">{{ order.embroidery_position or '-' }}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Größe:</span>
+                        <span class="info-value">{{ order.embroidery_size or '-' }}</span>
+                    </div>
+                    {% if order.stitch_count %}
+                    <div class="info-row">
+                        <span class="info-label">Stiche:</span>
+                        <span class="info-value">{{ '{:,}'.format(order.stitch_count) }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                {% if order.order_type in ['printing', 'dtf', 'combined'] %}
+                <div>
+                    <h4 style="font-size: 7pt; color: #1976d2; margin-bottom: 1mm;">🖨️ Textildruck</h4>
+                    <div class="info-row">
+                        <span class="info-label">Verfahren:</span>
+                        <span class="info-value">{{ order.print_method or '-' }}</span>
+                    </div>
+                    {% if order.print_width_cm and order.print_height_cm %}
+                    <div class="info-row">
+                        <span class="info-label">Größe:</span>
+                        <span class="info-value">{{ order.print_width_cm }} × {{ order.print_height_cm }} cm</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Artikel-Tabelle mit Bestandsanzeige -->
+        <div class="articles-section">
+            <h3>Artikel & Bestand</h3>
+            <table class="articles-table">
+                <thead>
+                    <tr>
+                        <th>Nr.</th>
+                        <th>Artikel</th>
+                        <th>Größe</th>
+                        <th>Farbe</th>
+                        <th>Menge</th>
+                        <th>Bestand</th>
+                        <th>Status</th>
+                        <th>Preis</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td>
+                            <strong>{{ item.article.name if item.article else 'Unbekannt' }}</strong><br>
+                            <small>{{ item.article.article_number if item.article else '-' }}</small>
+                        </td>
+                        <td>{{ item.textile_size or (item.article.size if item.article else '-') }}</td>
+                        <td>{{ item.textile_color or (item.article.color if item.article else '-') }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>
+                            {% if item.article %}
+                                {{ item.article.stock or 0 }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.article %}
+                                {% set stock_diff = (item.article.stock or 0) - item.quantity %}
+                                {% if stock_diff >= 0 %}
+                                    <span class="stock-badge stock-available">VORRÄTIG</span>
+                                {% else %}
+                                    <span class="stock-badge stock-missing">{{ -stock_diff }} FEHLEN</span>
+                                {% endif %}
+                                
+                                {% if item.supplier_order_status == 'to_order' %}
+                                    <br><span class="stock-badge stock-ordered">ZU BESTELLEN</span>
+                                {% elif item.supplier_order_status == 'ordered' %}
+                                    <br><span class="stock-badge stock-ordered">BESTELLT</span>
+                                    {% if item.supplier_expected_date %}
+                                        <br><small>{{ item.supplier_expected_date.strftime('%d.%m.%Y') }}</small>
+                                    {% endif %}
+                                {% elif item.supplier_order_status == 'delivered' %}
+                                    <br><span class="stock-badge stock-delivered">GELIEFERT</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="stock-badge stock-missing">NICHT GEFUNDEN</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ ((item.unit_price or 0) * item.quantity)|round(2) }} €</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Preis -->
+        {% if order.total_price and order.total_price > 0 %}
+        <div class="price-box">
+            <div class="price-main">{{ order.total_price|round(2) }} € netto</div>
+            <div class="price-sub">
+                + {{ (order.total_price * 0.19)|round(2) }} € MwSt = {{ (order.total_price * 1.19)|round(2) }} € brutto
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Notizen -->
+        <div class="notes-section">
+            <h3>📝 Notizen & Anweisungen</h3>
+            {% if order.internal_notes or order.customer_notes or order.special_instructions %}
+                <div style="margin-bottom: 2mm;">
+                    {% if order.internal_notes %}
+                        <div><strong>Intern:</strong> {{ order.internal_notes }}</div>
+                    {% endif %}
+                    {% if order.customer_notes %}
+                        <div><strong>Kunde:</strong> {{ order.customer_notes }}</div>
+                    {% endif %}
+                    {% if order.special_instructions %}
+                        <div><strong>Anweisungen:</strong> {{ order.special_instructions }}</div>
+                    {% endif %}
+                </div>
+            {% endif %}
+            <div class="note-lines"></div>
+        </div>
+        
+        <!-- Unterschriften -->
+        <div class="signature-section">
+            <h3>Workflow-Freigaben</h3>
+            <div class="signature-grid">
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Auftrag angenommen<br>Datum / Unterschrift</div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Produktion gestartet<br>Datum / Unterschrift</div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Qualitätskontrolle<br>Datum / Unterschrift</div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Fertigstellung<br>Datum / Unterschrift</div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Verpackung<br>Datum / Unterschrift</div>
+                </div>
+                <div class="signature-box">
+                    <div class="signature-line"></div>
+                    <div class="signature-label">Versand/Übergabe<br>Datum / Unterschrift</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div class="page-footer">
+        <strong>STITCHADMIN</strong> - Professionelle Textilveredelung • 
+        Generiert am {{ now.strftime('%d.%m.%Y um %H:%M') }} Uhr • 
+        Erstellt von: Hans Hahn - Alle Rechte vorbehalten
+    </div>
+    
+    <!-- JsBarcode Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+    
+    <script>
+        window.onload = function() {
+            // Auftrags-Barcode generieren
+            try {
+                JsBarcode("#order-barcode", "{{ order.id }}", {
+                    format: "CODE128",
+                    width: 1,
+                    height: 25,
+                    displayValue: false,
+                    margin: 1,
+                    fontSize: 8
+                });
+            } catch (e) {
+                console.error("Barcode generation failed:", e);
+                document.getElementById('order-barcode').style.display = 'none';
+            }
+            
+            // Design-Barcode generieren
+            {% if order.design_file_path %}
+            try {
+                // Verwende Design-Dateinamen oder Auftrags-ID mit Präfix
+                const designCode = "D{{ order.id }}"; // Design-Präfix + Auftrags-ID
+                
+                JsBarcode("#design-barcode", designCode, {
+                    format: "CODE128",
+                    width: 1,
+                    height: 20,
+                    displayValue: false,
+                    margin: 1,
+                    fontSize: 6
+                });
+            } catch (e) {
+                console.error("Design Barcode generation failed:", e);
+                document.getElementById('design-barcode').innerHTML = '<span style="font-size: 5pt;">Barcode Fehler</span>';
+            }
+            {% else %}
+            // Kein Design verfügbar
+            document.getElementById('design-barcode').innerHTML = '<span style="font-size: 5pt; color: #666;">Kein Design</span>';
+            {% endif %}
+            
+            // Auto-Print wenn Parameter gesetzt
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('autoprint') === '1') {
+                setTimeout(function() {
+                    window.print();
+                }, 1500); // Zeit für Barcode-Generierung
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+
+{% block title %}Lieferanten für {{ article.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>Lieferanten-Verwaltung: {{ article.article_number }} - {{ article.name }}</h2>
+                <div>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSupplierModal">
+                        <i class="bi bi-plus"></i> Lieferant hinzufügen
+                    </button>
+                    <a href="{{ url_for('articles.detail', id=article.id) }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Zurück
+                    </a>
+                </div>
+            </div>
+
+            <!-- Aktive Lieferanten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Aktive Lieferanten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Lieferant</th>
+                                    <th>Art.-Nr. beim Lieferanten</th>
+                                    <th>EK-Preis</th>
+                                    <th>Mindestmenge</th>
+                                    <th>Lieferzeit</th>
+                                    <th>Verfügbarkeit</th>
+                                    <th>Bevorzugt</th>
+                                    <th>Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for as_rel in article_suppliers %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('suppliers.detail', id=as_rel.supplier.id) }}">
+                                            {{ as_rel.supplier.name }}
+                                        </a>
+                                    </td>
+                                    <td>{{ as_rel.supplier_article_number or '-' }}</td>
+                                    <td>{{ "%.2f"|format(as_rel.purchase_price) }} €</td>
+                                    <td>{{ as_rel.minimum_order_quantity }} {{ as_rel.quantity_unit }}</td>
+                                    <td>
+                                        {{ as_rel.delivery_time_days or as_rel.supplier.delivery_time_days or '-' }} Tage
+                                        {% if as_rel.express_delivery_available %}
+                                        <span class="badge bg-warning">Express: {{ as_rel.express_delivery_days }} Tage</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if as_rel.availability_status == 'available' %}
+                                        <span class="badge bg-success">Verfügbar</span>
+                                        {% elif as_rel.availability_status == 'limited' %}
+                                        <span class="badge bg-warning">Begrenzt</span>
+                                        {% else %}
+                                        <span class="badge bg-danger">Nicht verfügbar</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if as_rel.preferred %}
+                                        <i class="bi bi-star-fill text-warning"></i>
+                                        {% else %}
+                                        <button class="btn btn-sm btn-outline-secondary" 
+                                                onclick="setPreferred('{{ as_rel.supplier_id }}')">
+                                            <i class="bi bi-star"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info" 
+                                                onclick="editSupplier('{{ as_rel.supplier_id }}')"
+                                                title="Bearbeiten">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-warning" 
+                                                onclick="showPriceHistory('{{ as_rel.supplier_id }}')"
+                                                title="Preishistorie">
+                                            <i class="bi bi-graph-up"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-danger" 
+                                                onclick="removeSupplier('{{ as_rel.supplier_id }}')"
+                                                title="Entfernen">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preisvergleich -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Preisvergleich</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="priceChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Lieferant hinzufügen -->
+<div class="modal fade" id="addSupplierModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('articles.add_supplier', article_id=article.id) }}">
+                {{ form.hidden_tag() }}
+                <div class="modal-header">
+                    <h5 class="modal-title">Lieferant hinzufügen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Lieferant</label>
+                                <select name="supplier_id" class="form-select" required>
+                                    <option value="">-- Bitte wählen --</option>
+                                    {% for supplier in available_suppliers %}
+                                    <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Artikel-Nr. beim Lieferanten</label>
+                                <input type="text" name="supplier_article_number" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">EK-Preis (€)</label>
+                                <input type="number" name="purchase_price" class="form-control" 
+                                       step="0.01" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Mindestbestellmenge</label>
+                                <input type="number" name="minimum_order_quantity" class="form-control" 
+                                       value="1" min="1">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Einheit</label>
+                                <select name="quantity_unit" class="form-select">
+                                    <option value="Stück">Stück</option>
+                                    <option value="Meter">Meter</option>
+                                    <option value="kg">kg</option>
+                                    <option value="Packung">Packung</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Lieferzeit (Tage)</label>
+                                <input type="number" name="delivery_time_days" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Express-Lieferung</label>
+                                <div class="form-check">
+                                    <input type="checkbox" name="express_delivery_available" 
+                                           class="form-check-input" id="expressCheck"
+                                           onchange="toggleExpressFields()">
+                                    <label class="form-check-label" for="expressCheck">
+                                        Express-Lieferung verfügbar
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row" id="expressFields" style="display: none;">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Express-Lieferzeit (Tage)</label>
+                                <input type="number" name="express_delivery_days" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Express-Zuschlag (%)</label>
+                                <input type="number" name="express_surcharge_percent" class="form-control" 
+                                       step="0.1">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Notizen</label>
+                        <textarea name="notes" class="form-control" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Hinzufügen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Preishistorie -->
+<div class="modal fade" id="priceHistoryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Preishistorie</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <canvas id="priceHistoryChart"></canvas>
+                <div id="priceHistoryTable" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Preisvergleich Chart
+const priceData = {
+    labels: [{% for as_rel in article_suppliers %}'{{ as_rel.supplier.name }}'{% if not loop.last %},{% endif %}{% endfor %}],
+    datasets: [{
+        label: 'EK-Preis',
+        data: [{% for as_rel in article_suppliers %}{{ as_rel.purchase_price }}{% if not loop.last %},{% endif %}{% endfor %}],
+        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        borderWidth: 1
+    }]
+};
+
+const priceChart = new Chart(document.getElementById('priceChart'), {
+    type: 'bar',
+    data: priceData,
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value + ' €';
+                    }
+                }
+            }
+        }
+    }
+});
+
+function toggleExpressFields() {
+    const expressFields = document.getElementById('expressFields');
+    const expressCheck = document.getElementById('expressCheck');
+    expressFields.style.display = expressCheck.checked ? 'flex' : 'none';
+}
+
+function setPreferred(supplierId) {
+    if (confirm('Diesen Lieferanten als bevorzugt markieren?')) {
+        fetch(`/articles/{{ article.id }}/suppliers/${supplierId}/set-preferred`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        }).then(() => location.reload());
+    }
+}
+
+function editSupplier(supplierId) {
+    // TODO: Implementiere Edit-Modal
+    alert('Edit-Funktion wird implementiert');
+}
+
+function removeSupplier(supplierId) {
+    if (confirm('Diesen Lieferanten wirklich entfernen?')) {
+        fetch(`/articles/{{ article.id }}/suppliers/${supplierId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token() }}'
+            }
+        }).then(() => location.reload());
+    }
+}
+
+function showPriceHistory(supplierId) {
+    // TODO: Lade und zeige Preishistorie
+    $('#priceHistoryModal').modal('show');
+}
+</script>
+{% endblock %}

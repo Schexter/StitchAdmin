@@ -1,0 +1,5 @@
+{% if config.get('SIMPLE_NAVIGATION', False) %}
+    {% include 'base_clean.html' %}
+{% else %}
+    {% include 'base.html' %}
+{% endif %}

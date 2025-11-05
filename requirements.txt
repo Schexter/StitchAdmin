@@ -1,6 +1,6 @@
 # StitchAdmin 2.0 Requirements
 # Erstellt von Hans Hahn - Alle Rechte vorbehalten
-# Python 3.11+
+# Python 3.11+ (getestet mit 3.11, 3.12, 3.13)
 
 # ==========================================
 # WEB FRAMEWORK
@@ -13,8 +13,9 @@ Werkzeug==3.0.3
 
 # ==========================================
 # DATENBANK
+# FIX: SQLAlchemy 2.0.36+ für Python 3.13 Kompatibilität
 # ==========================================
-SQLAlchemy==2.0.30
+SQLAlchemy>=2.0.36
 
 # ==========================================
 # FORMULARE & VALIDIERUNG

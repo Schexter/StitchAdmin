@@ -1,0 +1,598 @@
+{% extends "base.html" %}
+
+{% block title %}Logo-Bestellung erstellen - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Erstellt von: Hans Hahn - Alle Rechte vorbehalten -->
+
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-cart-plus"></i> Logo-Bestellung erstellen</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('orders.index') }}">Aufträge</a></li>
+                <li class="breadcrumb-item active">Logo-Bestellung</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5><i class="bi bi-exclamation-triangle"></i> Logo/Design-Bestellung</h5>
+                <small class="text-muted">Erstelle eine Bestellung für ein fehlendes Logo oder Design</small>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="logo-order-form">
+                    <!-- Bestellinformationen -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="bi bi-info-circle"></i> Bestellinformationen</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="description">Design-Beschreibung *</label>
+                                        <textarea class="form-control" id="description" name="description" 
+                                                  rows="3" required>{{ description }}</textarea>
+                                        <small class="text-muted">
+                                            Detaillierte Beschreibung des gewünschten Designs
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="design_file_path">Design-Dateipfad</label>
+                                        <input type="text" class="form-control" id="design_file_path" 
+                                               name="design_file_path" value="{{ design_file_path }}" readonly>
+                                        <small class="text-muted">
+                                            Pfad wo die Design-Datei gespeichert werden soll
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="supplier_id">Lieferant *</label>
+                                        <select class="form-control" id="supplier_id" name="supplier_id" required>
+                                            <option value="">Lieferant auswählen...</option>
+                                            {% for supplier in suppliers %}
+                                            <option value="{{ supplier.id }}">
+                                                {{ supplier.name }}
+                                                {% if supplier.contact_email %} ({{ supplier.contact_email }}){% endif %}
+                                            </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="cost">Geschätzte Kosten</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="cost" name="cost" 
+                                                   step="0.01" min="0" placeholder="0.00">
+                                            <span class="input-group-text">€</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="expected_delivery">Erwartete Lieferung</label>
+                                        <input type="date" class="form-control" id="expected_delivery" 
+                                               name="expected_delivery">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Design-Spezifikationen -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="bi bi-palette"></i> Design-Spezifikationen</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="design_type">Design-Typ *</label>
+                                        <select class="form-control" id="design_type" name="design_type" required>
+                                            <option value="">Typ auswählen...</option>
+                                            <option value="logo">Logo</option>
+                                            <option value="text">Text/Schrift</option>
+                                            <option value="embroidery">Stickerei-Design</option>
+                                            <option value="print">Druck-Design</option>
+                                            <option value="combined">Kombiniert</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="file_format">Gewünschtes Format *</label>
+                                        <select class="form-control" id="file_format" name="file_format" required>
+                                            <option value="">Format auswählen...</option>
+                                            <optgroup label="Stickerei">
+                                                <option value="dst">DST (Tajima)</option>
+                                                <option value="pes">PES (Brother)</option>
+                                                <option value="jef">JEF (Janome)</option>
+                                                <option value="exp">EXP (Melco)</option>
+                                            </optgroup>
+                                            <optgroup label="Druck">
+                                                <option value="svg">SVG (Vektor)</option>
+                                                <option value="ai">AI (Adobe Illustrator)</option>
+                                                <option value="pdf">PDF (Hochauflösend)</option>
+                                                <option value="png">PNG (Transparent)</option>
+                                            </optgroup>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="urgency">Dringlichkeit</label>
+                                        <select class="form-control" id="urgency" name="urgency">
+                                            <option value="normal">Normal (5-7 Tage)</option>
+                                            <option value="high">Hoch (2-3 Tage)</option>
+                                            <option value="urgent">Dringend (1-2 Tage)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="size_specifications">Größenangaben</label>
+                                        <textarea class="form-control" id="size_specifications" 
+                                                  name="size_specifications" rows="3" 
+                                                  placeholder="z.B. 10x8 cm, 300 DPI, 5000 Stiche"></textarea>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="color_specifications">Farbangaben</label>
+                                        <textarea class="form-control" id="color_specifications" 
+                                                  name="color_specifications" rows="3" 
+                                                  placeholder="z.B. Firmenfarben: Blau #003366, Grau #999999"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Zusätzliche Informationen -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="bi bi-chat-dots"></i> Zusätzliche Informationen</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label" for="reference_materials">Referenzmaterialien</label>
+                                <textarea class="form-control" id="reference_materials" 
+                                          name="reference_materials" rows="3" 
+                                          placeholder="Beschreibung vorhandener Materialien, Links, ähnliche Designs..."></textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label" for="special_requirements">Besondere Anforderungen</label>
+                                <textarea class="form-control" id="special_requirements" 
+                                          name="special_requirements" rows="3" 
+                                          placeholder="Spezielle Wünsche, Qualitätsanforderungen, Verwendungszweck..."></textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label" for="notes">Interne Notizen</label>
+                                <textarea class="form-control" id="notes" name="notes" rows="2" 
+                                          placeholder="Interne Notizen für die Bearbeitung..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Bestellstatus -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="bi bi-list-check"></i> Bestellstatus</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="status">Status</label>
+                                        <select class="form-control" id="status" name="status">
+                                            <option value="pending">⏳ Ausstehend</option>
+                                            <option value="ordered">📋 Bestellt</option>
+                                            <option value="in_progress">🔄 In Bearbeitung</option>
+                                            <option value="review">👀 Zur Überprüfung</option>
+                                            <option value="delivered">✅ Geliefert</option>
+                                            <option value="cancelled">❌ Storniert</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="order_date">Bestelldatum</label>
+                                        <input type="date" class="form-control" id="order_date" 
+                                               name="order_date" value="{{ date.today() }}">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Automatische Benachrichtigungen -->
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="email_notification" 
+                                           name="email_notification" checked>
+                                    <label class="form-check-label" for="email_notification">
+                                        E-Mail-Benachrichtigung bei Statusänderung
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="dashboard_notification" 
+                                           name="dashboard_notification" checked>
+                                    <label class="form-check-label" for="dashboard_notification">
+                                        Dashboard-Benachrichtigung anzeigen
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Aktionen -->
+                    <div class="d-flex justify-content-between">
+                        <a href="javascript:history.back()" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Zurück
+                        </a>
+                        <div>
+                            <button type="button" class="btn btn-outline-primary me-2" onclick="saveDraft()">
+                                <i class="bi bi-save"></i> Als Entwurf speichern
+                            </button>
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-check-lg"></i> Bestellung erstellen
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Erfolgs-Modal -->
+<div class="modal fade" id="successModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-check-circle"></i> Bestellung erfolgreich erstellt
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center">
+                    <i class="bi bi-check-circle text-success display-4"></i>
+                    <h4 class="mt-3">Logo-Bestellung wurde erfolgreich erstellt!</h4>
+                    <p class="text-muted">
+                        Die Bestellung wurde an den ausgewählten Lieferanten weitergeleitet.
+                        Sie werden per E-Mail über den Fortschritt informiert.
+                    </p>
+                </div>
+                <div class="alert alert-info">
+                    <h6><i class="bi bi-info-circle"></i> Nächste Schritte:</h6>
+                    <ul class="mb-0">
+                        <li>Bestellung wird an Lieferanten gesendet</li>
+                        <li>Lieferant bestätigt Bestellung und Lieferzeit</li>
+                        <li>Design wird erstellt und zur Überprüfung gesendet</li>
+                        <li>Nach Freigabe wird das Design geliefert</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Schließen
+                </button>
+                <a href="{{ url_for('orders.index') }}" class="btn btn-primary">
+                    <i class="bi bi-list"></i> Zu Aufträgen
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Logo-Bestellung JavaScript
+document.getElementById('logo-order-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Zeige Loading
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Wird erstellt...';
+    submitBtn.disabled = true;
+    
+    // Sammle Formulardaten
+    const formData = new FormData(this);
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+        data[key] = value;
+    }
+    
+    // Sende Bestellung
+    fetch('/orders/create_logo_order', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Zeige Erfolgs-Modal
+            const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            successModal.show();
+            
+            // Formular zurücksetzen
+            document.getElementById('logo-order-form').reset();
+            
+        } else {
+            // Zeige Fehler
+            alert('Fehler beim Erstellen der Bestellung: ' + (data.error || 'Unbekannter Fehler'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Netzwerkfehler beim Erstellen der Bestellung.');
+    })
+    .finally(() => {
+        // Stelle Button wieder her
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+// Entwurf speichern
+function saveDraft() {
+    const formData = new FormData(document.getElementById('logo-order-form'));
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+        data[key] = value;
+    }
+    
+    // Speichere als Entwurf im Local Storage
+    localStorage.setItem('logo_order_draft', JSON.stringify(data));
+    
+    // Zeige Bestätigung
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-success alert-dismissible fade show';
+    alert.innerHTML = `
+        <i class="bi bi-check-circle"></i> Entwurf gespeichert!
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.querySelector('.card-body').insertBefore(alert, document.querySelector('form'));
+    
+    // Automatisch nach 3 Sekunden ausblenden
+    setTimeout(() => {
+        alert.remove();
+    }, 3000);
+}
+
+// Lade Entwurf beim Seitenaufruf
+window.addEventListener('load', function() {
+    const draft = localStorage.getItem('logo_order_draft');
+    if (draft) {
+        const data = JSON.parse(draft);
+        
+        // Zeige Hinweis
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-info alert-dismissible fade show';
+        alert.innerHTML = `
+            <i class="bi bi-info-circle"></i> Ein gespeicherter Entwurf wurde gefunden.
+            <button type="button" class="btn btn-sm btn-outline-primary ms-2" onclick="loadDraft()">
+                Entwurf laden
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-1" onclick="clearDraft()">
+                Entwurf löschen
+            </button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.querySelector('.card-body').insertBefore(alert, document.querySelector('form'));
+    }
+});
+
+// Entwurf laden
+function loadDraft() {
+    const draft = localStorage.getItem('logo_order_draft');
+    if (draft) {
+        const data = JSON.parse(draft);
+        
+        // Fülle Formularfelder
+        Object.keys(data).forEach(key => {
+            const field = document.getElementById(key) || document.querySelector(`[name="${key}"]`);
+            if (field) {
+                if (field.type === 'checkbox') {
+                    field.checked = data[key] === 'on';
+                } else {
+                    field.value = data[key];
+                }
+            }
+        });
+        
+        // Entferne Hinweis
+        document.querySelector('.alert-info').remove();
+    }
+}
+
+// Entwurf löschen
+function clearDraft() {
+    localStorage.removeItem('logo_order_draft');
+    document.querySelector('.alert-info').remove();
+}
+
+// Automatische Kostenberechnung basierend auf Design-Typ
+document.getElementById('design_type').addEventListener('change', function() {
+    const type = this.value;
+    const costField = document.getElementById('cost');
+    
+    // Geschätzte Kosten basierend auf Design-Typ
+    const estimatedCosts = {
+        'logo': 50.00,
+        'text': 25.00,
+        'embroidery': 75.00,
+        'print': 40.00,
+        'combined': 90.00
+    };
+    
+    if (estimatedCosts[type]) {
+        costField.value = estimatedCosts[type].toFixed(2);
+    }
+});
+
+// Automatische Lieferzeit basierend auf Dringlichkeit
+document.getElementById('urgency').addEventListener('change', function() {
+    const urgency = this.value;
+    const deliveryField = document.getElementById('expected_delivery');
+    
+    const today = new Date();
+    let deliveryDate = new Date(today);
+    
+    switch(urgency) {
+        case 'urgent':
+            deliveryDate.setDate(today.getDate() + 2);
+            break;
+        case 'high':
+            deliveryDate.setDate(today.getDate() + 3);
+            break;
+        default:
+            deliveryDate.setDate(today.getDate() + 7);
+    }
+    
+    deliveryField.value = deliveryDate.toISOString().split('T')[0];
+});
+
+// Validierung vor Absenden
+document.getElementById('logo-order-form').addEventListener('submit', function(e) {
+    const description = document.getElementById('description').value.trim();
+    const designType = document.getElementById('design_type').value;
+    const fileFormat = document.getElementById('file_format').value;
+    const supplierId = document.getElementById('supplier_id').value;
+    
+    if (!description || !designType || !fileFormat || !supplierId) {
+        e.preventDefault();
+        alert('Bitte füllen Sie alle Pflichtfelder aus.');
+        return false;
+    }
+    
+    if (description.length < 10) {
+        e.preventDefault();
+        alert('Die Design-Beschreibung muss mindestens 10 Zeichen lang sein.');
+        return false;
+    }
+});
+
+console.log('Logo-Bestellung Formular geladen - Erstellt von Hans Hahn');
+</script>
+
+<style>
+/* Spezielle Styles für Logo-Bestellung */
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 0.5rem;
+}
+
+.card-header {
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 0.5rem 0.5rem 0 0 !important;
+}
+
+.bg-warning {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%) !important;
+}
+
+.form-control:focus {
+    border-color: #ffc107;
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+}
+
+.btn-outline-primary {
+    transition: all 0.3s ease;
+}
+
+.btn-outline-primary:hover {
+    transform: translateY(-1px);
+}
+
+.alert {
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.modal-content {
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .d-flex.justify-content-between {
+        flex-direction: column;
+    }
+    
+    .d-flex.justify-content-between > div {
+        margin-top: 1rem;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Animation für Erfolgs-Modal */
+@keyframes bounceIn {
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    70% {
+        transform: scale(0.9);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.modal.show .modal-dialog {
+    animation: bounceIn 0.5s ease-out;
+}
+</style>
+{% endblock %}

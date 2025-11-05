@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Neuer Kunde - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('customers.index') }}">Kunden</a></li>
+                <li class="breadcrumb-item active">Neuer Kunde</li>
+            </ol>
+        </nav>
+        
+        <h1>Neuer Kunde</h1>
+    </div>
+</div>
+
+<form method="POST" id="customerForm">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Kundentyp-Auswahl -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Kundentyp</h5>
+                </div>
+                <div class="card-body">
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="customer_type" id="type_private" value="private" checked>
+                        <label class="btn btn-outline-primary" for="type_private">
+                            <i class="bi bi-person-fill"></i> Privatperson
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="customer_type" id="type_business" value="business">
+                        <label class="btn btn-outline-primary" for="type_business">
+                            <i class="bi bi-building"></i> Firmenkunde
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Persönliche Daten (Privatperson) -->
+            <div class="card mb-4" id="privatePersonFields">
+                <div class="card-header">
+                    <h5 class="mb-0">Persönliche Daten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="first_name" class="form-label">Vorname *</label>
+                            <input type="text" class="form-control" id="first_name" name="first_name" required>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="last_name" class="form-label">Nachname *</label>
+                            <input type="text" class="form-control" id="last_name" name="last_name" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="birth_date" class="form-label">Geburtsdatum</label>
+                            <input type="date" class="form-control" id="birth_date" name="birth_date">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Firmendaten (Firmenkunde) -->
+            <div class="card mb-4" id="businessFields" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0">Firmendaten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="company_name" class="form-label">Firmenname *</label>
+                            <input type="text" class="form-control" id="company_name" name="company_name">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="tax_id" class="form-label">Steuernummer</label>
+                            <input type="text" class="form-control" id="tax_id" name="tax_id">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="vat_id" class="form-label">USt-ID</label>
+                            <input type="text" class="form-control" id="vat_id" name="vat_id" placeholder="DE123456789"
+                                   pattern="^(DE[0-9]{9})?$" title="Format: DE + 9 Ziffern (z.B. DE123456789)">
+                            <div class="form-text">Format: DE + 9 Ziffern</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="contact_person" class="form-label">Ansprechpartner</label>
+                            <input type="text" class="form-control" id="contact_person" name="contact_person">
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="department" class="form-label">Abteilung</label>
+                            <input type="text" class="form-control" id="department" name="department">
+                        </div>
+                        
+                        <div class="col-md-3 mb-3">
+                            <label for="position" class="form-label">Position</label>
+                            <input type="text" class="form-control" id="position" name="position">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Kontaktdaten (für beide) -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Kontaktdaten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="email" class="form-label">E-Mail</label>
+                            <input type="email" class="form-control" id="email" name="email">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="phone" class="form-label">Telefon</label>
+                            <input type="tel" class="form-control" id="phone" name="phone">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="mobile" class="form-label">Mobil</label>
+                            <input type="tel" class="form-control" id="mobile" name="mobile">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Adresse -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Adresse</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="street" class="form-label">Straße</label>
+                            <input type="text" class="form-control" id="street" name="street">
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label for="house_number" class="form-label">Hausnummer</label>
+                            <input type="text" class="form-control" id="house_number" name="house_number">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="postal_code" class="form-label">PLZ</label>
+                            <input type="text" class="form-control" id="postal_code" name="postal_code">
+                        </div>
+                        
+                        <div class="col-md-8 mb-3">
+                            <label for="city" class="form-label">Ort</label>
+                            <input type="text" class="form-control" id="city" name="city">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="country" class="form-label">Land</label>
+                        <input type="text" class="form-control" id="country" name="country" value="Deutschland">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Notizen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Notizen</h5>
+                </div>
+                <div class="card-body">
+                    <textarea class="form-control" id="notes" name="notes" rows="5" 
+                              placeholder="Besondere Wünsche, Vorlieben, etc."></textarea>
+                </div>
+            </div>
+            
+            <!-- Einstellungen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Einstellungen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="newsletter" name="newsletter">
+                        <label class="form-check-label" for="newsletter">
+                            Newsletter abonnieren
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Aktionen -->
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-success w-100 mb-2">
+                        <i class="bi bi-save"></i> Kunde erstellen
+                    </button>
+                    <a href="{{ url_for('customers.index') }}" class="btn btn-secondary w-100">
+                        <i class="bi bi-x-circle"></i> Abbrechen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+// JavaScript für Kundentyp-Umschaltung
+document.addEventListener('DOMContentLoaded', function() {
+    const typePrivate = document.getElementById('type_private');
+    const typeBusiness = document.getElementById('type_business');
+    const privateFields = document.getElementById('privatePersonFields');
+    const businessFields = document.getElementById('businessFields');
+    
+    // Pflichtfeld-Elemente
+    const firstName = document.getElementById('first_name');
+    const lastName = document.getElementById('last_name');
+    const companyName = document.getElementById('company_name');
+    
+    function toggleCustomerType() {
+        if (typePrivate.checked) {
+            // Privatperson anzeigen
+            privateFields.style.display = 'block';
+            businessFields.style.display = 'none';
+            
+            // Pflichtfelder anpassen
+            firstName.required = true;
+            lastName.required = true;
+            companyName.required = false;
+        } else {
+            // Firmenkunde anzeigen
+            privateFields.style.display = 'none';
+            businessFields.style.display = 'block';
+            
+            // Pflichtfelder anpassen
+            firstName.required = false;
+            lastName.required = false;
+            companyName.required = true;
+        }
+    }
+    
+    // Event Listener
+    typePrivate.addEventListener('change', toggleCustomerType);
+    typeBusiness.addEventListener('change', toggleCustomerType);
+    
+    // Initial ausführen
+    toggleCustomerType();
+});
+</script>
+{% endblock %}

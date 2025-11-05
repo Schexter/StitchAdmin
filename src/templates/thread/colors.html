@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+
+{% block title %}Garnfarben - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>
+                    <a href="{{ url_for('thread.index') }}" class="text-decoration-none">
+                        <i class="bi bi-arrow-left-circle"></i>
+                    </a>
+                    Garnfarben-Übersicht
+                </h1>
+                <div>
+                    <button class="btn btn-primary btn-lg touch-target" data-bs-toggle="modal" data-bs-target="#addColorModal">
+                        <i class="bi bi-plus-circle"></i> Neue Farbe
+                    </button>
+                    <a href="{{ url_for('thread.import_page') }}" class="btn btn-success btn-lg touch-target ms-2">
+                        <i class="bi bi-file-earmark-pdf"></i> PDF Import
+                    </a>
+                    <a href="{{ url_for('thread.web_scraper') }}" class="btn btn-warning btn-lg touch-target ms-2">
+                        <i class="bi bi-globe"></i> Web Scraper
+                    </a>
+                    <a href="{{ url_for('thread_online.index') }}" class="btn btn-danger btn-lg touch-target ms-2">
+                        <i class="bi bi-globe"></i> Online Import
+                        <span class="badge bg-white text-danger ms-1">NEU!</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter und Suche -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <label for="searchInput" class="form-label">Suche</label>
+            <input type="text" class="form-control form-control-lg" id="searchInput" 
+                   placeholder="Farbnummer oder Name...">
+        </div>
+        <div class="col-md-3 mb-3">
+            <label for="manufacturerFilter" class="form-label">Hersteller</label>
+            <select class="form-select form-select-lg" id="manufacturerFilter">
+                <option value="">Alle Hersteller</option>
+                {% for manufacturer in manufacturers %}
+                <option value="{{ manufacturer }}">{{ manufacturer }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3 mb-3">
+            <label for="categoryFilter" class="form-label">Kategorie</label>
+            <select class="form-select form-select-lg" id="categoryFilter">
+                <option value="">Alle Kategorien</option>
+                <option value="Standard">Standard</option>
+                <option value="Metallic">Metallic</option>
+                <option value="Fluoreszent">Fluoreszent</option>
+                <option value="Multi-Color">Multi-Color</option>
+            </select>
+        </div>
+        <div class="col-md-2 mb-3">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-secondary btn-lg w-100" onclick="resetFilters()">
+                <i class="bi bi-x-circle"></i> Filter zurücksetzen
+            </button>
+        </div>
+    </div>
+
+    <!-- Farben-Grid -->
+    <div class="row" id="colorsGrid">
+        <!-- Wird dynamisch gefüllt -->
+    </div>
+
+    <!-- Keine Ergebnisse -->
+    <div class="row d-none" id="noResults">
+        <div class="col-12 text-center py-5">
+            <i class="bi bi-search display-1 text-muted"></i>
+            <p class="lead text-muted">Keine Farben gefunden</p>
+        </div>
+    </div>
+</div>
+
+<!-- Modal für Farbbearbeitung -->
+<div class="modal fade" id="editColorModal" tabindex="-1" aria-labelledby="editColorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editColorModalLabel">Farbe bearbeiten</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editColorForm">
+                    <input type="hidden" id="edit_color_id">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_manufacturer" class="form-label">Hersteller</label>
+                            <input type="text" class="form-control" id="edit_manufacturer" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_thread_type" class="form-label">Produktlinie</label>
+                            <input type="text" class="form-control" id="edit_thread_type">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="edit_color_number" class="form-label">Farbnummer</label>
+                            <input type="text" class="form-control" id="edit_color_number" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="edit_hex_color" class="form-label">Hex-Farbe</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="edit_hex_color" 
+                                       pattern="^#[0-9A-Fa-f]{6}$">
+                                <input type="color" class="form-control form-control-color" 
+                                       id="edit_color_picker" style="max-width: 60px;">
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="edit_pantone" class="form-label">Pantone</label>
+                            <input type="text" class="form-control" id="edit_pantone">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_color_name_de" class="form-label">Farbname (DE)</label>
+                            <input type="text" class="form-control" id="edit_color_name_de">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_color_name_en" class="form-label">Farbname (EN)</label>
+                            <input type="text" class="form-control" id="edit_color_name_en">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_category" class="form-label">Kategorie</label>
+                            <select class="form-select" id="edit_category">
+                                <option value="Standard">Standard</option>
+                                <option value="Metallic">Metallic</option>
+                                <option value="Fluoreszent">Fluoreszent</option>
+                                <option value="Multi-Color">Multi-Color</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit_in_stock" class="form-label">Lagerbestand</label>
+                            <input type="number" class="form-control" id="edit_in_stock" min="0">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="updateColor()">
+                    <i class="bi bi-save"></i> Speichern
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal für neue Farbe (wiederverwenden vom index) -->
+<div class="modal fade" id="addColorModal" tabindex="-1" aria-labelledby="addColorModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addColorModalLabel">Neue Farbe hinzufügen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addColorForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="manufacturer" class="form-label">Hersteller</label>
+                            <input type="text" class="form-control" id="manufacturer" required 
+                                   list="manufacturersList" placeholder="z.B. Madeira">
+                            <datalist id="manufacturersList">
+                                {% for manufacturer in manufacturers %}
+                                <option value="{{ manufacturer }}">
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="thread_type" class="form-label">Produktlinie</label>
+                            <input type="text" class="form-control" id="thread_type" 
+                                   placeholder="z.B. Polyneon No.40">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="color_number" class="form-label">Farbnummer</label>
+                            <input type="text" class="form-control" id="color_number" required 
+                                   placeholder="z.B. 1800">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="hex_color" class="form-label">Hex-Farbe</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="hex_color" 
+                                       placeholder="#000000" pattern="^#[0-9A-Fa-f]{6}$">
+                                <input type="color" class="form-control form-control-color" 
+                                       id="color_picker" value="#000000" style="max-width: 60px;">
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="pantone" class="form-label">Pantone</label>
+                            <input type="text" class="form-control" id="pantone" 
+                                   placeholder="z.B. 872C">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="color_name_de" class="form-label">Farbname (DE)</label>
+                            <input type="text" class="form-control" id="color_name_de" 
+                                   placeholder="z.B. Schwarz">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="color_name_en" class="form-label">Farbname (EN)</label>
+                            <input type="text" class="form-control" id="color_name_en" 
+                                   placeholder="z.B. Black">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="category" class="form-label">Kategorie</label>
+                            <select class="form-select" id="category">
+                                <option value="Standard">Standard</option>
+                                <option value="Metallic">Metallic</option>
+                                <option value="Fluoreszent">Fluoreszent</option>
+                                <option value="Multi-Color">Multi-Color</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="in_stock" class="form-label">Lagerbestand</label>
+                            <input type="number" class="form-control" id="in_stock" 
+                                   min="0" value="0">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="saveNewColor()">
+                    <i class="bi bi-save"></i> Speichern
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Debug-Ausgaben
+console.log('Garnfarben-Seite wird geladen...');
+
+let allColors = [];
+let filteredColors = [];
+
+// Farben laden
+function loadColors() {
+    const manufacturer = document.getElementById('manufacturerFilter').value;
+    const search = document.getElementById('searchInput').value;
+    
+    let url = '/threads/api/colors?';
+    if (manufacturer) url += `manufacturer=${encodeURIComponent(manufacturer)}&`;
+    if (search) url += `search=${encodeURIComponent(search)}&`;
+    
+    console.log('Lade Farben von:', url);
+    
+    fetch(url)
+        .then(response => {
+            console.log('Response Status:', response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Empfangene Daten:', data);
+            if (data.success) {
+                allColors = data.colors;
+                console.log(`${allColors.length} Farben geladen`);
+                applyFilters();
+            } else {
+                console.error('API-Fehler:', data.message);
+                alert('Fehler beim Laden der Garnfarben: ' + (data.message || 'Unbekannter Fehler'));
+            }
+        })
+        .catch(error => {
+            console.error('Netzwerkfehler:', error);
+            // Zeige Fehlermeldung an
+            const grid = document.getElementById('colorsGrid');
+            grid.innerHTML = '<div class="col-12 text-center"><div class="alert alert-danger">Fehler beim Laden der Garnfarben. Bitte prüfen Sie, ob der Server läuft.</div></div>';
+        });
+}
+
+// Filter anwenden
+function applyFilters() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const manufacturer = document.getElementById('manufacturerFilter').value;
+    const category = document.getElementById('categoryFilter').value;
+    
+    filteredColors = allColors.filter(color => {
+        let matches = true;
+        
+        if (search) {
+            matches = color.color_number.toLowerCase().includes(search) ||
+                     (color.color_name_de && color.color_name_de.toLowerCase().includes(search)) ||
+                     (color.color_name_en && color.color_name_en.toLowerCase().includes(search));
+        }
+        
+        if (manufacturer && matches) {
+            matches = color.manufacturer === manufacturer;
+        }
+        
+        if (category && matches) {
+            matches = color.category === category;
+        }
+        
+        return matches;
+    });
+    
+    displayColors();
+}
+
+// Farben anzeigen
+function displayColors() {
+    const grid = document.getElementById('colorsGrid');
+    const noResults = document.getElementById('noResults');
+    
+    if (filteredColors.length === 0) {
+        grid.innerHTML = '';
+        noResults.classList.remove('d-none');
+        return;
+    }
+    
+    noResults.classList.add('d-none');
+    grid.innerHTML = '';
+    
+    filteredColors.forEach(color => {
+        const col = document.createElement('div');
+        col.className = 'col-lg-2 col-md-3 col-sm-4 col-6 mb-4';
+        
+        const hexColor = color.hex_color || '#CCCCCC';
+        const textColor = getContrastColor(hexColor);
+        
+        col.innerHTML = `
+            <div class="card h-100 color-card" onclick="editColor('${color.id}')">
+                <div class="color-preview" style="background-color: ${hexColor}; color: ${textColor};">
+                    <div class="color-number">${color.color_number}</div>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-title mb-1">${color.manufacturer}</h6>
+                    <p class="card-text small">
+                        ${color.color_name_de || color.color_name_en || '-'}<br>
+                        <span class="text-muted">${color.thread_type || ''}</span>
+                    </p>
+                    ${color.pantone ? `<span class="badge bg-secondary">${color.pantone}</span>` : ''}
+                    ${color.in_stock > 0 ? `<span class="badge bg-success">Lager: ${color.in_stock}</span>` : ''}
+                </div>
+            </div>
+        `;
+        
+        grid.appendChild(col);
+    });
+}
+
+// Kontrastfarbe berechnen
+function getContrastColor(hexColor) {
+    const rgb = parseInt(hexColor.slice(1), 16);
+    const r = (rgb >> 16) & 0xff;
+    const g = (rgb >>  8) & 0xff;
+    const b = (rgb >>  0) & 0xff;
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    return luma > 186 ? '#000000' : '#FFFFFF';
+}
+
+// Farbe bearbeiten
+function editColor(colorId) {
+    const color = allColors.find(c => c.id === colorId);
+    if (!color) return;
+    
+    document.getElementById('edit_color_id').value = color.id;
+    document.getElementById('edit_manufacturer').value = color.manufacturer;
+    document.getElementById('edit_thread_type').value = color.thread_type || '';
+    document.getElementById('edit_color_number').value = color.color_number;
+    document.getElementById('edit_color_name_de').value = color.color_name_de || '';
+    document.getElementById('edit_color_name_en').value = color.color_name_en || '';
+    document.getElementById('edit_hex_color').value = color.hex_color || '';
+    document.getElementById('edit_pantone').value = color.pantone || '';
+    document.getElementById('edit_category').value = color.category || 'Standard';
+    document.getElementById('edit_in_stock').value = color.in_stock || 0;
+    
+    if (color.hex_color) {
+        document.getElementById('edit_color_picker').value = color.hex_color;
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('editColorModal'));
+    modal.show();
+}
+
+// Farbe aktualisieren
+function updateColor() {
+    const colorId = document.getElementById('edit_color_id').value;
+    const formData = {
+        manufacturer: document.getElementById('edit_manufacturer').value,
+        thread_type: document.getElementById('edit_thread_type').value,
+        color_number: document.getElementById('edit_color_number').value,
+        color_name_de: document.getElementById('edit_color_name_de').value,
+        color_name_en: document.getElementById('edit_color_name_en').value,
+        hex_color: document.getElementById('edit_hex_color').value,
+        pantone: document.getElementById('edit_pantone').value,
+        category: document.getElementById('edit_category').value,
+        in_stock: parseInt(document.getElementById('edit_in_stock').value) || 0
+    };
+    
+    fetch(`/threads/api/color/${colorId}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Farbe erfolgreich aktualisiert!');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editColorModal'));
+            modal.hide();
+            loadColors();
+        } else {
+            alert('Fehler: ' + data.message);
+        }
+    });
+}
+
+// Filter zurücksetzen
+function resetFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('manufacturerFilter').value = '';
+    document.getElementById('categoryFilter').value = '';
+    loadColors();
+}
+
+// Farbwähler synchronisieren
+document.getElementById('color_picker').addEventListener('change', function() {
+    document.getElementById('hex_color').value = this.value;
+});
+
+document.getElementById('hex_color').addEventListener('input', function() {
+    if (this.value.match(/^#[0-9A-Fa-f]{6}$/)) {
+        document.getElementById('color_picker').value = this.value;
+    }
+});
+
+document.getElementById('edit_color_picker').addEventListener('change', function() {
+    document.getElementById('edit_hex_color').value = this.value;
+});
+
+document.getElementById('edit_hex_color').addEventListener('input', function() {
+    if (this.value.match(/^#[0-9A-Fa-f]{6}$/)) {
+        document.getElementById('edit_color_picker').value = this.value;
+    }
+});
+
+// Neue Farbe speichern
+function saveNewColor() {
+    const formData = {
+        manufacturer: document.getElementById('manufacturer').value,
+        thread_type: document.getElementById('thread_type').value,
+        color_number: document.getElementById('color_number').value,
+        color_name_de: document.getElementById('color_name_de').value,
+        color_name_en: document.getElementById('color_name_en').value,
+        hex_color: document.getElementById('hex_color').value,
+        pantone: document.getElementById('pantone').value,
+        category: document.getElementById('category').value,
+        in_stock: parseInt(document.getElementById('in_stock').value) || 0
+    };
+    
+    fetch('/threads/api/color', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Farbe erfolgreich hinzugefügt!');
+            document.getElementById('addColorForm').reset();
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addColorModal'));
+            modal.hide();
+            loadColors();
+        } else {
+            alert('Fehler: ' + data.message);
+        }
+    });
+}
+
+// Event-Listener
+document.getElementById('searchInput').addEventListener('input', applyFilters);
+document.getElementById('manufacturerFilter').addEventListener('change', applyFilters);
+document.getElementById('categoryFilter').addEventListener('change', applyFilters);
+
+// Beim Laden
+document.addEventListener('DOMContentLoaded', function() {
+    loadColors();
+});
+</script>
+
+<style>
+.color-card {
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.color-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+.color-preview {
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+.color-number {
+    text-shadow: 0 0 3px rgba(0,0,0,0.5);
+}
+.touch-target {
+    min-height: 60px;
+    padding: 15px 30px;
+}
+</style>
+{% endblock %}

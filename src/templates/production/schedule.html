@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}Produktionszeitplan - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-calendar-week"></i> Produktionszeitplan</h1>
+        <p class="text-muted">Aufträge sortiert nach Priorität und Abholdatum</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Reihenfolge</th>
+                                <th>Auftrag</th>
+                                <th>Kunde</th>
+                                <th>Typ</th>
+                                <th>Artikel</th>
+                                <th>Anzahl</th>
+                                <th>Priorität</th>
+                                <th>Produktionszeit</th>
+                                <th>Abholdatum</th>
+                                <th>Status</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in scheduled_orders %}
+                            {% set order = item.order %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary">#{{ loop.index }}</span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}">
+                                        {{ order.id }}
+                                    </a>
+                                </td>
+                                <td>{{ order.customer_name }}</td>
+                                <td>
+                                    {% if order.order_type == 'embroidery' %}
+                                        <span class="badge bg-primary">Stickerei</span>
+                                    {% elif order.order_type == 'printing' %}
+                                        <span class="badge bg-success">Textildruck</span>
+                                    {% elif order.order_type == 'combined' %}
+                                        <span class="badge bg-info">Kombiniert</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ order.design_description or order.description }}
+                                    {% if order.textile_type %}
+                                        <br><small class="text-muted">{{ order.textile_type|title }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ order.quantity }}</strong>
+                                    {% if order.textile_size %}
+                                        <br><small class="text-muted">{{ order.textile_size }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.priority == 'urgent' %}
+                                        <span class="badge bg-danger">Dringend</span>
+                                    {% elif order.priority == 'high' %}
+                                        <span class="badge bg-warning">Hoch</span>
+                                    {% elif order.priority == 'normal' %}
+                                        <span class="badge bg-secondary">Normal</span>
+                                    {% elif order.priority == 'low' %}
+                                        <span class="badge bg-light text-dark">Niedrig</span>
+                                    {% endif %}
+                                    {% if order.rush_order %}
+                                        <br><small class="text-danger"><i class="bi bi-lightning-fill"></i> Express</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ item.production_time_hours }}h</strong>
+                                    <br><small class="text-muted">{{ item.production_time_minutes }} Min</small>
+                                </td>
+                                <td>
+                                    {% if order.pickup_date %}
+                                        {{ order.pickup_date }}
+                                    {% else %}
+                                        <small class="text-muted">Nicht festgelegt</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.status == 'accepted' %}
+                                        <span class="badge bg-primary">Bereit</span>
+                                    {% elif order.status == 'in_progress' %}
+                                        <span class="badge bg-warning">In Arbeit</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.status == 'accepted' %}
+                                        <form method="POST" action="{{ url_for('production.start_production', order_id=order.id) }}" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm btn-success">
+                                                <i class="bi bi-play-fill"></i> Start
+                                            </button>
+                                        </form>
+                                    {% elif order.status == 'in_progress' %}
+                                        <form method="POST" action="{{ url_for('production.complete_production', order_id=order.id) }}" style="display: inline;">
+                                            <button type="submit" class="btn btn-sm btn-primary">
+                                                <i class="bi bi-check-lg"></i> Fertig
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}" class="btn btn-sm btn-info">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="11" class="text-center text-muted">
+                                    Keine Aufträge in der Produktionsplanung
+                                    <br><br>
+                                    <a href="{{ url_for('orders.new') }}" class="btn btn-success">
+                                        <i class="bi bi-plus-lg"></i> Neuen Auftrag erstellen
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Produktionszusammenfassung -->
+{% if scheduled_orders %}
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-graph-up"></i> Produktions-Übersicht</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h4 class="text-primary">{{ scheduled_orders|length }}</h4>
+                            <p class="text-muted">Aufträge gesamt</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h4 class="text-success">
+                                {% set total_hours = scheduled_orders|sum(attribute='production_time_hours') %}
+                                {{ "%.1f"|format(total_hours) }}h
+                            </h4>
+                            <p class="text-muted">Geschätzte Gesamtzeit</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h4 class="text-warning">
+                                {{ scheduled_orders|selectattr('order.priority', 'equalto', 'urgent')|list|length }}
+                            </h4>
+                            <p class="text-muted">Dringende Aufträge</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h4 class="text-info">
+                                {{ scheduled_orders|selectattr('order.rush_order', 'equalto', true)|list|length }}
+                            </h4>
+                            <p class="text-muted">Express-Aufträge</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="mt-3">
+    <a href="{{ url_for('production.index') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Zurück zur Produktionsplanung
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+
+{% block title %}{{ supplier.name }} bearbeiten{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.index') }}">Lieferanten</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.show', supplier_id=supplier.id) }}">{{ supplier.name }}</a></li>
+                <li class="breadcrumb-item active">Bearbeiten</li>
+            </ol>
+        </nav>
+        
+        <h1>{{ supplier.name }} bearbeiten</h1>
+    </div>
+</div>
+
+<form method="POST">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Grunddaten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Grunddaten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="name" class="form-label">Firmenname *</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ supplier.name }}" required autofocus>
+                        </div>
+                        
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Status</label>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="active" name="active" {% if supplier.active %}checked{% endif %}>
+                                <label class="form-check-label" for="active">
+                                    Aktiv
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="preferred" name="preferred" {% if supplier.preferred %}checked{% endif %}>
+                                <label class="form-check-label" for="preferred">
+                                    <i class="fas fa-star text-warning"></i> Bevorzugter Lieferant
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="contact_person" class="form-label">Kontaktperson</label>
+                            <input type="text" class="form-control" id="contact_person" name="contact_person" value="{{ supplier.contact_person or '' }}">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="tax_id" class="form-label">Steuernummer</label>
+                            <input type="text" class="form-control" id="tax_id" name="tax_id" value="{{ supplier.tax_id or '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="customer_number" class="form-label">Unsere Kundennummer</label>
+                            <input type="text" class="form-control" id="customer_number" name="customer_number" 
+                                   value="{{ supplier.customer_number or '' }}"
+                                   placeholder="Ihre Kundennummer bei diesem Lieferanten">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Kontaktdaten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Kontaktdaten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">E-Mail</label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ supplier.email or '' }}">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="website" class="form-label">Website</label>
+                            <input type="url" class="form-control" id="website" name="website" value="{{ supplier.website or '' }}" placeholder="https://">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="phone" class="form-label">Telefon</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" value="{{ supplier.phone or '' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Adresse -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Adresse</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="street" class="form-label">Straße</label>
+                            <input type="text" class="form-control" id="street" name="street" value="{{ supplier.street or '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="postal_code" class="form-label">PLZ</label>
+                            <input type="text" class="form-control" id="postal_code" name="postal_code" value="{{ supplier.postal_code or '' }}">
+                        </div>
+                        
+                        <div class="col-md-8 mb-3">
+                            <label for="city" class="form-label">Stadt</label>
+                            <input type="text" class="form-control" id="city" name="city" value="{{ supplier.city or '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="country" class="form-label">Land</label>
+                        <input type="text" class="form-control" id="country" name="country" value="{{ supplier.country or 'Deutschland' }}">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Retourenadresse -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Retourenadresse</h5>
+                    <small class="text-muted">Falls abweichend von der Hauptadresse</small>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="return_street" class="form-label">Straße</label>
+                            <input type="text" class="form-control" id="return_street" name="return_street" 
+                                   value="{{ supplier.return_street or '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="return_postal_code" class="form-label">PLZ</label>
+                            <input type="text" class="form-control" id="return_postal_code" name="return_postal_code" 
+                                   value="{{ supplier.return_postal_code or '' }}">
+                        </div>
+                        
+                        <div class="col-md-8 mb-3">
+                            <label for="return_city" class="form-label">Stadt</label>
+                            <input type="text" class="form-control" id="return_city" name="return_city" 
+                                   value="{{ supplier.return_city or '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="return_country" class="form-label">Land</label>
+                            <input type="text" class="form-control" id="return_country" name="return_country" 
+                                   value="{{ supplier.return_country or '' }}">
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="return_contact" class="form-label">Kontaktperson</label>
+                            <input type="text" class="form-control" id="return_contact" name="return_contact" 
+                                   value="{{ supplier.return_contact or '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="return_phone" class="form-label">Telefon</label>
+                            <input type="tel" class="form-control" id="return_phone" name="return_phone" 
+                                   value="{{ supplier.return_phone or '' }}">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="return_notes" class="form-label">Hinweise zur Retoure</label>
+                        <textarea class="form-control" id="return_notes" name="return_notes" rows="3" 
+                                  placeholder="z.B. RMA-Nummer erforderlich, Öffnungszeiten, etc.">{{ supplier.return_notes or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Webshop-Integration -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-shopping-cart me-2"></i>Webshop-Integration
+                        <small class="text-muted ms-2">Optional - für automatisches Bestellen</small>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="webshop_url" class="form-label">Webshop URL</label>
+                        <input type="url" class="form-control" id="webshop_url" name="webshop_url" 
+                               value="{{ supplier.webshop_url or '' }}" 
+                               placeholder="https://shop.lieferant.de">
+                        <small class="text-muted">Haupt-URL des Online-Shops</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="webshop_article_url_pattern" class="form-label">Artikel-URL-Muster</label>
+                        <input type="text" class="form-control" id="webshop_article_url_pattern" 
+                               name="webshop_article_url_pattern" 
+                               value="{{ supplier.webshop_article_url_pattern or '' }}" 
+                               placeholder="https://shop.lieferant.de/artikel/{article_number}">
+                        <small class="text-muted">Verwenden Sie {article_number} als Platzhalter für die Artikelnummer</small>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="webshop_type" class="form-label">Shop-System</label>
+                            <select class="form-select" id="webshop_type" name="webshop_type">
+                                <option value="">-- Bitte wählen --</option>
+                                <option value="generic" {% if supplier.webshop_type == 'generic' %}selected{% endif %}>
+                                    Standard/Unbekannt
+                                </option>
+                                <option value="shopware" {% if supplier.webshop_type == 'shopware' %}selected{% endif %}>
+                                    Shopware
+                                </option>
+                                <option value="woocommerce" {% if supplier.webshop_type == 'woocommerce' %}selected{% endif %}>
+                                    WooCommerce
+                                </option>
+                                <option value="magento" {% if supplier.webshop_type == 'magento' %}selected{% endif %}>
+                                    Magento
+                                </option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="webshop_username" class="form-label">Benutzername</label>
+                            <input type="text" class="form-control" id="webshop_username" name="webshop_username" 
+                                   value="{{ supplier.webshop_username or '' }}" 
+                                   placeholder="Login für den Webshop">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="webshop_password" class="form-label">
+                            Passwort
+                            {% if supplier.webshop_password_encrypted %}
+                                <span class="badge bg-success ms-2">Gespeichert</span>
+                            {% endif %}
+                        </label>
+                        <input type="password" class="form-control" id="webshop_password" 
+                               name="webshop_password" 
+                               placeholder="{% if supplier.webshop_password_encrypted %}Leer lassen für keine Änderung{% else %}Webshop-Passwort{% endif %}">
+                        <small class="text-muted">Wird verschlüsselt gespeichert</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="webshop_notes" class="form-label">Webshop-Notizen</label>
+                        <textarea class="form-control" id="webshop_notes" name="webshop_notes" rows="2" 
+                                  placeholder="z.B. Sonderkonditionen, Rabattcodes, Besonderheiten beim Login">{{ supplier.webshop_notes or '' }}</textarea>
+                    </div>
+                    
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="auto_order_enabled" 
+                               name="auto_order_enabled" value="on"
+                               {% if supplier.auto_order_enabled %}checked{% endif %}>
+                        <label class="form-check-label" for="auto_order_enabled">
+                            Auto-Order aktivieren
+                            <small class="text-muted">(Erweiterte Funktion - in Entwicklung)</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <!-- Bestellkonditionen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Bestellkonditionen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="payment_terms" class="form-label">Zahlungsbedingungen</label>
+                        <input type="text" class="form-control" id="payment_terms" name="payment_terms" 
+                               value="{{ supplier.payment_terms or '30 Tage netto' }}" placeholder="z.B. 30 Tage netto">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="delivery_time_days" class="form-label">Lieferzeit (Tage)</label>
+                        <input type="number" class="form-control" id="delivery_time_days" name="delivery_time_days" 
+                               value="{{ supplier.delivery_time_days or '' }}" min="0" placeholder="z.B. 3">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="minimum_order_value" class="form-label">Mindestbestellwert (€)</label>
+                        <input type="number" class="form-control" id="minimum_order_value" name="minimum_order_value" 
+                               value="{{ supplier.minimum_order_value or '' }}" min="0" step="0.01" placeholder="0.00">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Info</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1"><strong>ID:</strong> {{ supplier.id }}</p>
+                    <p class="mb-1"><strong>Erstellt:</strong> {{ supplier.created_at.strftime('%d.%m.%Y %H:%M') if supplier.created_at else '-' }}</p>
+                    {% if supplier.created_by %}
+                        <p class="mb-1"><strong>Erstellt von:</strong> {{ supplier.created_by }}</p>
+                    {% endif %}
+                    {% if supplier.updated_at %}
+                        <p class="mb-1"><strong>Zuletzt geändert:</strong> {{ supplier.updated_at.strftime('%d.%m.%Y %H:%M') }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Aktionen -->
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary w-100 mb-2">
+                        <i class="fas fa-save me-2"></i>Änderungen speichern
+                    </button>
+                    <a href="{{ url_for('suppliers.show', supplier_id=supplier.id) }}" class="btn btn-secondary w-100">
+                        <i class="fas fa-times me-2"></i>Abbrechen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

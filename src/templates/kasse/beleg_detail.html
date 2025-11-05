@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Beleg #{{ beleg.beleg_nummer }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <!-- Beleg-Ansicht -->
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <div class="row">
+                        <div class="col">
+                            <h4><i class="bi bi-receipt"></i> Kassenbeleg #{{ beleg.beleg_nummer }}</h4>
+                        </div>
+                        <div class="col text-end">
+                            <span class="badge bg-light text-dark">{{ beleg.datum.strftime('%d.%m.%Y %H:%M') }}</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card-body">
+                    <!-- Kopfbereich -->
+                    <div class="text-center mb-4">
+                        <h5>{{ firma.name }}</h5>
+                        <p class="mb-0">{{ firma.strasse }}</p>
+                        <p class="mb-0">{{ firma.plz }} {{ firma.ort }}</p>
+                        <p class="mb-0">Tel: {{ firma.telefon }}</p>
+                        <p class="mb-0">Steuernummer: {{ firma.steuernummer }}</p>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- Kunde -->
+                    {% if beleg.kunde %}
+                    <div class="mb-3">
+                        <strong>Kunde:</strong><br>
+                        {{ beleg.kunde.first_name }} {{ beleg.kunde.last_name }}<br>
+                        {% if beleg.kunde.company_name %}
+                        {{ beleg.kunde.company_name }}<br>
+                        {% endif %}
+                    </div>
+                    <hr>
+                    {% endif %}
+                    
+                    <!-- Positionen -->
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Artikel</th>
+                                <th class="text-end">Menge</th>
+                                <th class="text-end">Einzelpreis</th>
+                                <th class="text-end">Gesamt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for position in beleg.positionen %}
+                            <tr>
+                                <td>
+                                    {{ position.artikel_name }}<br>
+                                    <small class="text-muted">Art.Nr.: {{ position.artikel_nummer }}</small>
+                                </td>
+                                <td class="text-end">{{ position.menge }}</td>
+                                <td class="text-end">{{ "%.2f"|format(position.einzelpreis) }} €</td>
+                                <td class="text-end">{{ "%.2f"|format(position.gesamtpreis) }} €</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="text-end">Zwischensumme:</td>
+                                <td class="text-end">{{ "%.2f"|format(beleg.summe_netto) }} €</td>
+                            </tr>
+                            <tr>
+                                <td colspan="3" class="text-end">MwSt ({{ beleg.mwst_satz }}%):</td>
+                                <td class="text-end">{{ "%.2f"|format(beleg.summe_mwst) }} €</td>
+                            </tr>
+                            <tr class="table-secondary">
+                                <td colspan="3" class="text-end"><strong>Gesamtbetrag:</strong></td>
+                                <td class="text-end"><strong>{{ "%.2f"|format(beleg.summe_brutto) }} €</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    
+                    <!-- Zahlung -->
+                    <div class="mt-4">
+                        <table class="table table-sm table-borderless">
+                            <tr>
+                                <td><strong>Zahlungsart:</strong></td>
+                                <td>
+                                    {% if beleg.zahlungsart == 'cash' %}
+                                        <i class="bi bi-cash"></i> Bar
+                                    {% elif beleg.zahlungsart == 'card' %}
+                                        <i class="bi bi-credit-card"></i> Karte
+                                    {% elif beleg.zahlungsart == 'invoice' %}
+                                        <i class="bi bi-receipt"></i> Rechnung
+                                    {% else %}
+                                        {{ beleg.zahlungsart }}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% if beleg.zahlungsart == 'cash' and beleg.gegeben %}
+                            <tr>
+                                <td>Gegeben:</td>
+                                <td>{{ "%.2f"|format(beleg.gegeben) }} €</td>
+                            </tr>
+                            <tr>
+                                <td>Rückgeld:</td>
+                                <td>{{ "%.2f"|format(beleg.rueckgeld) }} €</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                    
+                    <!-- TSE Signatur -->
+                    {% if beleg.tse_signatur %}
+                    <div class="mt-4 p-3 bg-light">
+                        <small class="text-muted">
+                            <strong>TSE-Signatur:</strong><br>
+                            Trans.Nr.: {{ beleg.tse_transaktion_nummer }}<br>
+                            Start: {{ beleg.tse_start.strftime('%Y-%m-%d %H:%M:%S') }}<br>
+                            Ende: {{ beleg.tse_ende.strftime('%Y-%m-%d %H:%M:%S') }}<br>
+                            Signatur: {{ beleg.tse_signatur[:50] }}...
+                        </small>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Fußzeile -->
+                    <div class="text-center mt-4">
+                        <p class="mb-0">Vielen Dank für Ihren Einkauf!</p>
+                        <p class="mb-0"><small>Beleg-ID: {{ beleg.id }}</small></p>
+                        {% if beleg.kassier %}
+                        <p class="mb-0"><small>Bedienung: {{ beleg.kassier.username }}</small></p>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="card-footer">
+                    <div class="row">
+                        <div class="col">
+                            <a href="{{ url_for('kasse.kassen_index') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Zurück
+                            </a>
+                        </div>
+                        <div class="col text-end">
+                            <button class="btn btn-primary" onclick="printReceipt()">
+                                <i class="bi bi-printer"></i> Drucken
+                            </button>
+                            {% if beleg.storniert %}
+                            <span class="badge bg-danger">STORNIERT</span>
+                            {% else %}
+                            <button class="btn btn-danger" onclick="cancelReceipt()">
+                                <i class="bi bi-x-circle"></i> Stornieren
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function printReceipt() {
+    window.open(`/kasse/beleg/{{ beleg.id }}/print`, '_blank');
+}
+
+function cancelReceipt() {
+    if (confirm('Beleg wirklich stornieren? Diese Aktion kann nicht rückgängig gemacht werden.')) {
+        fetch(`/kasse/api/beleg/{{ beleg.id }}/storno`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert('Beleg wurde storniert');
+                location.reload();
+            } else {
+                alert('Fehler beim Stornieren: ' + result.message);
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

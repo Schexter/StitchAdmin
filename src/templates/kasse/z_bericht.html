@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block title %}Z-Bericht - Kassensystem{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="bi bi-file-text"></i> Z-Bericht (Tagesabschluss)</h3>
+                </div>
+                <div class="card-body">
+                    <!-- Kopfdaten -->
+                    <div class="text-center mb-4">
+                        <h4>{{ company_name or 'StitchAdmin GmbH' }}</h4>
+                        <p class="mb-0">{{ company_address or 'Musterstraße 1, 12345 Musterstadt' }}</p>
+                        <p class="mb-0">Steuernummer: {{ tax_number or 'DE123456789' }}</p>
+                        <hr>
+                        <h5>Z-BERICHT NR. {{ z_number }}</h5>
+                        <p class="mb-0">Datum: {{ report_date.strftime('%d.%m.%Y') }}</p>
+                        <p class="mb-0">Uhrzeit: {{ report_time.strftime('%H:%M:%S') }}</p>
+                        <p class="mb-0">Kasse: {{ terminal_id or 'KASSE-01' }}</p>
+                        <p class="mb-0">Bediener: {{ operator }}</p>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- Umsätze -->
+                    <h6 class="text-uppercase">Umsätze</h6>
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <td>Erster Beleg:</td>
+                                <td class="text-end">{{ first_receipt_number or '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td>Letzter Beleg:</td>
+                                <td class="text-end">{{ last_receipt_number or '-' }}</td>
+                            </tr>
+                            <tr>
+                                <td>Anzahl Belege:</td>
+                                <td class="text-end">{{ receipt_count }}</td>
+                            </tr>
+                            <tr>
+                                <td>Stornierte Belege:</td>
+                                <td class="text-end">{{ cancelled_count }}</td>
+                            </tr>
+                            <tr>
+                                <th>Gesamtumsatz Brutto:</th>
+                                <th class="text-end">{{ "%.2f"|format(gross_total) }} €</th>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <hr>
+                    
+                    <!-- Zahlungsarten -->
+                    <h6 class="text-uppercase">Zahlungsarten</h6>
+                    <table class="table table-sm">
+                        <tbody>
+                            {% for payment in payment_methods %}
+                            <tr>
+                                <td>{{ payment.name }}:</td>
+                                <td class="text-end">{{ "%.2f"|format(payment.amount) }} €</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="table-active">
+                                <th>Summe Zahlungen:</th>
+                                <th class="text-end">{{ "%.2f"|format(gross_total) }} €</th>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <hr>
+                    
+                    <!-- Steuersätze -->
+                    <h6 class="text-uppercase">Steuersätze</h6>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Satz</th>
+                                <th class="text-end">Netto</th>
+                                <th class="text-end">Steuer</th>
+                                <th class="text-end">Brutto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tax in tax_summary %}
+                            <tr>
+                                <td>{{ tax.rate }}%</td>
+                                <td class="text-end">{{ "%.2f"|format(tax.net_amount) }} €</td>
+                                <td class="text-end">{{ "%.2f"|format(tax.tax_amount) }} €</td>
+                                <td class="text-end">{{ "%.2f"|format(tax.gross_amount) }} €</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="table-active">
+                                <th>Gesamt</th>
+                                <th class="text-end">{{ "%.2f"|format(net_total) }} €</th>
+                                <th class="text-end">{{ "%.2f"|format(tax_total) }} €</th>
+                                <th class="text-end">{{ "%.2f"|format(gross_total) }} €</th>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <hr>
+                    
+                    <!-- Kassenzählung -->
+                    <h6 class="text-uppercase">Kassenzählung</h6>
+                    <table class="table table-sm">
+                        <tbody>
+                            <tr>
+                                <td>Kassenstand Anfang:</td>
+                                <td class="text-end">{{ "%.2f"|format(cash_start) }} €</td>
+                            </tr>
+                            <tr>
+                                <td>+ Bareinnahmen:</td>
+                                <td class="text-end">{{ "%.2f"|format(cash_revenue) }} €</td>
+                            </tr>
+                            <tr>
+                                <td>- Barentnahmen:</td>
+                                <td class="text-end">{{ "%.2f"|format(cash_withdrawals) }} €</td>
+                            </tr>
+                            <tr class="table-active">
+                                <th>Kassenstand SOLL:</th>
+                                <th class="text-end">{{ "%.2f"|format(cash_expected) }} €</th>
+                            </tr>
+                            <tr>
+                                <td>Kassenstand IST:</td>
+                                <td class="text-end">
+                                    <input type="number" step="0.01" class="form-control form-control-sm text-end" 
+                                           id="cashActual" value="{{ "%.2f"|format(cash_actual) }}" 
+                                           onchange="calculateDifference()">
+                                </td>
+                            </tr>
+                            <tr id="differenceRow" class="{{ 'text-danger' if cash_difference != 0 else '' }}">
+                                <td>Differenz:</td>
+                                <td class="text-end" id="cashDifference">{{ "%.2f"|format(cash_difference) }} €</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <!-- TSE-Signatur -->
+                    {% if tse_signature %}
+                    <hr>
+                    <h6 class="text-uppercase">TSE-Signatur</h6>
+                    <div class="small">
+                        <p class="mb-1"><strong>TSE-Serial:</strong> {{ tse_signature.serial }}</p>
+                        <p class="mb-1"><strong>Signatur-Zähler:</strong> {{ tse_signature.counter }}</p>
+                        <p class="mb-1"><strong>Zeitstempel:</strong> {{ tse_signature.timestamp }}</p>
+                        <p class="mb-1 text-break"><strong>Signatur:</strong> {{ tse_signature.signature }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    <!-- Unterschrift -->
+                    <div class="row mt-5">
+                        <div class="col-6">
+                            <div class="border-top pt-2">
+                                <p class="text-center mb-0">Datum, Unterschrift Kassierer</p>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border-top pt-2">
+                                <p class="text-center mb-0">Datum, Unterschrift Geschäftsführung</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Aktionen -->
+                    <div class="mt-4 text-center no-print">
+                        <button class="btn btn-primary" onclick="window.print()">
+                            <i class="bi bi-printer"></i> Drucken
+                        </button>
+                        <button class="btn btn-success" onclick="saveZReport()">
+                            <i class="bi bi-save"></i> Speichern & Abschließen
+                        </button>
+                        <a href="{{ url_for('kasse.kassen_index') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Zurück
+                        </a>
+                    </div>
+                    
+                    <!-- Warnung -->
+                    <div class="alert alert-warning mt-3 no-print">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Wichtig:</strong> Nach dem Speichern wird der Tageszähler zurückgesetzt 
+                        und ein neuer Geschäftstag beginnt. Dieser Vorgang kann nicht rückgängig gemacht werden.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    .card-header {
+        background: none !important;
+        color: black !important;
+        border-bottom: 2px solid black;
+    }
+    
+    body {
+        font-size: 12pt;
+    }
+    
+    .table {
+        font-size: 11pt;
+    }
+}
+
+.form-control-sm {
+    width: 120px;
+    margin-left: auto;
+}
+</style>
+
+<script>
+function calculateDifference() {
+    const expected = {{ cash_expected }};
+    const actual = parseFloat(document.getElementById('cashActual').value) || 0;
+    const difference = actual - expected;
+    
+    const diffElement = document.getElementById('cashDifference');
+    const diffRow = document.getElementById('differenceRow');
+    
+    diffElement.textContent = difference.toFixed(2) + ' €';
+    
+    if (difference !== 0) {
+        diffRow.classList.add('text-danger');
+    } else {
+        diffRow.classList.remove('text-danger');
+    }
+}
+
+function saveZReport() {
+    const cashActual = parseFloat(document.getElementById('cashActual').value) || 0;
+    
+    if (!confirm('Z-Bericht wirklich abschließen? Der Tageszähler wird zurückgesetzt.')) {
+        return;
+    }
+    
+    fetch('{{ url_for("kasse.api_tagesabschluss") }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            cash_actual: cashActual,
+            z_number: {{ z_number }}
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Z-Bericht wurde erfolgreich erstellt und gespeichert.');
+            window.location.href = '{{ url_for("kasse.kassen_index") }}';
+        } else {
+            alert('Fehler: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Fehler beim Speichern: ' + error);
+    });
+}
+
+// Auto-Print wenn gewünscht
+{% if auto_print %}
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        window.print();
+    }, 500);
+});
+{% endif %}
+</script>
+{% endblock %}

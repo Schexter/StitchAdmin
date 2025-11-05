@@ -1,0 +1,223 @@
+{% extends "base.html" %}
+
+{% block title %}Garnfarben Konverter - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>
+                    <a href="{{ url_for('thread.index') }}" class="text-decoration-none">
+                        <i class="bi bi-arrow-left-circle"></i>
+                    </a>
+                    Garnfarben Konverter
+                </h1>
+            </div>
+            <p class="lead">Finden Sie äquivalente Farben zwischen verschiedenen Herstellern.</p>
+        </div>
+    </div>
+
+    <!-- Konverter-Form -->
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-body">
+                    <form id="converterForm">
+                        <div class="row mb-4">
+                            <div class="col-md-5">
+                                <label for="from_manufacturer" class="form-label">Von Hersteller</label>
+                                <select class="form-select form-select-lg" id="from_manufacturer" required>
+                                    <option value="">Wählen Sie einen Hersteller</option>
+                                    {% for manufacturer in manufacturers %}
+                                    <option value="{{ manufacturer }}">{{ manufacturer }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2 text-center d-flex align-items-end">
+                                <i class="bi bi-arrow-right display-6 mx-auto"></i>
+                            </div>
+                            <div class="col-md-5">
+                                <label for="to_manufacturer" class="form-label">Zu Hersteller</label>
+                                <select class="form-select form-select-lg" id="to_manufacturer" required>
+                                    <option value="">Wählen Sie einen Hersteller</option>
+                                    {% for manufacturer in manufacturers %}
+                                    <option value="{{ manufacturer }}">{{ manufacturer }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <label for="color_search" class="form-label">Farbnummer oder Name</label>
+                                <div class="input-group input-group-lg">
+                                    <input type="text" class="form-control" id="color_search" 
+                                           placeholder="z.B. 1800 oder Schwarz" required>
+                                    <button class="btn btn-primary touch-target" type="submit">
+                                        <i class="bi bi-search"></i> Konvertieren
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ergebnisse -->
+    <div class="row mt-4 d-none" id="resultsSection">
+        <div class="col-md-10 mx-auto">
+            <h3>Konvertierungsergebnisse</h3>
+            
+            <!-- Original-Farbe -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <h5>Originalfarbe</h5>
+                    <div id="originalColor"></div>
+                </div>
+            </div>
+
+            <!-- Gefundene Übereinstimmungen -->
+            <div class="row">
+                <div class="col-12">
+                    <h5>Gefundene Übereinstimmungen</h5>
+                    <div id="matchedColors"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info-Box -->
+    <div class="row mt-5">
+        <div class="col-md-8 mx-auto">
+            <div class="alert alert-info">
+                <h5><i class="bi bi-info-circle"></i> Hinweis zur Farbkonvertierung</h5>
+                <p>Die Farbkonvertierung basiert auf verschiedenen Faktoren:</p>
+                <ul>
+                    <li><strong>Exakte Übereinstimmung:</strong> Gleicher Hex-Wert oder Pantone-Code</li>
+                    <li><strong>Ähnliche Farben:</strong> Farben mit geringem Farbabstand (ΔE < 5)</li>
+                    <li><strong>Herstellerangaben:</strong> Offizielle Konvertierungstabellen der Hersteller</li>
+                </ul>
+                <p class="mb-0">Beachten Sie, dass die tatsächliche Farbe je nach Material und Beleuchtung variieren kann.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Konverter-Formular
+document.getElementById('converterForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const fromManufacturer = document.getElementById('from_manufacturer').value;
+    const toManufacturer = document.getElementById('to_manufacturer').value;
+    const colorSearch = document.getElementById('color_search').value;
+    
+    if (!fromManufacturer || !toManufacturer || !colorSearch) {
+        alert('Bitte füllen Sie alle Felder aus.');
+        return;
+    }
+    
+    if (fromManufacturer === toManufacturer) {
+        alert('Bitte wählen Sie unterschiedliche Hersteller.');
+        return;
+    }
+    
+    // API-Aufruf
+    fetch('/threads/api/convert', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            from_manufacturer: fromManufacturer,
+            to_manufacturer: toManufacturer,
+            color_number: colorSearch
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            displayResults(data);
+        } else {
+            alert('Fehler: ' + data.message);
+        }
+    });
+});
+
+// Ergebnisse anzeigen
+function displayResults(data) {
+    const resultsSection = document.getElementById('resultsSection');
+    resultsSection.classList.remove('d-none');
+    
+    // Original-Farbe
+    const original = data.original;
+    const originalHtml = createColorCard(original);
+    document.getElementById('originalColor').innerHTML = originalHtml;
+    
+    // Übereinstimmungen
+    const matchesHtml = data.matches.length > 0 
+        ? data.matches.map(color => createColorCard(color)).join('')
+        : '<div class="alert alert-warning">Keine direkten Übereinstimmungen gefunden. Versuchen Sie eine manuelle Suche in der Farbübersicht.</div>';
+    
+    document.getElementById('matchedColors').innerHTML = matchesHtml;
+    
+    // Scroll zu Ergebnissen
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+}
+
+// Farbkarte erstellen
+function createColorCard(color) {
+    const hexColor = color.hex_color || '#CCCCCC';
+    const textColor = getContrastColor(hexColor);
+    
+    return `
+        <div class="card mb-3">
+            <div class="row g-0">
+                <div class="col-md-2">
+                    <div class="color-preview" style="background-color: ${hexColor}; color: ${textColor}; height: 100%; min-height: 120px; display: flex; align-items: center; justify-content: center;">
+                        <div class="text-center">
+                            <div class="fs-4 fw-bold">${color.color_number}</div>
+                            ${color.pantone ? `<small>${color.pantone}</small>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-10">
+                    <div class="card-body">
+                        <h5 class="card-title">${color.manufacturer} - ${color.thread_type || ''}</h5>
+                        <p class="card-text">
+                            <strong>Farbnummer:</strong> ${color.color_number}<br>
+                            <strong>Name:</strong> ${color.color_name_de || color.color_name_en || '-'}<br>
+                            ${color.hex_color ? `<strong>Hex:</strong> ${color.hex_color}<br>` : ''}
+                            ${color.category ? `<strong>Kategorie:</strong> ${color.category}` : ''}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Kontrastfarbe berechnen
+function getContrastColor(hexColor) {
+    const rgb = parseInt(hexColor.slice(1), 16);
+    const r = (rgb >> 16) & 0xff;
+    const g = (rgb >>  8) & 0xff;
+    const b = (rgb >>  0) & 0xff;
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    return luma > 186 ? '#000000' : '#FFFFFF';
+}
+</script>
+
+<style>
+.touch-target {
+    min-height: 60px;
+    padding: 15px 30px;
+}
+.color-preview {
+    border-radius: 0.375rem 0 0 0.375rem;
+}
+</style>
+{% endblock %}

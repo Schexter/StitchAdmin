@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+
+{% block title %}Link-Analyse - Bestellung {{ order.id }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Link-Analyse - Bestellung {{ order.id }}</h4>
+                </div>
+                <div class="card-body">
+                    {% if link_data %}
+                    
+                    <!-- Link-Informationen -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Link-Informationen</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>URL:</strong></td>
+                                    <td>
+                                        <a href="{{ link_data.url }}" target="_blank" class="text-break">
+                                            {{ link_data.url }}
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Domain:</strong></td>
+                                    <td>{{ link_data.link_info.domain }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Plattform:</strong></td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ link_data.link_info.platform_type|title }}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Sicher (HTTPS):</strong></td>
+                                    <td>
+                                        {% if link_data.link_info.is_secure %}
+                                        <span class="badge bg-success">Ja</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">Nein</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Status:</strong></td>
+                                    <td>
+                                        <span class="badge bg-info">{{ link_data.status|title }}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Erstellt:</strong></td>
+                                    <td>{{ link_data.created_at[:10] }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Datei-Informationen -->
+                    {% if link_data.link_info.is_direct_file %}
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Datei-Informationen</h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td><strong>Direkter Link:</strong></td>
+                                    <td>
+                                        <span class="badge bg-success">Ja</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Dateierweiterung:</strong></td>
+                                    <td>{{ link_data.link_info.file_extension|upper }}</td>
+                                </tr>
+                                {% if link_data.link_info.content_type %}
+                                <tr>
+                                    <td><strong>Content-Type:</strong></td>
+                                    <td>{{ link_data.link_info.content_type }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if link_data.link_info.file_size %}
+                                <tr>
+                                    <td><strong>Dateigröße:</strong></td>
+                                    <td>{{ (link_data.link_info.file_size|int / 1024)|round(2) }} KB</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Grafikmanager-Status -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Grafikmanager-Status</h5>
+                            <div class="alert {% if link_data.graphics_manager_required %}alert-warning{% else %}alert-success{% endif %}">
+                                {% if link_data.graphics_manager_required %}
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>Grafikmanager-Bearbeitung erforderlich</strong><br>
+                                Dieser Link erfordert eine manuelle Verarbeitung durch den Grafikmanager.
+                                {% else %}
+                                <i class="bi bi-check-circle"></i>
+                                <strong>Keine Grafikmanager-Bearbeitung erforderlich</strong><br>
+                                Der Link kann direkt verarbeitet werden.
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Nächste Schritte -->
+                    {% if link_data.next_steps %}
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Nächste Schritte</h5>
+                            <div class="timeline">
+                                {% for step in link_data.next_steps %}
+                                <div class="timeline-item">
+                                    <div class="timeline-marker 
+                                        {% if step.priority == 'high' %}bg-danger
+                                        {% elif step.priority == 'medium' %}bg-warning
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ loop.index }}
+                                    </div>
+                                    <div class="timeline-content">
+                                        <h6>{{ step.title }}</h6>
+                                        <p class="text-muted">{{ step.description }}</p>
+                                        <small class="text-muted">
+                                            Priorität: 
+                                            <span class="badge 
+                                                {% if step.priority == 'high' %}bg-danger
+                                                {% elif step.priority == 'medium' %}bg-warning
+                                                {% else %}bg-secondary{% endif %}">
+                                                {{ step.priority|title }}
+                                            </span>
+                                        </small>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Notizen -->
+                    {% if link_data.notes %}
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <h5>Notizen</h5>
+                            {% for note in link_data.notes %}
+                            <div class="card mb-2">
+                                <div class="card-body">
+                                    <p class="card-text">{{ note.note }}</p>
+                                    <small class="text-muted">
+                                        {{ note.timestamp[:10] }} - {{ note.user }}
+                                    </small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% else %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Keine Link-Daten für diese Bestellung gefunden.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5>Aktionen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('orders.show', order_id=order.id) }}" 
+                           class="btn btn-primary">
+                            <i class="bi bi-arrow-left"></i> Zurück zur Bestellung
+                        </a>
+                        
+                        {% if link_data and link_data.graphics_manager_required %}
+                        <a href="{{ url_for('design_workflow.graphics_manager', order_id=order.id) }}" 
+                           class="btn btn-warning">
+                            <i class="bi bi-tools"></i> Grafikmanager
+                        </a>
+                        {% endif %}
+                        
+                        {% if link_data %}
+                        <a href="{{ link_data.url }}" target="_blank" class="btn btn-outline-primary">
+                            <i class="bi bi-box-arrow-up-right"></i> Link öffnen
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            {% if link_data %}
+            <div class="card">
+                <div class="card-header">
+                    <h5>Plattform-Hilfe</h5>
+                </div>
+                <div class="card-body">
+                    {% set platform = link_data.link_info.platform_type %}
+                    
+                    {% if platform == 'google_drive' %}
+                    <h6>Google Drive</h6>
+                    <ul class="small">
+                        <li>Link muss öffentlich freigegeben sein</li>
+                        <li>Direkte Download-Links bevorzugt</li>
+                        <li>Berechtigung prüfen</li>
+                    </ul>
+                    {% elif platform == 'dropbox' %}
+                    <h6>Dropbox</h6>
+                    <ul class="small">
+                        <li>Öffentliche Links verwenden</li>
+                        <li>?dl=1 für direkten Download</li>
+                        <li>Freigabe-Einstellungen prüfen</li>
+                    </ul>
+                    {% elif platform == 'behance' %}
+                    <h6>Behance</h6>
+                    <ul class="small">
+                        <li>Manueller Download erforderlich</li>
+                        <li>Höchste Auflösung wählen</li>
+                        <li>Lizenz beachten</li>
+                    </ul>
+                    {% elif platform == 'dribbble' %}
+                    <h6>Dribbble</h6>
+                    <ul class="small">
+                        <li>Manueller Download erforderlich</li>
+                        <li>Vollauflösung bevorzugt</li>
+                        <li>Designer-Erlaubnis einholen</li>
+                    </ul>
+                    {% else %}
+                    <h6>Allgemeine Tipps</h6>
+                    <ul class="small">
+                        <li>Direkte Links bevorzugen</li>
+                        <li>Hohe Auflösung wählen</li>
+                        <li>Lizenz und Rechte prüfen</li>
+                    </ul>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background-color: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.timeline-content {
+    background-color: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+.timeline-content h6 {
+    margin-bottom: 5px;
+    color: #495057;
+}
+
+.timeline-content p {
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+</style>
+{% endblock %}

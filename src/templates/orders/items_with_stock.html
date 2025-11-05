@@ -1,0 +1,180 @@
+<!-- Auftragspositionen mit Bestandsanzeige -->
+<div class="card mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">Positionen & Bestand</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Artikel</th>
+                        <th>Menge</th>
+                        <th>Bestand</th>
+                        <th>Status</th>
+                        <th>Lieferant</th>
+                        <th>Bestellstatus</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items.all() %}
+                    <tr class="{% if item.article and item.quantity > (item.article.stock or 0) %}table-warning{% endif %}">
+                        <td>
+                            {% if item.article %}
+                                <strong>{{ item.article.name }}</strong><br>
+                                <small class="text-muted">Art.Nr: {{ item.article.article_number }}</small>
+                            {% else %}
+                                <em>Artikel nicht gefunden</em>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.quantity }}</td>
+                        <td>
+                            {% if item.article %}
+                                <span class="badge {% if item.article.stock >= item.quantity %}bg-success{% else %}bg-danger{% endif %}">
+                                    {{ item.article.stock or 0 }}
+                                </span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.article %}
+                                {% set stock_diff = (item.article.stock or 0) - item.quantity %}
+                                {% if stock_diff >= 0 %}
+                                    <span class="text-success"><i class="bi bi-check-circle"></i> Auf Lager</span>
+                                {% else %}
+                                    <span class="text-danger"><i class="bi bi-exclamation-circle"></i> {{ -stock_diff }} fehlen</span>
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.article and item.article.supplier %}
+                                {{ item.article.supplier }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.supplier_order_status == 'none' %}
+                                {% if item.article and item.quantity > (item.article.stock or 0) %}
+                                    <span class="badge bg-warning">Zu bestellen</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">-</span>
+                                {% endif %}
+                            {% elif item.supplier_order_status == 'to_order' %}
+                                <span class="badge bg-info">Bestellung geplant</span>
+                            {% elif item.supplier_order_status == 'ordered' %}
+                                <span class="badge bg-primary">
+                                    Bestellt
+                                    {% if item.supplier_order_date %}
+                                        <br><small>{{ item.supplier_order_date.strftime('%d.%m.%Y') }}</small>
+                                    {% endif %}
+                                </span>
+                                {% if item.supplier_expected_date %}
+                                    <br><small>Erwartet: {{ item.supplier_expected_date.strftime('%d.%m.%Y') }}</small>
+                                {% endif %}
+                            {% elif item.supplier_order_status == 'delivered' %}
+                                <span class="badge bg-success">
+                                    Geliefert
+                                    {% if item.supplier_delivered_date %}
+                                        <br><small>{{ item.supplier_delivered_date.strftime('%d.%m.%Y') }}</small>
+                                    {% endif %}
+                                </span>
+                            {% endif %}
+                            
+                            {% if item.supplier_order_id %}
+                                <br>
+                                <a href="{{ url_for('suppliers.show_order', supplier_id=item.supplier_order.supplier_id, order_id=item.supplier_order_id) }}" 
+                                   class="small">
+                                    Bestellung: {{ item.supplier_order.order_number }}
+                                </a>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.article and item.quantity > (item.article.stock or 0) and item.supplier_order_status in ['none', 'to_order'] %}
+                                <button class="btn btn-sm btn-warning" 
+                                        onclick="markForOrder('{{ item.id }}')">
+                                    <i class="bi bi-cart-plus"></i> Bestellen
+                                </button>
+                            {% elif item.supplier_order_status == 'ordered' %}
+                                <button class="btn btn-sm btn-success" 
+                                        onclick="markAsDelivered('{{ item.id }}')">
+                                    <i class="bi bi-check-circle"></i> Als geliefert
+                                </button>
+                            {% endif %}
+                            
+                            {% if item.supplier_order_notes %}
+                                <button class="btn btn-sm btn-info" 
+                                        data-bs-toggle="tooltip" 
+                                        title="{{ item.supplier_order_notes }}">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Zusammenfassung -->
+        <div class="mt-3">
+            
+            {% if items_to_order > 0 %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> 
+                    <strong>{{ items_to_order }} Position(en)</strong> müssen noch bestellt werden!
+                </div>
+            {% endif %}
+            
+            {% if items_ordered > 0 %}
+                <div class="alert alert-info">
+                    <i class="bi bi-clock"></i> 
+                    <strong>{{ items_ordered }} Position(en)</strong> wurden bestellt und warten auf Lieferung.
+                </div>
+            {% endif %}
+            
+            {% if items_delivered == order.items.count() and order.items.count() > 0 %}
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i> 
+                    Alle Artikel sind verfügbar!
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function markForOrder(itemId) {
+    if (confirm('Diese Position zur Bestellung markieren?')) {
+        fetch(`/orders/items/${itemId}/mark-for-order`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            }
+        });
+    }
+}
+
+function markAsDelivered(itemId) {
+    if (confirm('Diese Position als geliefert markieren?')) {
+        fetch(`/orders/items/${itemId}/mark-delivered`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }).then(response => {
+            if (response.ok) {
+                location.reload();
+            }
+        });
+    }
+}
+</script>

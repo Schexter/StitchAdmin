@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Neue Maschine anlegen{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0">🔧 Neue Maschine anlegen</h1>
+                <a href="{{ url_for('machines.index') }}" class="btn btn-secondary btn-touch">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <!-- Grunddaten -->
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Grunddaten</h5>
+                                
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Maschinenname *</label>
+                                    <input type="text" class="form-control" id="name" name="name" required 
+                                           placeholder="z.B. Stickmaschine 1">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="type" class="form-label">Maschinentyp *</label>
+                                    <select class="form-select" id="type" name="type" required onchange="toggleTypeFields()">
+                                        <option value="">Typ wählen</option>
+                                        <option value="embroidery">🧵 Stickmaschine</option>
+                                        <option value="dtf">🖨️ DTF-Drucker</option>
+                                        <option value="dtg">👕 DTG-Drucker</option>
+                                        <option value="vinyl">📋 Vinyl/Flex-Plotter</option>
+                                        <option value="sublimation">🌈 Sublimationsdrucker</option>
+                                        <option value="heat_press">🔥 Transferpresse</option>
+                                        <option value="other">⚙️ Sonstige</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="manufacturer" class="form-label">Hersteller</label>
+                                    <input type="text" class="form-control" id="manufacturer" name="manufacturer" 
+                                           placeholder="z.B. Brother, Ricoh, Epson">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="model" class="form-label">Modell</label>
+                                    <input type="text" class="form-control" id="model" name="model" 
+                                           placeholder="z.B. PR-1050X">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="serial_number" class="form-label">Seriennummer</label>
+                                    <input type="text" class="form-control" id="serial_number" name="serial_number">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="purchase_date" class="form-label">Kaufdatum</label>
+                                    <input type="date" class="form-control" id="purchase_date" name="purchase_date">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="location" class="form-label">Standort</label>
+                                    <input type="text" class="form-control" id="location" name="location" 
+                                           placeholder="z.B. Produktionshalle A">
+                                </div>
+                            </div>
+
+                            <!-- Technische Daten -->
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Technische Daten</h5>
+
+                                <!-- Stickmaschinen-spezifisch -->
+                                <div id="embroidery-fields" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="mb-3">
+                                                <label for="num_heads" class="form-label">Anzahl Stickköpfe</label>
+                                                <input type="number" class="form-control" id="num_heads" name="num_heads" 
+                                                       min="1" max="10" value="1" onchange="updateTotalNeedles()">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="mb-3">
+                                                <label for="needles_per_head" class="form-label">Nadeln pro Kopf</label>
+                                                <input type="number" class="form-control" id="needles_per_head" name="needles_per_head" 
+                                                       min="1" max="40" value="15" onchange="updateTotalNeedles()">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Gesamtzahl Nadeln</label>
+                                        <input type="text" class="form-control" id="total_needles" readonly 
+                                               style="background-color: #f8f9fa;">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="max_speed" class="form-label">Max. Geschwindigkeit (Stiche/min)</label>
+                                        <input type="number" class="form-control" id="max_speed" name="max_speed" 
+                                               min="100" max="3000" value="1000">
+                                        <small class="form-text text-muted">Praktische Geschwindigkeit: ca. 70% der max. Geschwindigkeit</small>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="mb-3">
+                                                <label for="max_embroidery_area_width" class="form-label">Max. Breite (mm)</label>
+                                                <input type="number" class="form-control" id="max_embroidery_area_width" 
+                                                       name="max_embroidery_area_width" min="50" max="1000" value="400">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="mb-3">
+                                                <label for="max_embroidery_area_height" class="form-label">Max. Höhe (mm)</label>
+                                                <input type="number" class="form-control" id="max_embroidery_area_height" 
+                                                       name="max_embroidery_area_height" min="50" max="1000" value="400">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="hoop_sizes" class="form-label">Verfügbare Rahmengrößen</label>
+                                        <input type="text" class="form-control" id="hoop_sizes" name="hoop_sizes" 
+                                               placeholder="z.B. 10x10,15x15,20x20,30x40">
+                                        <small class="form-text text-muted">Größen durch Komma getrennt (in cm)</small>
+                                    </div>
+
+                                    <!-- Rüstzeiten -->
+                                    <h6 class="mt-4 mb-3">Rüstzeiten</h6>
+                                    
+                                    <div class="row">
+                                        <div class="col-4">
+                                            <div class="mb-3">
+                                                <label for="setup_time_minutes" class="form-label">Grund-Rüstzeit (Min)</label>
+                                                <input type="number" class="form-control" id="setup_time_minutes" 
+                                                       name="setup_time_minutes" min="1" max="120" value="15">
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="mb-3">
+                                                <label for="thread_change_time_minutes" class="form-label">Garnwechsel (Min)</label>
+                                                <input type="number" class="form-control" id="thread_change_time_minutes" 
+                                                       name="thread_change_time_minutes" min="1" max="30" value="3">
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="mb-3">
+                                                <label for="hoop_change_time_minutes" class="form-label">Rahmenwechsel (Min)</label>
+                                                <input type="number" class="form-control" id="hoop_change_time_minutes" 
+                                                       name="hoop_change_time_minutes" min="1" max="30" value="5">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- DTF-Drucker-spezifisch -->
+                                <div id="dtf-fields" style="display: none;">
+                                    <div class="mb-3">
+                                        <label for="max_print_width" class="form-label">Max. Druckbreite (mm)</label>
+                                        <input type="number" class="form-control" id="max_print_width" name="max_print_width" 
+                                               min="100" max="1500" value="600">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="print_resolution" class="form-label">Druckauflösung</label>
+                                        <select class="form-select" id="print_resolution" name="print_resolution">
+                                            <option value="720x720">720x720 dpi</option>
+                                            <option value="1200x1200" selected>1200x1200 dpi</option>
+                                            <option value="1440x1440">1440x1440 dpi</option>
+                                            <option value="2400x1200">2400x1200 dpi</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <!-- Betriebszeiten -->
+                                <div class="mt-4">
+                                    <h6>Betriebszeiten</h6>
+                                    
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="mb-3">
+                                                <label for="operating_hours_start" class="form-label">Beginn</label>
+                                                <input type="time" class="form-control" id="operating_hours_start" 
+                                                       name="operating_hours_start" value="08:00">
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="mb-3">
+                                                <label for="operating_hours_end" class="form-label">Ende</label>
+                                                <input type="time" class="form-control" id="operating_hours_end" 
+                                                       name="operating_hours_end" value="18:00">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">Arbeitstage</label>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="monday" id="monday" checked>
+                                                    <label class="form-check-label" for="monday">Montag</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="tuesday" id="tuesday" checked>
+                                                    <label class="form-check-label" for="tuesday">Dienstag</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="wednesday" id="wednesday" checked>
+                                                    <label class="form-check-label" for="wednesday">Mittwoch</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="thursday" id="thursday" checked>
+                                                    <label class="form-check-label" for="thursday">Donnerstag</label>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="friday" id="friday" checked>
+                                                    <label class="form-check-label" for="friday">Freitag</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="saturday" id="saturday">
+                                                    <label class="form-check-label" for="saturday">Samstag</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="working_days[]" value="sunday" id="sunday">
+                                                    <label class="form-check-label" for="sunday">Sonntag</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Wartung -->
+                                <div class="mt-4">
+                                    <h6>Wartung</h6>
+                                    
+                                    <div class="mb-3">
+                                        <label for="last_maintenance" class="form-label">Letzte Wartung</label>
+                                        <input type="date" class="form-control" id="last_maintenance" name="last_maintenance">
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="maintenance_interval_days" class="form-label">Wartungsintervall (Tage)</label>
+                                        <input type="number" class="form-control" id="maintenance_interval_days" 
+                                               name="maintenance_interval_days" min="1" max="365" value="90">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label for="notes" class="form-label">Notizen</label>
+                                    <textarea class="form-control" id="notes" name="notes" rows="3" 
+                                              placeholder="Zusätzliche Informationen zur Maschine..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('machines.index') }}" class="btn btn-secondary btn-touch">
+                                <i class="fas fa-times"></i> Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-success btn-touch">
+                                <i class="fas fa-save"></i> Maschine anlegen
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleTypeFields() {
+    const type = document.getElementById('type').value;
+    const embroideryFields = document.getElementById('embroidery-fields');
+    const dtfFields = document.getElementById('dtf-fields');
+    
+    // Alle Felder ausblenden
+    embroideryFields.style.display = 'none';
+    dtfFields.style.display = 'none';
+    
+    // Entsprechende Felder einblenden
+    if (type === 'embroidery') {
+        embroideryFields.style.display = 'block';
+    } else if (type === 'dtf') {
+        dtfFields.style.display = 'block';
+    }
+}
+
+function updateTotalNeedles() {
+    const heads = parseInt(document.getElementById('num_heads').value) || 0;
+    const needlesPerHead = parseInt(document.getElementById('needles_per_head').value) || 0;
+    const total = heads * needlesPerHead;
+    document.getElementById('total_needles').value = total + ' Nadeln (' + heads + ' Köpfe × ' + needlesPerHead + ' Nadeln)';
+}
+
+// Initial beim Laden der Seite
+document.addEventListener('DOMContentLoaded', function() {
+    toggleTypeFields();
+    updateTotalNeedles();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📝 {{ page_title }}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <h4>⚠️ Rechnungsformular in Entwicklung</h4>
+                        <p>Das Rechnungsformular wird noch implementiert.</p>
+                        <p>Geplante Rechnungsnummer: <strong>{{ naechste_nummer }}</strong></p>
+                        <p>Features: ZUGPFERD-Profile, Artikel-Integration, PDF/A-3-Export</p>
+                    </div>
+                    
+                    <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-secondary">
+                        ← Zurück zur Rechnungsübersicht
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

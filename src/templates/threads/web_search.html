@@ -1,0 +1,241 @@
+_name}')">
+                            <i class="fas fa-plus me-2"></i>Zu meinen Garnen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+        </div>
+    `;
+    
+    modalContent.innerHTML = html;
+    modal.show();
+}
+
+function showPriceComparison() {
+    if (!currentSearchResult || !currentSearchResult.price_comparison) return;
+    
+    const comparison = currentSearchResult.price_comparison;
+    
+    let html = `
+        <div class="alert alert-info">
+            <h6><i class="fas fa-chart-line me-2"></i>Preisvergleich für ${comparison.manufacturer} ${comparison.color_number}</h6>
+            <div class="row">
+                <div class="col-md-3">
+                    <strong>Günstigster Preis:</strong><br>
+                    <span class="h5 text-success">${comparison.best_price || 'N/A'}€</span>
+                </div>
+                <div class="col-md-3">
+                    <strong>Durchschnittspreis:</strong><br>
+                    <span class="h5">${comparison.average_price || 'N/A'}€</span>
+                </div>
+                <div class="col-md-3">
+                    <strong>Preisspanne:</strong><br>
+                    <span class="h6">${comparison.price_range ? `${comparison.price_range.min}€ - ${comparison.price_range.max}€` : 'N/A'}</span>
+                </div>
+                <div class="col-md-3">
+                    <strong>Quellen:</strong><br>
+                    <span class="h6">${comparison.sources.length}</span>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Zeige in Modal oder als Alert
+    const modal = new bootstrap.Modal(document.getElementById('resultModal'));
+    document.getElementById('modalContent').innerHTML = html;
+    modal.show();
+}
+
+function selectManufacturer(manufacturer) {
+    document.getElementById('manufacturer').value = manufacturer;
+    
+    // Visuelle Auswahl
+    document.querySelectorAll('.manufacturer-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    event.target.closest('.manufacturer-card').classList.add('selected');
+}
+
+function loadSuggestions() {
+    fetch('/thread/search-suggestions')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.suggestions.length > 0) {
+                displaySuggestions(data.suggestions);
+            } else {
+                document.getElementById('suggestions').innerHTML = 
+                    '<p class="text-muted">Keine Nachbestellvorschläge verfügbar</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Fehler beim Laden der Vorschläge:', error);
+        });
+}
+
+function displaySuggestions(suggestions) {
+    let html = '';
+    
+    suggestions.slice(0, 5).forEach(suggestion => {
+        html += `
+            <span class="badge bg-${suggestion.urgency === 'high' ? 'danger' : 'warning'} suggestion-badge me-2 mb-2"
+                  onclick="fillSearchForm('${suggestion.manufacturer}', '${suggestion.color_number}', '${suggestion.color_name || ''}')"
+                  style="cursor: pointer;">
+                ${suggestion.manufacturer} ${suggestion.color_number}
+                (${suggestion.current_stock}/${suggestion.min_stock})
+            </span>
+        `;
+    });
+    
+    document.getElementById('suggestions').innerHTML = html;
+}
+
+function fillSearchForm(manufacturer, colorNumber, colorName) {
+    document.getElementById('manufacturer').value = manufacturer;
+    document.getElementById('color_number').value = colorNumber;
+    document.getElementById('color_name').value = colorName;
+    
+    // Scroll zum Formular
+    document.querySelector('.search-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+function addToSearchHistory(query) {
+    let history = JSON.parse(localStorage.getItem('threadSearchHistory') || '[]');
+    
+    // Neue Suche hinzufügen
+    history.unshift({
+        manufacturer: query.manufacturer,
+        color_number: query.color_number,
+        color_name: query.color_name,
+        timestamp: new Date().toISOString()
+    });
+    
+    // Nur die letzten 10 Suchen behalten
+    history = history.slice(0, 10);
+    localStorage.setItem('threadSearchHistory', JSON.stringify(history));
+    
+    displaySearchHistory();
+}
+
+function displaySearchHistory() {
+    const history = JSON.parse(localStorage.getItem('threadSearchHistory') || '[]');
+    const historyDiv = document.getElementById('searchHistory');
+    
+    if (history.length === 0) {
+        historyDiv.innerHTML = '<p class="text-muted text-center">Noch keine Suchen durchgeführt</p>';
+        return;
+    }
+    
+    let html = '';
+    history.forEach((search, index) => {
+        html += `
+            <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                <div>
+                    <strong>${search.manufacturer}</strong> ${search.color_number}
+                    ${search.color_name ? `<br><small class="text-muted">${search.color_name}</small>` : ''}
+                </div>
+                <button class="btn btn-sm btn-outline-primary" 
+                        onclick="fillSearchForm('${search.manufacturer}', '${search.color_number}', '${search.color_name || ''}')">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+        `;
+    });
+    
+    historyDiv.innerHTML = html;
+}
+
+function getAvailabilityColor(availability) {
+    switch(availability) {
+        case 'available': return 'success';
+        case 'out_of_stock': return 'danger';
+        default: return 'secondary';
+    }
+}
+
+function getAvailabilityText(availability) {
+    switch(availability) {
+        case 'available': return 'Verfügbar';
+        case 'out_of_stock': return 'Nicht verfügbar';
+        default: return 'Unbekannt';
+    }
+}
+
+function saveResult(index) {
+    if (!currentSearchResult || !currentSearchResult.search_results[index]) return;
+    
+    const result = currentSearchResult.search_results[index];
+    
+    // Hier könnte eine AJAX-Anfrage zum Speichern des Garns gemacht werden
+    showToast('Garn gespeichert', `${result.manufacturer} ${result.color_number} wurde zu Ihren Garnen hinzugefügt`, 'success');
+}
+
+function addToMyThreads(manufacturer, colorNumber, colorName) {
+    // AJAX-Anfrage zum Hinzufügen des Garns
+    const formData = new FormData();
+    formData.append('manufacturer', manufacturer);
+    formData.append('color_number', colorNumber);
+    formData.append('color_name', colorName);
+    
+    fetch('/thread/add-from-search', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Garn hinzugefügt', 'Das Garn wurde erfolgreich zu Ihrer Sammlung hinzugefügt', 'success');
+        } else {
+            showToast('Fehler', data.error, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Verbindungsfehler', error.message, 'error');
+    });
+}
+
+function saveSearchResults() {
+    if (!currentSearchResult) return;
+    
+    // Export als JSON
+    const dataStr = JSON.stringify(currentSearchResult, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `garn-suche-${currentSearchResult.query.manufacturer}-${currentSearchResult.query.color_number}.json`;
+    link.click();
+    
+    showToast('Export erfolgreich', 'Suchergebnisse wurden heruntergeladen', 'success');
+}
+
+function showToast(title, message, type) {
+    // Toast-Funktion (vereinfacht)
+    const alertClass = type === 'success' ? 'alert-success' : 
+                      type === 'error' ? 'alert-danger' : 'alert-info';
+    
+    const toast = document.createElement('div');
+    toast.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    toast.innerHTML = `
+        <strong>${title}</strong><br>${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
+
+// Initialisierung beim Laden der Seite
+document.addEventListener('DOMContentLoaded', function() {
+    displaySearchHistory();
+    loadSuggestions();
+});
+</script>
+{% endblock %}

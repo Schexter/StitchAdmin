@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons sicherstellen -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+<h1><i class="bi bi-speedometer2"></i> Dashboard</h1>
+
+<!-- Business KPIs -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-clipboard-check text-primary" style="font-size: 2rem;"></i>
+                <h3 class="text-primary mt-2">{{ stats.open_orders if stats.open_orders else 0 }}</h3>
+                <p class="text-muted mb-0">Offene Aufträge</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-gear-fill text-warning" style="font-size: 2rem;"></i>
+                <h3 class="text-warning mt-2">{{ stats.in_production if stats.in_production else 0 }}</h3>
+                <p class="text-muted mb-0">In Produktion</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 2rem;"></i>
+                <h3 class="text-success mt-2">{{ stats.ready_pickup if stats.ready_pickup else 0 }}</h3>
+                <p class="text-muted mb-0">Abholbereit</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <i class="bi bi-currency-euro text-info" style="font-size: 2rem;"></i>
+                <h3 class="text-info mt-2">{{ stats.today_revenue if stats.today_revenue else 0 }}€</h3>
+                <p class="text-muted mb-0">Tagesumsatz</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Schnellzugriff -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h2>Schnellzugriff</h2>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('customers.index') }}" class="text-decoration-none">
+            <div class="card h-100 text-center touch-card">
+                <div class="card-body">
+                    <i class="bi bi-people display-4 text-primary"></i>
+                    <h5 class="card-title mt-2">Kunden</h5>
+                    <p class="text-muted">Kundenverwaltung</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('articles.index') }}" class="text-decoration-none">
+            <div class="card h-100 text-center touch-card">
+                <div class="card-body">
+                    <i class="bi bi-box-seam display-4 text-success"></i>
+                    <h5 class="card-title mt-2">Artikel</h5>
+                    <p class="text-muted">Artikelverwaltung</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('orders.index') }}" class="text-decoration-none">
+            <div class="card h-100 text-center touch-card">
+                <div class="card-body">
+                    <i class="bi bi-clipboard-check display-4 text-warning"></i>
+                    <h5 class="card-title mt-2">Aufträge</h5>
+                    <p class="text-muted">Auftragsverwaltung</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('thread.index') }}" class="text-decoration-none">
+            <div class="card h-100 text-center touch-card">
+                <div class="card-body">
+                    <i class="bi bi-palette display-4 text-info"></i>
+                    <h5 class="card-title mt-2">Garnfarben</h5>
+                    <p class="text-muted">Farbverwaltung</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('machines.index') }}" class="text-decoration-none">
+            <div class="card h-100 text-center touch-card">
+                <div class="card-body">
+                    <i class="bi bi-gear-fill display-4 text-danger"></i>
+                    <h5 class="card-title mt-2">Maschinen</h5>
+                    <p class="text-muted">Maschinenpark</p>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{{ url_for('settings.index') }}" class="text-decoration-none">
+            <div class="card h-100 text-center touch-card">
+                <div class="card-body">
+                    <i class="bi bi-gear display-4 text-secondary"></i>
+                    <h5 class="card-title mt-2">Einstellungen</h5>
+                    <p class="text-muted">System-Konfiguration</p>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Aktuelle Aufträge -->
+{% if recent_orders %}
+<div class="row">
+    <div class="col-12">
+        <h3>Aktuelle Aufträge</h3>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Auftragsnr.</th>
+                        <th>Kunde</th>
+                        <th>Beschreibung</th>
+                        <th>Status</th>
+                        <th>Aktion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in recent_orders %}
+                    <tr>
+                        <td>{{ order.id }}</td>
+                        <td>{{ order.customer_name }}</td>
+                        <td>{{ order.description }}</td>
+                        <td>
+                            {% if order.status == 'accepted' %}
+                                <span class="badge bg-primary">Angenommen</span>
+                            {% elif order.status == 'in_progress' %}
+                                <span class="badge bg-warning">In Arbeit</span>
+                            {% elif order.status == 'ready' %}
+                                <span class="badge bg-success">Fertig</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ order.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('orders.show', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">Details</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.touch-card {
+    transition: transform 0.2s;
+}
+.touch-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}

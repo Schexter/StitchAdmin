@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Preiskalkulation - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3 mb-0"><i class="fas fa-calculator"></i> Preiskalkulation</h1>
+                <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Zurück
+                </a>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <h5>Stickerei-Preise</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="stitch_price_per_1000" class="form-label">Preis pro 1.000 Stiche (€)</label>
+                                    <input type="number" class="form-control" id="stitch_price_per_1000" 
+                                           name="stitch_price_per_1000" value="{{ settings.stitch_price_per_1000 }}" 
+                                           step="0.01" min="0" required>
+                                    <small class="form-text text-muted">Grundpreis für Stickarbeiten</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="setup_fee" class="form-label">Einrichtungsgebühr (€)</label>
+                                    <input type="number" class="form-control" id="setup_fee" 
+                                           name="setup_fee" value="{{ settings.setup_fee }}" 
+                                           step="0.01" min="0" required>
+                                    <small class="form-text text-muted">Einmalige Gebühr pro Auftrag</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="digitizing_per_1000" class="form-label">Digitalisierung pro 1.000 Stiche (€)</label>
+                            <input type="number" class="form-control" id="digitizing_per_1000" 
+                                   name="digitizing_per_1000" value="{{ settings.digitizing_per_1000 }}" 
+                                   step="0.01" min="0" required>
+                            <small class="form-text text-muted">Preis für die Erstellung von Stickdateien</small>
+                        </div>
+
+                        <hr>
+
+                        <h5>Allgemeine Preise</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="minimum_order_value" class="form-label">Mindestbestellwert (€)</label>
+                                    <input type="number" class="form-control" id="minimum_order_value" 
+                                           name="minimum_order_value" value="{{ settings.minimum_order_value }}" 
+                                           step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="tax_rate" class="form-label">Steuersatz (%)</label>
+                                    <input type="number" class="form-control" id="tax_rate" 
+                                           name="tax_rate" value="{{ settings.tax_rate }}" 
+                                           step="0.01" min="0" max="100" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 
+                            <strong>Hinweis:</strong> Diese Preise werden für die automatische Kalkulation von Aufträgen verwendet.
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
