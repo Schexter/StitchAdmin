@@ -52,15 +52,17 @@ class TestArticleModel:
             article = Article(
                 id='VAR001',
                 name='T-Shirt',
-                sizes=['S', 'M', 'L', 'XL'],
-                colors=['Rot', 'Blau', 'Grün'],
+                size='S-XL',  # size ist ein String-Feld
+                color='Mehrfarbig',  # color ist ein String-Feld
+                has_variants=True,
                 created_by='testuser'
             )
             db.session.add(article)
             db.session.commit()
 
-            # Note: sizes und colors werden als JSON gespeichert
+            # Note: Varianten werden über ArticleVariant-Relationship verwaltet
             assert article.id == 'VAR001'
+            assert article.has_variants is True
 
     def test_article_with_supplier_info(self, app):
         """Test: Artikel mit Lieferanten-Info"""
@@ -68,17 +70,17 @@ class TestArticleModel:
             article = Article(
                 id='SUP001',
                 name='Lieferanten-Artikel',
-                supplier_name='Test Supplier',
-                supplier_id='SUP-123',
-                purchase_price=5.00,
+                supplier='Test Supplier',  # Feld heißt 'supplier', nicht 'supplier_name'
+                supplier_article_number='SUP-123',  # Feld heißt 'supplier_article_number', nicht 'supplier_id'
+                purchase_price_single=5.00,  # Feld heißt 'purchase_price_single', nicht 'purchase_price'
                 created_by='testuser'
             )
             db.session.add(article)
             db.session.commit()
 
-            assert article.supplier_name == 'Test Supplier'
-            assert article.supplier_article_id == 'SUP-123'
-            assert article.purchase_price == 5.00
+            assert article.supplier == 'Test Supplier'
+            assert article.supplier_article_number == 'SUP-123'
+            assert article.purchase_price_single == 5.00
 
     def test_article_with_description(self, app):
         """Test: Artikel mit Beschreibung"""
@@ -95,19 +97,21 @@ class TestArticleModel:
 
             assert article.description == description
 
-    def test_article_with_ean(self, app):
-        """Test: Artikel mit EAN/Barcode"""
+    def test_article_with_manufacturer_number(self, app):
+        """Test: Artikel mit Herstellernummer"""
         with app.app_context():
             article = Article(
                 id='EAN001',
-                name='Artikel mit EAN',
-                ean='4012345678901',
+                name='Artikel mit Herstellernummer',
+                manufacturer_number='MFG-4012345',
+                article_number='ART-4012345',
                 created_by='testuser'
             )
             db.session.add(article)
             db.session.commit()
 
-            assert article.ean == '4012345678901'
+            assert article.manufacturer_number == 'MFG-4012345'
+            assert article.article_number == 'ART-4012345'
 
     def test_article_metadata(self, app):
         """Test: Artikel Metadaten"""
@@ -128,11 +132,15 @@ class TestArticleModel:
         with app.app_context():
             article = Article(
                 id='REPR001',
+                article_number='ART-REPR001',
                 name='Test Artikel'
             )
 
             repr_string = repr(article)
-            assert 'Article ART' in repr_string or 'REPR001' in repr_string
+            # Format ist: <Article {article_number}: {name}>
+            assert 'Article' in repr_string
+            assert 'ART-REPR001' in repr_string
+            assert 'Test Artikel' in repr_string
 
     def test_query_article_by_id(self, app, test_article):
         """Test: Artikel per ID abfragen"""

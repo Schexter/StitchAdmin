@@ -4,7 +4,7 @@ Testet alle Garn-bezogenen Funktionalitäten
 """
 
 import pytest
-from src.models.models import Thread, db
+from src.models.models import Thread, ThreadStock, db
 
 
 @pytest.mark.unit
@@ -28,9 +28,9 @@ class TestThreadModel:
 
             assert thread.id == 'THR001'
             assert thread.manufacturer == 'Madeira'
-            assert thread.product_line == 'Polyneon'
+            assert thread.thread_type == 'Polyneon'  # Feld heißt 'thread_type', nicht 'product_line'
             assert thread.color_number == '1234'
-            assert thread.color_name == 'Rot'
+            assert thread.color_name_de == 'Rot'  # Feld heißt 'color_name_de', nicht 'color_name'
 
     def test_thread_with_stock(self, app):
         """Test: Garn mit Lagerbestand"""
@@ -40,15 +40,23 @@ class TestThreadModel:
                 manufacturer='Madeira',
                 color_number='5678',
                 color_name_de='Blau',
-                stock=50,
-                unit='Spule',
                 created_by='testuser'
             )
             db.session.add(thread)
+            db.session.flush()  # Flush um thread.id verfügbar zu machen
+
+            # Stock ist eine separate Relationship über ThreadStock
+            thread_stock = ThreadStock(
+                thread_id=thread.id,
+                quantity=50,
+                min_stock=10
+            )
+            db.session.add(thread_stock)
             db.session.commit()
 
-            assert thread.stock == 50
-            assert thread.unit == 'Spule'
+            assert thread.stock is not None
+            assert thread.stock.quantity == 50
+            assert thread.stock.min_stock == 10
 
     def test_thread_with_pricing(self, app):
         """Test: Garn mit Preisinformationen"""
@@ -58,15 +66,15 @@ class TestThreadModel:
                 manufacturer='Madeira',
                 color_number='9999',
                 color_name_de='Grün',
-                price_per_unit=5.50,
-                currency='EUR',
+                price=5.50,  # Feld heißt 'price', nicht 'price_per_unit'
+                supplier='Garngroßhandel GmbH',  # supplier Feld vorhanden
                 created_by='testuser'
             )
             db.session.add(thread)
             db.session.commit()
 
-            assert thread.price_per_unit == 5.50
-            assert thread.currency == 'EUR'
+            assert thread.price == 5.50
+            assert thread.supplier == 'Garngroßhandel GmbH'
 
     def test_thread_metadata(self, app):
         """Test: Garn Metadaten"""
@@ -124,11 +132,18 @@ class TestThreadModel:
                 id='LOW001',
                 manufacturer='Madeira',
                 color_number='0001',
-                color_name_de='Niedrig',
-                stock=2,
-                min_stock=10
+                color_name_de='Niedrig'
             )
             db.session.add(thread)
+            db.session.flush()
+
+            # Stock ist eine separate Relationship über ThreadStock
+            thread_stock = ThreadStock(
+                thread_id=thread.id,
+                quantity=2,
+                min_stock=10
+            )
+            db.session.add(thread_stock)
             db.session.commit()
 
-            assert thread.stock < thread.min_stock
+            assert thread.stock.quantity < thread.stock.min_stock

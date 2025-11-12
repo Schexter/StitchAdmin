@@ -205,6 +205,12 @@ def test_article(app):
     Erstellt einen Test-Artikel
     """
     with app.app_context():
+        # Lösche existierende Artikel mit dieser ID (falls vorhanden)
+        existing = Article.query.filter_by(id='ART001').first()
+        if existing:
+            db.session.delete(existing)
+            db.session.commit()
+
         article = Article(
             id='ART001',
             name='Test Artikel',
@@ -218,9 +224,12 @@ def test_article(app):
 
         yield article
 
-        # Cleanup
-        db.session.delete(article)
-        db.session.commit()
+        # Cleanup - mit Error-Handling
+        try:
+            db.session.delete(article)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
 
 @pytest.fixture
@@ -230,6 +239,12 @@ def test_thread(app):
     Erstellt ein Test-Garn
     """
     with app.app_context():
+        # Lösche existierendes Garn mit dieser ID (falls vorhanden)
+        existing = Thread.query.filter_by(id='THR001').first()
+        if existing:
+            db.session.delete(existing)
+            db.session.commit()
+
         thread = Thread(
             id='THR001',
             manufacturer='Madeira',
@@ -243,9 +258,12 @@ def test_thread(app):
 
         yield thread
 
-        # Cleanup
-        db.session.delete(thread)
-        db.session.commit()
+        # Cleanup - mit Error-Handling
+        try:
+            db.session.delete(thread)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
 
 @pytest.fixture
@@ -277,7 +295,12 @@ def sample_customers(app):
     Fixture für mehrere Test-Kunden
     """
     with app.app_context():
-        customers = []
+        # Lösche existierende Kunden mit diesen IDs (falls vorhanden)
+        for cust_id in ['PRIV001', 'BUS001']:
+            existing = Customer.query.filter_by(id=cust_id).first()
+            if existing:
+                db.session.delete(existing)
+        db.session.commit()
 
         # Privatkunde
         customer1 = Customer(
@@ -306,7 +329,10 @@ def sample_customers(app):
 
         yield customers
 
-        # Cleanup
-        for customer in customers:
-            db.session.delete(customer)
-        db.session.commit()
+        # Cleanup - mit Error-Handling
+        try:
+            for customer in customers:
+                db.session.delete(customer)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
