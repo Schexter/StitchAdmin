@@ -4,7 +4,7 @@
 
 **Version:** 2.0.0
 **Stand:** 12.11.2025
-**Projektfortschritt:** ~45% (Alpha-Phase)
+**Projektfortschritt:** ~47% (Alpha-Phase)
 
 ---
 
@@ -68,18 +68,23 @@
 
 #### Testing-Framework
 - [x] Pytest-Setup mit `conftest.py` ✅ (12.11.2025)
-- [x] Model-Tests implementieren ✅ (12.11.2025 - 28/39 Tests bestehen)
+- [x] Model-Tests implementieren & reparieren ✅ (12.11.2025 - 39/39 Tests bestehen!)
   - [x] `test_customer_model.py` (12 Tests, alle bestanden ✅)
-  - [x] `test_article_model.py` (11 Tests, 7 bestanden)
+  - [x] `test_article_model.py` (11 Tests, alle bestanden ✅)
   - [x] `test_user_model.py` (8 Tests, alle bestanden ✅)
-  - [x] `test_thread_model.py` (9 Tests, 4 bestanden)
+  - [x] `test_thread_model.py` (9 Tests, alle bestanden ✅)
+- [x] Utils-Tests implementieren ✅ (12.11.2025 - 86 Tests, 93% Avg Coverage)
+  - [x] `test_form_helpers.py` (30 Tests, 100% Coverage ✅)
+  - [x] `test_filters.py` (32 Tests, 87% Coverage ✅)
+  - [x] `test_security.py` (24 Tests, 92% Coverage ✅)
 - [x] Controller-Tests implementieren ✅ (12.11.2025 - Basis)
   - [x] `test_customer_controller.py` (4 Tests - Basis)
   - [x] `test_auth_controller.py` (4 Tests - Basis)
-  - [ ] Weitere Controller-Tests (Sprint 2)
+  - [ ] Controller-Tests reparieren (benötigt vollständige Test-App)
+- [ ] Weitere Utils-Tests (activity_logger, customer_history, email_service)
 - [ ] Service-Tests implementieren (Sprint 2)
 - [ ] Integration-Tests für Hauptworkflows (Sprint 2)
-- [ ] Test-Coverage > 60% erreichen (aktuell: ~11%, Target: Sprint 2)
+- [ ] Test-Coverage > 60% erreichen (aktuell: ~13.22%, Target: Sprint 2)
 
 #### Technische Schulden
 - [x] Flask-Migrate für Datenbank-Migrations einrichten ✅ (12.11.2025)
@@ -428,7 +433,7 @@ Diese Probleme müssen vor dem nächsten Release behoben werden:
 
 ## 📊 Sprint-Planung
 
-### Sprint 1 (06.11 - 15.11.2025): Dokumentation & Code-Bereinigung ✅ 90%
+### Sprint 1 (06.11 - 15.11.2025): Dokumentation & Code-Bereinigung ✅ 95%
 - README.md fertigstellen ✅
 - TODO.md erstellen ✅
 - CHANGELOG.md erstellen ✅
@@ -436,13 +441,18 @@ Diese Probleme müssen vor dem nächsten Release behoben werden:
 - Legacy-Controller entfernen ✅ (12.11.2025 - 5.593 Zeilen gelöscht!)
 - Testing-Framework aufsetzen ✅ (12.11.2025 - Basis fertig: 28/39 Tests bestehen)
 - Technische Schulden reduzieren ✅ (12.11.2025 - Flask-Migrate, Logger, Error-Handling, Utils-Doku)
+- Model-Tests reparieren ✅ (12.11.2025 - 39/39 Tests bestehen!)
+- Utils-Tests implementieren ✅ (12.11.2025 - 86 Tests, Coverage +2.31%)
 
-### Sprint 2 (16.11 - 30.11.2025): Testing & Bug-Fixes
-- Testing-Framework fertigstellen
-- Model-Tests implementieren
-- Controller-Tests implementieren
-- Critical Bugs beheben
-- Performance-Optimierung
+### Sprint 2 (16.11 - 30.11.2025): Testing & Bug-Fixes 🟡 In Arbeit (30%)
+- Model-Tests fertigstellen ✅ (39/39 Tests)
+- Utils-Tests Basis ✅ (86 Tests, form_helpers, filters, security)
+- [ ] Weitere Utils-Tests (activity_logger, customer_history, email_service)
+- [ ] Service-Tests implementieren
+- [ ] Test-Coverage auf >60% bringen (aktuell 13.22%)
+- [ ] Controller-Tests reparieren
+- [ ] Critical Bugs beheben
+- [ ] Performance-Optimierung
 
 ### Sprint 3 (01.12 - 15.12.2025): Modul-Tests
 - Kundenverwaltung E2E-Tests
@@ -489,5 +499,5 @@ Diese TODO.md wird wöchentlich aktualisiert (jeden Freitag).
 ---
 
 **Erstellt von Hans Hahn - Alle Rechte vorbehalten**
-**Letzte Aktualisierung:** 12.11.2025 (Technische Schulden abgeschlossen)
-**Version:** 1.2
+**Letzte Aktualisierung:** 12.11.2025 (Sprint 2 Testing begonnen)
+**Version:** 1.3

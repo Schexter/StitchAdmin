@@ -12,8 +12,65 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/)
 ## [Unreleased]
 
 ### In Arbeit
-- Testing-Framework erweitern (28/39 Tests bestehen)
+- Test-Coverage auf >60% erhöhen (aktuell 13.22%)
+- Service-Tests implementieren
 - API-Dokumentation erweitern
+
+---
+
+## [2.0.4-alpha] - 2025-11-12
+
+### 🧪 Testing-Framework Erweiterung (Sprint 2)
+
+#### Added - Neue Features
+- **Model-Tests repariert** (39/39 Tests bestehen ✅)
+  - ✅ test_article_model.py: 4 Tests repariert (Feldnamen korrigiert)
+  - ✅ test_thread_model.py: 5 Tests repariert (ThreadStock-Relationship, Feldnamen)
+  - ✅ test_customer_model.py: Fixture-Problem behoben
+  - ✅ Alle 39 Model-Tests bestehen jetzt
+
+- **Utils-Tests implementiert** (86 neue Tests, ~93% Avg Coverage)
+  - ✅ test_form_helpers.py: 30 Tests, 100% Coverage
+    - parse_date_from_form, parse_datetime_from_form
+    - parse_float_from_form, parse_int_from_form (deutsche Zahlen)
+    - safe_get_form_value, validate_required_fields
+  - ✅ test_filters.py: 32 Tests, 87% Coverage
+    - format_date, format_datetime, format_time
+    - calculate_age, time_ago (relative Zeit)
+    - nl2br (Newline zu HTML)
+  - ✅ test_security.py: 24 Tests, 92% Coverage
+    - Login-Attempt-Tracking und Account-Sperrung
+    - Password-Strength-Validierung
+    - Password-Reset-Token-Management
+    - Secure Password Generation
+
+#### Changed - Änderungen
+- **Test-Statistiken:**
+  - Tests gesamt: 38 → 124 passed (+86 neue Tests)
+  - Test-Coverage: 10.91% → 13.22% (+2.31%)
+  - Model-Tests: 28/39 (71.8%) → 39/39 (100%) ✅
+- **Fortschritt:**
+  - Sprint 1: 90% → 95% ✅
+  - Sprint 2: 0% → 30% 🟡
+  - Projekt-Fortschritt: ~45% → ~47%
+
+#### Fixed - Behobene Fehler
+- Article Model: Feldnamen korrigiert (sizes→size, supplier_name→supplier)
+- Thread Model: Stock-Relationship korrekt implementiert
+- Fixtures: UNIQUE constraint Fehler behoben (cleanup vor create)
+
+#### Technical Details
+- Test-Request-Context für flash()-Funktionen
+- Automatisches Setup/Teardown für Security-Test-Dateien
+- Umfassende Edge-Case-Abdeckung
+- Deutsche Fehlermeldungen getestet
+
+#### Benefits
+- 📊 Utils-Module zu ~93% getestet
+- 🛡️ Kritische Sicherheitsfunktionen abgedeckt
+- 📝 Formular-Verarbeitung vollständig getestet
+- 🎨 Template-Filter umfassend getestet
+- ✅ Model-Layer zu 100% getestet
 
 ---
 
