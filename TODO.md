@@ -2,9 +2,9 @@
 
 **Erstellt von Hans Hahn - Alle Rechte vorbehalten**
 
-**Version:** 2.0.0  
-**Stand:** 05.11.2025  
-**Projektfortschritt:** ~40% (Alpha-Phase)
+**Version:** 2.0.0
+**Stand:** 12.11.2025
+**Projektfortschritt:** ~45% (Alpha-Phase)
 
 ---
 
@@ -27,7 +27,7 @@
 **Priorität:** 🔴 HOCH
 **Status:** 🟡 In Arbeit
 **Deadline:** 15.11.2025
-**Fortschritt:** 85% (Code-Bereinigung ✅ | Testing-Framework Basis ✅)
+**Fortschritt:** 90% (Code-Bereinigung ✅ | Testing-Framework Basis ✅ | Technische Schulden ✅)
 
 ### Ziele
 - Projekt-Dokumentation vervollständigen
@@ -82,10 +82,10 @@
 - [ ] Test-Coverage > 60% erreichen (aktuell: ~11%, Target: Sprint 2)
 
 #### Technische Schulden
-- [ ] Flask-Migrate für Datenbank-Migrations einrichten
-- [ ] Logger-System vereinheitlichen
-- [ ] Error-Handling standardisieren
-- [ ] Utils-Module dokumentieren
+- [x] Flask-Migrate für Datenbank-Migrations einrichten ✅ (12.11.2025)
+- [x] Logger-System vereinheitlichen ✅ (12.11.2025)
+- [x] Error-Handling standardisieren ✅ (12.11.2025)
+- [x] Utils-Module dokumentieren ✅ (12.11.2025 - src/utils/README.md erstellt)
 
 ### Definition of Done
 - ✅ Alle Pflichtdateien vorhanden und aktuell
@@ -428,13 +428,14 @@ Diese Probleme müssen vor dem nächsten Release behoben werden:
 
 ## 📊 Sprint-Planung
 
-### Sprint 1 (06.11 - 15.11.2025): Dokumentation & Code-Bereinigung ✅ 85%
+### Sprint 1 (06.11 - 15.11.2025): Dokumentation & Code-Bereinigung ✅ 90%
 - README.md fertigstellen ✅
 - TODO.md erstellen ✅
 - CHANGELOG.md erstellen ✅
 - error.log initialisieren ✅
 - Legacy-Controller entfernen ✅ (12.11.2025 - 5.593 Zeilen gelöscht!)
 - Testing-Framework aufsetzen ✅ (12.11.2025 - Basis fertig: 28/39 Tests bestehen)
+- Technische Schulden reduzieren ✅ (12.11.2025 - Flask-Migrate, Logger, Error-Handling, Utils-Doku)
 
 ### Sprint 2 (16.11 - 30.11.2025): Testing & Bug-Fixes
 - Testing-Framework fertigstellen
@@ -488,5 +489,5 @@ Diese TODO.md wird wöchentlich aktualisiert (jeden Freitag).
 ---
 
 **Erstellt von Hans Hahn - Alle Rechte vorbehalten**
-**Letzte Aktualisierung:** 12.11.2025 (Code-Bereinigung abgeschlossen)
-**Version:** 1.1
+**Letzte Aktualisierung:** 12.11.2025 (Technische Schulden abgeschlossen)
+**Version:** 1.2

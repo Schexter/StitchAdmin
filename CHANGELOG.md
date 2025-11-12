@@ -13,8 +13,66 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/)
 
 ### In Arbeit
 - Testing-Framework erweitern (28/39 Tests bestehen)
-- Flask-Migrate Integration
-- API-Dokumentation
+- API-Dokumentation erweitern
+
+---
+
+## [2.0.3-alpha] - 2025-11-12
+
+### 🛠️ Technische Schulden (Meilenstein 1)
+
+#### Added - Neue Features
+- **Flask-Migrate für Datenbank-Migrationen**
+  - ✅ Flask-Migrate installiert und in `app.py` integriert
+  - ✅ Migrations-Verzeichnis initialisiert (`migrations/`)
+  - ✅ `migrations/README.md` mit Anwendungsdokumentation erstellt
+  - ✅ Migrations-Commands verfügbar: `flask db migrate`, `flask db upgrade`, etc.
+
+- **Logger-System zentralisiert**
+  - ✅ Bestehendes Logger-System (`src/utils/logger.py`) in `app.py` integriert
+  - ✅ Logger über `app.logger_instance` verfügbar
+  - ✅ Separate Logger für Error, Activity, Production, Import, Debug
+  - ✅ Logging in Error-Handler integriert
+
+- **Error-Handling standardisiert**
+  - ✅ Logging in existierende Error-Handler (404, 403, 500) integriert
+  - ✅ Globaler Exception-Handler für unbehandelte Fehler hinzugefügt
+  - ✅ Fehler werden automatisch im Logger-System protokolliert
+  - ✅ Sichere Fehlerbehandlung mit Fallback-Mechanismen
+
+- **Utils-Module vollständig dokumentiert**
+  - ✅ `src/utils/README.md` erstellt (umfassende Dokumentation)
+  - ✅ Alle 13 Utils-Module beschrieben:
+    - Logger-System (logger.py)
+    - Security (security.py)
+    - Activity Logger (activity_logger.py)
+    - Template Filters (filters.py)
+    - Form Helpers (form_helpers.py)
+    - E-Mail Service (email_service.py)
+    - Customer History (customer_history.py)
+    - Design-Module (design_upload.py, design_link_manager.py, dst_analyzer.py)
+    - PDF-Module (pdf_analyzer.py, pdf_analyzer_lite.py)
+    - File Analysis (file_analysis.py)
+  - ✅ Verwendungsbeispiele für alle Module
+  - ✅ Best Practices und Integration-Beispiele
+
+#### Changed - Änderungen
+- **Meilenstein 1 Fortschritt:** 85% → 90%
+- **Sprint 1 Fortschritt:** 85% → 90%
+- **Projekt-Fortschritt:** ~40% → ~45%
+- **Dokumentation aktualisiert:** TODO.md (v1.2), README (geplant)
+
+#### Technical Details
+- Flask-Migrate ermöglicht jetzt versionierte Datenbank-Änderungen
+- Zentrales Logging für bessere Debugging- und Monitoring-Möglichkeiten
+- Fehlerbehandlung folgt jetzt einheitlichem Pattern
+- Utils-Dokumentation erleichtert Onboarding und Wartung
+
+#### Benefits
+- 🔄 Datenbank-Schema-Änderungen jetzt sicher versionierbar
+- 📊 Strukturiertes Logging für alle Anwendungsbereiche
+- 🛡️ Verbesserte Fehlerbehandlung und -nachverfolgung
+- 📚 Vollständige Utils-Dokumentation für Entwickler
 
 ---
 

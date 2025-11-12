@@ -10,9 +10,9 @@
 
 **Erstellt von Hans Hahn - Alle Rechte vorbehalten**
 
-**Version:** 2.0.0  
-**Stand:** November 2025  
-**Status:** Alpha (ca. 40% fertig, Testphase)
+**Version:** 2.0.3-alpha
+**Stand:** 12. November 2025
+**Status:** Alpha (ca. 45% fertig, Testphase)
 
 ---
 
@@ -138,9 +138,11 @@ Das Projekt befindet sich in der **schrittweisen Implementierung und Testphase**
 ### Backend
 - **Framework:** Flask 3.0.3 (Python Web Framework)
 - **Datenbank:** SQLite mit SQLAlchemy 2.0.36 ORM
+- **Migrations:** Flask-Migrate 4.0.5 (Alembic-basiert)
 - **Authentication:** Flask-Login
 - **Forms:** Flask-WTF mit WTForms
 - **Templating:** Jinja2
+- **Logging:** Zentrales Logger-System mit strukturiertem Logging
 
 ### Frontend
 - **HTML5** mit Jinja2-Templates
@@ -160,6 +162,9 @@ Das Projekt befindet sich in der **schrittweisen Implementierung und Testphase**
 - **pip** - Package Management
 - **venv** - Virtual Environment
 - **Git** - Version Control
+- **pytest 8.3.3** - Testing Framework
+- **pytest-cov 5.0.0** - Test Coverage
+- **pytest-flask 1.3.0** - Flask-spezifische Tests
 
 ---
 
