@@ -31,33 +31,19 @@ def app():
     Flask App Fixture für die gesamte Test-Session
     Verwendet eine In-Memory SQLite Datenbank
     """
-    from flask import Flask
-    from flask_login import LoginManager
+    # Nutze die echte create_app() Funktion mit Test-Konfiguration
+    os.environ['TESTING'] = '1'
+    os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
 
-    # Erstelle minimale Test-App ohne alle Controller
-    app = Flask(__name__,
-                template_folder='../src/templates',
-                static_folder='../src/static')
+    app = create_app()
 
-    # Test-Konfiguration
+    # Überschreibe Konfiguration für Tests
     app.config.update({
         'TESTING': True,
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
         'SQLALCHEMY_TRACK_MODIFICATIONS': False,
-        'SECRET_KEY': 'test-secret-key-do-not-use-in-production',
         'WTF_CSRF_ENABLED': False,  # Disable CSRF for testing
     })
-
-    # Initialisiere nur Datenbank und Login Manager
-    db.init_app(app)
-
-    login_manager = LoginManager()
-    login_manager.init_app(app)
-    login_manager.login_view = 'auth.login'
-
-    @login_manager.user_loader
-    def load_user(user_id):
-        return db.session.get(User, int(user_id))
 
     # Application context für die gesamte Test-Session
     with app.app_context():
@@ -160,7 +146,7 @@ def authenticated_client(client, test_user):
     Client ist bereits mit test_user eingeloggt
     """
     with client:
-        client.post('/auth/login', data={
+        client.post('/login', data={
             'username': 'testuser',
             'password': 'testpass123'
         }, follow_redirects=True)
@@ -173,29 +159,40 @@ def test_customer(app):
     Test Customer Fixture
     Erstellt einen Test-Kunden
     """
-    with app.app_context():
-        customer = Customer(
-            id='TEST001',
-            customer_type='private',
-            first_name='Max',
-            last_name='Mustermann',
-            email='max@example.com',
-            phone='0123456789',
-            street='Teststraße',
-            house_number='1',
-            postal_code='12345',
-            city='Teststadt',
-            country='Deutschland',
-            created_by='testuser'
-        )
-        db.session.add(customer)
+    # Nutze existierenden App-Context (von app-Fixture)
+    # Prüfe ob Kunde bereits existiert und lösche ihn
+    existing = Customer.query.filter_by(id='TEST001').first()
+    if existing:
+        db.session.delete(existing)
         db.session.commit()
 
-        yield customer
+    customer = Customer(
+        id='TEST001',
+        customer_type='private',
+        first_name='Max',
+        last_name='Mustermann',
+        email='max@example.com',
+        phone='0123456789',
+        street='Teststraße',
+        house_number='1',
+        postal_code='12345',
+        city='Teststadt',
+        country='Deutschland',
+        created_by='testuser'
+    )
+    db.session.add(customer)
+    db.session.commit()
 
-        # Cleanup
-        db.session.delete(customer)
-        db.session.commit()
+    yield customer
+
+    # Cleanup - mit Error-Handling
+    try:
+        customer_to_delete = Customer.query.filter_by(id='TEST001').first()
+        if customer_to_delete:
+            db.session.delete(customer_to_delete)
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 @pytest.fixture

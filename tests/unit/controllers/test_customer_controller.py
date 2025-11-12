@@ -29,7 +29,7 @@ class TestCustomerController:
 
     def test_customer_detail_view(self, authenticated_client, test_customer):
         """Test: Kundendetails anzeigen"""
-        response = authenticated_client.get(f'/customers/view/{test_customer.id}')
+        response = authenticated_client.get(f'/customers/{test_customer.id}')
 
         assert response.status_code == 200
 
