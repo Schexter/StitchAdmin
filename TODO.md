@@ -24,10 +24,10 @@
 
 ## 🎯 Meilenstein 1: Code-Qualität & Dokumentation
 
-**Priorität:** 🔴 HOCH  
-**Status:** 🟡 In Arbeit  
-**Deadline:** 15.11.2025  
-**Fortschritt:** 50%
+**Priorität:** 🔴 HOCH
+**Status:** 🟡 In Arbeit
+**Deadline:** 15.11.2025
+**Fortschritt:** 70% (Code-Bereinigung abgeschlossen! ✅)
 
 ### Ziele
 - Projekt-Dokumentation vervollständigen
@@ -50,20 +50,20 @@
 - [ ] Deployment-Guide vervollständigen
 
 #### Code-Bereinigung
-- [ ] Legacy JSON-Controller entfernen
-  - [ ] `customer_controller.py` (JSON-basiert) → Löschen
-  - [ ] `article_controller.py` (JSON-basiert) → Löschen
-  - [ ] `order_controller.py` (JSON-basiert) → Löschen
-  - [ ] `machine_controller.py` (JSON-basiert) → Löschen
-  - [ ] `thread_controller.py` (JSON-basiert) → Löschen
-  - [ ] `production_controller.py` (JSON-basiert) → Löschen
-  - [ ] `shipping_controller.py` (JSON-basiert) → Löschen
-  - [ ] `supplier_controller.py` (JSON-basiert) → Löschen
-  - [ ] `settings_controller.py` (JSON-basiert) → Löschen
-- [ ] Doppelte Controller konsolidieren
-  - [ ] `thread_online_controller.py` + `thread_online_controller_db.py` → Merge
-  - [ ] `settings_controller_db.py` + `settings_controller_unified.py` → Entscheiden
-- [ ] Ungenutzte Imports entfernen
+- [x] Legacy JSON-Controller entfernen ✅ (12.11.2025 - 5.593 Zeilen Code entfernt!)
+  - [x] `customer_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `article_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `order_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `machine_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `thread_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `production_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `shipping_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `supplier_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `settings_controller.py` (JSON-basiert) → Gelöscht
+- [x] Doppelte Controller konsolidieren ✅ (12.11.2025)
+  - [x] `thread_online_controller.py` + `thread_online_controller_db.py` → Beide gelöscht (nicht verwendet)
+  - [x] `settings_controller_db.py` + `settings_controller_unified.py` → `settings_controller_unified.py` behalten
+- [x] Ungenutzte Imports entfernen ✅ (12.11.2025 - 13 Dateien bereinigt)
 - [ ] Code-Kommentare standardisieren (Deutsch vs. Englisch klären)
 
 #### Testing-Framework
@@ -433,7 +433,7 @@ Diese Probleme müssen vor dem nächsten Release behoben werden:
 - TODO.md erstellen ✅
 - CHANGELOG.md erstellen ✅
 - error.log initialisieren ✅
-- Legacy-Controller entfernen (50%)
+- Legacy-Controller entfernen ✅ (12.11.2025 - Abgeschlossen!)
 - Testing-Framework aufsetzen (30%)
 
 ### Sprint 2 (16.11 - 30.11.2025): Testing & Bug-Fixes
@@ -487,6 +487,6 @@ Diese TODO.md wird wöchentlich aktualisiert (jeden Freitag).
 
 ---
 
-**Erstellt von Hans Hahn - Alle Rechte vorbehalten**  
-**Letzte Aktualisierung:** 05.11.2025  
-**Version:** 1.0
+**Erstellt von Hans Hahn - Alle Rechte vorbehalten**
+**Letzte Aktualisierung:** 12.11.2025 (Code-Bereinigung abgeschlossen)
+**Version:** 1.1

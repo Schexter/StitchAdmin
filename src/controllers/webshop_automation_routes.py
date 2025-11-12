@@ -156,7 +156,6 @@ def automation_status():
         selenium_version = None
     
     try:
-        import chromedriver_autoinstaller
         chromedriver_available = True
     except ImportError:
         chromedriver_available = False

@@ -5,8 +5,8 @@ Versand-Verwaltung mit Datenbank
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
-from datetime import datetime, date
-from src.models import db, Order, Shipment, ShipmentItem, Customer, ActivityLog
+from datetime import datetime
+from src.models import db, Order, Shipment, ShipmentItem, ActivityLog
 
 # Blueprint erstellen
 shipping_bp = Blueprint('shipping', __name__, url_prefix='/shipping')

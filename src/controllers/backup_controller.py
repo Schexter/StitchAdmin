@@ -2,9 +2,8 @@
 Backup Controller - Backup und Restore Funktionalität
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, send_file
+from flask import Blueprint, render_template, redirect, url_for, flash, session, send_file
 from functools import wraps
-import json
 import os
 import zipfile
 import shutil

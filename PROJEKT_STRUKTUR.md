@@ -84,26 +84,29 @@ StitchAdmin2.0/
 | **Kasse** | `rechnungsmodul/kasse_controller.py` | `kasse_bp` | TSE-konforme Kassenfunktionen, Belege |
 | **Rechnungen** | `rechnungsmodul/rechnung_controller.py` | `rechnung_bp` | Rechnungserstellung, ZUGFeRD-Export |
 
-### Legacy-Controller (JSON-basiert)
+### ~~Legacy-Controller (JSON-basiert)~~ ✅ ENTFERNT
 
-Diese Controller unterstützen die alte JSON-basierte Datenhaltung und sind für die Migration vorhanden:
+**Status:** ✅ Alle Legacy JSON-Controller wurden am 12.11.2025 entfernt (5.593 Zeilen Code gelöscht)
 
-- `customer_controller.py`
-- `article_controller.py`
-- `order_controller.py`
-- `machine_controller.py`
-- `thread_controller.py`
-- `production_controller.py`
-- `shipping_controller.py`
-- `supplier_controller.py`
-- `settings_controller.py`
-- `settings_advanced_controller.py`
+Die folgenden Controller wurden bereinigt:
+- ~~`customer_controller.py`~~ → Ersetzt durch `customer_controller_db.py`
+- ~~`article_controller.py`~~ → Ersetzt durch `article_controller_db.py`
+- ~~`order_controller.py`~~ → Ersetzt durch `order_controller_db.py`
+- ~~`machine_controller.py`~~ → Ersetzt durch `machine_controller_db.py`
+- ~~`thread_controller.py`~~ → Ersetzt durch `thread_controller_db.py`
+- ~~`production_controller.py`~~ → Ersetzt durch `production_controller_db.py`
+- ~~`shipping_controller.py`~~ → Ersetzt durch `shipping_controller_db.py`
+- ~~`supplier_controller.py`~~ → Ersetzt durch `supplier_controller_db.py`
+- ~~`settings_controller.py`~~ → Ersetzt durch `settings_controller_unified.py`
+- ~~`settings_controller_db.py`~~ → Konsolidiert in `settings_controller_unified.py`
+- ~~`thread_online_controller.py`~~ → Entfernt (nicht verwendet)
+- ~~`thread_online_controller_db.py`~~ → Entfernt (nicht verwendet)
 
 ### Zusätzliche Controller
 
-- `thread_online_controller.py` / `thread_online_controller_db.py` - Online-Garnsuche
 - `thread_web_search_routes.py` - Web-Suche für Garne
 - `supplier_controller_db_extension.py` - Erweiterte Lieferanten-Funktionen
+- `settings_advanced_controller.py` - Erweiterte Einstellungen
 
 ---
 

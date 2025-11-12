@@ -652,7 +652,7 @@ Siehe `TODO.md` für detaillierte Meilensteine und Aufgaben.
 
 ### Kurzfristig (Meilenstein 1-2)
 - [ ] Testing-Framework implementieren
-- [ ] Legacy-Controller bereinigen
+- [x] Legacy-Controller bereinigen ✅ (12.11.2025 - Abgeschlossen!)
 - [ ] Dokumentation vervollständigen
 - [ ] Migrations-System (Flask-Migrate)
 

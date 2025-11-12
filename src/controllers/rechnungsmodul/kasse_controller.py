@@ -16,16 +16,13 @@ Features:
 - Warenkorb-Funktionalität
 """
 
-import json
 import uuid
 from datetime import datetime, date
-from decimal import Decimal
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for, session
-from sqlalchemy.exc import SQLAlchemyError
 
 # Imports für Models und Services
 try:
-    from src.models import db, Article, Customer, User
+    from src.models import db, Article
     from src.models.rechnungsmodul import (
         KassenBeleg, BelegPosition, KassenTransaktion, MwStSatz, TSEKonfiguration,
         BelegTyp, ZahlungsArt, models_available
@@ -103,19 +100,15 @@ class TSEService:
     
     def _get_real_tse_info(self):
         """Placeholder für echte TSE-Info"""
-        pass
     
     def _test_real_tse(self):
         """Placeholder für echte TSE-Verbindung"""
-        pass
     
     def _start_real_transaction(self, process_type, client_id):
         """Placeholder für echte TSE-Transaktion"""
-        pass
     
     def _finish_real_transaction(self, transaction_id, process_data):
         """Placeholder für echte TSE-Transaktion"""
-        pass
 
 # Globale TSE-Service-Instanz
 tse_service = TSEService()
@@ -846,7 +839,7 @@ def beleg_detail(beleg_id):
 def api_sale():
     """API-Endpunkt für Verkauf aus verkauf.html"""
     try:
-        data = request.get_json()
+        request.get_json()
         
         # Mock-Response für Entwicklung
         receipt_id = f"MOCK-{datetime.now().strftime('%Y%m%d%H%M%S')}"

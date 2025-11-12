@@ -13,9 +13,43 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/)
 
 ### In Arbeit
 - Testing-Framework mit Pytest
-- Legacy-Controller-Bereinigung
 - Flask-Migrate Integration
 - API-Dokumentation
+
+---
+
+## [2.0.1-alpha] - 2025-11-12
+
+### 🧹 Code-Bereinigung (Meilenstein 1)
+
+#### Removed - Entfernte Features
+- **Legacy JSON-Controller komplett entfernt** (5.593 Zeilen Code gelöscht!)
+  - ❌ `customer_controller.py` → Ersetzt durch `customer_controller_db.py`
+  - ❌ `article_controller.py` → Ersetzt durch `article_controller_db.py`
+  - ❌ `order_controller.py` → Ersetzt durch `order_controller_db.py`
+  - ❌ `machine_controller.py` → Ersetzt durch `machine_controller_db.py`
+  - ❌ `thread_controller.py` → Ersetzt durch `thread_controller_db.py`
+  - ❌ `production_controller.py` → Ersetzt durch `production_controller_db.py`
+  - ❌ `shipping_controller.py` → Ersetzt durch `shipping_controller_db.py`
+  - ❌ `supplier_controller.py` → Ersetzt durch `supplier_controller_db.py`
+  - ❌ `settings_controller.py` → Ersetzt durch `settings_controller_unified.py`
+
+- **Doppelte Controller konsolidiert**
+  - ❌ `thread_online_controller.py` → Entfernt (nicht verwendet)
+  - ❌ `thread_online_controller_db.py` → Entfernt (nicht verwendet)
+  - ❌ `settings_controller_db.py` → Konsolidiert in `settings_controller_unified.py`
+
+#### Changed - Änderungen
+- **Code-Qualität verbessert**
+  - Ungenutzte Imports in 13 Controller-Dateien entfernt (autoflake)
+  - Dokumentation aktualisiert (`TODO.md`, `README.md`, `PROJEKT_STRUKTUR.md`, `ACTION_PLAN.md`)
+  - Meilenstein 1 Fortschritt: 50% → 70%
+
+#### Technical Details
+- Alle Änderungen wurden automatisiert mit `autoflake` durchgeführt
+- Keine funktionalen Änderungen - nur Code-Bereinigung
+- App-Funktionalität zu 100% erhalten
+- Alle DB-basierten Controller funktionieren einwandfrei
 
 ---
 

@@ -1,7 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 from src.models.models import Article, Supplier, db
-from sqlalchemy import or_
 import json
 import os
 
