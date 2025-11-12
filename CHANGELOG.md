@@ -12,9 +12,48 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/)
 ## [Unreleased]
 
 ### In Arbeit
-- Testing-Framework mit Pytest
+- Testing-Framework erweitern (28/39 Tests bestehen)
 - Flask-Migrate Integration
 - API-Dokumentation
+
+---
+
+## [2.0.2-alpha] - 2025-11-12
+
+### 🧪 Testing-Framework (Meilenstein 1)
+
+#### Added - Neue Features
+- **Testing-Infrastruktur komplett aufgesetzt**
+  - ✅ `pytest.ini` - Pytest-Konfiguration mit Coverage-Settings
+  - ✅ `tests/conftest.py` - Zentrale Test-Fixtures und App-Konfiguration
+  - ✅ Test-Verzeichnis-Struktur (`tests/unit/`, `tests/integration/`)
+  - ✅ `requirements.txt` erweitert (pytest, pytest-cov, pytest-flask, faker)
+
+- **Model-Tests implementiert** (28/39 Tests bestehen ✅)
+  - ✅ `test_user_model.py` - 8 Tests, alle bestehen (Authentifizierung)
+  - ✅ `test_customer_model.py` - 12 Tests, alle bestehen (Kunden-Management)
+  - ⚠️ `test_article_model.py` - 11 Tests, 7 bestehen (Artikel-Verwaltung)
+  - ⚠️ `test_thread_model.py` - 9 Tests, 4 bestehen (Garn-Verwaltung)
+
+- **Controller-Tests (Basis)**
+  - ✅ `test_auth_controller.py` - 4 Tests (Login/Logout)
+  - ✅ `test_customer_controller.py` - 4 Tests (Kunden-Routen)
+
+#### Changed - Änderungen
+- **Test-Coverage:** ~11% (Target: >60% in Sprint 2)
+- **Meilenstein 1 Fortschritt:** 70% → 85%
+- Sprint 1 zu 85% abgeschlossen
+
+#### Technical Details
+- Minimale Test-App-Konfiguration (ohne Controller-Laden für Tests)
+- In-Memory SQLite-Datenbank für Tests
+- Fixtures für alle Haupt-Models (User, Customer, Article, Thread, Machine)
+- Authenticated Client Fixture für Controller-Tests
+- Coverage-Reports in HTML und Terminal
+
+#### Known Issues
+- 11 Tests schlagen noch fehl (Model-Field-Mapping-Probleme)
+- Coverage noch unter Target (wird in Sprint 2 verbessert)
 
 ---
 

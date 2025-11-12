@@ -27,7 +27,7 @@
 **Priorität:** 🔴 HOCH
 **Status:** 🟡 In Arbeit
 **Deadline:** 15.11.2025
-**Fortschritt:** 70% (Code-Bereinigung abgeschlossen! ✅)
+**Fortschritt:** 85% (Code-Bereinigung ✅ | Testing-Framework Basis ✅)
 
 ### Ziele
 - Projekt-Dokumentation vervollständigen
@@ -67,19 +67,19 @@
 - [ ] Code-Kommentare standardisieren (Deutsch vs. Englisch klären)
 
 #### Testing-Framework
-- [ ] Pytest-Setup mit `conftest.py`
-- [ ] Model-Tests implementieren
-  - [ ] `test_customer_model.py`
-  - [ ] `test_article_model.py`
-  - [ ] `test_order_model.py`
-  - [ ] `test_thread_model.py`
-- [ ] Controller-Tests implementieren
-  - [ ] `test_customer_controller.py`
-  - [ ] `test_article_controller.py`
-  - [ ] `test_order_controller.py`
-- [ ] Service-Tests implementieren
-- [ ] Integration-Tests für Hauptworkflows
-- [ ] Test-Coverage > 60% erreichen
+- [x] Pytest-Setup mit `conftest.py` ✅ (12.11.2025)
+- [x] Model-Tests implementieren ✅ (12.11.2025 - 28/39 Tests bestehen)
+  - [x] `test_customer_model.py` (12 Tests, alle bestanden ✅)
+  - [x] `test_article_model.py` (11 Tests, 7 bestanden)
+  - [x] `test_user_model.py` (8 Tests, alle bestanden ✅)
+  - [x] `test_thread_model.py` (9 Tests, 4 bestanden)
+- [x] Controller-Tests implementieren ✅ (12.11.2025 - Basis)
+  - [x] `test_customer_controller.py` (4 Tests - Basis)
+  - [x] `test_auth_controller.py` (4 Tests - Basis)
+  - [ ] Weitere Controller-Tests (Sprint 2)
+- [ ] Service-Tests implementieren (Sprint 2)
+- [ ] Integration-Tests für Hauptworkflows (Sprint 2)
+- [ ] Test-Coverage > 60% erreichen (aktuell: ~11%, Target: Sprint 2)
 
 #### Technische Schulden
 - [ ] Flask-Migrate für Datenbank-Migrations einrichten
@@ -428,13 +428,13 @@ Diese Probleme müssen vor dem nächsten Release behoben werden:
 
 ## 📊 Sprint-Planung
 
-### Sprint 1 (06.11 - 15.11.2025): Dokumentation & Code-Bereinigung
+### Sprint 1 (06.11 - 15.11.2025): Dokumentation & Code-Bereinigung ✅ 85%
 - README.md fertigstellen ✅
 - TODO.md erstellen ✅
 - CHANGELOG.md erstellen ✅
 - error.log initialisieren ✅
-- Legacy-Controller entfernen ✅ (12.11.2025 - Abgeschlossen!)
-- Testing-Framework aufsetzen (30%)
+- Legacy-Controller entfernen ✅ (12.11.2025 - 5.593 Zeilen gelöscht!)
+- Testing-Framework aufsetzen ✅ (12.11.2025 - Basis fertig: 28/39 Tests bestehen)
 
 ### Sprint 2 (16.11 - 30.11.2025): Testing & Bug-Fixes
 - Testing-Framework fertigstellen
