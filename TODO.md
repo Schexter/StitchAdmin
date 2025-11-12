@@ -2,9 +2,9 @@
 
 **Erstellt von Hans Hahn - Alle Rechte vorbehalten**
 
-**Version:** 2.0.0  
-**Stand:** 05.11.2025  
-**Projektfortschritt:** ~40% (Alpha-Phase)
+**Version:** 2.0.0
+**Stand:** 12.11.2025
+**Projektfortschritt:** ~47% (Alpha-Phase)
 
 ---
 
@@ -24,10 +24,10 @@
 
 ## 🎯 Meilenstein 1: Code-Qualität & Dokumentation
 
-**Priorität:** 🔴 HOCH  
-**Status:** 🟡 In Arbeit  
-**Deadline:** 15.11.2025  
-**Fortschritt:** 50%
+**Priorität:** 🔴 HOCH
+**Status:** 🟡 In Arbeit
+**Deadline:** 15.11.2025
+**Fortschritt:** 90% (Code-Bereinigung ✅ | Testing-Framework Basis ✅ | Technische Schulden ✅)
 
 ### Ziele
 - Projekt-Dokumentation vervollständigen
@@ -50,42 +50,47 @@
 - [ ] Deployment-Guide vervollständigen
 
 #### Code-Bereinigung
-- [ ] Legacy JSON-Controller entfernen
-  - [ ] `customer_controller.py` (JSON-basiert) → Löschen
-  - [ ] `article_controller.py` (JSON-basiert) → Löschen
-  - [ ] `order_controller.py` (JSON-basiert) → Löschen
-  - [ ] `machine_controller.py` (JSON-basiert) → Löschen
-  - [ ] `thread_controller.py` (JSON-basiert) → Löschen
-  - [ ] `production_controller.py` (JSON-basiert) → Löschen
-  - [ ] `shipping_controller.py` (JSON-basiert) → Löschen
-  - [ ] `supplier_controller.py` (JSON-basiert) → Löschen
-  - [ ] `settings_controller.py` (JSON-basiert) → Löschen
-- [ ] Doppelte Controller konsolidieren
-  - [ ] `thread_online_controller.py` + `thread_online_controller_db.py` → Merge
-  - [ ] `settings_controller_db.py` + `settings_controller_unified.py` → Entscheiden
-- [ ] Ungenutzte Imports entfernen
+- [x] Legacy JSON-Controller entfernen ✅ (12.11.2025 - 5.593 Zeilen Code entfernt!)
+  - [x] `customer_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `article_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `order_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `machine_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `thread_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `production_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `shipping_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `supplier_controller.py` (JSON-basiert) → Gelöscht
+  - [x] `settings_controller.py` (JSON-basiert) → Gelöscht
+- [x] Doppelte Controller konsolidieren ✅ (12.11.2025)
+  - [x] `thread_online_controller.py` + `thread_online_controller_db.py` → Beide gelöscht (nicht verwendet)
+  - [x] `settings_controller_db.py` + `settings_controller_unified.py` → `settings_controller_unified.py` behalten
+- [x] Ungenutzte Imports entfernen ✅ (12.11.2025 - 13 Dateien bereinigt)
 - [ ] Code-Kommentare standardisieren (Deutsch vs. Englisch klären)
 
 #### Testing-Framework
-- [ ] Pytest-Setup mit `conftest.py`
-- [ ] Model-Tests implementieren
-  - [ ] `test_customer_model.py`
-  - [ ] `test_article_model.py`
-  - [ ] `test_order_model.py`
-  - [ ] `test_thread_model.py`
-- [ ] Controller-Tests implementieren
-  - [ ] `test_customer_controller.py`
-  - [ ] `test_article_controller.py`
-  - [ ] `test_order_controller.py`
-- [ ] Service-Tests implementieren
-- [ ] Integration-Tests für Hauptworkflows
-- [ ] Test-Coverage > 60% erreichen
+- [x] Pytest-Setup mit `conftest.py` ✅ (12.11.2025)
+- [x] Model-Tests implementieren & reparieren ✅ (12.11.2025 - 39/39 Tests bestehen!)
+  - [x] `test_customer_model.py` (12 Tests, alle bestanden ✅)
+  - [x] `test_article_model.py` (11 Tests, alle bestanden ✅)
+  - [x] `test_user_model.py` (8 Tests, alle bestanden ✅)
+  - [x] `test_thread_model.py` (9 Tests, alle bestanden ✅)
+- [x] Utils-Tests implementieren ✅ (12.11.2025 - 86 Tests, 93% Avg Coverage)
+  - [x] `test_form_helpers.py` (30 Tests, 100% Coverage ✅)
+  - [x] `test_filters.py` (32 Tests, 87% Coverage ✅)
+  - [x] `test_security.py` (24 Tests, 92% Coverage ✅)
+- [x] Controller-Tests implementieren ✅ (12.11.2025 - Basis)
+  - [x] `test_customer_controller.py` (4 Tests - Basis)
+  - [x] `test_auth_controller.py` (4 Tests - Basis)
+  - [ ] Controller-Tests reparieren (benötigt vollständige Test-App)
+- [ ] Weitere Utils-Tests (activity_logger, customer_history, email_service)
+- [ ] Service-Tests implementieren (Sprint 2)
+- [ ] Integration-Tests für Hauptworkflows (Sprint 2)
+- [ ] Test-Coverage > 60% erreichen (aktuell: ~13.22%, Target: Sprint 2)
 
 #### Technische Schulden
-- [ ] Flask-Migrate für Datenbank-Migrations einrichten
-- [ ] Logger-System vereinheitlichen
-- [ ] Error-Handling standardisieren
-- [ ] Utils-Module dokumentieren
+- [x] Flask-Migrate für Datenbank-Migrations einrichten ✅ (12.11.2025)
+- [x] Logger-System vereinheitlichen ✅ (12.11.2025)
+- [x] Error-Handling standardisieren ✅ (12.11.2025)
+- [x] Utils-Module dokumentieren ✅ (12.11.2025 - src/utils/README.md erstellt)
 
 ### Definition of Done
 - ✅ Alle Pflichtdateien vorhanden und aktuell
@@ -428,20 +433,26 @@ Diese Probleme müssen vor dem nächsten Release behoben werden:
 
 ## 📊 Sprint-Planung
 
-### Sprint 1 (06.11 - 15.11.2025): Dokumentation & Code-Bereinigung
+### Sprint 1 (06.11 - 15.11.2025): Dokumentation & Code-Bereinigung ✅ 95%
 - README.md fertigstellen ✅
 - TODO.md erstellen ✅
 - CHANGELOG.md erstellen ✅
 - error.log initialisieren ✅
-- Legacy-Controller entfernen (50%)
-- Testing-Framework aufsetzen (30%)
+- Legacy-Controller entfernen ✅ (12.11.2025 - 5.593 Zeilen gelöscht!)
+- Testing-Framework aufsetzen ✅ (12.11.2025 - Basis fertig: 28/39 Tests bestehen)
+- Technische Schulden reduzieren ✅ (12.11.2025 - Flask-Migrate, Logger, Error-Handling, Utils-Doku)
+- Model-Tests reparieren ✅ (12.11.2025 - 39/39 Tests bestehen!)
+- Utils-Tests implementieren ✅ (12.11.2025 - 86 Tests, Coverage +2.31%)
 
-### Sprint 2 (16.11 - 30.11.2025): Testing & Bug-Fixes
-- Testing-Framework fertigstellen
-- Model-Tests implementieren
-- Controller-Tests implementieren
-- Critical Bugs beheben
-- Performance-Optimierung
+### Sprint 2 (16.11 - 30.11.2025): Testing & Bug-Fixes 🟡 In Arbeit (30%)
+- Model-Tests fertigstellen ✅ (39/39 Tests)
+- Utils-Tests Basis ✅ (86 Tests, form_helpers, filters, security)
+- [ ] Weitere Utils-Tests (activity_logger, customer_history, email_service)
+- [ ] Service-Tests implementieren
+- [ ] Test-Coverage auf >60% bringen (aktuell 13.22%)
+- [ ] Controller-Tests reparieren
+- [ ] Critical Bugs beheben
+- [ ] Performance-Optimierung
 
 ### Sprint 3 (01.12 - 15.12.2025): Modul-Tests
 - Kundenverwaltung E2E-Tests
@@ -487,6 +498,6 @@ Diese TODO.md wird wöchentlich aktualisiert (jeden Freitag).
 
 ---
 
-**Erstellt von Hans Hahn - Alle Rechte vorbehalten**  
-**Letzte Aktualisierung:** 05.11.2025  
-**Version:** 1.0
+**Erstellt von Hans Hahn - Alle Rechte vorbehalten**
+**Letzte Aktualisierung:** 12.11.2025 (Sprint 2 Testing begonnen)
+**Version:** 1.3

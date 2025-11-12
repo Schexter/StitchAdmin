@@ -6,12 +6,11 @@ Artikel-Verwaltung mit Datenbank
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import login_required, current_user
 from datetime import datetime
-from src.models import db, Article, ActivityLog, Supplier, ArticleVariant, ProductCategory, Brand, PriceCalculationSettings
+from src.models import db, Article, ActivityLog, Supplier, ProductCategory, Brand, PriceCalculationSettings
 from src.services import LShopImportService
 from werkzeug.utils import secure_filename
 import os
 import tempfile
-import pandas as pd
 import json
 
 # Blueprint erstellen
@@ -561,7 +560,7 @@ def import_lshop_analyze():
         return jsonify({'success': False, 'error': analysis['error']})
     
     # Hole Spalten-Mapping Preview
-    mapping_preview = service.get_column_mapping_preview()
+    service.get_column_mapping_preview()
     
     # Speichere Filepath in Session für späteren Import
     session['import_file_path'] = filepath

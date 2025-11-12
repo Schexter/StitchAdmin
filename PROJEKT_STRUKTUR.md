@@ -1,8 +1,8 @@
 # StitchAdmin 2.0 - Projekt-Struktur und Komponenten-Übersicht
 
 **Erstellt von:** Hans Hahn - Alle Rechte vorbehalten
-**Version:** 2.0.0
-**Stand:** 05.11.2025
+**Version:** 2.0.4-alpha
+**Stand:** 12.11.2025
 **Python-Version:** 3.11+ (getestet mit 3.11, 3.12, 3.13)
 
 ---
@@ -13,6 +13,8 @@
 - **38 Controller-Module** (inkl. Rechnungsmodul)
 - **126 HTML-Templates**
 - **14 Utility-Module**
+- **124 Tests** (39 Model-Tests, 86 Utils-Tests)
+- **Test-Coverage:** 13.22% (Ziel: >60%)
 - **Datenbank:** SQLite mit SQLAlchemy 2.0.36+
 - **Framework:** Flask 3.0.3
 
@@ -44,6 +46,19 @@ StitchAdmin2.0/
 ├── logs/                          # Anwendungs-Logs
 ├── backups/                       # Datenbank-Backups
 └── tests/                         # Unit- und Integration-Tests
+    ├── conftest.py                # Pytest Fixtures & Configuration
+    ├── unit/                      # Unit-Tests
+    │   ├── models/                # Model-Tests (39 Tests ✅)
+    │   │   ├── test_customer_model.py
+    │   │   ├── test_article_model.py
+    │   │   ├── test_thread_model.py
+    │   │   └── test_order_model.py
+    │   └── utils/                 # Utils-Tests (86 Tests ✅)
+    │       ├── test_form_helpers.py  (30 Tests, 100% Coverage)
+    │       ├── test_filters.py       (32 Tests, 87% Coverage)
+    │       └── test_security.py      (24 Tests, 92% Coverage)
+    ├── integration/               # Integration-Tests (geplant)
+    └── htmlcov/                   # Coverage HTML-Reports
 ```
 
 ---
@@ -84,26 +99,29 @@ StitchAdmin2.0/
 | **Kasse** | `rechnungsmodul/kasse_controller.py` | `kasse_bp` | TSE-konforme Kassenfunktionen, Belege |
 | **Rechnungen** | `rechnungsmodul/rechnung_controller.py` | `rechnung_bp` | Rechnungserstellung, ZUGFeRD-Export |
 
-### Legacy-Controller (JSON-basiert)
+### ~~Legacy-Controller (JSON-basiert)~~ ✅ ENTFERNT
 
-Diese Controller unterstützen die alte JSON-basierte Datenhaltung und sind für die Migration vorhanden:
+**Status:** ✅ Alle Legacy JSON-Controller wurden am 12.11.2025 entfernt (5.593 Zeilen Code gelöscht)
 
-- `customer_controller.py`
-- `article_controller.py`
-- `order_controller.py`
-- `machine_controller.py`
-- `thread_controller.py`
-- `production_controller.py`
-- `shipping_controller.py`
-- `supplier_controller.py`
-- `settings_controller.py`
-- `settings_advanced_controller.py`
+Die folgenden Controller wurden bereinigt:
+- ~~`customer_controller.py`~~ → Ersetzt durch `customer_controller_db.py`
+- ~~`article_controller.py`~~ → Ersetzt durch `article_controller_db.py`
+- ~~`order_controller.py`~~ → Ersetzt durch `order_controller_db.py`
+- ~~`machine_controller.py`~~ → Ersetzt durch `machine_controller_db.py`
+- ~~`thread_controller.py`~~ → Ersetzt durch `thread_controller_db.py`
+- ~~`production_controller.py`~~ → Ersetzt durch `production_controller_db.py`
+- ~~`shipping_controller.py`~~ → Ersetzt durch `shipping_controller_db.py`
+- ~~`supplier_controller.py`~~ → Ersetzt durch `supplier_controller_db.py`
+- ~~`settings_controller.py`~~ → Ersetzt durch `settings_controller_unified.py`
+- ~~`settings_controller_db.py`~~ → Konsolidiert in `settings_controller_unified.py`
+- ~~`thread_online_controller.py`~~ → Entfernt (nicht verwendet)
+- ~~`thread_online_controller_db.py`~~ → Entfernt (nicht verwendet)
 
 ### Zusätzliche Controller
 
-- `thread_online_controller.py` / `thread_online_controller_db.py` - Online-Garnsuche
 - `thread_web_search_routes.py` - Web-Suche für Garne
 - `supplier_controller_db_extension.py` - Erweiterte Lieferanten-Funktionen
+- `settings_advanced_controller.py` - Erweiterte Einstellungen
 
 ---
 
@@ -492,12 +510,46 @@ Passwort: admin
 
 ### Datenbank-Migrations
 - Models werden bei Start automatisch erstellt (`db.create_all()`)
-- Für Produktivumgebung empfohlen: Flask-Migrate/Alembic
+- Flask-Migrate 4.0.5 installiert (Alembic-basiert)
+- Migrations im `migrations/`-Verzeichnis
 
 ### Testing
-- Unit-Tests im `tests/`-Verzeichnis
-- Integration-Tests für Controller
-- Datenbank-Tests mit in-memory SQLite
+- **Framework:** pytest 8.3.3 mit pytest-flask 1.3.0
+- **Coverage-Tool:** pytest-cov 5.0.0
+- **Tests-Struktur:**
+  - Unit-Tests: `tests/unit/` (125 Tests ✅)
+  - Integration-Tests: `tests/integration/` (geplant)
+- **Model-Tests:** 39 Tests - 100% bestanden ✅
+  - test_customer_model.py (10 Tests)
+  - test_article_model.py (10 Tests)
+  - test_thread_model.py (9 Tests)
+  - test_order_model.py (10 Tests)
+- **Utils-Tests:** 86 Tests - 93% Avg Coverage ✅
+  - test_form_helpers.py (30 Tests, 100% Coverage)
+  - test_filters.py (32 Tests, 87% Coverage)
+  - test_security.py (24 Tests, 92% Coverage)
+- **Test-Coverage:** 13.22% (Stand: 12.11.2025)
+- **Ziel:** >60% Coverage bis Ende Sprint 2
+- **Test-Datenbank:** In-Memory SQLite für schnelle Tests
+- **Fixtures:** Zentralisiert in conftest.py
+
+### Test-Befehle
+```bash
+# Alle Tests ausführen
+pytest
+
+# Tests mit Coverage
+pytest --cov=src --cov-report=html --cov-report=term
+
+# Nur Model-Tests
+pytest tests/unit/models/ -v
+
+# Nur Utils-Tests
+pytest tests/unit/utils/ -v
+
+# Coverage-Report im Browser
+# htmlcov/index.html öffnen
+```
 
 ---
 
@@ -541,4 +593,28 @@ Passwort: admin
 
 ---
 
-**📌 Diese Dokumentation wurde automatisch generiert am 05.11.2025**
+## 📈 Entwicklungsstand (Sprint 2)
+
+### Abgeschlossen ✅
+- **Sprint 1 (95%):**
+  - Legacy-Code-Cleanup (5.593 LOC entfernt)
+  - Testing-Framework aufgesetzt
+  - Model-Tests implementiert (39/39 ✅)
+  - Utils-Tests Basis implementiert (86 Tests)
+  - Technische Schulden (Logger, Error-Handler, Migrations)
+
+### In Arbeit 🟡
+- **Sprint 2 (30%):**
+  - Test-Coverage erhöhen (13.22% → 60%)
+  - Controller-Tests erweitern
+  - Service-Tests implementieren
+  - Integration-Tests für Hauptworkflows
+
+### Geplant 📋
+- Produktionsplanung-Workflow (Sprint 2)
+- E-Mail-Benachrichtigungen (Sprint 3)
+- Dashboard-Statistiken (Sprint 4)
+
+---
+
+**📌 Diese Dokumentation wurde zuletzt aktualisiert am 12.11.2025**

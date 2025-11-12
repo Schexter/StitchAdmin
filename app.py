@@ -68,6 +68,26 @@ def create_app():
         return None
 
     # ==========================================
+    # FLASK-MIGRATE (Datenbank-Migrationen)
+    # ==========================================
+    try:
+        from flask_migrate import Migrate
+        migrate = Migrate(app, db)
+        print("✅ Flask-Migrate erfolgreich initialisiert")
+    except ImportError as e:
+        print(f"⚠️ Flask-Migrate nicht verfügbar: {e}")
+
+    # ==========================================
+    # LOGGER-SYSTEM
+    # ==========================================
+    try:
+        from src.utils.logger import logger
+        app.logger_instance = logger
+        print("✅ Logger-System erfolgreich initialisiert")
+    except ImportError as e:
+        print(f"⚠️ Logger-System nicht verfügbar: {e}")
+
+    # ==========================================
     # CUSTOM FILTERS
     # ==========================================
     try:
@@ -273,18 +293,56 @@ def create_app():
     @app.errorhandler(404)
     def not_found_error(error):
         """404 - Seite nicht gefunden"""
+        try:
+            if hasattr(app, 'logger_instance'):
+                app.logger_instance.log_debug(f"404 Error: {request.url}", "error_handler")
+        except Exception:
+            pass  # Logging sollte nie die Error-Behandlung blockieren
         return render_template('errors/404.html'), 404
 
     @app.errorhandler(500)
     def internal_error(error):
         """500 - Interner Server-Fehler"""
         db.session.rollback()
+        try:
+            if hasattr(app, 'logger_instance'):
+                app.logger_instance.log_error(f"500 Error: {str(error)}", "error_handler")
+        except Exception:
+            pass
         return render_template('errors/500.html'), 500
 
     @app.errorhandler(403)
     def forbidden_error(error):
         """403 - Zugriff verweigert"""
+        try:
+            if hasattr(app, 'logger_instance'):
+                app.logger_instance.log_warning(f"403 Error: {request.url}", "error_handler")
+        except Exception:
+            pass
         return render_template('errors/403.html'), 403
+
+    @app.errorhandler(Exception)
+    def handle_exception(error):
+        """Globaler Exception Handler für unbehandelte Fehler"""
+        try:
+            if hasattr(app, 'logger_instance'):
+                app.logger_instance.log_error(
+                    f"Unhandled Exception: {type(error).__name__}: {str(error)}",
+                    "error_handler"
+                )
+        except Exception:
+            pass
+
+        # Bei bekannten HTTP-Exceptions die richtige Seite anzeigen
+        if hasattr(error, 'code'):
+            if error.code == 404:
+                return render_template('errors/404.html'), 404
+            elif error.code == 403:
+                return render_template('errors/403.html'), 403
+
+        # Bei unbekannten Fehlern: 500
+        db.session.rollback()
+        return render_template('errors/500.html'), 500
 
     return app
 

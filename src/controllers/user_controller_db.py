@@ -5,9 +5,7 @@ Benutzer-Verwaltung mit Datenbank
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
-from datetime import datetime
 from src.models import db, User, ActivityLog
-from werkzeug.security import generate_password_hash
 
 # Blueprint erstellen
 user_bp = Blueprint('users', __name__, url_prefix='/users')

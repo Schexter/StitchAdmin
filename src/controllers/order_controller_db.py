@@ -5,14 +5,13 @@ Auftrags-Verwaltung mit Datenbank
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, current_user
-from datetime import datetime, timedelta
+from datetime import datetime
 from src.models import db, Order, Customer, Article, OrderItem, ActivityLog, Supplier
 from sqlalchemy import text
 from src.utils.dst_analyzer import analyze_dst_file_robust
 from werkzeug.utils import secure_filename
 import json
 import os
-import tempfile
 
 # Blueprint erstellen
 order_bp = Blueprint('orders', __name__, url_prefix='/orders')
