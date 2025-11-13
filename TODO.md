@@ -45,9 +45,9 @@
 - [x] IST-SOLL-Analyse erstellt (10.11.2025)
 - [x] Action Plan erstellt (10.11.2025)
 - [x] Workflows 01-04 dokumentiert (10.11.2025)
-- [ ] API-Dokumentation erstellen (später)
+- [x] API-Dokumentation erstellen ✅ (13.11.2025 - OpenAPI/Swagger)
 - [ ] Entwickler-Guide schreiben
-- [ ] Deployment-Guide vervollständigen
+- [x] Deployment-Guide vervollständigen ✅ (13.11.2025)
 
 #### Code-Bereinigung
 - [x] Legacy JSON-Controller entfernen ✅ (12.11.2025 - 5.593 Zeilen Code entfernt!)
@@ -81,10 +81,13 @@
   - [x] `test_customer_controller.py` (4 Tests - Basis)
   - [x] `test_auth_controller.py` (4 Tests - Basis)
   - [ ] Controller-Tests reparieren (benötigt vollständige Test-App)
-- [ ] Weitere Utils-Tests (activity_logger, customer_history, email_service)
+- [x] Weitere Utils-Tests ✅ (13.11.2025 - 78 Tests, 100% Coverage)
+  - [x] `test_activity_logger.py` (26 Tests, 100% Coverage ✅)
+  - [x] `test_customer_history.py` (28 Tests, 100% Coverage ✅)
+  - [x] `test_email_service.py` (24 Tests, 100% Coverage ✅)
 - [ ] Service-Tests implementieren (Sprint 2)
 - [ ] Integration-Tests für Hauptworkflows (Sprint 2)
-- [ ] Test-Coverage > 60% erreichen (aktuell: ~13.22%, Target: Sprint 2)
+- [ ] Test-Coverage > 60% erreichen (aktuell: ~23.45%, Target: Sprint 2)
 
 #### Technische Schulden
 - [x] Flask-Migrate für Datenbank-Migrations einrichten ✅ (12.11.2025)
