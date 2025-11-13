@@ -117,6 +117,15 @@ def create_app():
     def favicon():
         return app.send_static_file('favicon.svg')
 
+    @app.route('/openapi.yaml')
+    def openapi_spec():
+        """OpenAPI-Spezifikation bereitstellen"""
+        from flask import send_file
+        openapi_path = os.path.join(BASE_DIR, 'openapi.yaml')
+        if os.path.exists(openapi_path):
+            return send_file(openapi_path, mimetype='text/yaml')
+        return "OpenAPI-Spezifikation nicht gefunden", 404
+
     @app.route('/')
     def index():
         """Startseite"""
@@ -219,6 +228,15 @@ def create_app():
     
     # API
     register_blueprint_safe('src.controllers.api_controller', 'api_bp', 'API')
+
+    # Swagger UI für API-Dokumentation
+    try:
+        from src.controllers.api_controller import swaggerui_blueprint
+        app.register_blueprint(swaggerui_blueprint)
+        blueprints_registered.append('API-Docs (Swagger UI)')
+        print("[OK] Swagger UI Blueprint registriert")
+    except Exception as e:
+        print(f"[WARNING] Swagger UI nicht verfügbar: {e}")
     
     # Rechnungsmodul
     try:
