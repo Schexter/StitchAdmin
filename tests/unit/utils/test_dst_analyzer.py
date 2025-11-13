@@ -382,24 +382,25 @@ class TestClassifyCommand:
 
     def test_classify_color_change(self):
         """Test: Farbwechsel-Command"""
-        cmd = classify_command(0x00, 0x00, 0xC3)
+        cmd = classify_command(0x00, 0xB0, 0xFE)  # b2=0xFE and b1=0xB0
         assert cmd == 'color_change'
 
     def test_classify_trim(self):
         """Test: Trim-Command"""
-        cmd = classify_command(0x00, 0x00, 0xC7)
+        cmd = classify_command(0x00, 0x00, 0xFD)  # b2=0xFD
         assert cmd == 'trim'
 
     def test_classify_stop(self):
         """Test: Stop-Command"""
-        cmd = classify_command(0x00, 0x00, 0xCF)
+        cmd = classify_command(0x00, 0x00, 0xFF)  # b2=0xFF
         assert cmd == 'stop'
 
     def test_classify_unknown(self):
         """Test: Unbekannter Command"""
-        cmd = classify_command(0x00, 0x00, 0xFF)
+        cmd = classify_command(0x00, 0x00, 0x00)  # Unknown command
         # Sollte einen String zurückgeben
         assert isinstance(cmd, str)
+        assert cmd == 'unknown'
 
 
 class TestDecodeMovement:
