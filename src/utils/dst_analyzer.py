@@ -67,7 +67,7 @@ def extract_all_header_info(header: bytes) -> dict:
     
     # Label (Position 0-20)
     try:
-        label = header[0:20].decode('ascii', errors='ignore').strip().rstrip('\\x00')
+        label = header[0:20].decode('ascii', errors='ignore').strip().rstrip('\x00')
         if label:
             info['dst_label'] = label
     except:
