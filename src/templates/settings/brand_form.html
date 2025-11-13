@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if brand %}
+        Marke bearbeiten - {{ brand.name }}
+    {% else %}
+        Neue Marke
+    {% endif %} - StitchAdmin
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1>
+            <i class="bi bi-award"></i>
+            {% if brand %}
+                Marke bearbeiten: {{ brand.name }}
+            {% else %}
+                Neue Marke
+            {% endif %}
+        </h1>
+        <p class="text-muted">
+            {% if brand %}
+                Bearbeiten Sie die Marken-Daten
+            {% else %}
+                Erstellen Sie eine neue Marke oder einen Hersteller
+            {% endif %}
+        </p>
+    </div>
+    <div>
+        <a href="{{ url_for('settings.brands') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>
+                    <i class="bi bi-award-fill"></i>
+                    {% if brand %}Marken-Daten bearbeiten{% else %}Neue Marken-Daten{% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="brandForm">
+                    <!-- Name -->
+                    <div class="mb-3">
+                        <label for="name" class="form-label">
+                            <i class="bi bi-tag"></i> Markenname *
+                        </label>
+                        <input type="text"
+                               class="form-control"
+                               id="name"
+                               name="name"
+                               value="{{ brand.name if brand else '' }}"
+                               required
+                               placeholder="z.B. Nike, Adidas, L-Shop">
+                        <small class="form-text text-muted">Der Name muss eindeutig sein</small>
+                    </div>
+
+                    <!-- Beschreibung -->
+                    <div class="mb-3">
+                        <label for="description" class="form-label">
+                            <i class="bi bi-file-text"></i> Beschreibung
+                        </label>
+                        <textarea class="form-control"
+                                  id="description"
+                                  name="description"
+                                  rows="3"
+                                  placeholder="Optionale Beschreibung der Marke">{{ brand.description if brand else '' }}</textarea>
+                    </div>
+
+                    <!-- Website -->
+                    <div class="mb-3">
+                        <label for="website" class="form-label">
+                            <i class="bi bi-globe"></i> Website
+                        </label>
+                        <input type="url"
+                               class="form-control"
+                               id="website"
+                               name="website"
+                               value="{{ brand.website if brand else '' }}"
+                               placeholder="https://www.beispiel.de">
+                        <small class="form-text text-muted">Optionale Website-URL der Marke</small>
+                    </div>
+
+                    <!-- Logo URL -->
+                    <div class="mb-3">
+                        <label for="logo_url" class="form-label">
+                            <i class="bi bi-image"></i> Logo URL
+                        </label>
+                        <input type="url"
+                               class="form-control"
+                               id="logo_url"
+                               name="logo_url"
+                               value="{{ brand.logo_url if brand else '' }}"
+                               placeholder="https://www.beispiel.de/logo.png">
+                        <small class="form-text text-muted">Optionale URL zum Marken-Logo</small>
+                    </div>
+
+                    <!-- Status -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   id="active"
+                                   name="active"
+                                   {% if not brand or brand.active %}checked{% endif %}>
+                            <label class="form-check-label" for="active">
+                                <i class="bi bi-check-circle"></i> Marke ist aktiv
+                            </label>
+                        </div>
+                        <small class="form-text text-muted">Nur aktive Marken werden bei der Artikel-Erstellung angezeigt</small>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i>
+                                {% if brand %}Änderungen speichern{% else %}Marke erstellen{% endif %}
+                            </button>
+                            <a href="{{ url_for('settings.brands') }}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Abbrechen
+                            </a>
+                        </div>
+                        {% if brand %}
+                        <button type="button" class="btn btn-outline-danger" onclick="confirmDelete()">
+                            <i class="bi bi-trash"></i> Marke löschen
+                        </button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info-Sidebar -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> Hinweise</h5>
+            </div>
+            <div class="card-body">
+                <h6>Was sind Marken?</h6>
+                <p class="small">
+                    Marken sind Hersteller oder Brands von Artikeln (z.B. Nike, Adidas, L-Shop).
+                    Sie helfen bei der Organisation und Filterung Ihrer Artikel.
+                </p>
+
+                <h6 class="mt-3">Pflichtfelder</h6>
+                <ul class="small">
+                    <li>Markenname (muss eindeutig sein)</li>
+                </ul>
+
+                <h6 class="mt-3">Optionale Felder</h6>
+                <ul class="small">
+                    <li>Beschreibung</li>
+                    <li>Website</li>
+                    <li>Logo URL</li>
+                </ul>
+
+                {% if brand %}
+                <div class="alert alert-info mt-3">
+                    <small>
+                        <strong>Erstellt:</strong><br>
+                        {{ brand.created_at.strftime('%d.%m.%Y %H:%M') if brand.created_at else 'Unbekannt' }}
+                        {% if brand.created_by %}von {{ brand.created_by }}{% endif %}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+{% if brand %}
+function confirmDelete() {
+    if (confirm('Marke "{{ brand.name }}" wirklich löschen?\n\nDies ist nur möglich, wenn keine Artikel diese Marke verwenden.')) {
+        // Erstelle ein Form für DELETE Request
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '{{ url_for("settings.delete_brand", brand_id=brand.id) }}';
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+{% endif %}
+
+// Form Validierung
+document.getElementById('brandForm').addEventListener('submit', function(e) {
+    const name = document.getElementById('name').value.trim();
+    if (name.length < 1) {
+        e.preventDefault();
+        alert('Bitte geben Sie einen Markennamen ein.');
+        return false;
+    }
+});
+</script>
+
+{% endblock %}

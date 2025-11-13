@@ -545,11 +545,11 @@ def api_system_logs():
     """System-Logs API"""
     if not current_user.is_admin:
         return jsonify({'error': 'Keine Berechtigung'}), 403
-    
+
     try:
         import os
         log_file = 'error_log.txt'
-        
+
         if os.path.exists(log_file):
             with open(log_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
@@ -566,3 +566,129 @@ def api_system_logs():
             })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+# ==================== MARKEN-VERWALTUNG ====================
+
+@settings_bp.route('/brands')
+@login_required
+def brands():
+    """Marken-Verwaltung"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können Marken verwalten.', 'error')
+        return redirect(url_for('settings.index'))
+
+    brands_list = Brand.query.order_by(Brand.name).all()
+
+    # Zähle Artikel pro Marke
+    for brand in brands_list:
+        brand.article_count = brand.articles.count()
+
+    return render_template('settings/brands.html', brands=brands_list)
+
+@settings_bp.route('/brands/new', methods=['GET', 'POST'])
+@login_required
+def new_brand():
+    """Neue Marke erstellen"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können Marken erstellen.', 'error')
+        return redirect(url_for('settings.index'))
+
+    if request.method == 'POST':
+        # Prüfe ob Name bereits existiert
+        existing = Brand.query.filter_by(name=request.form.get('name')).first()
+        if existing:
+            flash('Eine Marke mit diesem Namen existiert bereits!', 'error')
+            return render_template('settings/brand_form.html', brand=None)
+
+        # Erstelle neue Marke
+        brand = Brand(
+            name=request.form.get('name'),
+            description=request.form.get('description', ''),
+            website=request.form.get('website', ''),
+            logo_url=request.form.get('logo_url', ''),
+            active=request.form.get('active', 'on') == 'on',
+            created_by=current_user.username
+        )
+
+        db.session.add(brand)
+        db.session.commit()
+
+        flash(f'Marke {brand.name} wurde erstellt!', 'success')
+        return redirect(url_for('settings.brands'))
+
+    return render_template('settings/brand_form.html', brand=None)
+
+@settings_bp.route('/brands/<int:brand_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_brand(brand_id):
+    """Marke bearbeiten"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können Marken bearbeiten.', 'error')
+        return redirect(url_for('settings.index'))
+
+    brand = Brand.query.get_or_404(brand_id)
+
+    if request.method == 'POST':
+        # Prüfe ob Name bereits existiert (außer bei dieser Marke)
+        existing = Brand.query.filter(
+            Brand.name == request.form.get('name'),
+            Brand.id != brand_id
+        ).first()
+        if existing:
+            flash('Eine Marke mit diesem Namen existiert bereits!', 'error')
+            return render_template('settings/brand_form.html', brand=brand)
+
+        # Aktualisiere Marke
+        brand.name = request.form.get('name')
+        brand.description = request.form.get('description', '')
+        brand.website = request.form.get('website', '')
+        brand.logo_url = request.form.get('logo_url', '')
+        brand.active = request.form.get('active', 'on') == 'on'
+        brand.updated_at = datetime.utcnow()
+
+        db.session.commit()
+
+        flash(f'Marke {brand.name} wurde aktualisiert!', 'success')
+        return redirect(url_for('settings.brands'))
+
+    return render_template('settings/brand_form.html', brand=brand)
+
+@settings_bp.route('/brands/<int:brand_id>/delete', methods=['POST'])
+@login_required
+def delete_brand(brand_id):
+    """Marke löschen"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können Marken löschen.', 'error')
+        return redirect(url_for('settings.index'))
+
+    brand = Brand.query.get_or_404(brand_id)
+    brand_name = brand.name
+
+    # Prüfe ob Artikel diese Marke verwenden
+    article_count = brand.articles.count()
+    if article_count > 0:
+        flash(f'Marke {brand_name} kann nicht gelöscht werden, da {article_count} Artikel diese Marke verwenden!', 'danger')
+        return redirect(url_for('settings.brands'))
+
+    db.session.delete(brand)
+    db.session.commit()
+
+    flash(f'Marke {brand_name} wurde gelöscht!', 'success')
+    return redirect(url_for('settings.brands'))
+
+@settings_bp.route('/brands/<int:brand_id>/toggle', methods=['POST'])
+@login_required
+def toggle_brand(brand_id):
+    """Marke aktivieren/deaktivieren"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Keine Berechtigung'}), 403
+
+    brand = Brand.query.get_or_404(brand_id)
+    brand.active = not brand.active
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'active': brand.active,
+        'message': f'Marke {brand.name} wurde {"aktiviert" if brand.active else "deaktiviert"}'
+    })

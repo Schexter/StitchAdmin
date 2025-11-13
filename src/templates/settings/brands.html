@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Marken-Verwaltung - StitchAdmin{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1><i class="bi bi-award"></i> Marken-Verwaltung</h1>
+        <p class="text-muted">Verwalten Sie alle Marken und Hersteller</p>
+    </div>
+    <div>
+        <a href="{{ url_for('settings.new_brand') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Neue Marke
+        </a>
+        <a href="{{ url_for('settings.articles') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück
+        </a>
+    </div>
+</div>
+
+<!-- Marken-Statistiken -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-award-fill text-primary" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Gesamt</h5>
+                <h3 class="text-primary">{{ brands|length }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Aktiv</h5>
+                <h3 class="text-success">{{ brands|selectattr('active')|list|length }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <i class="bi bi-box-seam text-info" style="font-size: 2rem;"></i>
+                <h5 class="card-title mt-2">Artikel</h5>
+                <h3 class="text-info">{{ brands|sum(attribute='article_count') }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Marken-Tabelle -->
+<div class="card">
+    <div class="card-header">
+        <h5><i class="bi bi-table"></i> Alle Marken</h5>
+    </div>
+    <div class="card-body">
+        {% if brands %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Beschreibung</th>
+                        <th>Website</th>
+                        <th>Artikel</th>
+                        <th>Status</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for brand in brands %}
+                    <tr>
+                        <td>
+                            <strong>{{ brand.name }}</strong>
+                        </td>
+                        <td>
+                            {{ brand.description|truncate(50) if brand.description else '-' }}
+                        </td>
+                        <td>
+                            {% if brand.website %}
+                            <a href="{{ brand.website }}" target="_blank" class="text-decoration-none">
+                                <i class="bi bi-link-45deg"></i> Link
+                            </a>
+                            {% else %}
+                            -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-info">{{ brand.article_count }}</span>
+                        </td>
+                        <td>
+                            {% if brand.active %}
+                            <span class="badge bg-success">Aktiv</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inaktiv</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{{ url_for('settings.edit_brand', brand_id=brand.id) }}"
+                                   class="btn btn-outline-primary" title="Bearbeiten">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <button type="button" class="btn btn-outline-warning"
+                                        onclick="toggleBrand({{ brand.id }})" title="Status ändern">
+                                    <i class="bi bi-toggle-on"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger"
+                                        onclick="deleteBrand({{ brand.id }}, '{{ brand.name }}')" title="Löschen">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i>
+            Noch keine Marken vorhanden. Erstellen Sie eine neue Marke!
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function toggleBrand(brandId) {
+    if (confirm('Status dieser Marke ändern?')) {
+        fetch(`/settings/brands/${brandId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message);
+                location.reload();
+            } else {
+                alert('Fehler: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Fehler bei der Verbindung zum Server');
+        });
+    }
+}
+
+function deleteBrand(brandId, brandName) {
+    if (confirm(`Marke "${brandName}" wirklich löschen?\n\nDies ist nur möglich, wenn keine Artikel diese Marke verwenden.`)) {
+        fetch(`/settings/brands/${brandId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => {
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else {
+                return response.json();
+            }
+        })
+        .then(data => {
+            if (data && !data.success) {
+                alert('Fehler: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Fehler bei der Verbindung zum Server');
+        });
+    }
+}
+</script>
+
+{% endblock %}
