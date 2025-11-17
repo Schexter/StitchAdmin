@@ -10,9 +10,9 @@
 
 **Erstellt von Hans Hahn - Alle Rechte vorbehalten**
 
-**Version:** 2.0.4-alpha
-**Stand:** 12. November 2025
-**Status:** Alpha (ca. 47% fertig, Testing-Phase Sprint 2)
+**Version:** 2.0.5-alpha
+**Stand:** 14. November 2025
+**Status:** Alpha (ca. 50% fertig, Testing-Phase Sprint 2)
 
 ---
 
@@ -69,11 +69,11 @@ Das Projekt befindet sich in der **schrittweisen Implementierung und Testphase**
 - DSGVO-konforme Datenhaltung
 
 ### 📦 Artikelverwaltung
-- L-Shop Excel-Import für Textilien
+- **L-Shop Excel-Import** für Textilien (✅ 10.251 Artikel erfolgreich importiert)
 - Artikel-Varianten (Farbe/Größe)
 - Mehrstufige Preiskalkulation (EK → VK)
 - Lagerbestandsverwaltung
-- Kategorien und Marken
+- **137 Marken** automatisch aus Import generiert
 - Lieferanten-Zuordnung mit Preishistorie
 
 ### 📋 Auftragsverwaltung
@@ -165,9 +165,9 @@ Das Projekt befindet sich in der **schrittweisen Implementierung und Testphase**
 
 ### Testing Framework ✅
 - **pytest 8.3.3** - Testing Framework
-- **pytest-cov 5.0.0** - Test Coverage (13.22%, Ziel: >60%)
+- **pytest-cov 5.0.0** - Test Coverage (~20%, Ziel: >60%)
 - **pytest-flask 1.3.0** - Flask-spezifische Tests
-- **124 Tests** implementiert (39 Model-Tests ✅, 86 Utils-Tests ✅)
+- **~400 Tests** implementiert (39 Model-Tests ✅, Integration-Tests ✅, Service-Tests ✅)
 
 ---
 
@@ -576,15 +576,15 @@ tests/
 └── htmlcov/                 # Coverage HTML-Reports
 ```
 
-### Test-Statistiken (Stand: 12.11.2025)
+### Test-Statistiken (Stand: 14.11.2025)
 
-- ✅ **124 Tests** implementiert und bestehend
+- ✅ **~400 Tests** implementiert und bestehend
 - ✅ **Model-Tests:** 39/39 (100%)
-- ✅ **Utils-Tests:** 86 Tests (~93% Avg Coverage)
-- 🟡 **Test-Coverage:** 13.22% (Ziel: >60% bis Ende Sprint 2)
-- 🟡 **Controller-Tests:** In Planung
-- 🟡 **Service-Tests:** In Planung
-- 🟡 **Integration-Tests:** In Planung
+- ✅ **Integration-Tests:** 10/10 (100%)
+- ✅ **L-Shop Import Tests:** 11/11 (100%)
+- ✅ **Service-Tests:** ZugpferdService, PDFService getestet
+- 🟡 **Test-Coverage:** ~20% (Ziel: >60% bis Ende Sprint 2)
+- ✅ **10.251 L-Shop Artikel** erfolgreich importiert
 
 ---
 
@@ -740,5 +740,5 @@ Diese Software ist urheberrechtlich geschützt. Die Nutzung, Vervielfältigung, 
 ---
 
 **Erstellt von Hans Hahn - Alle Rechte vorbehalten**
-**Letzte Aktualisierung:** 12.11.2025
-**Version:** 2.0.4-alpha
+**Letzte Aktualisierung:** 14.11.2025
+**Version:** 2.0.5-alpha

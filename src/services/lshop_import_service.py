@@ -125,7 +125,7 @@ class LShopImportService:
             brand = Brand(
                 name=brand_name,
                 active=True,
-                created_by=current_user.username if current_user.is_authenticated else 'L-Shop Import',
+                created_by=current_user.username if current_user and current_user.is_authenticated else 'L-Shop Import',
                 created_at=datetime.utcnow()
             )
             db.session.add(brand)
@@ -147,7 +147,7 @@ class LShopImportService:
                 name=category_name,
                 active=True,
                 sort_order=999,
-                created_by=current_user.username if current_user.is_authenticated else 'L-Shop Import',
+                created_by=current_user.username if current_user and current_user.is_authenticated else 'L-Shop Import',
                 created_at=datetime.utcnow()
             )
             db.session.add(category)
@@ -554,7 +554,7 @@ class LShopImportService:
                             min_stock=0,
                             price=0,  # Wird später kalkuliert
                             weight=0,
-                            created_by=current_user.username if current_user.is_authenticated else 'L-Shop Import',
+                            created_by=current_user.username if current_user and current_user.is_authenticated else 'L-Shop Import',
                             created_at=datetime.utcnow()
                         )
                         
