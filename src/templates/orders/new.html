@@ -118,12 +118,35 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="row">
                                         <div class="col-md-6">
                                             <div class="mb-3">
-                                                <label class="form-label">Artikel auswählen *</label>
-                                                <select class="form-control article-select" name="article_id[]" required onchange="updateTextileInfo(this)">
+                                                <label class="form-label">Artikel suchen/scannen *</label>
+                                                <div class="input-group mb-2">
+                                                    <span class="input-group-text"><i class="bi bi-upc-scan"></i></span>
+                                                    <input type="text"
+                                                           class="form-control article-search-input"
+                                                           placeholder="Artikelnummer oder Name eingeben/scannen..."
+                                                           autocomplete="off">
+                                                    <button type="button" class="btn btn-outline-secondary" onclick="clearArticleSearch(this)">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+                                                <!-- Verstecktes Input für die Formular-Übermittlung -->
+                                                <input type="hidden" class="article-id-input" name="article_id[]" required>
+                                                <!-- Dropdown für Suchergebnisse -->
+                                                <div class="article-search-results" style="display: none; position: relative;">
+                                                    <ul class="list-group position-absolute w-100" style="z-index: 1000; max-height: 300px; overflow-y: auto;">
+                                                        <!-- Wird dynamisch gefüllt -->
+                                                    </ul>
+                                                </div>
+                                                <!-- Anzeige des gewählten Artikels -->
+                                                <div class="selected-article-display alert alert-info mt-2" style="display: none;">
+                                                    <strong>Gewählt:</strong> <span class="selected-article-text"></span>
+                                                </div>
+                                                <!-- Fallback: Original Dropdown (optional, falls JS fehlschlägt) -->
+                                                <select class="form-control article-select d-none" onchange="updateTextileInfo(this)">
                                                     <option value="">-- Artikel wählen --</option>
                                                     {% for article_id, article in articles.items() %}
                                                         {% if article.active %}
-                                                        <option value="{{ article_id }}" 
+                                                        <option value="{{ article_id }}"
                                                                 data-name="{{ article.name }}"
                                                                 data-price="{{ article.price }}"
                                                                 data-weight="{{ article.weight or 0.5 }}"
@@ -838,28 +861,62 @@ function addTextileItem() {
     const container = document.getElementById('textile-items');
     const firstItem = container.querySelector('.textile-item');
     const newItem = firstItem.cloneNode(true);
-    
+
     // Update counter and clear values
     newItem.querySelector('h6').textContent = `Textil #${textileItemCounter}`;
-    newItem.querySelector('.article-select').selectedIndex = 0;
+
+    // Clear search input fields
+    const searchInput = newItem.querySelector('.article-search-input');
+    if (searchInput) {
+        searchInput.value = '';
+    }
+
+    const hiddenInput = newItem.querySelector('.article-id-input');
+    if (hiddenInput) {
+        hiddenInput.value = '';
+    }
+
+    // Hide selected article display
+    const displayDiv = newItem.querySelector('.selected-article-display');
+    if (displayDiv) {
+        displayDiv.style.display = 'none';
+    }
+
+    // Hide search results
+    const resultsDiv = newItem.querySelector('.article-search-results');
+    if (resultsDiv) {
+        resultsDiv.style.display = 'none';
+        const resultsList = resultsDiv.querySelector('ul');
+        if (resultsList) {
+            resultsList.innerHTML = '';
+        }
+    }
+
+    // Clear old dropdown if exists
+    const articleSelect = newItem.querySelector('.article-select');
+    if (articleSelect) {
+        articleSelect.selectedIndex = 0;
+        articleSelect.setAttribute('onchange', 'updateTextileInfo(this)');
+    }
+
+    // Clear other fields
     newItem.querySelector('.quantity-input').value = 1;
     newItem.querySelector('.textile-info').value = '';
     newItem.querySelector('.price-display').value = '';
     newItem.querySelector('select[name="textile_size[]"]').selectedIndex = 0;
     newItem.querySelector('input[name="textile_color_note[]"]').value = '';
-    
-    // Event-Handler für das neue Item aktualisieren
-    const articleSelect = newItem.querySelector('.article-select');
-    articleSelect.setAttribute('onchange', 'updateTextileInfo(this)');
-    
+
     const quantityInput = newItem.querySelector('.quantity-input');
     quantityInput.setAttribute('onchange', 'calculatePrice()');
-    
+
     // Show remove button
     newItem.querySelector('.remove-textile').classList.remove('d-none');
-    
+
     container.appendChild(newItem);
     updateRemoveButtons();
+
+    // Initialisiere die Suche für das neue Item
+    initArticleSearch();
 }
 
 function removeTextileItem(button) {
@@ -1036,6 +1093,197 @@ function calculatePrice() {
     .catch(error => {
         console.error('Fehler bei Preiskalkulation:', error);
     });
+}
+
+// ==========================================
+// ARTIKEL-SUCHE & BARCODE-SCANNER FUNKTION
+// ==========================================
+
+let searchTimeout = null;
+let activeSearchInput = null;
+
+function initArticleSearch() {
+    // Event-Listener für alle Suchfelder hinzufügen
+    document.querySelectorAll('.article-search-input').forEach(input => {
+        input.addEventListener('input', function(e) {
+            handleArticleSearch(this);
+        });
+
+        // Barcode-Scanner-Support: Bei Enter direkt suchen
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const searchTerm = this.value.trim();
+                if (searchTerm) {
+                    performArticleSearch(this, searchTerm);
+                }
+            }
+        });
+
+        // Schließe Dropdown beim Klick außerhalb
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.article-search-input') &&
+                !event.target.closest('.article-search-results')) {
+                document.querySelectorAll('.article-search-results').forEach(div => {
+                    div.style.display = 'none';
+                });
+            }
+        });
+    });
+}
+
+function handleArticleSearch(inputElement) {
+    activeSearchInput = inputElement;
+    const searchTerm = inputElement.value.trim();
+
+    // Clear previous timeout
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+
+    // Wenn leer, verstecke Ergebnisse
+    if (!searchTerm) {
+        const resultsDiv = inputElement.closest('.mb-3').querySelector('.article-search-results');
+        resultsDiv.style.display = 'none';
+        return;
+    }
+
+    // Debounce: Warte 300ms nach letzter Eingabe
+    searchTimeout = setTimeout(() => {
+        performArticleSearch(inputElement, searchTerm);
+    }, 300);
+}
+
+function performArticleSearch(inputElement, searchTerm) {
+    const resultsDiv = inputElement.closest('.mb-3').querySelector('.article-search-results');
+    const resultsList = resultsDiv.querySelector('ul');
+
+    // Zeige Loading
+    resultsList.innerHTML = '<li class="list-group-item"><i class="bi bi-hourglass-split"></i> Suche...</li>';
+    resultsDiv.style.display = 'block';
+
+    // AJAX-Request
+    fetch(`/orders/api/articles/search?q=${encodeURIComponent(searchTerm)}`)
+        .then(response => response.json())
+        .then(articles => {
+            if (articles.length === 0) {
+                resultsList.innerHTML = `
+                    <li class="list-group-item text-muted">
+                        <i class="bi bi-info-circle"></i> Keine Artikel gefunden
+                    </li>`;
+            } else {
+                resultsList.innerHTML = '';
+                articles.forEach(article => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item list-group-item-action';
+                    li.style.cursor = 'pointer';
+                    li.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>${article.name}</strong><br>
+                                <small class="text-muted">
+                                    Art.Nr: ${article.article_number || 'N/A'}
+                                    ${article.color ? ' | Farbe: ' + article.color : ''}
+                                    ${article.size ? ' | Größe: ' + article.size : ''}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <strong>${article.price.toFixed(2)} €</strong><br>
+                                <small class="text-muted">Lager: ${article.stock}</small>
+                            </div>
+                        </div>
+                    `;
+
+                    // Klick-Event zum Auswählen
+                    li.addEventListener('click', function() {
+                        selectArticle(inputElement, article);
+                    });
+
+                    resultsList.appendChild(li);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Artikel-Suche Fehler:', error);
+            resultsList.innerHTML = `
+                <li class="list-group-item text-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Fehler bei der Suche
+                </li>`;
+        });
+}
+
+function selectArticle(inputElement, article) {
+    const textileItem = inputElement.closest('.textile-item');
+
+    // Verstecke Suchergebnisse
+    const resultsDiv = inputElement.closest('.mb-3').querySelector('.article-search-results');
+    resultsDiv.style.display = 'none';
+
+    // Setze den Suchtext auf den Artikelnamen
+    inputElement.value = article.name;
+
+    // Setze die versteckte Artikel-ID
+    const hiddenInput = textileItem.querySelector('.article-id-input');
+    hiddenInput.value = article.id;
+
+    // Zeige gewählten Artikel an
+    const displayDiv = textileItem.querySelector('.selected-article-display');
+    const displayText = textileItem.querySelector('.selected-article-text');
+    displayText.textContent = `${article.article_number || 'N/A'} - ${article.name} - ${article.price.toFixed(2)}€`;
+    displayDiv.style.display = 'block';
+
+    // Fülle die Textil-Info-Felder
+    let info = article.name;
+    if (article.material) info += ` (${article.material})`;
+
+    textileItem.querySelector('.textile-info').value = info;
+    textileItem.querySelector('.price-display').value = article.price.toFixed(2) + ' €';
+
+    // Setze Größe und Farbe, falls vorhanden
+    const sizeSelect = textileItem.querySelector('select[name="textile_size[]"]');
+    const colorInput = textileItem.querySelector('input[name="textile_color_note[]"]');
+
+    if (article.size && sizeSelect) {
+        for (let i = 0; i < sizeSelect.options.length; i++) {
+            if (sizeSelect.options[i].value.toLowerCase() === article.size.toLowerCase()) {
+                sizeSelect.selectedIndex = i;
+                break;
+            }
+        }
+    }
+
+    if (article.color && colorInput) {
+        colorInput.value = article.color;
+    }
+
+    // Berechne Preis neu
+    calculatePrice();
+}
+
+function clearArticleSearch(button) {
+    const textileItem = button.closest('.textile-item');
+    const searchInput = textileItem.querySelector('.article-search-input');
+    const hiddenInput = textileItem.querySelector('.article-id-input');
+    const resultsDiv = textileItem.querySelector('.article-search-results');
+    const displayDiv = textileItem.querySelector('.selected-article-display');
+
+    // Lösche alle Werte
+    searchInput.value = '';
+    hiddenInput.value = '';
+    resultsDiv.style.display = 'none';
+    displayDiv.style.display = 'none';
+
+    // Lösche Textil-Info-Felder
+    textileItem.querySelector('.textile-info').value = '';
+    textileItem.querySelector('.price-display').value = '';
+    textileItem.querySelector('select[name="textile_size[]"]').selectedIndex = 0;
+    textileItem.querySelector('input[name="textile_color_note[]"]').value = '';
+
+    // Fokus zurück auf Suchfeld
+    searchInput.focus();
+
+    // Berechne Preis neu
+    calculatePrice();
 }
 
 // Event-Listener
@@ -1222,11 +1470,50 @@ window.addEventListener('load', function() {
     } else {
         console.error('Thread selector button not found!');
     }
+
+    // Initialisiere Artikel-Suche für Barcode-Scanner & Textsuche
+    console.log('Initialisiere Artikel-Suche...');
+    initArticleSearch();
+    console.log('Artikel-Suche initialisiert');
 });
 </script>
 
 <!-- CSS für Print Color Selector -->
 <style>
+/* Artikel-Suche & Barcode-Scanner Styles */
+.article-search-input {
+    font-size: 1rem;
+}
+
+.article-search-input:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.article-search-results {
+    margin-top: -1px;
+}
+
+.article-search-results .list-group {
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.article-search-results .list-group-item {
+    border-left: 3px solid transparent;
+    transition: all 0.2s;
+}
+
+.article-search-results .list-group-item:hover {
+    background-color: #f8f9fa;
+    border-left-color: #0d6efd;
+    transform: translateX(2px);
+}
+
+.selected-article-display {
+    font-size: 0.9rem;
+}
+
 /* Print Color Selector Styles */
 .color-card {
     cursor: pointer;

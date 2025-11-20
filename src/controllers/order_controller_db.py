@@ -419,6 +419,41 @@ def api_article_details(article_id):
         'size': article.size
     })
 
+@order_bp.route('/api/articles/search')
+@login_required
+def api_article_search():
+    """Artikel-Suche für AJAX (Artikelnummer, Name)"""
+    search_term = request.args.get('q', '').strip()
+
+    if not search_term:
+        return jsonify([])
+
+    # Suche nach Artikelnummer oder Name (Case-insensitive)
+    articles = Article.query.filter(
+        Article.active == True,
+        db.or_(
+            Article.article_number.ilike(f'%{search_term}%'),
+            Article.name.ilike(f'%{search_term}%')
+        )
+    ).order_by(Article.name).limit(20).all()
+
+    results = []
+    for article in articles:
+        results.append({
+            'id': article.id,
+            'article_number': article.article_number or '',
+            'name': article.name,
+            'price': float(article.price) if article.price else 0.0,
+            'stock': article.stock or 0,
+            'color': article.color or '',
+            'size': article.size or '',
+            'material': article.material or '',
+            'weight': float(article.weight) if article.weight else 0.5,
+            'display': f"{article.article_number or 'N/A'} - {article.name} - {article.price:.2f}€"
+        })
+
+    return jsonify(results)
+
 # Hilfsfunktionen für Templates
 def get_customer_display_name(customer):
     """Kunden-Anzeigename generieren"""

@@ -37,3 +37,12 @@ instance/*.db
 instance/uploads/*
 !instance/.gitkeep
 *.log
+
+# Excel temporary files
+~$*.xlsx
+~$*.xls
+*.tmp
+
+# Excel data files (optional - uncomment if you don't want to commit Excel files)
+# *.xlsx
+# *.xls
