@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block title %}Kalkulationseinstellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="bi bi-calculator"></i> Kalkulationseinstellungen</h1>
+            <div>
+                <a href="{{ url_for('settings.index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück zu Einstellungen
+                </a>
+            </div>
+        </div>
+        <p class="text-muted mt-2">
+            Konfiguriere deine Preiskalkulation: Fixkosten, Maschinenstundensätze und Kalkulationsmodi.
+        </p>
+    </div>
+</div>
+
+<!-- Info-Banner -->
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+    <i class="bi bi-info-circle"></i> <strong>Wie funktioniert's?</strong>
+    Wähle einen Kalkulationsmodus (Einfach, Standard, Vollkosten oder Custom), konfiguriere deine Betriebskosten
+    und Maschinenstundensätze. Das System berechnet dann automatisch realistische Verkaufspreise basierend auf
+    deinen echten Kosten.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<!-- KPI Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Fixkosten/Monat</h6>
+                        <h2 class="mb-0">{{ "%.2f"|format(total_monthly_costs) }} €</h2>
+                    </div>
+                    <div class="fs-1"><i class="bi bi-cash-stack"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Fixkosten/Stunde</h6>
+                        <h2 class="mb-0">{{ "%.2f"|format(hourly_rate) }} €</h2>
+                    </div>
+                    <div class="fs-1"><i class="bi bi-clock"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Maschinen</h6>
+                        <h2 class="mb-0">{{ machines|length }}</h2>
+                    </div>
+                    <div class="fs-1"><i class="bi bi-gear-fill"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title mb-0">Aktiver Modus</h6>
+                        <h4 class="mb-0">{{ default_mode.display_name if default_mode else 'Nicht gesetzt' }}</h4>
+                    </div>
+                    <div class="fs-1"><i class="bi bi-{{ default_mode.icon if default_mode else 'question-circle' }}"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kalkulationsmodi -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-sliders"></i> Kalkulationsmodus wählen</h5>
+                <a href="{{ url_for('calculation_settings.modes') }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-gear"></i> Konfigurieren
+                </a>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for mode in modes %}
+                    <div class="col-md-3 mb-3">
+                        <div class="mode-card {% if mode.is_default %}mode-active{% endif %}"
+                             style="border: 2px solid {{ mode.color }};">
+                            <div class="mode-icon" style="color: {{ mode.color }};">
+                                <i class="bi bi-{{ mode.icon }} fs-1"></i>
+                            </div>
+                            <h5 class="mode-title">{{ mode.display_name }}</h5>
+                            <p class="mode-description">{{ mode.description }}</p>
+
+                            <div class="mode-details">
+                                <small class="text-muted">
+                                    <i class="bi bi-award"></i> Gewinnmarge: {{ mode.default_profit_margin }}%
+                                </small>
+                            </div>
+
+                            {% if mode.is_default %}
+                            <span class="badge bg-success mt-2">
+                                <i class="bi bi-check-circle"></i> Aktiv
+                            </span>
+                            {% else %}
+                            <form method="POST" action="{{ url_for('calculation_settings.set_default_mode', mode_id=mode.id) }}" style="display: inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-primary mt-2">
+                                    Aktivieren
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Erklärung der Modi -->
+                <div class="alert alert-light mt-3">
+                    <h6><i class="bi bi-lightbulb"></i> Welcher Modus passt zu mir?</h6>
+                    <ul class="mb-0">
+                        <li><strong>Einfach:</strong> Perfekt für den Einstieg. Schnelle Kalkulation mit Faktor (z.B. EK × 2)</li>
+                        <li><strong>Standard:</strong> Empfohlen! Berücksichtigt Material, Maschinen- und Personalzeit</li>
+                        <li><strong>Vollkosten:</strong> Für maximale Transparenz. Alle Betriebskosten werden eingerechnet</li>
+                        <li><strong>Custom:</strong> Für Profis. Wähle selbst, welche Komponenten du einbeziehen möchtest</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Betriebskosten nach Kategorie -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-piggy-bank"></i> Betriebskosten (Fixkosten)</h5>
+                <a href="{{ url_for('calculation_settings.operating_costs') }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-plus-circle"></i> Verwalten
+                </a>
+            </div>
+            <div class="card-body">
+                {% if category_costs %}
+                <div class="row">
+                    {% for item in category_costs %}
+                    <div class="col-md-4 mb-3">
+                        <div class="cost-category-card">
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="category-icon me-2" style="color: {{ item.category.color }};">
+                                    <i class="bi bi-{{ item.category.icon }} fs-3"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0">{{ item.category.name }}</h6>
+                                    <small class="text-muted">{{ item.category.costs.count() }} Posten</small>
+                                </div>
+                            </div>
+                            <div class="cost-amount">
+                                <h3 style="color: {{ item.category.color }};">{{ "%.2f"|format(item.monthly_cost) }} €</h3>
+                                <small class="text-muted">pro Monat</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p>Noch keine Betriebskosten erfasst</p>
+                    <a href="{{ url_for('calculation_settings.operating_costs') }}" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Erste Kosten hinzufügen
+                    </a>
+                </div>
+                {% endif %}
+
+                <div class="alert alert-light mt-3 mb-0">
+                    <i class="bi bi-info-circle"></i> <strong>Tipp:</strong>
+                    Je genauer du deine Betriebskosten erfasst, desto realistischer werden deine Verkaufspreise.
+                    Vergiss nicht: Miete, Strom, Versicherungen, Software-Lizenzen und Personalkosten summieren sich!
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Maschinenstundensätze -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-gear-fill"></i> Maschinenstundensätze</h5>
+                <a href="{{ url_for('calculation_settings.machine_rates') }}" class="btn btn-sm btn-primary">
+                    <i class="bi bi-gear"></i> Konfigurieren
+                </a>
+            </div>
+            <div class="card-body">
+                {% if machines %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Maschine</th>
+                                <th>Typ</th>
+                                <th class="text-end">Maschinenstundensatz</th>
+                                <th class="text-end">Personalkostensatz</th>
+                                <th class="text-end">Gesamt/Stunde</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for machine in machines %}
+                            <tr>
+                                <td>
+                                    <strong>{{ machine.name }}</strong>
+                                    {% if machine.use_custom_rate %}
+                                    <span class="badge bg-info" title="Verwendet Custom Rate">
+                                        <i class="bi bi-pencil"></i> Custom
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ machine.type or 'Nicht gesetzt' }}</td>
+                                <td class="text-end">
+                                    <strong>{{ "%.2f"|format(machine.get_hourly_rate() or 0) }} €</strong>
+                                </td>
+                                <td class="text-end">
+                                    {{ "%.2f"|format(machine.get_labor_cost_per_hour() or 0) }} €
+                                </td>
+                                <td class="text-end">
+                                    <span class="badge bg-success">
+                                        {{ "%.2f"|format((machine.get_hourly_rate() or 0) + (machine.get_labor_cost_per_hour() or 0)) }} €
+                                    </span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('calculation_settings.machine_rates') }}#machine-{{ machine.id }}"
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-gear" style="font-size: 3rem;"></i>
+                    <p>Noch keine Maschinen vorhanden</p>
+                </div>
+                {% endif %}
+
+                <div class="alert alert-light mt-3 mb-0">
+                    <i class="bi bi-info-circle"></i> <strong>Berechnung:</strong>
+                    Maschinenstundensatz = (Anschaffung ÷ Nutzungsdauer) + Energiekosten + Wartung + Platzkosten.
+                    Du kannst auch einen Custom Rate manuell eingeben.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Schnellzugriff -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lightning"></i> Schnellzugriff</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('calculation_settings.operating_costs') }}" class="btn btn-primary">
+                        <i class="bi bi-cash-stack"></i> Betriebskosten verwalten
+                    </a>
+                    <a href="{{ url_for('calculation_settings.machine_rates') }}" class="btn btn-success">
+                        <i class="bi bi-gear-fill"></i> Maschinenstundensätze
+                    </a>
+                    <a href="{{ url_for('calculation_settings.modes') }}" class="btn btn-info">
+                        <i class="bi bi-sliders"></i> Kalkulationsmodi
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #e9ecef;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.mode-card {
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    background-color: #f8f9fa;
+    height: 100%;
+    transition: all 0.3s;
+}
+
+.mode-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.mode-active {
+    background-color: #e7f5ff !important;
+}
+
+.mode-icon {
+    margin-bottom: 10px;
+}
+
+.mode-title {
+    margin-bottom: 10px;
+    font-weight: 600;
+}
+
+.mode-description {
+    font-size: 0.9rem;
+    color: #6c757d;
+    min-height: 60px;
+}
+
+.mode-details {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #dee2e6;
+}
+
+.cost-category-card {
+    padding: 15px;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+    border-left: 4px solid;
+    height: 100%;
+}
+
+.cost-amount h3 {
+    margin-bottom: 0;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}

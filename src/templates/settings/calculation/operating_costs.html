@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block title %}Betriebskosten - StitchAdmin{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="bi bi-cash-stack"></i> Betriebskosten (Fixkosten)</h1>
+            <div>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addCostModal">
+                    <i class="bi bi-plus-circle"></i> Neue Kosten hinzufügen
+                </button>
+                <a href="{{ url_for('calculation_settings.index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+        </div>
+        <p class="text-muted mt-2">
+            Erfasse alle deine monatlichen Fixkosten. Diese werden automatisch auf die Produktionsstunden umgelegt.
+        </p>
+    </div>
+</div>
+
+<!-- Hilfe-Banner -->
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+    <i class="bi bi-lightbulb"></i> <strong>Tipp:</strong>
+    Erfasse ALLE deine Fixkosten (Miete, Strom, Gehälter, Versicherungen etc.). Das System rechnet automatisch
+    um auf Stundensatz. Bei 160 Produktionsstunden/Monat entsprechen 3.200€ Fixkosten = 20€ Fixkosten pro Stunde.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<!-- Kosten nach Kategorie -->
+{% for category in categories %}
+<div class="card mb-4">
+    <div class="card-header" style="background-color: {{ category.color }}15; border-left: 4px solid {{ category.color }};">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="mb-0" style="color: {{ category.color }};">
+                <i class="bi bi-{{ category.icon }}"></i> {{ category.name }}
+            </h5>
+            <span class="badge" style="background-color: {{ category.color }};">
+                {{ "%.2f"|format(category.get_total_monthly_cost()) }} €/Monat
+            </span>
+        </div>
+    </div>
+    <div class="card-body">
+        {% set category_costs = costs|selectattr('category_id', 'equalto', category.id)|list %}
+        {% if category_costs %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Name</th>
+                        <th style="width: 30%;">Beschreibung</th>
+                        <th class="text-end">Betrag</th>
+                        <th class="text-center">Intervall</th>
+                        <th class="text-end">Pro Monat</th>
+                        <th class="text-center">Verteilung</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cost in category_costs %}
+                    <tr>
+                        <td><strong>{{ cost.name }}</strong></td>
+                        <td>
+                            <small class="text-muted">{{ cost.description or '-' }}</small>
+                        </td>
+                        <td class="text-end">{{ "%.2f"|format(cost.amount) }} €</td>
+                        <td class="text-center">
+                            {% if cost.interval == 'monthly' %}
+                            <span class="badge bg-primary">Monatlich</span>
+                            {% elif cost.interval == 'yearly' %}
+                            <span class="badge bg-info">Jährlich</span>
+                            {% elif cost.interval == 'quarterly' %}
+                            <span class="badge bg-success">Quartalsweise</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Einmalig</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <strong>{{ "%.2f"|format(cost.get_monthly_amount()) }} €</strong>
+                        </td>
+                        <td class="text-center">
+                            {% if cost.distribute_over_machines %}
+                            <span class="badge bg-success" title="Auf alle Maschinen verteilt">
+                                <i class="bi bi-gear-fill"></i> Alle
+                            </span>
+                            {% elif cost.specific_machine_id %}
+                            <span class="badge bg-warning" title="Nur für: {{ cost.specific_machine.name }}">
+                                <i class="bi bi-gear"></i> {{ cost.specific_machine.name }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary">Nicht verteilt</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary"
+                                    onclick="editCost({{ cost.id }}, '{{ cost.name }}', '{{ cost.description }}', {{ cost.amount }}, '{{ cost.interval }}', {{ cost.category_id }}, {{ cost.distribute_over_machines|lower }}, '{{ cost.specific_machine_id or '' }}')">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form method="POST" action="{{ url_for('calculation_settings.delete_operating_cost', cost_id=cost.id) }}"
+                                  style="display: inline;"
+                                  onsubmit="return confirm('Wirklich löschen?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-3">
+            <i class="bi bi-inbox"></i> Noch keine Kosten in dieser Kategorie
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+<!-- Add Cost Modal -->
+<div class="modal fade" id="addCostModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Neue Betriebskosten hinzufügen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('calculation_settings.add_operating_cost') }}">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="name" required
+                                   placeholder="z.B. Miete Produktionshalle">
+                            <small class="text-muted">Aussagekräftiger Name für diese Kostenposition</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Kategorie <span class="text-danger">*</span></label>
+                            <select class="form-select" name="category_id" required>
+                                {% for category in categories %}
+                                <option value="{{ category.id }}">
+                                    {{ category.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea class="form-control" name="description" rows="2"
+                                  placeholder="Optionale Details zu dieser Kostenposition"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Betrag <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="amount" step="0.01" min="0" required
+                                       placeholder="0.00">
+                                <span class="input-group-text">€</span>
+                            </div>
+                            <small class="text-muted">Betrag im gewählten Intervall</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Intervall <span class="text-danger">*</span></label>
+                            <select class="form-select" name="interval" required>
+                                <option value="monthly">Monatlich</option>
+                                <option value="yearly">Jährlich</option>
+                                <option value="quarterly">Quartalsweise (3 Monate)</option>
+                                <option value="one-time">Einmalig (über 12 Monate verteilt)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light">
+                        <h6><i class="bi bi-gear-fill"></i> Verteilung auf Maschinen</h6>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="distribute_over_machines"
+                                   id="distributeAll" value="true" checked>
+                            <label class="form-check-label" for="distributeAll">
+                                <strong>Auf alle Maschinen verteilen</strong>
+                            </label>
+                            <div class="text-muted small">
+                                Empfohlen für allgemeine Kosten wie Miete, Strom, Verwaltung
+                            </div>
+                        </div>
+
+                        <div class="mt-3">
+                            <label class="form-label">Oder nur für eine bestimmte Maschine:</label>
+                            <select class="form-select" name="specific_machine_id">
+                                <option value="">-- Keine spezifische Maschine --</option>
+                                {% for machine in machines %}
+                                <option value="{{ machine.id }}">{{ machine.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Nur für maschinenspezifische Kosten (z.B. spezielle Wartung)</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Hinzufügen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Cost Modal -->
+<div class="modal fade" id="editCostModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Betriebskosten bearbeiten</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" id="editCostForm">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" name="name" id="edit_name" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Kategorie</label>
+                            <select class="form-select" name="category_id" id="edit_category_id" required>
+                                {% for category in categories %}
+                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea class="form-control" name="description" id="edit_description" rows="2"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Betrag</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="amount" id="edit_amount"
+                                       step="0.01" min="0" required>
+                                <span class="input-group-text">€</span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Intervall</label>
+                            <select class="form-select" name="interval" id="edit_interval" required>
+                                <option value="monthly">Monatlich</option>
+                                <option value="yearly">Jährlich</option>
+                                <option value="quarterly">Quartalsweise</option>
+                                <option value="one-time">Einmalig</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-light">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="distribute_over_machines"
+                                   id="edit_distribute_all" value="true">
+                            <label class="form-check-label" for="edit_distribute_all">
+                                Auf alle Maschinen verteilen
+                            </label>
+                        </div>
+
+                        <div class="mt-3">
+                            <label class="form-label">Oder nur für:</label>
+                            <select class="form-select" name="specific_machine_id" id="edit_machine_id">
+                                <option value="">-- Keine spezifische Maschine --</option>
+                                {% for machine in machines %}
+                                <option value="{{ machine.id }}">{{ machine.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Speichern
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function editCost(id, name, description, amount, interval, categoryId, distributeAll, machineId) {
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_description').value = description || '';
+    document.getElementById('edit_amount').value = amount;
+    document.getElementById('edit_interval').value = interval;
+    document.getElementById('edit_category_id').value = categoryId;
+    document.getElementById('edit_distribute_all').checked = distributeAll;
+    document.getElementById('edit_machine_id').value = machineId || '';
+
+    document.getElementById('editCostForm').action =
+        '/settings/calculation/operating-costs/' + id + '/edit';
+
+    new bootstrap.Modal(document.getElementById('editCostModal')).show();
+}
+</script>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 8px;
+}
+
+.card-header {
+    border-bottom: 2px solid #e9ecef;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}
