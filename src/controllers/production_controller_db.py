@@ -105,6 +105,96 @@ def log_activity(action, details):
     db.session.add(activity)
     db.session.commit()
 
+def _record_automatic_thread_usage(order):
+    """
+    Erfasst automatisch Garnverbrauch beim Produktionsabschluss
+
+    Basierend auf:
+    - order.selected_threads (JSON mit ausgewählten Garnen)
+    - order.stitch_count (Anzahl Stiche)
+    - order.assigned_machine_id (Zugewiesene Maschine)
+    """
+    from src.models import Thread, ThreadStock, ThreadUsage
+
+    # Nur für Stickerei-Aufträge
+    if order.order_type not in ['embroidery', 'combined']:
+        return
+
+    # Prüfe ob Stichanzahl vorhanden
+    if not order.stitch_count or order.stitch_count == 0:
+        print(f"[INFO] Kein stitch_count für Auftrag {order.id}, überspringe Garnverbrauchserfassung")
+        return
+
+    # Parse selected_threads JSON
+    selected_threads = []
+    if order.selected_threads:
+        try:
+            selected_threads = json.loads(order.selected_threads)
+        except:
+            # Fallback: Verwende thread_colors als Komma-getrennte Liste
+            if order.thread_colors:
+                thread_colors = [c.strip() for c in order.thread_colors.split(',')]
+                # Versuche Threads zu finden
+                for color in thread_colors:
+                    threads = Thread.query.filter(
+                        db.or_(
+                            Thread.color_number == color,
+                            Thread.color_name_de.ilike(f'%{color}%')
+                        )
+                    ).all()
+                    if threads:
+                        selected_threads.append({'thread_id': threads[0].id})
+
+    if not selected_threads:
+        print(f"[INFO] Keine Garne für Auftrag {order.id}, überspringe Garnverbrauchserfassung")
+        return
+
+    # Berechne Garnverbrauch pro Garn
+    # Formel: (Stichanzahl * 0.5mm pro Stich) / 1000 = Meter
+    # + 10% Puffer für Faden wechsel und Verschnitt
+    total_usage_meters = (order.stitch_count * 0.5 / 1000) * 1.1
+    usage_per_thread = total_usage_meters / len(selected_threads)
+
+    print(f"[INFO] Erfasse Garnverbrauch für Auftrag {order.id}: {len(selected_threads)} Garne, gesamt {total_usage_meters:.1f}m")
+
+    # Erstelle ThreadUsage-Einträge
+    for thread_data in selected_threads:
+        thread_id = thread_data.get('thread_id')
+        if not thread_id:
+            continue
+
+        # Prüfe ob Thread existiert
+        thread = Thread.query.get(thread_id)
+        if not thread:
+            print(f"[WARNUNG] Garn {thread_id} nicht gefunden")
+            continue
+
+        # Erstelle ThreadUsage-Eintrag
+        usage = ThreadUsage(
+            thread_id=thread_id,
+            order_id=order.id,
+            machine_id=order.assigned_machine_id,
+            quantity_used=usage_per_thread,
+            usage_type='production',
+            recorded_by='system',
+            notes=f'Automatisch erfasst bei Produktionsabschluss (geschätzt)',
+            used_at=datetime.utcnow()
+        )
+        db.session.add(usage)
+
+        # Aktualisiere Lagerbestand
+        stock = ThreadStock.query.filter_by(thread_id=thread_id).first()
+        if stock and stock.quantity > 0:
+            stock.quantity = max(0, stock.quantity - usage_per_thread)
+            stock.last_updated = datetime.utcnow()
+            print(f"[INFO] Lagerbestand aktualisiert: {thread.color_name_de} -{usage_per_thread:.1f}m")
+        else:
+            print(f"[WARNUNG] Kein Lagerbestand für Garn {thread.color_name_de}")
+
+    # Commit alle Änderungen
+    db.session.commit()
+    print(f"[OK] Garnverbrauch für Auftrag {order.id} erfolgreich erfasst")
+
 @production_bp.route('/')
 @login_required
 def index():
@@ -451,20 +541,27 @@ def start_production(order_id):
 def complete_production(order_id):
     """Produktion abschließen"""
     order = Order.query.get_or_404(order_id)
-    
+
     if order.status != 'in_progress':
         flash('Nur laufende Produktionen können abgeschlossen werden!', 'danger')
         return redirect(url_for('production.index'))
-    
+
     # Status aktualisieren
     order.status = 'ready'
     order.production_end = datetime.utcnow()
-    
+
     # Produktionszeit berechnen
     if order.production_start:
         duration = order.production_end - order.production_start
         order.production_minutes = int(duration.total_seconds() / 60)
-    
+
+    # AUTOMATISCHE GARNVERBRAUCH-ERFASSUNG
+    try:
+        _record_automatic_thread_usage(order)
+    except Exception as e:
+        print(f"[WARNUNG] Automatische Garnverbrauchserfassung fehlgeschlagen: {e}")
+        # Nicht kritisch - Produktion kann trotzdem abgeschlossen werden
+
     # Status-Historie
     from src.models import OrderStatusHistory
     history = OrderStatusHistory(
@@ -475,13 +572,13 @@ def complete_production(order_id):
         changed_by=current_user.username
     )
     db.session.add(history)
-    
+
     db.session.commit()
-    
+
     # Aktivität protokollieren
-    log_activity('production_completed', 
+    log_activity('production_completed',
                 f'Produktion abgeschlossen: Auftrag {order.id}')
-    
+
     flash(f'Produktion für Auftrag {order.id} wurde abgeschlossen!', 'success')
     return redirect(url_for('production.index'))
 

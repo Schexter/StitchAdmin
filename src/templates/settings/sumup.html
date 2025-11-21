@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}SumUp Integration - Einstellungen{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="bi bi-credit-card-2-front"></i> SumUp Integration</h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    {% if is_connected %}
+                        <div class="alert alert-success">
+                            <h5 class="alert-heading">Erfolgreich verbunden!</h5>
+                            <p>StitchAdmin ist mit Ihrem SumUp-Konto verbunden. Kartenzahlungen sind jetzt aktiviert.</p>
+                        </div>
+                        
+                        {% if token %}
+                        <ul class="list-group mb-3">
+                            <li class="list-group-item">
+                                <strong>Token-Typ:</strong> {{ token.token_type }}
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Gültig bis:</strong> {{ token.expires_at.strftime('%d.%m.%Y %H:%M:%S') }}
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Berechtigungen:</strong> <span class="badge bg-secondary">{{ token.scope }}</span>
+                            </li>
+                        </ul>
+                        {% endif %}
+
+                        <form action="{{ url_for('settings.sumup_disconnect') }}" method="POST">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-x-circle"></i> Verbindung zu SumUp trennen
+                            </button>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <h5 class="alert-heading">Nicht verbunden</h5>
+                            <p>Verbinden Sie StitchAdmin mit Ihrem SumUp-Konto, um Kartenzahlungen direkt über das Kassensystem abzuwickeln.</p>
+                        </div>
+                        
+                        <p>
+                            Klicken Sie auf den folgenden Button, um zur sicheren Anmeldeseite von SumUp weitergeleitet zu werden.
+                            Ihre Anmeldedaten werden <strong>niemals</strong> von StitchAdmin gespeichert.
+                        </p>
+
+                        <form action="{{ url_for('settings.sumup_authorize') }}" method="POST">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-link-45deg"></i> Jetzt mit SumUp verbinden
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+                <div class="card-footer text-muted">
+                    Sichere Verbindung via OAuth2.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
