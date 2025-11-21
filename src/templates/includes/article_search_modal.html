@@ -168,8 +168,14 @@ function searchArticles() {
                     ? `<span class="badge bg-warning article-badge">Wenig Lager</span>`
                     : `<span class="badge bg-danger article-badge">Nicht lagernd</span>`;
 
+                // Escape für Strings im onclick
+                const safeName = escapeHtml(article.name).replace(/'/g, "\\'");
+                const safeColor = escapeHtml(article.color || '').replace(/'/g, "\\'");
+                const safeSize = escapeHtml(article.size || '').replace(/'/g, "\\'");
+                const safeMaterial = escapeHtml(article.material || '').replace(/'/g, "\\'");
+
                 html += `
-                    <div class="article-result-item" onclick="selectArticle(${article.id}, '${escapeHtml(article.name)}', ${article.price})">
+                    <div class="article-result-item" onclick="selectArticle(${article.id}, '${safeName}', ${article.price}, '${safeColor}', '${safeSize}', '${safeMaterial}', ${article.weight || 0.5})">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="flex-grow-1">
                                 <h6 class="mb-1">${escapeHtml(article.name)}</h6>
@@ -205,10 +211,47 @@ function searchArticles() {
         });
 }
 
-function selectArticle(articleId, articleName, articlePrice) {
+function selectArticle(articleId, articleName, articlePrice, articleColor, articleSize, articleMaterial, articleWeight) {
     if (!currentTargetSelect) {
         console.error('Kein Ziel-Select definiert');
         return;
+    }
+
+    // Setze Defaults für optionale Parameter
+    articleColor = articleColor || '';
+    articleSize = articleSize || '';
+    articleMaterial = articleMaterial || '';
+    articleWeight = articleWeight || 0.5;
+
+    // Prüfe ob die Option bereits existiert
+    let optionExists = false;
+    for (let i = 0; i < currentTargetSelect.options.length; i++) {
+        if (currentTargetSelect.options[i].value == articleId) {
+            optionExists = true;
+            break;
+        }
+    }
+
+    // Wenn die Option nicht existiert, füge sie hinzu
+    if (!optionExists) {
+        const newOption = document.createElement('option');
+        newOption.value = articleId;
+
+        // Erstelle Display-Text mit verfügbaren Details
+        let displayText = `${articleName} - ${formatPrice(articlePrice)}€`;
+        if (articleColor) displayText += ` (${articleColor})`;
+        if (articleSize) displayText += ` - ${articleSize}`;
+
+        newOption.textContent = displayText;
+        newOption.setAttribute('data-name', articleName);
+        newOption.setAttribute('data-price', articlePrice);
+        newOption.setAttribute('data-weight', articleWeight);
+        newOption.setAttribute('data-color', articleColor);
+        newOption.setAttribute('data-size', articleSize);
+        newOption.setAttribute('data-material', articleMaterial);
+
+        // Füge die Option zum Select hinzu
+        currentTargetSelect.appendChild(newOption);
     }
 
     // Setze Wert im Select-Element

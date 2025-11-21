@@ -383,9 +383,14 @@ def search_articles():
                 'article_number': article.article_number,
                 'name': article.name,
                 'price': float(article.price or 0),
+                'stock': article.stock or 0,
                 'stock_quantity': article.stock or 0,
                 'barcode': getattr(article, 'barcode', None),
-                'category': article.category
+                'category': article.category,
+                'color': getattr(article, 'color', None),
+                'size': getattr(article, 'size', None),
+                'material': getattr(article, 'material', None),
+                'weight': getattr(article, 'weight', 0.5)
             })
         
         return jsonify(result)
