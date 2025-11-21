@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Garnverbrauch erfassen - StitchAdmin{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="bi bi-pencil-square"></i> Garnverbrauch erfassen</h1>
+            <div>
+                <a href="{{ url_for('thread.usage_overview') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-list"></i> Zur Übersicht
+                </a>
+                <a href="{{ url_for('thread.index') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-left"></i> Zurück zu Garnen
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Verbrauchsdaten eingeben</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('thread.record_usage') }}">
+                    <!-- Garnauswahl -->
+                    <div class="mb-3">
+                        <label for="thread_id" class="form-label">Garn <span class="text-danger">*</span></label>
+                        <select class="form-select" id="thread_id" name="thread_id" required>
+                            <option value="">-- Garn auswählen --</option>
+                            {% for thread in threads %}
+                            <option value="{{ thread.id }}"
+                                    data-color="{{ thread.hex_color }}"
+                                    data-name="{{ thread.color_name_de }}">
+                                {{ thread.manufacturer }} - {{ thread.color_number }}
+                                ({{ thread.color_name_de or 'Unbenannt' }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div id="threadPreview" class="mt-2 d-none">
+                            <div class="d-flex align-items-center">
+                                <div id="threadColorBadge" style="width: 40px; height: 40px; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px;"></div>
+                                <span id="threadName"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Verbrauchte Menge -->
+                    <div class="mb-3">
+                        <label for="quantity_used" class="form-label">Verbrauchte Menge (Meter) <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="quantity_used" name="quantity_used"
+                               step="0.1" min="0.1" required placeholder="z.B. 150.5">
+                        <small class="text-muted">Angabe in Metern</small>
+                    </div>
+
+                    <!-- Maschine -->
+                    <div class="mb-3">
+                        <label for="machine_id" class="form-label">Maschine</label>
+                        <select class="form-select" id="machine_id" name="machine_id">
+                            <option value="">-- Keine Maschine --</option>
+                            {% for machine in machines %}
+                            <option value="{{ machine.id }}">
+                                {{ machine.name }} ({{ machine.type }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Optional: Zuordnung zu einer Maschine</small>
+                    </div>
+
+                    <!-- Auftrag -->
+                    <div class="mb-3">
+                        <label for="order_id" class="form-label">Auftrag</label>
+                        <select class="form-select" id="order_id" name="order_id">
+                            <option value="">-- Kein Auftrag --</option>
+                            {% for order in orders %}
+                            <option value="{{ order.id }}">
+                                {{ order.id }} - {{ order.customer_name }}
+                                ({{ order.quantity }} Stk.)
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="text-muted">Optional: Zuordnung zu einem Auftrag</small>
+                    </div>
+
+                    <!-- Verwendungstyp -->
+                    <div class="mb-3">
+                        <label for="usage_type" class="form-label">Verwendungstyp</label>
+                        <select class="form-select" id="usage_type" name="usage_type">
+                            <option value="production">Produktion</option>
+                            <option value="test">Test/Probe</option>
+                            <option value="waste">Verschnitt/Ausschuss</option>
+                            <option value="correction">Korrektur</option>
+                        </select>
+                    </div>
+
+                    <!-- Notizen -->
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notizen</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="3"
+                                  placeholder="Optionale Anmerkungen zum Verbrauch"></textarea>
+                    </div>
+
+                    <!-- Buttons -->
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('thread.usage_overview') }}" class="btn btn-secondary">
+                            <i class="bi bi-x"></i> Abbrechen
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Verbrauch erfassen
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Hilfe-Card -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Hinweise</h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li>Der Lagerbestand wird automatisch aktualisiert</li>
+                    <li>Maschine und Auftrag sind optional, aber für Statistiken empfohlen</li>
+                    <li>Verwendungstyp "Produktion" für normale Auftragsbearbeitung</li>
+                    <li>Verwendungstyp "Test" für Probestickungen</li>
+                    <li>Verwendungstyp "Verschnitt" für unbrauchbares Material</li>
+                    <li>Verwendungstyp "Korrektur" für Bestandskorrekturen</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Thread-Vorschau bei Auswahl
+document.getElementById('thread_id').addEventListener('change', function() {
+    const selectedOption = this.options[this.selectedIndex];
+    const preview = document.getElementById('threadPreview');
+    const colorBadge = document.getElementById('threadColorBadge');
+    const threadName = document.getElementById('threadName');
+
+    if (this.value && selectedOption) {
+        const color = selectedOption.dataset.color || '#cccccc';
+        const name = selectedOption.dataset.name || 'Unbenannt';
+
+        colorBadge.style.backgroundColor = color;
+        threadName.textContent = name;
+        preview.classList.remove('d-none');
+    } else {
+        preview.classList.add('d-none');
+    }
+});
+
+// Quick-Fill: Wenn Maschine gewählt, versuche aktuellen Auftrag zu laden
+document.getElementById('machine_id').addEventListener('change', function() {
+    // TODO: API-Call um aktuellen Auftrag der Maschine zu laden
+    // und automatisch im Auftrag-Dropdown zu selektieren
+});
+</script>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 8px;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.form-label {
+    font-weight: 500;
+}
+
+.text-danger {
+    color: #dc3545;
+}
+</style>
+{% endblock %}

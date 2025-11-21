@@ -599,6 +599,135 @@ def api_search():
     
     return jsonify(results)
 
+@thread_bp.route('/usage')
+@login_required
+def usage_overview():
+    """Übersicht über Garnverbrauch"""
+    from sqlalchemy import func
+    from datetime import timedelta
+
+    # Zeiträume für Filter
+    period = request.args.get('period', '30')  # 7, 30, 90 Tage
+    days = int(period)
+    start_date = datetime.utcnow() - timedelta(days=days)
+
+    # Gesamtverbrauch nach Thread
+    thread_usage_stats = db.session.query(
+        Thread.manufacturer,
+        Thread.color_number,
+        Thread.color_name_de,
+        Thread.hex_color,
+        func.sum(ThreadUsage.quantity_used).label('total_used'),
+        func.count(ThreadUsage.id).label('usage_count')
+    ).join(ThreadUsage, Thread.id == ThreadUsage.thread_id)\
+     .filter(ThreadUsage.used_at >= start_date)\
+     .group_by(Thread.id)\
+     .order_by(func.sum(ThreadUsage.quantity_used).desc())\
+     .limit(50).all()
+
+    # Verbrauch nach Maschine
+    machine_usage_stats = db.session.query(
+        ThreadUsage.machine_id,
+        func.count(ThreadUsage.id).label('usage_count'),
+        func.sum(ThreadUsage.quantity_used).label('total_used')
+    ).filter(ThreadUsage.used_at >= start_date, ThreadUsage.machine_id.isnot(None))\
+     .group_by(ThreadUsage.machine_id)\
+     .order_by(func.sum(ThreadUsage.quantity_used).desc())\
+     .all()
+
+    # Verbrauch nach Auftrag
+    order_usage_stats = db.session.query(
+        ThreadUsage.order_id,
+        func.count(ThreadUsage.id).label('usage_count'),
+        func.sum(ThreadUsage.quantity_used).label('total_used')
+    ).filter(ThreadUsage.used_at >= start_date, ThreadUsage.order_id.isnot(None))\
+     .group_by(ThreadUsage.order_id)\
+     .order_by(func.sum(ThreadUsage.quantity_used).desc())\
+     .limit(20).all()
+
+    # Letzte Erfassungen
+    recent_usage = ThreadUsage.query\
+        .order_by(ThreadUsage.used_at.desc())\
+        .limit(50).all()
+
+    return render_template('threads/usage_overview.html',
+                         thread_stats=thread_usage_stats,
+                         machine_stats=machine_usage_stats,
+                         order_stats=order_usage_stats,
+                         recent_usage=recent_usage,
+                         period=period)
+
+@thread_bp.route('/usage/record', methods=['GET', 'POST'])
+@login_required
+def record_usage():
+    """Garnverbrauch erfassen"""
+    from src.models import Machine, Order
+
+    if request.method == 'POST':
+        try:
+            # Hole Formulardaten
+            thread_id = request.form.get('thread_id')
+            quantity_used = float(request.form.get('quantity_used', 0))
+            machine_id = request.form.get('machine_id')
+            order_id = request.form.get('order_id')
+            usage_type = request.form.get('usage_type', 'production')
+            notes = request.form.get('notes', '')
+
+            # Validierung
+            if not thread_id or quantity_used <= 0:
+                flash('Bitte Garn und Menge angeben', 'danger')
+                return redirect(url_for('thread.record_usage'))
+
+            # Prüfe ob Thread existiert
+            thread = Thread.query.get(thread_id)
+            if not thread:
+                flash('Garn nicht gefunden', 'danger')
+                return redirect(url_for('thread.record_usage'))
+
+            # Erstelle ThreadUsage Eintrag
+            usage = ThreadUsage(
+                thread_id=thread_id,
+                quantity_used=quantity_used,
+                machine_id=machine_id if machine_id else None,
+                order_id=order_id if order_id else None,
+                usage_type=usage_type,
+                recorded_by=current_user.username,
+                notes=notes,
+                used_at=datetime.utcnow()
+            )
+
+            db.session.add(usage)
+
+            # Aktualisiere Lagerbestand
+            stock = ThreadStock.query.filter_by(thread_id=thread_id).first()
+            if stock:
+                stock.quantity = max(0, stock.quantity - quantity_used)
+                stock.last_updated = datetime.utcnow()
+
+            db.session.commit()
+
+            log_activity('thread_usage_recorded',
+                        f'Garnverbrauch erfasst: {thread.color_name_de} ({quantity_used}m)')
+
+            flash(f'Garnverbrauch erfasst: {quantity_used}m von {thread.color_name_de}', 'success')
+            return redirect(url_for('thread.usage_overview'))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Fehler beim Erfassen: {str(e)}', 'danger')
+            return redirect(url_for('thread.record_usage'))
+
+    # GET - Zeige Formular
+    threads = Thread.query.order_by(Thread.manufacturer, Thread.color_number).all()
+    machines = Machine.query.order_by(Machine.name).all()
+    orders = Order.query.filter(Order.status.in_(['accepted', 'in_progress']))\
+        .order_by(Order.created_at.desc()).limit(50).all()
+
+    return render_template('threads/record_usage.html',
+                         threads=threads,
+                         machines=machines,
+                         orders=orders)
+
 # Hilfsfunktionen
 def get_thread_by_id(thread_id):
     """Garn nach ID abrufen"""

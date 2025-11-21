@@ -234,13 +234,19 @@
             </div>
             <div class="card-body">
                 <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('thread.record_usage') }}" class="btn btn-primary">
+                        <i class="bi bi-pencil-square"></i> Verbrauch erfassen
+                    </a>
+                    <a href="{{ url_for('thread.usage_overview') }}" class="btn btn-info">
+                        <i class="bi bi-graph-up"></i> Verbrauchsübersicht
+                    </a>
                     <a href="{{ url_for('thread.index', stock='low') }}" class="btn btn-warning">
                         <i class="bi bi-exclamation-triangle"></i> Niedriger Bestand
                     </a>
                     <a href="{{ url_for('thread.index', stock='out') }}" class="btn btn-danger">
                         <i class="bi bi-x-circle"></i> Ausverkauft
                     </a>
-                    <a href="{{ url_for('thread.import_threads') }}" class="btn btn-info">
+                    <a href="{{ url_for('thread.import_threads') }}" class="btn btn-outline-info">
                         <i class="bi bi-upload"></i> Garne importieren
                     </a>
                     <a href="{{ url_for('thread.index') }}" class="btn btn-secondary">

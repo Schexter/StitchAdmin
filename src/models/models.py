@@ -252,7 +252,7 @@ class Article(db.Model):
         # Berechne VK-Preise: EK * Faktor * (1 + Steuersatz/100)
         tax_multiplier = 1 + (default_tax_rate / 100)
         self.price_calculated = round(base_price * factor_calculated * tax_multiplier, 2)
-        self.price_recommended = round(base_price * factor_recommended * tax_multiplier, 2)
+        self.price_recommended = round(base_price * rec_factor * tax_multiplier, 2)
         
         # Setze aktuellen Preis auf kalkulierten Preis, wenn noch kein Preis gesetzt
         if not self.price:
@@ -484,7 +484,7 @@ class Machine(db.Model):
     
     id = db.Column(db.String(50), primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    type = db.Column(db.String(50))  # embroidery, printing, dtf
+    type = dbColumn(db.String(50))  # embroidery, printing, dtf
     
     # Maschinendetails
     manufacturer = db.Column(db.String(100))
@@ -662,22 +662,27 @@ class ThreadStock(db.Model):
 class ThreadUsage(db.Model):
     """Garnverbrauch Model"""
     __tablename__ = 'thread_usage'
-    
+
     id = db.Column(db.Integer, primary_key=True)
     thread_id = db.Column(db.String(50), db.ForeignKey('threads.id'), nullable=False)
     order_id = db.Column(db.String(50), db.ForeignKey('orders.id'))
-    
+    machine_id = db.Column(db.String(50), db.ForeignKey('machines.id'))
+
     quantity_used = db.Column(db.Float, default=0)  # in Meter oder Konen
-    usage_type = db.Column(db.String(50))  # production, test, waste
-    machine_id = db.Column(db.String(50))
-    
+    usage_type = db.Column(db.String(50))  # production, test, waste, correction
+
     # Metadaten
     used_at = db.Column(db.DateTime, default=datetime.utcnow)
     recorded_by = db.Column(db.String(80))
     notes = db.Column(db.Text)
-    
+
+    # Relationships
+    thread = db.relationship('Thread', backref='usage_records')
+    order = db.relationship('Order', backref='thread_usage_records')
+    machine = db.relationship('Machine', backref='thread_usage_records')
+
     def __repr__(self):
-        return f'<ThreadUsage {self.thread_id}: {self.quantity_used}>'
+        return f'<ThreadUsage {self.thread_id}: {self.quantity_used}m on {self.machine_id}>'
 
 
 class Shipment(db.Model):
@@ -990,3 +995,5 @@ class PriceCalculationSettings(db.Model):
     
     def __repr__(self):
         return f'<PriceCalculationSettings {self.name}={self.value}>'
+
+from .sumup_token import SumUpToken
