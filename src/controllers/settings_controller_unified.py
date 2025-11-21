@@ -3,7 +3,7 @@ Zentraler Settings Controller für StitchAdmin
 Erstellt von Hans Hahn - Alle Rechte vorbehalten
 """
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, current_user
 from datetime import datetime, date
 from src.models import db
@@ -31,8 +31,28 @@ settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 @login_required
 def index():
     """Zentrale Einstellungen-Übersicht"""
-    # ... (unverändert)
-    pass
+    if not current_user.is_admin:
+        flash('Keine Berechtigung für diese Seite!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    # Statistiken für Übersicht
+    settings_overview = {
+        'user_count': User.query.count(),
+        'admin_count': User.query.filter_by(is_admin=True).count(),
+        'category_count': ProductCategory.query.count() if ProductCategory else 0,
+        'brand_count': Brand.query.count() if Brand else 0,
+        'supplier_count': Supplier.query.count() if Supplier else 0,
+    }
+
+    # Legacy Einstellungen für Preiskalkulation
+    legacy_settings = {
+        'price_factor_calculated': PriceCalculationSettings.get_setting('price_factor_calculated', 1.5),
+        'price_factor_recommended': PriceCalculationSettings.get_setting('price_factor_recommended', 2.0),
+    }
+
+    return render_template('settings/index.html',
+                         settings_overview=settings_overview,
+                         legacy_settings=legacy_settings)
 
 # ==================== SUMUP INTEGRATION ====================
 
@@ -115,9 +135,59 @@ def sumup_disconnect():
 @settings_bp.route('/users')
 @login_required
 def users():
-    pass
+    """Benutzer-Verwaltung"""
+    if not current_user.is_admin:
+        flash('Keine Berechtigung für diese Seite!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    users = User.query.order_by(User.username).all()
+    return render_template('settings/users.html', users=users)
 
 @settings_bp.route('/users/new', methods=['GET', 'POST'])
 @login_required
 def new_user():
-    pass
+    """Neuen Benutzer erstellen"""
+    if not current_user.is_admin:
+        flash('Keine Berechtigung für diese Seite!', 'danger')
+        return redirect(url_for('dashboard'))
+
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        is_admin = request.form.get('is_admin') == 'on'
+
+        # Validierung
+        if not username or not email or not password:
+            flash('Alle Felder sind erforderlich!', 'danger')
+            return redirect(url_for('settings.new_user'))
+
+        # Prüfe ob Benutzer schon existiert
+        if User.query.filter_by(username=username).first():
+            flash('Benutzername existiert bereits!', 'danger')
+            return redirect(url_for('settings.new_user'))
+
+        if User.query.filter_by(email=email).first():
+            flash('E-Mail existiert bereits!', 'danger')
+            return redirect(url_for('settings.new_user'))
+
+        # Erstelle neuen Benutzer
+        user = User(
+            username=username,
+            email=email,
+            is_admin=is_admin,
+            is_active=True
+        )
+        user.set_password(password)
+
+        try:
+            db.session.add(user)
+            db.session.commit()
+            flash(f'Benutzer {username} erfolgreich erstellt!', 'success')
+            return redirect(url_for('settings.users'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Fehler beim Erstellen des Benutzers: {str(e)}', 'danger')
+            return redirect(url_for('settings.new_user'))
+
+    return render_template('settings/user_form.html', user=None)
