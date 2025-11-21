@@ -17,7 +17,7 @@ def login_required(f):
         from flask import session, redirect, url_for, flash
         if 'username' not in session:
             flash('Bitte melden Sie sich an.', 'info')
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
 

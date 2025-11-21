@@ -14,7 +14,7 @@ def admin_required(f):
     def decorated_function(*args, **kwargs):
         if 'username' not in session:
             flash('Bitte melden Sie sich an.', 'info')
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
         if not session.get('is_admin', False):
             flash('Keine Berechtigung für diese Aktion.', 'danger')
             return redirect(url_for('dashboard'))

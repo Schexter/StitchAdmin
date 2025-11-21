@@ -60,9 +60,9 @@ def create_app():
     try:
         from src.models.models import db, User, Customer, Article, Order, Machine, Thread, ActivityLog, Supplier
         db.init_app(app)
-        print("✅ Datenbank-Models erfolgreich importiert")
+        print("[OK] Datenbank-Models erfolgreich importiert")
     except ImportError as e:
-        print(f"❌ FEHLER beim Importieren der Models: {e}")
+        print(f"[FEHLER] FEHLER beim Importieren der Models: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -73,9 +73,9 @@ def create_app():
     try:
         from src.utils.filters import register_filters
         register_filters(app)
-        print("✅ Custom Template-Filters registriert")
+        print("[OK] Custom Template-Filters registriert")
     except ImportError as e:
-        print(f"⚠️ Custom Filters nicht verfügbar: {e}")
+        print(f"[WARNUNG] Custom Filters nicht verfuegbar: {e}")
 
     # ==========================================
     # LOGIN MANAGER
@@ -123,7 +123,7 @@ def create_app():
                 'today_revenue': 0,  # TODO: Implementieren
                 'total_customers': Customer.query.count(),
                 'total_articles': Article.query.count(),
-                'active_machines': Machine.query.filter_by(active=True).count(),
+                'active_machines': Machine.query.count(),
             }
             
             # Letzte Bestellungen
@@ -137,7 +137,7 @@ def create_app():
             ).limit(10).all()
             
         except Exception as e:
-            print(f"❌ Fehler beim Laden der Dashboard-Statistiken: {e}")
+            print(f"[FEHLER] Fehler beim Laden der Dashboard-Statistiken: {e}")
             stats = {
                 'open_orders': 0,
                 'in_production': 0,
@@ -169,10 +169,10 @@ def create_app():
             blueprint = getattr(module, blueprint_name)
             app.register_blueprint(blueprint)
             blueprints_registered.append(display_name)
-            print(f"✅ {display_name} Blueprint registriert")
+            print(f"[OK] {display_name} Blueprint registriert")
             return True
         except Exception as e:
-            print(f"⚠️ {display_name} Blueprint nicht verfügbar: {e}")
+            print(f"[WARNUNG] {display_name} Blueprint nicht verfuegbar: {e}")
             import traceback
             if app.config['DEBUG']:
                 traceback.print_exc()
@@ -207,9 +207,9 @@ def create_app():
         app.register_blueprint(kasse_bp)
         app.register_blueprint(rechnung_bp)
         blueprints_registered.extend(['Kasse', 'Rechnungen'])
-        print("✅ Rechnungsmodul Blueprints registriert")
+        print("[OK] Rechnungsmodul Blueprints registriert")
     except Exception as e:
-        print(f"⚠️ Rechnungsmodul nicht verfügbar: {e}")
+        print(f"[WARNUNG] Rechnungsmodul nicht verfuegbar: {e}")
         if app.config['DEBUG']:
             import traceback
             traceback.print_exc()
@@ -249,11 +249,11 @@ def create_app():
         
         app.register_blueprint(auth_bp)
         blueprints_registered.append('Auth')
-        print("✅ Auth Blueprint registriert")
+        print("[OK] Auth Blueprint registriert")
     except Exception as e:
-        print(f"⚠️ Auth Blueprint Fehler: {e}")
+        print(f"[WARNUNG] Auth Blueprint Fehler: {e}")
 
-    print(f"\n📋 Registrierte Module ({len(blueprints_registered)}): {', '.join(blueprints_registered)}\n")
+    print(f"\n[INFO] Registrierte Module ({len(blueprints_registered)}): {', '.join(blueprints_registered)}\n")
 
     # ==========================================
     # CONTEXT PROCESSORS
@@ -297,7 +297,7 @@ if __name__ == '__main__':
     app = create_app()
     
     if app is None:
-        print("❌ FEHLER: App konnte nicht erstellt werden!")
+        print("[FEHLER] FEHLER: App konnte nicht erstellt werden!")
         print("Bitte prüfen Sie die Fehlermeldungen oben.")
         sys.exit(1)
     
@@ -306,19 +306,19 @@ if __name__ == '__main__':
         from src.models.models import db, User
         
         # Erstelle alle Tabellen
-        print("🔄 Erstelle Datenbank-Tabellen...")
+        print("[LAUFT] Erstelle Datenbank-Tabellen...")
         db.create_all()
-        print("✅ Datenbank-Tabellen erstellt")
+        print("[OK] Datenbank-Tabellen erstellt")
         
         # Führe Migrationen aus (falls vorhanden)
         try:
             from scripts.db_migration import migrate_database
             migrate_database(db)
-            print("✅ Datenbank-Migrationen erfolgreich")
+            print("[OK] Datenbank-Migrationen erfolgreich")
         except ImportError:
-            print("ℹ️ Keine Migrationen gefunden")
+            print("[INFO] Keine Migrationen gefunden")
         except Exception as e:
-            print(f"⚠️ Migration fehlgeschlagen: {e}")
+            print(f"[WARNUNG] Migration fehlgeschlagen: {e}")
         
         # Erstelle Admin-User falls nicht vorhanden
         admin = User.query.filter_by(username='admin').first()
@@ -332,18 +332,18 @@ if __name__ == '__main__':
             admin.set_password('admin')
             db.session.add(admin)
             db.session.commit()
-            print("✅ Admin-User erstellt (admin/admin)")
+            print("[OK] Admin-User erstellt (admin/admin)")
         else:
-            print("ℹ️ Admin-User existiert bereits")
+            print("[INFO] Admin-User existiert bereits")
     
     # Starte Server
     print("\n" + "="*60)
-    print("🚀 StitchAdmin 2.0 gestartet!")
+    print("[START] StitchAdmin 2.0 gestartet!")
     print("="*60)
-    print(f"📍 URL:         http://localhost:5000")
-    print(f"👤 Login:       admin / admin")
-    print(f"🐛 Debug-Modus: {'Aktiv' if app.config['DEBUG'] else 'Inaktiv'}")
-    print(f"📊 Blueprints:  {len([x for x in app.blueprints])} registriert")
+    print(f"[URL] URL:         http://localhost:5000")
+    print(f"[LOGIN] Login:       admin / admin")
+    print(f"[DEBUG] Debug-Modus: {'Aktiv' if app.config['DEBUG'] else 'Inaktiv'}")
+    print(f"[STATS] Blueprints:  {len([x for x in app.blueprints])} registriert")
     print("="*60 + "\n")
     
     app.run(host='0.0.0.0', port=5000, debug=app.config['DEBUG'])

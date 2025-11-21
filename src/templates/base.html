@@ -49,19 +49,19 @@
                             <li><a class="dropdown-item" href="{{ url_for('thread.index') }}">🧵 Garne</a></li>
                         </ul>
                     </li>
-                    {% if 'kasse' in blueprints_available or 'rechnungen' in blueprints_available %}
+                    {% if 'Kasse' in blueprints_available or 'Rechnungen' in blueprints_available %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="financeDropdown" role="button" data-bs-toggle="dropdown">
                             Finanzen
                         </a>
                         <ul class="dropdown-menu">
-                            {% if 'kasse' in blueprints_available %}
+                            {% if 'Kasse' in blueprints_available %}
                             <li><a class="dropdown-item" href="{{ url_for('kasse.kassen_index') }}">💰 Kasse</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('kasse.verkauf_interface') }}">🛒 Verkauf</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('kasse.tagesabschluss') }}">📊 Tagesabschluss</a></li>
                             <li><hr class="dropdown-divider"></li>
                             {% endif %}
-                            {% if 'rechnungen' in blueprints_available %}
+                            {% if 'Rechnungen' in blueprints_available %}
                             <li><a class="dropdown-item" href="{{ url_for('rechnung.rechnungs_index') }}">📄 Rechnungen</a></li>
                             <li><a class="dropdown-item" href="{{ url_for('rechnung.neue_rechnung') }}">➕ Neue Rechnung</a></li>
                             {% endif %}

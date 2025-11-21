@@ -1,0 +1,295 @@
+<!-- Artikel-Such-Modal für Aufträge -->
+<div class="modal fade" id="articleSearchModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-search"></i> Artikel suchen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Suchfeld -->
+                <div class="mb-3">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="articleSearchInput"
+                               placeholder="Artikelnummer, Name, Farbe, Größe..."
+                               autocomplete="off">
+                        <button class="btn btn-outline-secondary" type="button" onclick="clearArticleSearch()">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted">Mindestens 2 Zeichen eingeben</small>
+                </div>
+
+                <!-- Filter -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Kategorie</label>
+                        <select class="form-select form-select-sm" id="articleCategoryFilter">
+                            <option value="">Alle Kategorien</option>
+                            <option value="shirts">T-Shirts</option>
+                            <option value="polos">Polo-Shirts</option>
+                            <option value="hoodies">Hoodies & Sweatshirts</option>
+                            <option value="jackets">Jacken</option>
+                            <option value="caps">Caps & Mützen</option>
+                            <option value="bags">Taschen</option>
+                            <option value="other">Sonstiges</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Nur verfügbare</label>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="onlyAvailableFilter" checked>
+                            <label class="form-check-label" for="onlyAvailableFilter">
+                                Nur lieferbare Artikel anzeigen
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Suchergebnisse -->
+                <div id="searchResults">
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                        <p>Geben Sie einen Suchbegriff ein</p>
+                    </div>
+                </div>
+
+                <!-- Ladeindikator -->
+                <div id="searchLoading" class="text-center py-4 d-none">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Lade...</span>
+                    </div>
+                    <p class="mt-2">Suche läuft...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.article-result-item {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.article-result-item:hover {
+    background-color: #f8f9fa;
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.article-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+</style>
+
+<script>
+let articleSearchTimeout = null;
+let currentTargetSelect = null;
+
+function openArticleSearchModal(selectElement) {
+    currentTargetSelect = selectElement;
+    const modal = new bootstrap.Modal(document.getElementById('articleSearchModal'));
+    modal.show();
+
+    // Fokus auf Suchfeld
+    setTimeout(() => {
+        document.getElementById('articleSearchInput').focus();
+    }, 500);
+}
+
+function clearArticleSearch() {
+    document.getElementById('articleSearchInput').value = '';
+    document.getElementById('searchResults').innerHTML = `
+        <div class="text-center text-muted py-4">
+            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+            <p>Geben Sie einen Suchbegriff ein</p>
+        </div>
+    `;
+}
+
+function searchArticles() {
+    const searchTerm = document.getElementById('articleSearchInput').value;
+    const category = document.getElementById('articleCategoryFilter').value;
+    const onlyAvailable = document.getElementById('onlyAvailableFilter').checked;
+
+    if (searchTerm.length < 2) {
+        document.getElementById('searchResults').innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-info-circle" style="font-size: 2rem;"></i>
+                <p>Bitte mindestens 2 Zeichen eingeben</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Zeige Ladeindikator
+    document.getElementById('searchLoading').classList.remove('d-none');
+    document.getElementById('searchResults').innerHTML = '';
+
+    // API-Aufruf
+    const params = new URLSearchParams({
+        q: searchTerm,
+        limit: 50
+    });
+
+    if (category) params.append('category', category);
+    if (onlyAvailable) params.append('active', 'true');
+
+    fetch(`/api/articles/search?${params}`)
+        .then(response => response.json())
+        .then(articles => {
+            document.getElementById('searchLoading').classList.add('d-none');
+
+            if (articles.length === 0) {
+                document.getElementById('searchResults').innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> Keine Artikel gefunden für "${searchTerm}"
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="list-group">';
+            articles.forEach(article => {
+                const stockBadge = article.stock > 10
+                    ? `<span class="badge bg-success article-badge">Verfügbar</span>`
+                    : article.stock > 0
+                    ? `<span class="badge bg-warning article-badge">Wenig Lager</span>`
+                    : `<span class="badge bg-danger article-badge">Nicht lagernd</span>`;
+
+                html += `
+                    <div class="article-result-item" onclick="selectArticle(${article.id}, '${escapeHtml(article.name)}', ${article.price})">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">${escapeHtml(article.name)}</h6>
+                                <p class="mb-1 text-muted small">
+                                    <strong>Art-Nr:</strong> ${escapeHtml(article.article_number || 'N/A')}
+                                    ${article.color ? ` | <strong>Farbe:</strong> ${escapeHtml(article.color)}` : ''}
+                                    ${article.size ? ` | <strong>Größe:</strong> ${escapeHtml(article.size)}` : ''}
+                                </p>
+                                ${article.material ? `<p class="mb-0 text-muted small"><strong>Material:</strong> ${escapeHtml(article.material)}</p>` : ''}
+                            </div>
+                            <div class="text-end ms-3">
+                                <div class="fw-bold">${formatPrice(article.price)} €</div>
+                                ${stockBadge}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            html += `<div class="text-muted text-center mt-3 small">${articles.length} Artikel gefunden</div>`;
+
+            document.getElementById('searchResults').innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Suchfehler:', error);
+            document.getElementById('searchLoading').classList.add('d-none');
+            document.getElementById('searchResults').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Fehler bei der Suche
+                </div>
+            `;
+        });
+}
+
+function selectArticle(articleId, articleName, articlePrice) {
+    if (!currentTargetSelect) {
+        console.error('Kein Ziel-Select definiert');
+        return;
+    }
+
+    // Setze Wert im Select-Element
+    currentTargetSelect.value = articleId;
+
+    // Trigger change event
+    const event = new Event('change', { bubbles: true });
+    currentTargetSelect.dispatchEvent(event);
+
+    // Schließe Modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('articleSearchModal'));
+    modal.hide();
+
+    // Zeige Bestätigung
+    showToast('Artikel ausgewählt', `${articleName} wurde ausgewählt`);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatPrice(price) {
+    return parseFloat(price).toFixed(2);
+}
+
+function showToast(title, message) {
+    // Einfache Toast-Benachrichtigung
+    const toastHtml = `
+        <div class="toast position-fixed bottom-0 end-0 m-3" role="alert" style="z-index: 9999;">
+            <div class="toast-header">
+                <i class="bi bi-check-circle text-success me-2"></i>
+                <strong class="me-auto">${escapeHtml(title)}</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body">
+                ${escapeHtml(message)}
+            </div>
+        </div>
+    `;
+
+    const container = document.createElement('div');
+    container.innerHTML = toastHtml;
+    document.body.appendChild(container);
+
+    const toastEl = container.querySelector('.toast');
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
+    toast.show();
+
+    toastEl.addEventListener('hidden.bs.toast', () => {
+        container.remove();
+    });
+}
+
+// Event-Listener
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('articleSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(articleSearchTimeout);
+            articleSearchTimeout = setTimeout(searchArticles, 500);
+        });
+
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                clearTimeout(articleSearchTimeout);
+                searchArticles();
+            }
+        });
+    }
+
+    const categoryFilter = document.getElementById('articleCategoryFilter');
+    if (categoryFilter) {
+        categoryFilter.addEventListener('change', searchArticles);
+    }
+
+    const availableFilter = document.getElementById('onlyAvailableFilter');
+    if (availableFilter) {
+        availableFilter.addEventListener('change', searchArticles);
+    }
+});
+</script>

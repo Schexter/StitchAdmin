@@ -18,11 +18,11 @@ try:
     
     # Teste ob die Models funktionieren
     models_available = True
-    print("✅ Echte Rechnungsmodul-Models verfügbar")
-    
+    print("[OK] Echte Rechnungsmodul-Models verfuegbar")
+
 except (ImportError, Exception) as e:
-    print(f"⚠️ Echte Models nicht verfügbar: {e}")
-    print("📋 Verwende Mock-Implementierungen...")
+    print(f"[WARNUNG] Echte Models nicht verfuegbar: {e}")
+    print("[INFO] Verwende Mock-Implementierungen...")
     
     # Mock-Implementierungen für Development
     class MockQuery:

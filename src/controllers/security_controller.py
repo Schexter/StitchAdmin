@@ -62,7 +62,7 @@ def forgot_password():
             # Aus Sicherheitsgründen immer dieselbe Meldung
             flash('Eine E-Mail mit Anweisungen wurde gesendet.', 'success')
         
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
     
     return render_template('security/forgot_password.html')
 
@@ -73,7 +73,7 @@ def reset_password(token):
     
     if not username:
         flash('Ungültiger oder abgelaufener Link.', 'danger')
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
     
     if request.method == 'POST':
         new_password = request.form.get('new_password')
@@ -105,7 +105,7 @@ def reset_password(token):
         log_activity(username, 'password_reset', 'Passwort wurde zurückgesetzt')
         flash('Ihr Passwort wurde erfolgreich geändert. Sie können sich jetzt anmelden.', 'success')
         
-        return redirect(url_for('login'))
+        return redirect(url_for('auth.login'))
     
     return render_template('security/reset_password.html', token=token)
 

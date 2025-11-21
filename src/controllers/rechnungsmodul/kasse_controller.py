@@ -30,9 +30,9 @@ try:
         KassenBeleg, BelegPosition, KassenTransaktion, MwStSatz, TSEKonfiguration,
         BelegTyp, ZahlungsArt, models_available
     )
-    print("✅ Rechnungsmodul-Models importiert")
+    print("[OK] Rechnungsmodul-Models importiert")
 except ImportError as e:
-    print(f"⚠️ Rechnungsmodul Models Import-Fehler: {e}")
+    print(f"[WARNUNG] Rechnungsmodul Models Import-Fehler: {e}")
     models_available = False
     db = None
 

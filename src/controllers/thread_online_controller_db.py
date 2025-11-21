@@ -317,4 +317,4 @@ def preview_manufacturer(manufacturer):
 def register_thread_online_blueprint(app):
     """Registriert den Thread Online Blueprint"""
     app.register_blueprint(thread_online_bp)
-    print("✅ Thread Online Blueprint registriert: /thread/online")
+    print("[OK] Thread Online Blueprint registriert: /thread/online")

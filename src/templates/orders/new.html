@@ -5,6 +5,9 @@
 <!-- File Browser Modal -->
 {% include 'file_browser/modal.html' %}
 
+<!-- Artikel-Such-Modal -->
+{% include 'includes/article_search_modal.html' %}
+
 <script>
 // Zusätzliche Workflow-Funktionen
 function validateDesignWorkflow() {
@@ -119,24 +122,32 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <div class="col-md-6">
                                             <div class="mb-3">
                                                 <label class="form-label">Artikel auswählen *</label>
-                                                <select class="form-control article-select" name="article_id[]" required onchange="updateTextileInfo(this)">
-                                                    <option value="">-- Artikel wählen --</option>
-                                                    {% for article_id, article in articles.items() %}
-                                                        {% if article.active %}
-                                                        <option value="{{ article_id }}" 
-                                                                data-name="{{ article.name }}"
-                                                                data-price="{{ article.price }}"
-                                                                data-weight="{{ article.weight or 0.5 }}"
-                                                                data-color="{{ article.color or '' }}"
-                                                                data-size="{{ article.size or '' }}"
-                                                                data-material="{{ article.material or '' }}">
-                                                            {{ article.name }} - {{ "%.2f"|format(article.price) }}€
-                                                            {% if article.color %} ({{ article.color }}){% endif %}
-                                                            {% if article.size %} - {{ article.size }}{% endif %}
-                                                        </option>
-                                                        {% endif %}
-                                                    {% endfor %}
-                                                </select>
+                                                <div class="input-group">
+                                                    <select class="form-control article-select" name="article_id[]" required onchange="updateTextileInfo(this)">
+                                                        <option value="">-- Artikel wählen --</option>
+                                                        {% for article_id, article in articles.items() %}
+                                                            {% if article.active %}
+                                                            <option value="{{ article_id }}"
+                                                                    data-name="{{ article.name }}"
+                                                                    data-price="{{ article.price }}"
+                                                                    data-weight="{{ article.weight or 0.5 }}"
+                                                                    data-color="{{ article.color or '' }}"
+                                                                    data-size="{{ article.size or '' }}"
+                                                                    data-material="{{ article.material or '' }}">
+                                                                {{ article.name }} - {{ "%.2f"|format(article.price) }}€
+                                                                {% if article.color %} ({{ article.color }}){% endif %}
+                                                                {% if article.size %} - {{ article.size }}{% endif %}
+                                                            </option>
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </select>
+                                                    <button class="btn btn-outline-primary" type="button"
+                                                            onclick="openArticleSearchModal(this.previousElementSibling)"
+                                                            title="Erweiterte Suche">
+                                                        <i class="bi bi-search"></i> Suchen
+                                                    </button>
+                                                </div>
+                                                <small class="text-muted">Tipp: Nutzen Sie die erweiterte Suche bei vielen Artikeln</small>
                                             </div>
                                         </div>
                                         <div class="col-md-3">
