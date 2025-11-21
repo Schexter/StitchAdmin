@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Erscheinungsbild - Einstellungen{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header">
+                    <h4><i class="bi bi-palette"></i> Erscheinungsbild anpassen</h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST" enctype="multipart/form-data">
+                        
+                        <!-- Logo Upload -->
+                        <div class="mb-4">
+                            <h5>Firmenlogo</h5>
+                            <p>Laden Sie hier Ihr Firmenlogo hoch. Es wird oben links in der Navigation angezeigt. Empfohlenes Format: SVG, PNG.</p>
+                            
+                            <div class="mb-3">
+                                <label for="logo" class="form-label">Neues Logo hochladen</label>
+                                <input class="form-control" type="file" id="logo" name="logo" accept="image/png, image/jpeg, image/gif, image/svg+xml">
+                            </div>
+
+                            {% if settings.logo_path %}
+                            <div class="text-center">
+                                <p>Aktuelles Logo:</p>
+                                <img src="{{ url_for('static', filename=settings.logo_path) }}" alt="Firmenlogo" style="max-height: 80px; background-color: #f8f9fa; padding: 10px; border-radius: 5px;">
+                            </div>
+                            {% else %}
+                            <div class="alert alert-light">Kein Logo hochgeladen.</div>
+                            {% endif %}
+                        </div>
+
+                        <hr>
+
+                        <!-- Farbauswahl -->
+                        <div class="mb-4">
+                            <h5>Farbschema</h5>
+                            <p>Passen Sie die Hauptfarben der Benutzeroberfläche an.</p>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="primary_color" class="form-label">Primärfarbe (z.B. für Buttons, Links)</label>
+                                    <input type="color" class="form-control form-control-color" id="primary_color" name="primary_color" value="{{ settings.primary_color }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="secondary_color" class="form-label">Sekundärfarbe (z.B. für Akzente)</label>
+                                    <input type="color" class="form-control form-control-color" id="secondary_color" name="secondary_color" value="{{ settings.secondary_color }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Einstellungen speichern
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

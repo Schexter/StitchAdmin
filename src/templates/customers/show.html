@@ -266,6 +266,203 @@
     </div>
 </div>
 
+<!-- Aufträge des Kunden -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Aufträge ({{ orders|length }})</h5>
+                <a href="{{ url_for('orders.new') }}?customer_id={{ customer.id }}" class="btn btn-sm btn-success">
+                    <i class="bi bi-plus-circle"></i> Neuer Auftrag
+                </a>
+            </div>
+            <div class="card-body">
+                {% if orders %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Auftragsnr.</th>
+                                <th>Beschreibung</th>
+                                <th>Typ</th>
+                                <th>Status</th>
+                                <th>Erstellt</th>
+                                <th>Fällig</th>
+                                <th>Preis</th>
+                                <th>Aktion</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}" class="text-decoration-none">
+                                        <strong>{{ order.order_number }}</strong>
+                                    </a>
+                                </td>
+                                <td>{{ order.description[:50] }}{% if order.description and order.description|length > 50 %}...{% endif %}</td>
+                                <td>
+                                    {% if order.order_type == 'embroidery' %}
+                                        <span class="badge bg-primary">Stickerei</span>
+                                    {% elif order.order_type == 'printing' %}
+                                        <span class="badge bg-info">Druck</span>
+                                    {% elif order.order_type == 'dtf' %}
+                                        <span class="badge bg-warning">DTF</span>
+                                    {% elif order.order_type == 'combined' %}
+                                        <span class="badge bg-secondary">Kombiniert</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ order.order_type or '-' }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.status == 'new' or order.status == 'pending' %}
+                                        <span class="badge bg-secondary">Neu</span>
+                                    {% elif order.status == 'approved' %}
+                                        <span class="badge bg-info">Freigegeben</span>
+                                    {% elif order.status == 'in_progress' %}
+                                        <span class="badge bg-warning">In Bearbeitung</span>
+                                    {% elif order.status == 'ready' or order.status == 'ready_for_pickup' %}
+                                        <span class="badge bg-success">Fertig</span>
+                                    {% elif order.status == 'completed' %}
+                                        <span class="badge bg-dark">Abgeschlossen</span>
+                                    {% elif order.status == 'cancelled' %}
+                                        <span class="badge bg-danger">Storniert</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ order.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ order.created_at|format_date if order.created_at else '-' }}</td>
+                                <td>
+                                    {% if order.due_date %}
+                                        {{ order.due_date|format_date }}
+                                        {% if order.rush_order %}
+                                            <span class="badge bg-danger ms-1">Eilauftrag</span>
+                                        {% endif %}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ order.total_price|format_currency if order.total_price else '-' }}</strong></td>
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i> Details
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">
+                    <i class="bi bi-inbox fs-1"></i><br>
+                    Noch keine Aufträge für diesen Kunden vorhanden.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hochgeladene Dateien / Logos -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-image"></i> Design-Dateien & Logos</h5>
+            </div>
+            <div class="card-body">
+                {% set files_found = [] %}
+                {% for order in orders %}
+                    {% if order.design_file or order.design_file_path or order.design_thumbnail_path or order.production_file %}
+                        {% set _ = files_found.append(order) %}
+                    {% endif %}
+                {% endfor %}
+
+                {% if files_found %}
+                <div class="row">
+                    {% for order in files_found %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0">
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}" class="text-decoration-none">
+                                        {{ order.order_number }}
+                                    </a>
+                                    <small class="text-muted">- {{ order.description[:30] if order.description else 'Kein Titel' }}</small>
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                {% if order.design_thumbnail_path %}
+                                <div class="mb-3 text-center">
+                                    <img src="{{ url_for('static', filename=order.design_thumbnail_path) }}"
+                                         alt="Thumbnail"
+                                         class="img-thumbnail"
+                                         style="max-height: 200px;">
+                                </div>
+                                {% endif %}
+
+                                <div class="list-group list-group-flush">
+                                    {% if order.design_file %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <i class="bi bi-file-earmark-text text-primary"></i>
+                                            <strong>Design-Datei:</strong>
+                                        </div>
+                                        <div class="text-end">
+                                            <code class="small">{{ order.design_file }}</code>
+                                            {% if order.design_file_path %}
+                                            <br><a href="{{ url_for('static', filename=order.design_file_path) }}"
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-outline-primary mt-1">
+                                                <i class="bi bi-download"></i> Download
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
+
+                                    {% if order.design_file_path and not order.design_file %}
+                                    <div class="list-group-item">
+                                        <i class="bi bi-folder text-warning"></i>
+                                        <strong>Pfad:</strong>
+                                        <br><code class="small">{{ order.design_file_path }}</code>
+                                        <br><a href="{{ url_for('static', filename=order.design_file_path) }}"
+                                               target="_blank"
+                                               class="btn btn-sm btn-outline-primary mt-1">
+                                            <i class="bi bi-download"></i> Anzeigen
+                                        </a>
+                                    </div>
+                                    {% endif %}
+
+                                    {% if order.production_file %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <i class="bi bi-file-earmark-check text-success"></i>
+                                            <strong>Produktionsdatei:</strong>
+                                        </div>
+                                        <div class="text-end">
+                                            <code class="small">{{ order.production_file }}</code>
+                                        </div>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">
+                    <i class="bi bi-inbox fs-1"></i><br>
+                    Noch keine Dateien für diesen Kunden hochgeladen.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Kunden-Historie -->
 <div class="row mt-4">
     <div class="col-md-12">

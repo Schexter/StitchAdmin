@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ thread.brand }}-{{ thread.color_code }} - Garndetails{% endblock %}
+{% block title %}{{ thread.manufacturer }}-{{ thread.color_number }} - Garndetails{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -8,9 +8,11 @@
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h1 class="h3 mb-0">
-                    🧵 {{ thread.brand }}-{{ thread.color_code }}
-                    {% if thread.color_name %}
-                    <small class="text-muted">({{ thread.color_name }})</small>
+                    🧵 {{ thread.manufacturer }}-{{ thread.color_number }}
+                    {% if thread.color_name_de %}
+                    <small class="text-muted">({{ thread.color_name_de }})</small>
+                    {% elif thread.color_name_en %}
+                    <small class="text-muted">({{ thread.color_name_en }})</small>
                     {% endif %}
                 </h1>
                 <div>
@@ -35,48 +37,78 @@
                                 <div class="col-md-6">
                                     <table class="table table-borderless">
                                         <tr>
-                                            <td class="fw-bold">Marke:</td>
-                                            <td>{{ thread.brand }}</td>
+                                            <td class="fw-bold">Hersteller:</td>
+                                            <td>{{ thread.manufacturer }}</td>
                                         </tr>
                                         <tr>
                                             <td class="fw-bold">Farbnummer:</td>
-                                            <td><code>{{ thread.color_code }}</code></td>
+                                            <td><code>{{ thread.color_number }}</code></td>
                                         </tr>
                                         <tr>
-                                            <td class="fw-bold">Farbname:</td>
-                                            <td>{{ thread.color_name or '-' }}</td>
+                                            <td class="fw-bold">Farbname (DE):</td>
+                                            <td>{{ thread.color_name_de or '-' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Farbname (EN):</td>
+                                            <td>{{ thread.color_name_en or '-' }}</td>
                                         </tr>
                                         <tr>
                                             <td class="fw-bold">Farbe:</td>
                                             <td>
                                                 <div class="d-flex align-items-center">
-                                                    <div class="color-sample me-2" 
-                                                         style="width: 30px; height: 30px; background-color: {{ thread.color_hex }}; border: 2px solid #ccc; border-radius: 50%;"></div>
-                                                    {{ thread.color_hex }}
+                                                    {% if thread.hex_color %}
+                                                    <div class="color-sample me-2"
+                                                         style="width: 30px; height: 30px; background-color: {{ thread.hex_color }}; border: 2px solid #ccc; border-radius: 50%;"></div>
+                                                    {{ thread.hex_color }}
+                                                    {% else %}
+                                                    -
+                                                    {% endif %}
                                                 </div>
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td class="fw-bold">Material:</td>
-                                            <td>
-                                                <span class="badge bg-secondary">{{ thread.material|title }}</span>
-                                            </td>
+                                            <td class="fw-bold">Pantone:</td>
+                                            <td>{{ thread.pantone or '-' }}</td>
                                         </tr>
                                         <tr>
-                                            <td class="fw-bold">Garnstärke:</td>
-                                            <td>{{ thread.weight }}wt</td>
+                                            <td class="fw-bold">RGB:</td>
+                                            <td>
+                                                {% if thread.rgb_r is not none %}
+                                                rgb({{ thread.rgb_r }}, {{ thread.rgb_g }}, {{ thread.rgb_b }})
+                                                {% else %}
+                                                -
+                                                {% endif %}
+                                            </td>
                                         </tr>
                                     </table>
                                 </div>
                                 <div class="col-md-6">
                                     <table class="table table-borderless">
                                         <tr>
-                                            <td class="fw-bold">Länge pro Kone:</td>
-                                            <td>{{ thread.length_per_cone|default('-') }} Meter</td>
+                                            <td class="fw-bold">Typ:</td>
+                                            <td>{{ thread.thread_type or '-' }}</td>
                                         </tr>
                                         <tr>
-                                            <td class="fw-bold">Preis pro Kone:</td>
-                                            <td>{{ "%.2f"|format(thread.price_per_cone) }} €</td>
+                                            <td class="fw-bold">Material:</td>
+                                            <td>
+                                                {% if thread.material %}
+                                                <span class="badge bg-secondary">{{ thread.material|title }}</span>
+                                                {% else %}
+                                                -
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Garnstärke:</td>
+                                            <td>No. {{ thread.weight|default('40') }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Kategorie:</td>
+                                            <td>{{ thread.category or 'Standard' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td class="fw-bold">Preis:</td>
+                                            <td>{{ "%.2f"|format(thread.price|default(0)) }} €</td>
                                         </tr>
                                         <tr>
                                             <td class="fw-bold">Lieferant:</td>
@@ -84,102 +116,111 @@
                                         </tr>
                                         <tr>
                                             <td class="fw-bold">Artikel-Nr.:</td>
-                                            <td>{{ thread.supplier_part_number or '-' }}</td>
+                                            <td>{{ thread.supplier_article_number or '-' }}</td>
                                         </tr>
                                         <tr>
-                                            <td class="fw-bold">Waschtemperatur:</td>
-                                            <td>{{ thread.washable_temp or 40 }}°C</td>
-                                        </tr>
-                                        <tr>
-                                            <td class="fw-bold">Eigenschaften:</td>
+                                            <td class="fw-bold">Status:</td>
                                             <td>
-                                                {% if thread.suitable_for_embroidery %}
-                                                <span class="badge bg-success me-1">Stickerei</span>
-                                                {% endif %}
-                                                {% if thread.suitable_for_quilting %}
-                                                <span class="badge bg-info me-1">Quilting</span>
-                                                {% endif %}
-                                                {% if thread.colorfast %}
-                                                <span class="badge bg-primary me-1">Farbecht</span>
+                                                {% if thread.discontinued %}
+                                                <span class="badge bg-danger">Eingestellt</span>
+                                                {% elif thread.active %}
+                                                <span class="badge bg-success">Aktiv</span>
+                                                {% else %}
+                                                <span class="badge bg-secondary">Inaktiv</span>
                                                 {% endif %}
                                             </td>
                                         </tr>
                                     </table>
                                 </div>
                             </div>
-
-                            {% if thread.notes %}
-                            <div class="mt-3">
-                                <h6>Notizen:</h6>
-                                <p class="text-muted">{{ thread.notes|nl2br|safe }}</p>
-                            </div>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
 
                 <!-- Bestand & Aktionen -->
                 <div class="col-lg-4 mb-4">
+                    {% if thread.stock %}
                     <div class="card mb-3">
-                        <div class="card-header 
-                            {% if stock.low_stock %}bg-danger text-white
-                            {% elif stock.quantity <= (stock.min_stock * 2) %}bg-warning text-dark
+                        <div class="card-header
+                            {% if thread.stock.quantity == 0 %}bg-danger text-white
+                            {% elif thread.stock.quantity <= thread.stock.min_stock %}bg-warning text-dark
                             {% else %}bg-success text-white{% endif %}">
                             <h6 class="card-title mb-0">
-                                <i class="fas fa-boxes"></i> Lagerbestand
+                                <i class="fas fa-boxes"></i> Lagerbestand: {{ stock_text }}
                             </h6>
                         </div>
                         <div class="card-body">
                             <div class="text-center mb-3">
-                                <div class="display-6 fw-bold 
-                                    {% if stock.low_stock %}text-danger
-                                    {% elif stock.quantity <= (stock.min_stock * 2) %}text-warning
+                                <div class="display-6 fw-bold
+                                    {% if thread.stock.quantity == 0 %}text-danger
+                                    {% elif thread.stock.quantity <= thread.stock.min_stock %}text-warning
                                     {% else %}text-success{% endif %}">
-                                    {{ stock.quantity }}
+                                    {{ thread.stock.quantity }}
                                 </div>
-                                <small class="text-muted">Konen verfügbar</small>
+                                <small class="text-muted">Einheiten verfügbar</small>
                             </div>
-                            
+
                             <hr>
-                            
-                            <p><strong>Mindestbestand:</strong> {{ stock.min_stock }} Konen</p>
-                            <p><strong>Lagerort:</strong> {{ stock.location or 'Unbekannt' }}</p>
-                            
-                            {% if stock.last_updated %}
+
+                            <p><strong>Mindestbestand:</strong> {{ thread.stock.min_stock }} Einheiten</p>
+                            <p><strong>Lagerort:</strong> {{ thread.stock.location or 'Nicht angegeben' }}</p>
+
+                            {% if thread.stock.updated_at %}
                             <p><small class="text-muted">
-                                Zuletzt aktualisiert: {{ stock.last_updated[:16].replace('T', ' ') }}
+                                Zuletzt aktualisiert: {{ thread.stock.updated_at.strftime('%d.%m.%Y %H:%M') if thread.stock.updated_at else '-' }}
                             </small></p>
                             {% endif %}
-                            
-                            {% if stock.low_stock %}
+
+                            {% if thread.stock.quantity == 0 %}
                             <div class="alert alert-danger mt-3">
-                                <i class="fas fa-exclamation-triangle"></i> 
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Nicht auf Lager!</strong><br>
+                                Nachbestellung erforderlich.
+                            </div>
+                            {% elif thread.stock.quantity <= thread.stock.min_stock %}
+                            <div class="alert alert-warning mt-3">
+                                <i class="fas fa-exclamation-triangle"></i>
                                 <strong>Niedriger Bestand!</strong><br>
                                 Nachbestellung empfohlen.
                             </div>
                             {% endif %}
                         </div>
                     </div>
+                    {% else %}
+                    <div class="card mb-3">
+                        <div class="card-header bg-secondary text-white">
+                            <h6 class="card-title mb-0">
+                                <i class="fas fa-boxes"></i> Lagerbestand
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted">Kein Lagerbestand angelegt</p>
+                        </div>
+                    </div>
+                    {% endif %}
 
                     <div class="card">
                         <div class="card-header">
-                            <h6 class="card-title mb-0">Aktionen</h6>
+                            <h6 class="card-title mb-0">Bestand verwalten</h6>
                         </div>
                         <div class="card-body">
-                            <div class="d-grid gap-2">
-                                <a href="{{ url_for('thread.manage_stock', thread_id=thread.id) }}" class="btn btn-primary btn-sm">
-                                    <i class="fas fa-boxes"></i> Bestand verwalten
-                                </a>
-                                <a href="{{ url_for('thread.edit', thread_id=thread.id) }}" class="btn btn-outline-warning btn-sm">
-                                    <i class="fas fa-edit"></i> Garn bearbeiten
-                                </a>
-                                <button class="btn btn-outline-info btn-sm" onclick="alert('Bestellfunktion wird in einem zukünftigen Update verfügbar sein.')">
-                                    <i class="fas fa-shopping-cart"></i> Nachbestellen
+                            <form method="POST" action="{{ url_for('thread.update_stock', thread_id=thread.id) }}">
+                                <div class="mb-3">
+                                    <label class="form-label">Aktion:</label>
+                                    <select name="action" class="form-select" required>
+                                        <option value="add">Hinzufügen</option>
+                                        <option value="remove">Entnehmen</option>
+                                        <option value="set">Setzen</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Menge:</label>
+                                    <input type="number" name="quantity" class="form-control" min="0" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-save"></i> Speichern
                                 </button>
-                                <button class="btn btn-outline-danger btn-sm" onclick="confirmDelete()">
-                                    <i class="fas fa-trash"></i> Garn löschen
-                                </button>
-                            </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -193,12 +234,42 @@
                             <h5 class="card-title mb-0">Verwendungshistorie</h5>
                         </div>
                         <div class="card-body">
+                            {% if usage_history and usage_history|length > 0 %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Datum</th>
+                                            <th>Typ</th>
+                                            <th>Menge</th>
+                                            <th>Maschine</th>
+                                            <th>Auftrag</th>
+                                            <th>Erfasst von</th>
+                                            <th>Notizen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for usage in usage_history %}
+                                        <tr>
+                                            <td>{{ usage.used_at.strftime('%d.%m.%Y %H:%M') if usage.used_at else '-' }}</td>
+                                            <td><span class="badge bg-info">{{ usage.usage_type }}</span></td>
+                                            <td>{{ usage.quantity_used }}m</td>
+                                            <td>{{ usage.machine_id or '-' }}</td>
+                                            <td>{{ usage.order_id or '-' }}</td>
+                                            <td>{{ usage.recorded_by or '-' }}</td>
+                                            <td>{{ usage.notes or '-' }}</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {% else %}
                             <div class="text-center text-muted py-4">
                                 <i class="fas fa-history fa-3x mb-3"></i>
-                                <h5>Verwendungshistorie</h5>
-                                <p>Diese Funktion wird in einem zukünftigen Update verfügbar sein.</p>
-                                <small>Hier werden alle Aufträge angezeigt, in denen dieses Garn verwendet wurde.</small>
+                                <h5>Keine Verwendungshistorie</h5>
+                                <p>Dieses Garn wurde noch nicht verwendet.</p>
                             </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -207,11 +278,10 @@
     </div>
 </div>
 
-<script>
-function confirmDelete() {
-    if (confirm('Möchten Sie dieses Garn wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
-        alert('Löschfunktion wird in einem zukünftigen Update implementiert.');
-    }
+<style>
+.btn-touch {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
 }
-</script>
+</style>
 {% endblock %}

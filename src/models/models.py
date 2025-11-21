@@ -71,9 +71,11 @@ class Customer(db.Model):
     country = db.Column(db.String(100), default='Deutschland')
     
     # Sonstiges
+    customer_number = db.Column(db.String(50))  # Kundennummer (mit Index)
+    barcode = db.Column(db.String(100))  # Barcode für Kundenkarte (mit Index)
     newsletter = db.Column(db.Boolean, default=False)
     notes = db.Column(db.Text)
-    
+
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(80))
@@ -636,6 +638,116 @@ class ProductionSchedule(db.Model):
     
     def __repr__(self):
         return f'<Schedule {self.id}: {self.machine_id} - {self.scheduled_start}>'
+
+
+class ShellyDevice(db.Model):
+    """Shelly Smart Device Model für Energie-Tracking"""
+    __tablename__ = 'shelly_devices'
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    ip_address = db.Column(db.String(15), nullable=False, unique=True)
+
+    # Geräte-Info
+    device_type = db.Column(db.String(50))  # z.B. "SHELLY1PM", "SHELLYPLUG-S"
+    mac_address = db.Column(db.String(17))
+    firmware_version = db.Column(db.String(20))
+
+    # Zuordnung
+    machine_id = db.Column(db.String(50), db.ForeignKey('machines.id'))
+    assigned_to_type = db.Column(db.String(50))  # 'machine', 'button', 'other'
+    channel = db.Column(db.Integer, default=0)  # Kanal bei Multi-Channel Geräten
+
+    # Einstellungen
+    active = db.Column(db.Boolean, default=True)
+    track_energy = db.Column(db.Boolean, default=True)
+    auto_control = db.Column(db.Boolean, default=False)  # Automatische Steuerung erlauben
+
+    # Kosten
+    electricity_price_per_kwh = db.Column(db.Float, default=0.30)  # €/kWh
+
+    # Letzter Status
+    last_seen = db.Column(db.DateTime)
+    last_power_w = db.Column(db.Float)
+    is_online = db.Column(db.Boolean, default=False)
+    is_on = db.Column(db.Boolean, default=False)
+
+    # Metadaten
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.String(80))
+    updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
+    updated_by = db.Column(db.String(80))
+
+    # Relationships
+    machine = db.relationship('Machine', backref='shelly_devices')
+    energy_readings = db.relationship('ShellyEnergyReading', backref='device', lazy='dynamic', cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<ShellyDevice {self.name} ({self.ip_address})>'
+
+
+class ShellyEnergyReading(db.Model):
+    """Energie-Messwerte von Shelly-Geräten"""
+    __tablename__ = 'shelly_energy_readings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    device_id = db.Column(db.Integer, db.ForeignKey('shelly_devices.id'), nullable=False)
+
+    # Zeitstempel
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    # Leistungsdaten
+    power_w = db.Column(db.Float)  # Aktuelle Leistung in Watt
+    voltage_v = db.Column(db.Float)  # Spannung in Volt
+    current_a = db.Column(db.Float)  # Strom in Ampere
+    power_factor = db.Column(db.Float)  # Leistungsfaktor
+
+    # Energie
+    energy_wh = db.Column(db.Float)  # Gesamtenergie in Wh (Counter)
+    energy_delta_wh = db.Column(db.Float)  # Energie seit letzter Messung
+
+    # Status
+    is_on = db.Column(db.Boolean)
+    temperature_c = db.Column(db.Float)  # Geräte-Temperatur
+
+    # Zuordnung zu Produktionen
+    production_schedule_id = db.Column(db.Integer, db.ForeignKey('production_schedules.id'))
+
+    def __repr__(self):
+        return f'<EnergyReading {self.device_id} @ {self.timestamp}: {self.power_w}W>'
+
+
+class ShellyProductionEnergy(db.Model):
+    """Energie-Verbrauch pro Produktionsauftrag"""
+    __tablename__ = 'shelly_production_energy'
+
+    id = db.Column(db.Integer, primary_key=True)
+    production_schedule_id = db.Column(db.Integer, db.ForeignKey('production_schedules.id'), nullable=False)
+    shelly_device_id = db.Column(db.Integer, db.ForeignKey('shelly_devices.id'), nullable=False)
+
+    # Zeitraum
+    start_time = db.Column(db.DateTime, nullable=False)
+    end_time = db.Column(db.DateTime)
+
+    # Energie-Statistik
+    total_energy_kwh = db.Column(db.Float, default=0)
+    avg_power_w = db.Column(db.Float)
+    max_power_w = db.Column(db.Float)
+    min_power_w = db.Column(db.Float)
+
+    # Kosten
+    electricity_price_per_kwh = db.Column(db.Float)
+    total_cost_eur = db.Column(db.Float)
+
+    # Metadaten
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    production_schedule = db.relationship('ProductionSchedule', backref='energy_data')
+    shelly_device = db.relationship('ShellyDevice', backref='production_energy')
+
+    def __repr__(self):
+        return f'<ProductionEnergy {self.production_schedule_id}: {self.total_energy_kwh}kWh = {self.total_cost_eur}€>'
 
 
 class Thread(db.Model):

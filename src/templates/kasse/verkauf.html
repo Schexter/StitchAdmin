@@ -3,6 +3,8 @@
 {% block title %}Kassenverkauf - StitchAdmin{% endblock %}
 
 {% block content %}
+<!-- Artikel-Such-Modal -->
+{% include 'includes/article_search_modal.html' %}
 <div class="container-fluid">
     <div class="row">
         <!-- Artikel-Suche und Warenkorb (unverändert) -->
@@ -61,12 +63,29 @@
         <!-- Zahlung und Aktionen (Button-ID für Kartenzahlung angepasst) -->
         <div class="col-md-4">
             <div class="card mb-3">
-                <div class="card-header"><h5><i class="bi bi-person"></i> Kunde</h5></div>
+                <div class="card-header">
+                    <h5><i class="bi bi-person"></i> Kunde</h5>
+                </div>
                 <div class="card-body">
-                    <select class="form-select" id="customerId">
-                        <option value="">Laufkunde</option>
-                        {# Kunden dynamisch laden #}
-                    </select>
+                    <div class="mb-2">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="customerSearch"
+                                   placeholder="Kunde suchen oder Karte scannen..."
+                                   autocomplete="off">
+                            <button class="btn btn-outline-secondary" type="button" onclick="showCustomerList()">
+                                <i class="bi bi-search"></i>
+                            </button>
+                        </div>
+                        <div id="customerSearchResults" class="list-group mt-1" style="display: none; max-height: 200px; overflow-y: auto;">
+                            <!-- Suchergebnisse werden hier dynamisch eingefügt -->
+                        </div>
+                    </div>
+                    <div class="alert alert-info mb-0 py-2" id="currentCustomer">
+                        <i class="bi bi-person-badge"></i> <strong>Laufkunde</strong>
+                        <button class="btn btn-sm btn-outline-secondary float-end" onclick="clearCustomer()" style="display: none;" id="btnClearCustomer">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="card mb-3">
@@ -365,6 +384,204 @@ function cancelSale() {
     if (confirm('Soll der Warenkorb wirklich geleert werden?')) {
         updateWarenkorb("{{ url_for('kasse.warenkorb_leeren') }}", {}); // Annahme: Route existiert
     }
+}
+
+// ==========================================
+// KUNDENSUCHE UND -AUSWAHL
+// ==========================================
+
+let customerSearchTimeout = null;
+let selectedCustomerId = null;
+
+// Event-Listener für Kundensuche
+document.getElementById('customerSearch').addEventListener('input', function(e) {
+    const query = e.target.value.trim();
+
+    // Debounce: Warte 300ms nach letzter Eingabe
+    clearTimeout(customerSearchTimeout);
+
+    if (query.length >= 2) {
+        customerSearchTimeout = setTimeout(() => {
+            searchCustomers(query);
+        }, 300);
+    } else if (query.length === 0) {
+        // Bei leerem Suchfeld: Verstecke Suchergebnisse
+        document.getElementById('customerSearchResults').style.display = 'none';
+    }
+});
+
+// Kundensuche (auch für Barcode-Scanner)
+function searchCustomers(query) {
+    fetch(`{{ url_for('kasse.kunden_suchen') }}?q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                displayCustomerResults(data.kunden);
+            } else {
+                console.error('Fehler bei Kundensuche:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Fehler bei Kundensuche:', error);
+        });
+}
+
+// Zeige Kunden-Suchergebnisse
+function displayCustomerResults(kunden) {
+    const resultsDiv = document.getElementById('customerSearchResults');
+
+    if (kunden.length === 0) {
+        resultsDiv.innerHTML = '<div class="list-group-item">Keine Kunden gefunden</div>';
+        resultsDiv.style.display = 'block';
+        return;
+    }
+
+    // Verwende data-Attribute statt inline onclick für Sicherheit
+    resultsDiv.innerHTML = kunden.map(k => `
+        <a href="#" class="list-group-item list-group-item-action customer-select-item"
+           data-customer-id="${k.id}"
+           data-customer-name="${k.name.replace(/"/g, '&quot;')}">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${k.name}</strong>
+                    <br><small class="text-muted">${k.customer_number || ''} ${k.email || ''}</small>
+                </div>
+                <i class="bi bi-chevron-right"></i>
+            </div>
+        </a>
+    `).join('');
+
+    // Event-Listener für alle Kunden-Items
+    resultsDiv.querySelectorAll('.customer-select-item').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            const customerId = this.getAttribute('data-customer-id');
+            const customerName = this.getAttribute('data-customer-name');
+            selectCustomer(customerId, customerName);
+        });
+    });
+
+    resultsDiv.style.display = 'block';
+}
+
+// Kunde auswählen
+function selectCustomer(customerId, customerName) {
+    fetch("{{ url_for('kasse.kunde_setzen') }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({customer_id: customerId})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            selectedCustomerId = customerId;
+
+            // Aktualisiere Anzeige
+            document.getElementById('currentCustomer').innerHTML = `
+                <i class="bi bi-person-check-fill text-success"></i> <strong>${customerName}</strong>
+                <button class="btn btn-sm btn-outline-secondary float-end" onclick="clearCustomer()">
+                    <i class="bi bi-x"></i>
+                </button>
+            `;
+            document.getElementById('currentCustomer').className = 'alert alert-success mb-0 py-2';
+
+            // Suchergebnisse ausblenden und Suchfeld leeren
+            document.getElementById('customerSearchResults').style.display = 'none';
+            document.getElementById('customerSearch').value = '';
+
+            console.log('Kunde ausgewählt:', customerName);
+        } else {
+            alert('Fehler beim Setzen des Kunden: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Fehler beim Setzen des Kunden:', error);
+        alert('Fehler beim Setzen des Kunden');
+    });
+}
+
+// Kunde zurücksetzen (Laufkunde)
+function clearCustomer() {
+    fetch("{{ url_for('kasse.kunde_setzen') }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({customer_id: null})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            selectedCustomerId = null;
+
+            // Aktualisiere Anzeige
+            document.getElementById('currentCustomer').innerHTML = `
+                <i class="bi bi-person-badge"></i> <strong>Laufkunde</strong>
+            `;
+            document.getElementById('currentCustomer').className = 'alert alert-info mb-0 py-2';
+
+            console.log('Kunde zurückgesetzt: Laufkunde');
+        }
+    })
+    .catch(error => {
+        console.error('Fehler beim Zurücksetzen des Kunden:', error);
+    });
+}
+
+// Zeige komplette Kundenliste
+function showCustomerList() {
+    searchCustomers(''); // Leere Suche lädt die letzten 20 Kunden
+    document.getElementById('customerSearch').focus();
+}
+
+// ==========================================
+// ARTIKEL-SUCHE MODAL
+// ==========================================
+
+function showArticleList() {
+    // Öffne das Artikel-Such-Modal
+    const modal = new bootstrap.Modal(document.getElementById('articleSearchModal'));
+    modal.show();
+
+    // Fokus auf Suchfeld
+    setTimeout(() => {
+        document.getElementById('articleSearchInput').focus();
+    }, 500);
+}
+
+// Override der selectArticle Funktion für die Kasse
+// Diese Funktion wird vom Artikel-Modal aufgerufen
+function selectArticle(articleId, articleName, articlePrice, articleColor, articleSize, articleMaterial, articleWeight) {
+    // Füge Artikel direkt zum Warenkorb hinzu (nicht zu einem Select)
+    fetch("{{ url_for('kasse.warenkorb_hinzufuegen') }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            artikel_id: articleId,
+            menge: 1
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Aktualisiere Warenkorb-Anzeige
+            displayCart(data.warenkorb, data.warenkorb_summen);
+
+            // Schließe Modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('articleSearchModal'));
+            if (modal) modal.hide();
+
+            // Zeige Bestätigung
+            showToast('Artikel hinzugefügt', `${articleName} wurde zum Warenkorb hinzugefügt`);
+
+            // Fokus zurück auf Artikelsuche
+            document.getElementById('articleSearch').focus();
+        } else {
+            alert('Fehler beim Hinzufügen: ' + (data.error || 'Unbekannter Fehler'));
+        }
+    })
+    .catch(error => {
+        console.error('Fehler beim Hinzufügen zum Warenkorb:', error);
+        alert('Fehler beim Hinzufügen zum Warenkorb');
+    });
 }
 </script>
 {% endblock %}

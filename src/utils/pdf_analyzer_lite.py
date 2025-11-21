@@ -37,7 +37,7 @@ class ThreadColorPDFAnalyzerLite:
     def analyze_pdf(self, pdf_path: str) -> Dict[str, Any]:
         """
         Hauptmethode zur PDF-Analyse
-        
+
         Returns:
             Dict mit:
             - success: bool
@@ -46,16 +46,24 @@ class ThreadColorPDFAnalyzerLite:
             - message: str - Status/Fehlermeldung
         """
         try:
+            print(f"[PDF-Analyzer] Starte Analyse von: {os.path.basename(pdf_path)}")
             colors = []
+
+            print("[PDF-Analyzer] Erkenne Hersteller...")
             manufacturer = self._detect_manufacturer(pdf_path)
-            
+            print(f"[PDF-Analyzer] Hersteller erkannt: {manufacturer}")
+
             # Text mit pdfplumber extrahieren
+            print("[PDF-Analyzer] Extrahiere Text und Farben...")
             text_colors = self._extract_from_text(pdf_path)
             colors.extend(text_colors)
-            
+            print(f"[PDF-Analyzer] {len(text_colors)} Farben aus Text extrahiert")
+
             # Duplikate entfernen basierend auf Farbnummer
+            print("[PDF-Analyzer] Entferne Duplikate...")
             unique_colors = self._remove_duplicates(colors)
-            
+            print(f"[PDF-Analyzer] Analyse abgeschlossen: {len(unique_colors)} eindeutige Farben")
+
             return {
                 'success': True,
                 'colors': unique_colors,
@@ -63,8 +71,11 @@ class ThreadColorPDFAnalyzerLite:
                 'colors_found': len(unique_colors),
                 'message': f'{len(unique_colors)} Farben erfolgreich extrahiert'
             }
-            
+
         except Exception as e:
+            print(f"[PDF-Analyzer] FEHLER: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {
                 'success': False,
                 'colors': [],
@@ -199,28 +210,37 @@ class ThreadColorPDFAnalyzerLite:
     def _extract_from_text(self, pdf_path: str) -> List[Dict]:
         """Extrahiert Farben aus dem Fließtext"""
         colors = []
-        
+
         try:
             with pdfplumber.open(pdf_path) as pdf:
-                for page_num, page in enumerate(pdf.pages):
+                total_pages = len(pdf.pages)
+                print(f"[PDF-Analyzer] PDF hat {total_pages} Seiten")
+
+                for page_num, page in enumerate(pdf.pages, 1):
+                    print(f"[PDF-Analyzer] Analysiere Seite {page_num}/{total_pages}...")
+
                     # Versuche zuerst strukturierte Tabellen
                     tables = page.extract_tables()
                     if tables:
-                        for table in tables:
+                        print(f"[PDF-Analyzer]   → {len(tables)} Tabelle(n) gefunden")
+                        for table_idx, table in enumerate(tables, 1):
                             table_colors = self._parse_table(table)
+                            if table_colors:
+                                print(f"[PDF-Analyzer]   → Tabelle {table_idx}: {len(table_colors)} Farben extrahiert")
                             colors.extend(table_colors)
                     
                     # Dann normaler Text
                     text = page.extract_text()
                     if text:
+                        page_colors_before = len(colors)
                         # Verbesserte Zeilenerkennung
                         lines = text.split('\n')
-                        
+
                         # Sammle zusammengehörige Zeilen
                         i = 0
                         while i < len(lines):
                             line = lines[i].strip()
-                            
+
                             # Prüfe ob Zeile mit Farbnummer beginnt
                             if re.match(r'^\d{3,5}\s', line):
                                 # Sammle nächste Zeilen die evtl. zur Farbe gehören
@@ -234,7 +254,7 @@ class ThreadColorPDFAnalyzerLite:
                                         j += 1
                                     else:
                                         break
-                                
+
                                 color_data = self._parse_text_line(combined_line)
                                 if color_data:
                                     colors.append(color_data)
@@ -245,6 +265,10 @@ class ThreadColorPDFAnalyzerLite:
                                 if color_data:
                                     colors.append(color_data)
                                 i += 1
+
+                        page_colors_found = len(colors) - page_colors_before
+                        if page_colors_found > 0:
+                            print(f"[PDF-Analyzer]   → {page_colors_found} Farben aus Text extrahiert")
                             
         except Exception as e:
             print(f"Text-Extraktion fehlgeschlagen: {e}")

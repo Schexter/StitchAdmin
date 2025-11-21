@@ -462,109 +462,102 @@ def import_threads():
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
                 file.save(tmp_file.name)
                 temp_path = tmp_file.name
-            
+
             try:
-                # Verwende den Universal Thread Analyzer
-                # Versuche verschiedene Pfade
-                possible_paths = [
-                    # Universal Thread Analyzer V2 - Ein Analyzer für alle!
-                    'Universal_Thread_Analyzer.py',
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'Universal_Thread_Analyzer.py'),
-                    os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'Universal_Thread_Analyzer.py'),
-                    # Fallback auf alte Analyzer (falls noch benötigt)
-                    'Universal_Thread_Analyzer_V2.py',
-                    'thread_analyzer_wrapper.py'
-                ]
-                
-                analyzer_path = None
-                for path in possible_paths:
-                    if os.path.exists(path):
-                        analyzer_path = path
-                        print(f"Verwende Analyzer: {path}")
-                        break
-                
-                if analyzer_path:
-                    # Führe Analyzer aus
-                    # Setze Umgebungsvariablen für korrektes Encoding
-                    env = os.environ.copy()
-                    env['PYTHONIOENCODING'] = 'utf-8'
-                    
-                    result = subprocess.run([
-                        sys.executable, '-u', analyzer_path, temp_path
-                    ], capture_output=True, text=True, encoding='utf-8', 
-                       errors='replace', env=env)
-                    
-                    if result.returncode == 0:
-                        # Suche nach generierter CSV
-                        csv_files = glob.glob('*_Farben_*.csv')
-                        
-                        if csv_files:
-                            # Neueste CSV-Datei nehmen
-                            latest_csv = max(csv_files, key=os.path.getctime)
-                            
-                            # CSV importieren
-                            with open(latest_csv, 'r', encoding='utf-8') as csv_file:
-                                csv_reader = csv.DictReader(csv_file)
-                                
-                                imported = 0
-                                for row in csv_reader:
-                                    try:
-                                        manufacturer = row.get('Hersteller', '').strip()
-                                        color_number = row.get('Farbnummer', '').strip()
-                                        
-                                        if manufacturer and color_number:
-                                            thread_id = f"{manufacturer}_{color_number}".replace(' ', '_')
-                                            
-                                            thread = Thread.query.get(thread_id)
-                                            if not thread:
-                                                thread = Thread(id=thread_id)
-                                                db.session.add(thread)
-                                            
-                                            thread.manufacturer = manufacturer
-                                            thread.color_number = color_number
-                                            thread.color_name_de = row.get('Farbname_DE', '')
-                                            thread.color_name_en = row.get('Farbname_EN', '')
-                                            thread.hex_color = row.get('Hex', '')
-                                            thread.pantone = row.get('Pantone', '')
-                                            
-                                            # RGB-Werte
-                                            if row.get('RGB_R'):
-                                                thread.rgb_r = int(row.get('RGB_R', 0))
-                                                thread.rgb_g = int(row.get('RGB_G', 0))
-                                                thread.rgb_b = int(row.get('RGB_B', 0))
-                                            
-                                            thread.category = 'Standard'
-                                            thread.updated_by = current_user.username
-                                            thread.active = True
-                                            
-                                            imported += 1
-                                    except Exception as e:
-                                        print(f"Fehler beim Import: {e}")
-                                
-                                db.session.commit()
-                                
-                                # Aktivität protokollieren
-                                log_activity('threads_imported_pdf', 
-                                            f'{imported} Garne aus PDF importiert')
-                                
-                                flash(f'{imported} Garne erfolgreich aus PDF extrahiert und importiert!', 'success')
-                                
-                            # Lösche temporäre CSV
-                            os.remove(latest_csv)
-                        else:
-                            flash('Keine Farben konnten aus der PDF extrahiert werden.', 'warning')
+                # Verwende den ThreadColorPDFAnalyzer (mit Fallback auf Lite-Version)
+                try:
+                    from src.utils.pdf_analyzer import ThreadColorPDFAnalyzer
+                    analyzer = ThreadColorPDFAnalyzer()
+                    print("[PDF-Import] Verwende vollständigen PDF-Analyzer")
+                except ImportError as e:
+                    print(f"[PDF-Import] Vollständiger Analyzer nicht verfügbar ({e}), verwende Lite-Version")
+                    from src.utils.pdf_analyzer_lite import ThreadColorPDFAnalyzerLite
+                    analyzer = ThreadColorPDFAnalyzerLite()
+
+                result = analyzer.analyze_pdf(temp_path)
+                print(f"[PDF-Import] Analyse-Ergebnis: {result.get('message', 'Keine Nachricht')}")
+
+                if result['success'] and result['colors']:
+                    imported = 0
+                    errors = []
+                    detected_manufacturer = result.get('manufacturer', 'Unknown')
+
+                    for color_data in result['colors']:
+                        try:
+                            # Verwende erkannten Hersteller oder Fallback
+                            manufacturer = color_data.get('manufacturer', detected_manufacturer)
+                            color_number = color_data.get('color_number', '').strip()
+
+                            if not manufacturer or not color_number:
+                                continue
+
+                            # Thread-ID erstellen
+                            thread_id = f"{manufacturer}_{color_number}".replace(' ', '_')
+
+                            # Thread erstellen oder aktualisieren
+                            thread = Thread.query.get(thread_id)
+                            if not thread:
+                                thread = Thread(id=thread_id)
+                                db.session.add(thread)
+
+                            thread.manufacturer = manufacturer
+                            thread.color_number = color_number
+                            thread.color_name_de = color_data.get('color_name_de', '')
+                            thread.color_name_en = color_data.get('color_name_en', '')
+                            thread.hex_color = color_data.get('hex_color', '')
+                            thread.pantone = color_data.get('pantone', '')
+
+                            # RGB-Werte
+                            if color_data.get('rgb_r') is not None:
+                                thread.rgb_r = int(color_data.get('rgb_r', 0))
+                                thread.rgb_g = int(color_data.get('rgb_g', 0))
+                                thread.rgb_b = int(color_data.get('rgb_b', 0))
+                            elif thread.hex_color and thread.hex_color.startswith('#'):
+                                # RGB aus Hex berechnen falls nicht vorhanden
+                                try:
+                                    hex_color = thread.hex_color.lstrip('#')
+                                    thread.rgb_r = int(hex_color[0:2], 16)
+                                    thread.rgb_g = int(hex_color[2:4], 16)
+                                    thread.rgb_b = int(hex_color[4:6], 16)
+                                except:
+                                    pass
+
+                            thread.category = color_data.get('category', 'Standard')
+                            thread.updated_by = current_user.username
+                            thread.active = True
+
+                            imported += 1
+
+                        except Exception as e:
+                            errors.append(f"Fehler bei Farbe {color_number}: {str(e)}")
+
+                    db.session.commit()
+
+                    # Aktivität protokollieren
+                    log_activity('threads_imported_pdf',
+                                f'{imported} Garne aus PDF importiert (Hersteller: {detected_manufacturer})')
+
+                    if errors:
+                        flash(f'{imported} Garne importiert. {len(errors)} Fehler aufgetreten.', 'warning')
+                        for error in errors[:5]:  # Zeige max 5 Fehler
+                            flash(error, 'danger')
                     else:
-                        flash(f'PDF-Analyse fehlgeschlagen: {result.stderr}', 'danger')
+                        flash(f'{imported} Garne erfolgreich aus PDF extrahiert und importiert! (Hersteller: {detected_manufacturer})', 'success')
                 else:
-                    flash('PDF-Analyzer nicht gefunden. Bitte stellen Sie sicher, dass Universal_Thread_Analyzer.py existiert.', 'danger')
-                    
+                    error_msg = result.get('message', 'Unbekannter Fehler')
+                    flash(f'PDF-Analyse fehlgeschlagen: {error_msg}', 'danger')
+
+            except ImportError as e:
+                flash(f'PDF-Analyzer nicht verfügbar. Bitte installieren Sie die erforderlichen Bibliotheken: {str(e)}', 'danger')
             except Exception as e:
                 flash(f'Fehler beim PDF-Import: {str(e)}', 'danger')
+                import traceback
+                traceback.print_exc()
             finally:
                 # Temporäre Datei löschen
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
-            
+
             return redirect(url_for('thread.index'))
         else:
             flash(f'Ungültiges Dateiformat für {import_type}-Import!', 'danger')
@@ -577,10 +570,10 @@ def import_threads():
 def api_search():
     """Garn-Suche für Autocomplete"""
     query = request.args.get('q', '')
-    
+
     if len(query) < 2:
         return jsonify([])
-    
+
     threads = Thread.query.filter(
         db.or_(
             Thread.color_number.ilike(f'%{query}%'),
@@ -588,7 +581,7 @@ def api_search():
             Thread.color_name_en.ilike(f'%{query}%')
         )
     ).filter_by(active=True).limit(20).all()
-    
+
     results = []
     for thread in threads:
         results.append({
@@ -596,7 +589,54 @@ def api_search():
             'text': f"{thread.manufacturer} {thread.color_number} - {thread.color_name_de or thread.color_name_en}",
             'color': thread.hex_color
         })
-    
+
+    return jsonify(results)
+
+@thread_bp.route('/api/colors')
+@login_required
+def api_colors():
+    """API-Endpoint für alle verfügbaren Garnfarben
+    Wird vom Farbauswahl-Widget verwendet"""
+
+    # Optionale Filter
+    manufacturer_filter = request.args.get('manufacturer', '')
+    category_filter = request.args.get('category', '')
+    active_only = request.args.get('active_only', 'true').lower() == 'true'
+
+    # Query erstellen
+    query = Thread.query
+
+    if manufacturer_filter:
+        query = query.filter_by(manufacturer=manufacturer_filter)
+
+    if category_filter:
+        query = query.filter_by(category=category_filter)
+
+    if active_only:
+        query = query.filter_by(active=True)
+
+    # Nach Hersteller und Farbnummer sortieren
+    threads = query.order_by(Thread.manufacturer, Thread.color_number).all()
+
+    # Ergebnis formatieren
+    results = []
+    for thread in threads:
+        results.append({
+            'id': thread.id,
+            'manufacturer': thread.manufacturer,
+            'color_number': thread.color_number,
+            'color_name_de': thread.color_name_de,
+            'color_name_en': thread.color_name_en,
+            'hex_color': thread.hex_color or '#CCCCCC',
+            'rgb_r': thread.rgb_r,
+            'rgb_g': thread.rgb_g,
+            'rgb_b': thread.rgb_b,
+            'pantone': thread.pantone,
+            'category': thread.category,
+            'in_stock': thread.stock.quantity > 0 if thread.stock else False,
+            'stock_quantity': thread.stock.quantity if thread.stock else 0
+        })
+
     return jsonify(results)
 
 @thread_bp.route('/usage')

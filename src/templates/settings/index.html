@@ -29,18 +29,18 @@
                 <i class="bi bi-box-seam text-success" style="font-size: 2rem;"></i>
                 <h5 class="card-title mt-2">Artikel</h5>
                 <p class="card-text">{{ settings_overview.category_count }} Kategorien<br>{{ settings_overview.brand_count }} Marken</p>
-                <a href="{{ url_for('settings.articles') }}" class="btn btn-success btn-sm">Konfigurieren</a>
+                <a href="{{ url_for('articles.index') }}" class="btn btn-success btn-sm">Verwalten</a>
             </div>
         </div>
     </div>
-    
+
     <div class="col-md-3">
         <div class="card text-center">
             <div class="card-body">
                 <i class="bi bi-calculator text-warning" style="font-size: 2rem;"></i>
                 <h5 class="card-title mt-2">Preiskalkulation</h5>
                 <p class="card-text">Faktor: {{ legacy_settings.price_factor_calculated }}x / {{ legacy_settings.price_factor_recommended }}x</p>
-                <a href="{{ url_for('settings.articles_pricing') }}" class="btn btn-warning btn-sm">Anpassen</a>
+                <a href="{{ url_for('calculation_settings.index') }}" class="btn btn-warning btn-sm">Anpassen</a>
             </div>
         </div>
     </div>
@@ -55,7 +55,7 @@
                     {% if advanced_settings.tax_rates %}{{ advanced_settings.tax_rates }} MwSt-Sätze{% else %}Nicht konfiguriert{% endif %}<br>
                     {% if advanced_settings.calculation_rules %}{{ advanced_settings.calculation_rules }} Regeln{% else %}Keine Regeln{% endif %}
                 </p>
-                <a href="{{ url_for('settings.advanced') }}" class="btn btn-info btn-sm">Konfigurieren</a>
+                <a href="{{ url_for('calculation_settings.index') }}" class="btn btn-info btn-sm">Konfigurieren</a>
                 {% else %}
                 <i class="bi bi-exclamation-triangle text-secondary" style="font-size: 2rem;"></i>
                 <h5 class="card-title mt-2">Erweitert</h5>
@@ -76,25 +76,27 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    <a href="{{ url_for('settings.articles_pricing') }}" class="btn btn-outline-primary">
-                        <i class="bi bi-calculator"></i> Preisfaktoren anpassen
+                    <a href="{{ url_for('calculation_settings.index') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-calculator"></i> Preiskalkulation anpassen
                     </a>
-                    
+
                     {% if current_user.is_admin %}
-                    <a href="{{ url_for('settings.new_user') }}" class="btn btn-outline-success">
-                        <i class="bi bi-person-plus"></i> Neuen Benutzer erstellen
+                    <a href="{{ url_for('users.index') }}" class="btn btn-outline-success">
+                        <i class="bi bi-people"></i> Benutzer verwalten
                     </a>
                     {% endif %}
-                    
-                    {% if settings_overview.advanced_available %}
-                    <button class="btn btn-outline-info" onclick="initAdvancedSettings()">
-                        <i class="bi bi-gear-wide"></i> Erweiterte Einstellungen initialisieren
-                    </button>
-                    {% endif %}
-                    
+
+                    <a href="{{ url_for('machines.index') }}" class="btn btn-outline-info">
+                        <i class="bi bi-gear-wide"></i> Maschinen verwalten
+                    </a>
+
                     {% if current_user.is_admin %}
-                    <a href="{{ url_for('settings.system') }}" class="btn btn-outline-warning">
-                        <i class="bi bi-info-circle"></i> System-Informationen
+                    <a href="{{ url_for('settings.branding') }}" class="btn btn-outline-warning">
+                        <i class="bi bi-palette"></i> Erscheinungsbild anpassen
+                    </a>
+
+                    <a href="{{ url_for('shelly.index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-plug"></i> Shelly-Geräte verwalten
                     </a>
                     {% endif %}
                 </div>
@@ -172,76 +174,37 @@
 
 function testCalculation() {
     const purchasePrice = parseFloat(document.getElementById('test_purchase_price').value);
-    
+
     if (!purchasePrice || purchasePrice <= 0) {
         alert('Bitte geben Sie einen gültigen EK-Preis ein.');
         return;
     }
-    
-    fetch('{{ url_for("settings.test_calculation") }}', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            purchase_price: purchasePrice
-        })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const resultDiv = document.getElementById('calculation_result');
-            resultDiv.innerHTML = `
-                <div class="alert alert-success">
-                    <strong>Kalkulationsergebnis:</strong><br>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <strong>VK kalkuliert:</strong><br>
-                            ${data.calculated_net.toFixed(2).replace('.', ',')} € (netto)<br>
-                            ${data.calculated_gross.toFixed(2).replace('.', ',')} € (${data.tax_rate}% MwSt)
-                        </div>
-                        <div class="col-md-6">
-                            <strong>VK empfohlen:</strong><br>
-                            ${data.recommended_net.toFixed(2).replace('.', ',')} € (netto)<br>
-                            ${data.recommended_gross.toFixed(2).replace('.', ',')} € (${data.tax_rate}% MwSt)
-                        </div>
-                    </div>
-                    <small class="text-muted">Regel: ${data.rule_used}</small>
+
+    // Einfache lokale Berechnung als Demo
+    const factor = 2.5; // Standard-Faktor
+    const taxRate = 19;
+    const netPrice = purchasePrice * factor;
+    const grossPrice = netPrice * (1 + taxRate / 100);
+
+    const resultDiv = document.getElementById('calculation_result');
+    resultDiv.innerHTML = `
+        <div class="alert alert-info">
+            <strong>Kalkulationsergebnis (Demo):</strong><br>
+            <div class="row">
+                <div class="col-md-12">
+                    <strong>VK kalkuliert:</strong><br>
+                    ${netPrice.toFixed(2).replace('.', ',')} € (netto)<br>
+                    ${grossPrice.toFixed(2).replace('.', ',')} € (${taxRate}% MwSt)
                 </div>
-            `;
-            resultDiv.style.display = 'block';
-        } else {
-            alert('Fehler bei der Berechnung: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Fehler bei der Verbindung zum Server');
-    });
+            </div>
+            <small class="text-muted">Faktor: ${factor}x | Für detaillierte Kalkulation nutzen Sie die Kalkulationseinstellungen</small>
+        </div>
+    `;
+    resultDiv.style.display = 'block';
 }
 
 function initAdvancedSettings() {
-    if (confirm('Sollen die erweiterten Einstellungen mit Standard-Werten initialisiert werden?')) {
-        fetch('{{ url_for("settings.init_advanced_settings") }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Erweiterte Einstellungen wurden erfolgreich initialisiert!');
-                location.reload();
-            } else {
-                alert('Fehler: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Fehler bei der Verbindung zum Server');
-        });
-    }
+    alert('Diese Funktion wird in einem zukünftigen Update verfügbar sein.\n\nVerwenden Sie die Kalkulationseinstellungen für erweiterte Konfiguration.');
 }
 </script>
 {% endblock %}
