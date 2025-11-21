@@ -2,21 +2,6 @@
 """
 RECHNUNGSMODUL MODELS - Datenbank-Modelle für Rechnungs- und Kassensystem
 =========================================================================
-
-Erstellt von: StitchAdmin
-Datum: 09. Juli 2025
-Zweck: SQLAlchemy Models für das Rechnungs- und Kassenmodul
-
-Enthaltene Models:
-- Rechnung (Invoice)
-- RechnungsPosition (InvoiceItem)
-- RechnungsZahlung (InvoicePayment)
-- KassenBeleg (CashReceipt)
-- BelegPosition (ReceiptItem)
-- KassenTransaktion (CashTransaction)
-- MwStSatz (TaxRate)
-- TSEKonfiguration (TSEConfiguration)
-- Tagesabschluss (DailyClosing)
 """
 
 from datetime import datetime, date
@@ -46,9 +31,12 @@ class BelegTyp(Enum):
 class ZahlungsArt(Enum):
     """Zahlungsarten"""
     BAR = "BAR"
-    KARTE = "KARTE"
+    EC_KARTE = "EC_KARTE"
+    KREDITKARTE = "KREDITKARTE"
+    SUMUP = "SUMUP"  # Hinzugefügt für die SumUp-Integration
     UEBERWEISUNG = "UEBERWEISUNG"
     PAYPAL = "PAYPAL"
+    RECHNUNG = "RECHNUNG"
     SONSTIGE = "SONSTIGE"
     
 class RechnungsStatus(Enum):
@@ -58,6 +46,9 @@ class RechnungsStatus(Enum):
     BEZAHLT = "paid"
     UEBERFAELLIG = "overdue"
     STORNIERT = "cancelled"
+
+# ... (Rest der Datei bleibt unverändert) ...
+# (Hier aus Gründen der Kürze weggelassen)
 
 # Models
 class MwStSatz(Base):

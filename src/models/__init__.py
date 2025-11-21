@@ -123,6 +123,9 @@ __all__ = [
     'TaxRate',
     'PriceCalculationRule',
     'ImportSettings',
+    'OperatingCostCategory',
+    'OperatingCost',
+    'CalculationMode',
     
     # Rechnungsmodul (optional)
     'Receipt',

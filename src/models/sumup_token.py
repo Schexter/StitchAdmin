@@ -8,8 +8,8 @@ Datum: 10. Juli 2024
 Zweck: Datenbankmodell zum sicheren Speichern von SumUp OAuth2-Tokens.
 """
 
-from . import db
 from datetime import datetime, timedelta
+from src.models.models import db
 
 class SumUpToken(db.Model):
     """
@@ -21,7 +21,7 @@ class SumUpToken(db.Model):
     
     # Verknüpfung zum Benutzer, der das Konto verknüpft hat.
     # Falls das System nur eine globale SumUp-Verbindung hat, kann dies optional sein.
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True, unique=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, unique=True)
     user = db.relationship('User', backref=db.backref('sumup_token', uselist=False))
 
     access_token = db.Column(db.String(2048), nullable=False)
