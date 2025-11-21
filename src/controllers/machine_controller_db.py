@@ -28,7 +28,7 @@ def generate_machine_id():
     last_machine = Machine.query.filter(
         Machine.id.like('M%')
     ).order_by(Machine.id.desc()).first()
-    
+
     if last_machine:
         try:
             last_num = int(last_machine.id[1:])
@@ -36,6 +36,79 @@ def generate_machine_id():
         except:
             return "M001"
     return "M001"
+
+@machine_bp.route('/<machine_id>/threads')
+@login_required
+def machine_threads(machine_id):
+    """Garn-Übersicht für eine Maschine"""
+    from src.models import Thread, ThreadUsage
+    from sqlalchemy import func
+
+    machine = Machine.query.get_or_404(machine_id)
+
+    # Zeitraum-Filter
+    period = request.args.get('period', '30')
+    days = int(period)
+    start_date = datetime.utcnow() - timedelta(days=days)
+
+    # Garnverbrauch dieser Maschine (historisch)
+    thread_usage_stats = db.session.query(
+        Thread.manufacturer,
+        Thread.color_number,
+        Thread.color_name_de,
+        Thread.hex_color,
+        func.sum(ThreadUsage.quantity_used).label('total_used'),
+        func.count(ThreadUsage.id).label('usage_count'),
+        func.max(ThreadUsage.used_at).label('last_used')
+    ).join(ThreadUsage, Thread.id == ThreadUsage.thread_id)\
+     .filter(ThreadUsage.machine_id == machine_id, ThreadUsage.used_at >= start_date)\
+     .group_by(Thread.id)\
+     .order_by(func.sum(ThreadUsage.quantity_used).desc())\
+     .limit(50).all()
+
+    # Aktuelle/geplante Aufträge für diese Maschine
+    current_orders = Order.query.filter(
+        Order.assigned_machine_id == machine_id,
+        Order.status.in_(['accepted', 'in_progress'])
+    ).order_by(Order.due_date).all()
+
+    # Garnbedarf für aktuelle Aufträge
+    required_threads = []
+    for order in current_orders:
+        if order.selected_threads:
+            try:
+                threads_data = json.loads(order.selected_threads)
+                for thread_data in threads_data:
+                    thread_id = thread_data.get('thread_id')
+                    if thread_id:
+                        thread = Thread.query.get(thread_id)
+                        if thread:
+                            # Berechne geschätzten Bedarf
+                            estimated_usage = 0
+                            if order.stitch_count:
+                                estimated_usage = (order.stitch_count * 0.5 / 1000) * 1.1
+                                estimated_usage /= len(threads_data)  # Verteilt auf alle Garne
+
+                            required_threads.append({
+                                'thread': thread,
+                                'order': order,
+                                'estimated_usage': estimated_usage
+                            })
+            except:
+                pass
+
+    # Gesamtstatistik
+    total_usage = db.session.query(
+        func.sum(ThreadUsage.quantity_used)
+    ).filter(ThreadUsage.machine_id == machine_id, ThreadUsage.used_at >= start_date).scalar() or 0
+
+    return render_template('machines/thread_overview.html',
+                         machine=machine,
+                         thread_stats=thread_usage_stats,
+                         required_threads=required_threads,
+                         current_orders=current_orders,
+                         total_usage=total_usage,
+                         period=period)
 
 @machine_bp.route('/')
 @login_required
