@@ -680,7 +680,7 @@ class Thread(db.Model):
     
     # Relationships
     stock = db.relationship('ThreadStock', backref='thread', uselist=False, cascade='all, delete-orphan')
-    usage_history = db.relationship('ThreadUsage', backref='thread', lazy='dynamic')
+    usage_history = db.relationship('ThreadUsage', back_populates='thread', lazy='dynamic')
     
     def get(self, key, default=None):
         """Kompatibilität mit Dictionary-Zugriff"""
@@ -731,7 +731,7 @@ class ThreadUsage(db.Model):
     notes = db.Column(db.Text)
 
     # Relationships
-    thread = db.relationship('Thread', backref='usage_records')
+    thread = db.relationship('Thread', back_populates='usage_history')
     order = db.relationship('Order', backref='thread_usage_records')
     machine = db.relationship('Machine', backref='thread_usage_records')
 
