@@ -33,7 +33,14 @@ from .supplier_contact import SupplierContact, SupplierCommunicationLog
 from .article_variant import ArticleVariant
 
 # Erweiterte Settings
-from .settings import TaxRate, PriceCalculationRule, ImportSettings
+from .settings import (
+    TaxRate,
+    PriceCalculationRule,
+    ImportSettings,
+    OperatingCostCategory,
+    OperatingCost,
+    CalculationMode
+)
 
 # Rechnungsmodul (optional)
 try:

@@ -481,17 +481,17 @@ class OrderStatusHistory(db.Model):
 class Machine(db.Model):
     """Maschinen Model"""
     __tablename__ = 'machines'
-    
+
     id = db.Column(db.String(50), primary_key=True)
     name = db.Column(db.String(100), nullable=False)
-    type = dbColumn(db.String(50))  # embroidery, printing, dtf
-    
+    type = db.Column(db.String(50))  # embroidery, printing, dtf
+
     # Maschinendetails
     manufacturer = db.Column(db.String(100))
     model = db.Column(db.String(100))
     serial_number = db.Column(db.String(100))
     purchase_date = db.Column(db.Date)
-    
+
     # Stickmaschinen-Details
     num_heads = db.Column(db.Integer, default=1)
     needles_per_head = db.Column(db.Integer, default=15)
@@ -511,7 +511,26 @@ class Machine(db.Model):
     setup_time_minutes = db.Column(db.Integer, default=15)
     thread_change_time_minutes = db.Column(db.Integer, default=3)
     hoop_change_time_minutes = db.Column(db.Integer, default=5)
-    
+
+    # NEUE FELDER: Kosten & Kalkulation
+    # Anschaffung
+    purchase_price = db.Column(db.Float)  # Anschaffungspreis
+    depreciation_years = db.Column(db.Integer, default=10)  # Abschreibungsdauer
+    expected_lifetime_hours = db.Column(db.Integer, default=20000)  # Erwartete Nutzungsdauer
+
+    # Betriebskosten pro Stunde
+    energy_cost_per_hour = db.Column(db.Float, default=2.0)  # Stromkosten €/h
+    maintenance_cost_per_hour = db.Column(db.Float, default=1.5)  # Wartung €/h
+    space_cost_per_hour = db.Column(db.Float, default=0.5)  # Platzkosten €/h
+
+    # Kalkulierter Maschinenstundensatz (wird automatisch berechnet)
+    calculated_hourly_rate = db.Column(db.Float)
+    custom_hourly_rate = db.Column(db.Float)  # Manuell überschreibbar
+    use_custom_rate = db.Column(db.Boolean, default=False)
+
+    # Personalkostensatz für diese Maschine
+    labor_cost_per_hour = db.Column(db.Float, default=35.0)  # Lohnkosten €/h
+
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(80))
@@ -546,7 +565,42 @@ class Machine(db.Model):
     def get(self, key, default=None):
         """Kompatibilität mit Dictionary-Zugriff"""
         return getattr(self, key, default)
-    
+
+    def calculate_hourly_rate(self):
+        """
+        Berechnet den Maschinenstundensatz automatisch
+
+        Formel:
+        Stundensatz = Abschreibung/h + Energiekosten/h + Wartung/h + Platzkosten/h
+        """
+        depreciation_per_hour = 0.0
+        if self.purchase_price and self.expected_lifetime_hours and self.expected_lifetime_hours > 0:
+            depreciation_per_hour = self.purchase_price / self.expected_lifetime_hours
+
+        energy = self.energy_cost_per_hour or 0.0
+        maintenance = self.maintenance_cost_per_hour or 0.0
+        space = self.space_cost_per_hour or 0.0
+
+        self.calculated_hourly_rate = depreciation_per_hour + energy + maintenance + space
+        return self.calculated_hourly_rate
+
+    def get_hourly_rate(self):
+        """
+        Gibt den effektiven Maschinenstundensatz zurück
+        Custom Rate wird bevorzugt, wenn aktiviert
+        """
+        if self.use_custom_rate and self.custom_hourly_rate:
+            return self.custom_hourly_rate
+
+        if not self.calculated_hourly_rate:
+            return self.calculate_hourly_rate()
+
+        return self.calculated_hourly_rate
+
+    def get_labor_cost_per_hour(self):
+        """Gibt Personalkostensatz zurück"""
+        return self.labor_cost_per_hour or 35.0
+
     def __repr__(self):
         return f'<Machine {self.name}>'
 
