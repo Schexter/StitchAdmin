@@ -198,24 +198,39 @@ class FileBrowser {
         this.selectedFile = null;
         this.viewMode = 'grid';
         this.callback = null;
+        this.initialized = false;
         this.init();
     }
-    
+
     init() {
         this.attachEventListeners();
-        this.loadDefaultPath();
+        // Nicht automatisch laden - erst beim Modal-Öffnen
+        // this.loadDefaultPath();
+    }
+
+    lazyLoad() {
+        if (!this.initialized) {
+            this.loadDefaultPath();
+            this.initialized = true;
+        }
     }
     
     attachEventListeners() {
+        // Modal shown Event - Lazy Load
+        const modal = document.getElementById('fileBrowserModal');
+        if (modal) {
+            modal.addEventListener('shown.bs.modal', () => this.lazyLoad());
+        }
+
         // View Mode Toggle
         document.getElementById('viewListBtn').addEventListener('click', () => this.setViewMode('list'));
         document.getElementById('viewGridBtn').addEventListener('click', () => this.setViewMode('grid'));
-        
+
         // Toolbar Buttons
         document.getElementById('refreshBtn').addEventListener('click', () => this.loadDirectory(this.currentPath));
         document.getElementById('homeBtn').addEventListener('click', () => this.loadDefaultPath());
         document.getElementById('goToPathBtn').addEventListener('click', () => this.goToPath());
-        
+
         // Selection
         document.getElementById('clearSelectionBtn').addEventListener('click', () => this.clearSelection());
         document.getElementById('selectFileBtn').addEventListener('click', () => this.confirmSelection());
