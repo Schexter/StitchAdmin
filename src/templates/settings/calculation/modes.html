@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+
+{% block title %}Kalkulationsmodi - StitchAdmin{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1><i class="bi bi-sliders"></i> Kalkulationsmodi</h1>
+            <div>
+                <a href="{{ url_for('calculation_settings.index') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+        </div>
+        <p class="text-muted mt-2">
+            Wähle deinen bevorzugten Kalkulationsmodus oder passe den Custom-Modus an deine Bedürfnisse an.
+        </p>
+    </div>
+</div>
+
+<!-- Info-Banner -->
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+    <i class="bi bi-lightbulb"></i> <strong>Wie wähle ich den richtigen Modus?</strong>
+    Beginne mit <strong>"Einfach"</strong> wenn du unsicher bist. Wechsle zu <strong>"Standard"</strong> wenn du
+    Material- und Zeitkosten berücksichtigen möchtest. <strong>"Vollkosten"</strong> ist am genauesten, aber
+    auch am aufwändigsten. <strong>"Custom"</strong> ist für erfahrene Nutzer.
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+
+<!-- Modi-Karten -->
+<div class="row mb-4">
+    {% for mode in modes %}
+    <div class="col-md-6 mb-4">
+        <div class="card mode-card h-100 {% if mode.is_default %}mode-default{% endif %}"
+             style="border-left: 4px solid {{ mode.color }};">
+            <div class="card-header" style="background-color: {{ mode.color }}15;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0" style="color: {{ mode.color }};">
+                        <i class="bi bi-{{ mode.icon }}"></i> {{ mode.display_name }}
+                    </h4>
+                    {% if mode.is_default %}
+                    <span class="badge bg-success">
+                        <i class="bi bi-check-circle"></i> AKTIV
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Beschreibung -->
+                <p class="mode-description">{{ mode.description }}</p>
+
+                <!-- Komponenten -->
+                <h6 class="mt-3 mb-3"><i class="bi bi-list-check"></i> Enthaltene Komponenten:</h6>
+                {% set components = mode.get_components() %}
+                <div class="components-list">
+                    <div class="component-item {{ 'active' if components.get('base_factor') else 'inactive' }}">
+                        <i class="bi bi-{{ 'check-circle-fill' if components.get('base_factor') else 'x-circle' }}"></i>
+                        <strong>Basis-Faktor</strong>
+                        <small>EK × Faktor = VK</small>
+                    </div>
+                    <div class="component-item {{ 'active' if components.get('material_costs') else 'inactive' }}">
+                        <i class="bi bi-{{ 'check-circle-fill' if components.get('material_costs') else 'x-circle' }}"></i>
+                        <strong>Materialkosten</strong>
+                        <small>Garn, Vlies, Verpackung</small>
+                    </div>
+                    <div class="component-item {{ 'active' if components.get('machine_time') else 'inactive' }}">
+                        <i class="bi bi-{{ 'check-circle-fill' if components.get('machine_time') else 'x-circle' }}"></i>
+                        <strong>Maschinenzeit</strong>
+                        <small>Maschinenstundensatz × Zeit</small>
+                    </div>
+                    <div class="component-item {{ 'active' if components.get('labor_costs') else 'inactive' }}">
+                        <i class="bi bi-{{ 'check-circle-fill' if components.get('labor_costs') else 'x-circle' }}"></i>
+                        <strong>Personalkosten</strong>
+                        <small>Lohnkosten × Zeit</small>
+                    </div>
+                    <div class="component-item {{ 'active' if components.get('operating_costs') else 'inactive' }}">
+                        <i class="bi bi-{{ 'check-circle-fill' if components.get('operating_costs') else 'x-circle' }}"></i>
+                        <strong>Betriebskosten</strong>
+                        <small>Fixkosten anteilig</small>
+                    </div>
+                    <div class="component-item {{ 'active' if components.get('complexity_markup') else 'inactive' }}">
+                        <i class="bi bi-{{ 'check-circle-fill' if components.get('complexity_markup') else 'x-circle' }}"></i>
+                        <strong>Komplexitätszuschläge</strong>
+                        <small>Aufschlag je nach Schwierigkeit</small>
+                    </div>
+                    <div class="component-item {{ 'active' if components.get('quantity_discount') else 'inactive' }}">
+                        <i class="bi bi-{{ 'check-circle-fill' if components.get('quantity_discount') else 'x-circle' }}"></i>
+                        <strong>Mengenrabatte</strong>
+                        <small>Staffelpreise bei hoher Menge</small>
+                    </div>
+                </div>
+
+                <!-- Margen -->
+                <div class="row mt-4">
+                    <div class="col-6">
+                        <div class="stat-box">
+                            <small class="text-muted">Gewinnmarge</small>
+                            <h4 style="color: {{ mode.color }};">{{ mode.default_profit_margin }}%</h4>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-box">
+                            <small class="text-muted">Sicherheitspuffer</small>
+                            <h4 style="color: {{ mode.color }};">{{ mode.default_safety_buffer }}%</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aktionen -->
+                <div class="mt-4 d-flex gap-2">
+                    {% if not mode.is_default %}
+                    <form method="POST" action="{{ url_for('calculation_settings.set_default_mode', mode_id=mode.id) }}"
+                          style="flex: 1;">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-check-circle"></i> Als Standard setzen
+                        </button>
+                    </form>
+                    {% else %}
+                    <button class="btn btn-success w-100" disabled>
+                        <i class="bi bi-check-circle-fill"></i> Aktiver Modus
+                    </button>
+                    {% endif %}
+
+                    {% if not mode.is_system_mode or mode.name == 'custom' %}
+                    <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModeModal{{ mode.id }}">
+                        <i class="bi bi-gear"></i>
+                    </button>
+                    {% endif %}
+                </div>
+
+                <!-- System-Modus Hinweis -->
+                {% if mode.is_system_mode and mode.name != 'custom' %}
+                <div class="alert alert-light mt-3 mb-0">
+                    <small><i class="bi bi-lock"></i> System-Modus - Komponenten nicht editierbar</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Edit Modal für Custom Modus -->
+        {% if mode.name == 'custom' %}
+        <div class="modal fade" id="editModeModal{{ mode.id }}" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header" style="background-color: {{ mode.color }}15;">
+                        <h5 class="modal-title">
+                            <i class="bi bi-{{ mode.icon }}"></i> {{ mode.display_name }} konfigurieren
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="{{ url_for('calculation_settings.update_mode', mode_id=mode.id) }}">
+                        <div class="modal-body">
+                            <p class="text-muted">
+                                Wähle, welche Komponenten in der Kalkulation berücksichtigt werden sollen.
+                            </p>
+
+                            <h6 class="mb-3"><i class="bi bi-toggles"></i> Komponenten aktivieren</h6>
+                            <div class="list-group mb-4">
+                                <div class="list-group-item">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="base_factor"
+                                               value="true" id="base_factor" checked disabled>
+                                        <label class="form-check-label" for="base_factor">
+                                            <strong>Basis-Faktor</strong> - EK × Faktor = VK
+                                            <div class="text-muted small">Immer aktiv - Grundlage der Kalkulation</div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="list-group-item">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="material_costs"
+                                               value="true" id="material_costs" {{ 'checked' if components.get('material_costs') else '' }}>
+                                        <label class="form-check-label" for="material_costs">
+                                            <strong>Materialkosten</strong>
+                                            <div class="text-muted small">Garn, Vlies, Verpackung, Etiketten</div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="list-group-item">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="machine_time"
+                                               value="true" id="machine_time" {{ 'checked' if components.get('machine_time') else '' }}>
+                                        <label class="form-check-label" for="machine_time">
+                                            <strong>Maschinenzeit</strong>
+                                            <div class="text-muted small">Berechnet aus Maschinenstundensatz</div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="list-group-item">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="labor_costs"
+                                               value="true" id="labor_costs" {{ 'checked' if components.get('labor_costs') else '' }}>
+                                        <label class="form-check-label" for="labor_costs">
+                                            <strong>Personalkosten</strong>
+                                            <div class="text-muted small">Lohnkosten inkl. Nebenkosten</div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="list-group-item">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="operating_costs"
+                                               value="true" id="operating_costs" {{ 'checked' if components.get('operating_costs') else '' }}>
+                                        <label class="form-check-label" for="operating_costs">
+                                            <strong>Betriebskosten</strong>
+                                            <div class="text-muted small">Fixkosten anteilig (Miete, Strom, etc.)</div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="list-group-item">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="complexity_markup"
+                                               value="true" id="complexity_markup" {{ 'checked' if components.get('complexity_markup') else '' }}>
+                                        <label class="form-check-label" for="complexity_markup">
+                                            <strong>Komplexitätszuschläge</strong>
+                                            <div class="text-muted small">Aufschlag für schwierige Aufträge</div>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="list-group-item">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" name="quantity_discount"
+                                               value="true" id="quantity_discount" {{ 'checked' if components.get('quantity_discount') else '' }}>
+                                        <label class="form-check-label" for="quantity_discount">
+                                            <strong>Mengenrabatte</strong>
+                                            <div class="text-muted small">Staffelpreise bei großen Mengen</div>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6 class="mb-3"><i class="bi bi-percent"></i> Margen</h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label">Gewinnmarge (%)</label>
+                                    <input type="number" class="form-control" name="default_profit_margin"
+                                           value="{{ mode.default_profit_margin }}" step="0.1" min="0" max="100">
+                                    <small class="text-muted">Empfohlen: 20-30%</small>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Sicherheitspuffer (%)</label>
+                                    <input type="number" class="form-control" name="default_safety_buffer"
+                                           value="{{ mode.default_safety_buffer }}" step="0.1" min="0" max="20">
+                                    <small class="text-muted">Empfohlen: 5-10%</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Vergleichstabelle -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-table"></i> Modi im Vergleich</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Modus</th>
+                        <th class="text-center">Komplexität</th>
+                        <th class="text-center">Genauigkeit</th>
+                        <th class="text-center">Zeitaufwand</th>
+                        <th>Empfohlen für</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Einfach</strong></td>
+                        <td class="text-center"><span class="badge bg-success">Niedrig</span></td>
+                        <td class="text-center"><span class="badge bg-warning">Basis</span></td>
+                        <td class="text-center"><span class="badge bg-success">Minimal</span></td>
+                        <td>Einstieg, Schnellkalkulationen, Standardprodukte</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Standard</strong></td>
+                        <td class="text-center"><span class="badge bg-info">Mittel</span></td>
+                        <td class="text-center"><span class="badge bg-success">Gut</span></td>
+                        <td class="text-center"><span class="badge bg-info">Moderat</span></td>
+                        <td>Die meisten Betriebe, ausgewogenes Verhältnis</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Vollkosten</strong></td>
+                        <td class="text-center"><span class="badge bg-warning">Hoch</span></td>
+                        <td class="text-center"><span class="badge bg-success">Sehr gut</span></td>
+                        <td class="text-center"><span class="badge bg-warning">Hoch</span></td>
+                        <td>Transparenz, Reporting, genaue Kostenanalyse</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Custom</strong></td>
+                        <td class="text-center"><span class="badge bg-primary">Flexibel</span></td>
+                        <td class="text-center"><span class="badge bg-primary">Anpassbar</span></td>
+                        <td class="text-center"><span class="badge bg-primary">Individuell</span></td>
+                        <td>Erfahrene Nutzer, spezielle Anforderungen</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 8px;
+}
+
+.card-header {
+    border-bottom: 2px solid #e9ecef;
+    border-radius: 8px 8px 0 0 !important;
+}
+
+.mode-card {
+    transition: transform 0.2s;
+}
+
+.mode-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+}
+
+.mode-default {
+    box-shadow: 0 0 0 2px #198754;
+}
+
+.mode-description {
+    font-size: 1.1rem;
+    color: #6c757d;
+    min-height: 60px;
+}
+
+.components-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.component-item {
+    padding: 10px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.component-item.active {
+    background-color: #d1e7dd;
+    border-left: 3px solid #198754;
+}
+
+.component-item.inactive {
+    background-color: #f8f9fa;
+    border-left: 3px solid #dee2e6;
+    opacity: 0.6;
+}
+
+.component-item i {
+    font-size: 1.2rem;
+}
+
+.component-item.active i {
+    color: #198754;
+}
+
+.component-item.inactive i {
+    color: #6c757d;
+}
+
+.component-item strong {
+    flex: 1;
+}
+
+.component-item small {
+    color: #6c757d;
+    display: block;
+}
+
+.stat-box {
+    text-align: center;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.stat-box h4 {
+    margin: 0;
+}
+</style>
+{% endblock %}
