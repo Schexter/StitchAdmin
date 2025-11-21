@@ -191,6 +191,7 @@ def create_app():
     register_blueprint_safe('src.controllers.supplier_controller_db', 'supplier_bp', 'Lieferanten')
     register_blueprint_safe('src.controllers.user_controller_db', 'user_bp', 'Benutzer')
     register_blueprint_safe('src.controllers.settings_controller_unified', 'settings_bp', 'Einstellungen')
+    register_blueprint_safe('src.controllers.calculation_settings_controller', 'calc_settings_bp', 'Kalkulationseinstellungen')
     register_blueprint_safe('src.controllers.activity_controller_db', 'activity_bp', 'Aktivitäten')
     
     # Spezial-Module
