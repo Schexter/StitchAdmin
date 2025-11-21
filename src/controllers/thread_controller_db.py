@@ -29,6 +29,83 @@ def log_activity(action, details):
     db.session.add(activity)
     db.session.commit()
 
+@thread_bp.route('/dashboard')
+@login_required
+def dashboard():
+    """Garn-Dashboard mit Statistiken"""
+    from sqlalchemy import func
+
+    # Bestandsstatistiken
+    total_threads = Thread.query.count()
+    threads_with_stock = db.session.query(func.count(ThreadStock.id)).filter(ThreadStock.quantity > 0).scalar() or 0
+    threads_low_stock = db.session.query(func.count(ThreadStock.id)).filter(
+        ThreadStock.quantity <= ThreadStock.min_stock,
+        ThreadStock.quantity > 0
+    ).scalar() or 0
+    threads_out_of_stock = db.session.query(func.count(ThreadStock.id)).filter(ThreadStock.quantity == 0).scalar() or 0
+
+    # Top 10 meist verwendete Garne (nach Verbrauch)
+    top_threads = db.session.query(
+        Thread.id,
+        Thread.manufacturer,
+        Thread.color_number,
+        Thread.color_name_de,
+        Thread.hex_color,
+        func.sum(ThreadUsage.quantity_used).label('total_used')
+    ).join(ThreadUsage, Thread.id == ThreadUsage.thread_id)\
+     .group_by(Thread.id)\
+     .order_by(func.sum(ThreadUsage.quantity_used).desc())\
+     .limit(10).all()
+
+    # Verbrauch nach Maschine (letzte 30 Tage)
+    from datetime import timedelta
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+    machine_usage = db.session.query(
+        ThreadUsage.machine_id,
+        func.count(ThreadUsage.id).label('usage_count'),
+        func.sum(ThreadUsage.quantity_used).label('total_used')
+    ).filter(ThreadUsage.used_at >= thirty_days_ago)\
+     .group_by(ThreadUsage.machine_id)\
+     .order_by(func.sum(ThreadUsage.quantity_used).desc())\
+     .all()
+
+    # Hersteller-Übersicht
+    manufacturer_stats = db.session.query(
+        Thread.manufacturer,
+        func.count(Thread.id).label('thread_count'),
+        func.sum(ThreadStock.quantity).label('total_stock')
+    ).join(ThreadStock, Thread.id == ThreadStock.thread_id)\
+     .group_by(Thread.manufacturer)\
+     .order_by(func.count(Thread.id).desc())\
+     .all()
+
+    # Warnungen sammeln
+    warnings = []
+    if threads_out_of_stock > 0:
+        warnings.append({
+            'type': 'danger',
+            'message': f'{threads_out_of_stock} Garne sind ausverkauft'
+        })
+    if threads_low_stock > 0:
+        warnings.append({
+            'type': 'warning',
+            'message': f'{threads_low_stock} Garne haben niedrigen Bestand'
+        })
+
+    stats = {
+        'total_threads': total_threads,
+        'threads_with_stock': threads_with_stock,
+        'threads_low_stock': threads_low_stock,
+        'threads_out_of_stock': threads_out_of_stock,
+        'top_threads': top_threads,
+        'machine_usage': machine_usage,
+        'manufacturer_stats': manufacturer_stats,
+        'warnings': warnings
+    }
+
+    return render_template('threads/dashboard.html', stats=stats)
+
 @thread_bp.route('/')
 @login_required
 def index():
