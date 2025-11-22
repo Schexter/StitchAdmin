@@ -1,3 +1,4 @@
+
 # StitchAdmin 2.0
 
 **ERP-System für Stickerei- und Textilveredelungsbetriebe**

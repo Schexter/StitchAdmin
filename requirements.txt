@@ -53,11 +53,36 @@ pdfplumber==0.10.3
 reportlab>=4.0.0        # PDF-Generierung
 pikepdf>=8.0.0          # PDF/A-3 Konvertierung für ZUGFeRD
 lxml>=5.0.0             # XML-Validierung
+qrcode[pil]>=7.4.2      # QR-Code Generierung für Zahlungs-QR-Codes
 
 # ==========================================
 # STICKEREI-SPEZIFISCH
 # ==========================================
 pyembroidery==1.5.1
+
+# ==========================================
+# BANKING & FINANZMANAGEMENT
+# ==========================================
+fints>=3.0.0            # FinTS/HBCI für Banking-Integration (Deutschland)
+
+# ==========================================
+# E-MAIL INTEGRATION (NEU!)
+# ==========================================
+# Keine zusätzlichen Packages nötig - Python Standard Library:
+# - imaplib (built-in)
+# - smtplib (built-in)  
+# - email (built-in)
+
+# ==========================================
+# VERSCHLÜSSELUNG (NEU!)
+# ==========================================
+cryptography>=41.0.0    # Für E-Mail-Passwort-Verschlüsselung
+
+# ==========================================
+# OCR & TEXT-EXTRAKTION (OPTIONAL)
+# ==========================================
+# pytesseract>=0.3.10   # OCR für Rechnungserkennung
+# pdf2image>=1.16.3     # PDF zu Bild Konvertierung für OCR
 
 # ==========================================
 # UTILITIES

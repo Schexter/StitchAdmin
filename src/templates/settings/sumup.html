@@ -49,8 +49,32 @@
                             <h5 class="alert-heading">Nicht verbunden</h5>
                             <p>Verbinden Sie StitchAdmin mit Ihrem SumUp-Konto, um Kartenzahlungen direkt über das Kassensystem abzuwickeln.</p>
                         </div>
-                        
-                        <p>
+
+                        <h5 class="mt-4">Voraussetzungen:</h5>
+                        <ol>
+                            <li>Ein aktives <strong>SumUp-Konto</strong> (<a href="https://sumup.de" target="_blank">Hier registrieren</a>)</li>
+                            <li><strong>SumUp API Credentials</strong> (Client ID & Secret)
+                                <ul class="mt-2">
+                                    <li>Erstellen Sie eine App im <a href="https://me.sumup.com/developers" target="_blank">SumUp Developer Portal</a></li>
+                                    <li>Notieren Sie sich die <code>Client ID</code> und <code>Client Secret</code></li>
+                                    <li>Tragen Sie diese als Umgebungsvariablen ein:
+                                        <ul>
+                                            <li><code>SUMUP_CLIENT_ID</code></li>
+                                            <li><code>SUMUP_CLIENT_SECRET</code></li>
+                                        </ul>
+                                    </li>
+                                    <li>Redirect URL in SumUp: <code>{{ request.url_root }}settings/integrations/sumup/callback</code></li>
+                                </ul>
+                            </li>
+                        </ol>
+
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Hinweis:</strong> Die Umgebungsvariablen müssen vor dem Start von StitchAdmin gesetzt werden.
+                            Bei Änderungen muss die Anwendung neu gestartet werden.
+                        </div>
+
+                        <p class="mt-4">
                             Klicken Sie auf den folgenden Button, um zur sicheren Anmeldeseite von SumUp weitergeleitet zu werden.
                             Ihre Anmeldedaten werden <strong>niemals</strong> von StitchAdmin gespeichert.
                         </p>

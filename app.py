@@ -183,6 +183,10 @@ def create_app():
     # Smart Home Integration
     register_blueprint_safe('src.controllers.shelly_controller', 'shelly_bp', 'Shelly-Geräte')
 
+    # Finanzen-Modul
+    register_blueprint_safe('src.controllers.finanzen_controller', 'finanzen_bp', 'Finanzen')
+    register_blueprint_safe('src.controllers.angebote_controller', 'angebote_bp', 'Angebote')
+
     # Auth und Dashboard
     register_blueprint_safe('src.controllers.auth_controller', 'auth_bp', 'Authentifizierung')
 

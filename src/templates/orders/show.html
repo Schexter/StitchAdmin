@@ -397,8 +397,14 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
+                    {% if order.status in ['ready', 'ready_for_pickup', 'completed'] %}
+                    <button class="btn btn-success" onclick="auftragZurKasseUebernehmen('{{ order.id }}')">
+                        <i class="bi bi-cash-coin"></i> Zur Kasse / Rechnung erstellen
+                    </button>
+                    {% endif %}
+
                     {% if supplier and supplier.email %}
-                    <a href="mailto:{{ supplier.email }}?subject=Bestellung {{ order.id }}" 
+                    <a href="mailto:{{ supplier.email }}?subject=Bestellung {{ order.id }}"
                        class="btn btn-info">
                         <i class="bi bi-envelope"></i> E-Mail an Lieferant
                     </a>
@@ -409,6 +415,32 @@
                 </div>
             </div>
         </div>
+
+        <script>
+        function auftragZurKasseUebernehmen(orderId) {
+            if (!confirm('Möchten Sie diesen Auftrag zur Kasse übernehmen und eine Rechnung erstellen?')) {
+                return;
+            }
+
+            fetch(`/kasse/auftrag/uebernehmen/${orderId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    window.location.href = data.redirect_url;
+                } else {
+                    alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+                }
+            })
+            .catch(error => {
+                console.error('Fehler:', error);
+                alert('Fehler beim Übernehmen des Auftrags');
+            });
+        }
+        </script>
     </div>
 </div>
 

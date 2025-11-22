@@ -26,6 +26,13 @@ try:
 except ImportError:
     SUMUP_AVAILABLE = False
 
+# Import für Firmeneinstellungen
+try:
+    from src.models.company_settings import CompanySettings
+    COMPANY_SETTINGS_AVAILABLE = True
+except ImportError:
+    COMPANY_SETTINGS_AVAILABLE = False
+
 # Blueprint für zentrale Einstellungen
 settings_bp = Blueprint('settings', __name__, url_prefix='/settings')
 
@@ -129,27 +136,188 @@ def index():
 @login_required
 def sumup_integration():
     """SumUp Integration Einstellungen"""
-    return render_template('settings/sumup.html')
+    if not current_user.is_admin:
+        flash('Nur Administratoren können SumUp konfigurieren.', 'danger')
+        return redirect(url_for('settings.index'))
+
+    # Prüfe ob SumUp verfügbar ist
+    if not SUMUP_AVAILABLE:
+        flash('SumUp-Modul ist nicht verfügbar. Bitte prüfen Sie die Installation.', 'error')
+        return redirect(url_for('settings.index'))
+
+    # Hole aktuellen Token-Status
+    token = None
+    is_connected = False
+
+    try:
+        token = SumUpToken.get_current_token()
+        if token and token.is_valid():
+            is_connected = True
+    except Exception as e:
+        print(f"Fehler beim Laden des SumUp Tokens: {e}")
+
+    return render_template('settings/sumup.html',
+                         is_connected=is_connected,
+                         token=token)
 
 @settings_bp.route('/integrations/sumup/authorize', methods=['POST'])
 @login_required
 def sumup_authorize():
-    """SumUp OAuth Autorisierung"""
-    flash('SumUp Integration ist noch nicht implementiert.', 'info')
-    return redirect(url_for('settings.index'))
+    """SumUp OAuth Autorisierung starten"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können SumUp konfigurieren.', 'danger')
+        return redirect(url_for('settings.index'))
+
+    if not SUMUP_AVAILABLE:
+        flash('SumUp-Modul ist nicht verfügbar.', 'error')
+        return redirect(url_for('settings.sumup_integration'))
+
+    try:
+        # Starte OAuth Flow
+        auth_url = sumup_service.get_authorization_url(
+            redirect_uri=url_for('settings.sumup_callback', _external=True)
+        )
+
+        if auth_url:
+            return redirect(auth_url)
+        else:
+            flash('Fehler beim Starten der Autorisierung. Bitte prüfen Sie die SumUp Client ID.', 'error')
+            return redirect(url_for('settings.sumup_integration'))
+    except Exception as e:
+        flash(f'Fehler: {str(e)}', 'error')
+        return redirect(url_for('settings.sumup_integration'))
 
 @settings_bp.route('/integrations/sumup/callback')
 @login_required
 def sumup_callback():
     """SumUp OAuth Callback"""
-    flash('SumUp Integration ist noch nicht implementiert.', 'info')
-    return redirect(url_for('settings.index'))
+    if not current_user.is_admin:
+        flash('Nur Administratoren können SumUp konfigurieren.', 'danger')
+        return redirect(url_for('settings.index'))
+
+    if not SUMUP_AVAILABLE:
+        flash('SumUp-Modul ist nicht verfügbar.', 'error')
+        return redirect(url_for('settings.sumup_integration'))
+
+    code = request.args.get('code')
+    if not code:
+        flash('Keine Autorisierung erhalten. Bitte versuchen Sie es erneut.', 'warning')
+        return redirect(url_for('settings.sumup_integration'))
+
+    try:
+        # Tausche Code gegen Access Token
+        success = sumup_service.exchange_code_for_token(
+            code=code,
+            redirect_uri=url_for('settings.sumup_callback', _external=True)
+        )
+
+        if success:
+            flash('SumUp erfolgreich verbunden! Kartenzahlungen sind jetzt aktiviert.', 'success')
+        else:
+            flash('Fehler beim Verbinden mit SumUp. Bitte versuchen Sie es erneut.', 'error')
+    except Exception as e:
+        flash(f'Fehler: {str(e)}', 'error')
+
+    return redirect(url_for('settings.sumup_integration'))
+
 @settings_bp.route('/integrations/sumup/disconnect', methods=['POST'])
 @login_required
 def sumup_disconnect():
     """SumUp Verbindung trennen"""
-    flash('SumUp Integration ist noch nicht implementiert.', 'info')
-    return redirect(url_for('settings.index'))
+    if not current_user.is_admin:
+        flash('Nur Administratoren können SumUp konfigurieren.', 'danger')
+        return redirect(url_for('settings.index'))
+
+    if not SUMUP_AVAILABLE:
+        flash('SumUp-Modul ist nicht verfügbar.', 'error')
+        return redirect(url_for('settings.sumup_integration'))
+
+    try:
+        # Lösche Token aus der Datenbank
+        token = SumUpToken.get_current_token()
+        if token:
+            db.session.delete(token)
+            db.session.commit()
+            flash('Verbindung zu SumUp wurde getrennt.', 'success')
+        else:
+            flash('Keine aktive SumUp-Verbindung gefunden.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Fehler beim Trennen: {str(e)}', 'error')
+
+    return redirect(url_for('settings.sumup_integration'))
+
+@settings_bp.route('/company', methods=['GET', 'POST'])
+@login_required
+def company_settings():
+    """Firmeneinstellungen für Rechnungen"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können Firmeneinstellungen ändern.', 'danger')
+        return redirect(url_for('settings.index'))
+
+    if not COMPANY_SETTINGS_AVAILABLE:
+        flash('Firmeneinstellungen-Modul ist nicht verfügbar.', 'error')
+        return redirect(url_for('settings.index'))
+
+    settings = CompanySettings.get_settings()
+
+    if request.method == 'POST':
+        # Aktualisiere alle Felder
+        settings.company_name = request.form.get('company_name', '')
+        settings.company_addition = request.form.get('company_addition', '')
+        settings.owner_name = request.form.get('owner_name', '')
+
+        # Adresse
+        settings.street = request.form.get('street', '')
+        settings.house_number = request.form.get('house_number', '')
+        settings.postal_code = request.form.get('postal_code', '')
+        settings.city = request.form.get('city', '')
+        settings.country = request.form.get('country', 'Deutschland')
+
+        # Kontakt
+        settings.phone = request.form.get('phone', '')
+        settings.fax = request.form.get('fax', '')
+        settings.email = request.form.get('email', '')
+        settings.website = request.form.get('website', '')
+
+        # Steuern
+        settings.tax_id = request.form.get('tax_id', '')
+        settings.vat_id = request.form.get('vat_id', '')
+        settings.tax_office = request.form.get('tax_office', '')
+
+        # Bank
+        settings.bank_name = request.form.get('bank_name', '')
+        settings.iban = request.form.get('iban', '')
+        settings.bic = request.form.get('bic', '')
+        settings.account_holder = request.form.get('account_holder', '')
+
+        # Handelsregister
+        settings.commercial_register = request.form.get('commercial_register', '')
+
+        # Rechnungseinstellungen
+        settings.invoice_prefix = request.form.get('invoice_prefix', 'RE')
+        settings.payment_terms_days = int(request.form.get('payment_terms_days', 14))
+        settings.default_tax_rate = float(request.form.get('default_tax_rate', 19.0))
+        settings.invoice_footer_text = request.form.get('invoice_footer_text', '')
+
+        # Kleinunternehmer
+        settings.small_business = request.form.get('small_business') == 'on'
+        if settings.small_business:
+            settings.small_business_text = request.form.get('small_business_text', '')
+
+        settings.updated_by = current_user.username
+        settings.updated_at = datetime.now()
+
+        try:
+            db.session.commit()
+            flash('Firmeneinstellungen erfolgreich gespeichert.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Fehler beim Speichern: {e}', 'danger')
+
+        return redirect(url_for('settings.company_settings'))
+
+    return render_template('settings/company.html', settings=settings)
 
 @settings_bp.route('/users')
 @login_required

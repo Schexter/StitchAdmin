@@ -591,15 +591,29 @@ class ZugpferdService:
                 'total': float(pos.brutto_betrag)
             })
 
-        # Verkäufer-Daten (aus Konfiguration oder Settings)
-        seller_data = {
-            'name': 'StitchAdmin GmbH',  # TODO: Aus Settings laden
-            'street': 'Musterstraße 1',
-            'postcode': '12345',
-            'city': 'Musterstadt',
-            'country': 'DE',
-            'tax_number': 'DE123456789'
-        }
+        # Verkäufer-Daten aus CompanySettings laden
+        try:
+            from src.models.company_settings import CompanySettings
+            settings = CompanySettings.get_settings()
+
+            seller_data = {
+                'name': settings.display_name,
+                'street': f"{settings.street or ''} {settings.house_number or ''}".strip(),
+                'postcode': settings.postal_code or '',
+                'city': settings.city or '',
+                'country': settings.country[:2].upper() if settings.country else 'DE',  # ISO-Code
+                'tax_number': settings.vat_id or settings.tax_id or ''
+            }
+        except Exception as e:
+            logger.warning(f"Konnte CompanySettings nicht laden: {e}, verwende Fallback-Daten")
+            seller_data = {
+                'name': 'StitchAdmin GmbH',
+                'street': 'Musterstraße 1',
+                'postcode': '12345',
+                'city': 'Musterstadt',
+                'country': 'DE',
+                'tax_number': 'DE123456789'
+            }
 
         # Käufer-Daten
         buyer_data = {
@@ -646,9 +660,9 @@ class ZugpferdService:
             'discount_percent': float(rechnung.rabatt_prozent or 0),
             'subject': f"Rechnung {rechnung.rechnungsnummer}",
             'bank_details': {
-                'bank_name': 'Musterbank',  # TODO: Aus Settings
-                'iban': 'DE89370400440532013000',
-                'bic': 'COBADEFFXXX'
+                'bank_name': settings.bank_name if 'settings' in locals() else 'Musterbank',
+                'iban': settings.iban if 'settings' in locals() else 'DE89370400440532013000',
+                'bic': settings.bic if 'settings' in locals() else 'COBADEFFXXX'
             },
-            'footer_text': 'Vielen Dank für Ihren Auftrag!'
+            'footer_text': settings.invoice_footer_text if 'settings' in locals() and settings.invoice_footer_text else 'Vielen Dank für Ihren Auftrag!'
         }

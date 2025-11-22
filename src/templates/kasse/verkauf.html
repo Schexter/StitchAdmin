@@ -562,8 +562,9 @@ function selectArticle(articleId, articleName, articlePrice, articleColor, artic
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // Aktualisiere Warenkorb-Anzeige
-            displayCart(data.warenkorb, data.warenkorb_summen);
+            // Aktualisiere Warenkorb-Anzeige (richtige Funktionsname!)
+            cart = data.warenkorb;
+            updateCartDisplay(data.warenkorb, data.warenkorb_summen);
 
             // Schließe Modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('articleSearchModal'));
