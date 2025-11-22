@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+
+{% block title %}Shelly Netzwerk-Scan{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-search"></i> Netzwerk-Scan</h2>
+            <p class="text-muted mb-0">Suche nach Shelly-Ger\u00e4ten im lokalen Netzwerk</p>
+        </div>
+        <div>
+            <a href="{{ url_for('shelly.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Zur\u00fcck zur \u00dcbersicht
+            </a>
+        </div>
+    </div>
+
+    <!-- Scan-Konfiguration -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> Scan-Einstellungen</h5>
+                </div>
+                <div class="card-body">
+                    <form id="scanForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="networkPrefix" class="form-label">Netzwerk-Pr\u00e4fix</label>
+                                <input type="text"
+                                       class="form-control font-monospace"
+                                       id="networkPrefix"
+                                       value="192.168.1"
+                                       placeholder="192.168.1"
+                                       pattern="^\d{1,3}\.\d{1,3}\.\d{1,3}$">
+                                <small class="form-text text-muted">
+                                    Scannt 192.168.1.1 bis 192.168.1.254
+                                </small>
+                            </div>
+                            <div class="col-md-6 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100" id="startScanBtn">
+                                    <i class="bi bi-play-circle"></i> Scan starten
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Scan-Progress -->
+                    <div id="scanProgress" class="mt-4" style="display: none;">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Scanne Netzwerk...</span>
+                            <span id="scanStatus">Initialisiere...</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                 id="scanProgressBar"
+                                 role="progressbar"
+                                 style="width: 0%">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="card-title"><i class="bi bi-info-circle"></i> Hinweise</h6>
+                    <ul class="small mb-0">
+                        <li>Der Scan kann 30-60 Sekunden dauern</li>
+                        <li>Stellen Sie sicher, dass die Ger\u00e4te eingeschaltet sind</li>
+                        <li>Bereits hinzugef\u00fcgte Ger\u00e4te werden markiert</li>
+                        <li>Unterst\u00fctzte Ger\u00e4te: Shelly Plug, 1PM, Plus 1PM, Pro 1PM, EM</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scan-Ergebnisse -->
+    <div class="card" id="resultsCard" style="display: none;">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-list-check"></i> Gefundene Ger\u00e4te</h5>
+            <span class="badge bg-primary" id="resultCount">0 Ger\u00e4te</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Name</th>
+                            <th>Typ</th>
+                            <th>IP-Adresse</th>
+                            <th>MAC-Adresse</th>
+                            <th>Firmware</th>
+                            <th>Leistung</th>
+                            <th class="text-end">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsTableBody">
+                        <!-- Wird per JavaScript gef\u00fcllt -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ger\u00e4t-Hinzuf\u00fcgen-Modal -->
+<div class="modal fade" id="addDeviceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Shelly-Ger\u00e4t hinzuf\u00fcgen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addDeviceForm">
+                    <input type="hidden" id="deviceIp">
+                    <input type="hidden" id="deviceType">
+                    <input type="hidden" id="deviceMac">
+                    <input type="hidden" id="deviceFw">
+
+                    <div class="mb-3">
+                        <label class="form-label">Ger\u00e4te-Typ</label>
+                        <input type="text" class="form-control" id="displayType" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">IP-Adresse</label>
+                        <input type="text" class="form-control font-monospace" id="displayIp" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="deviceName" class="form-label">Ger\u00e4tename *</label>
+                        <input type="text"
+                               class="form-control"
+                               id="deviceName"
+                               placeholder="z.B. Stickmaschine 1"
+                               required>
+                        <small class="form-text text-muted">Eindeutiger Name zur Identifikation</small>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="trackEnergy" checked>
+                        <label class="form-check-label" for="trackEnergy">
+                            Energie-Verbrauch aufzeichnen
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" id="saveDeviceBtn">Ger\u00e4t hinzuf\u00fcgen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+#scanProgress {
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.result-row-new {
+    animation: slideIn 0.3s;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.device-online {
+    color: #198754;
+}
+
+.device-exists {
+    background-color: #e7f3ff;
+}
+</style>
+
+<script>
+let addDeviceModal;
+let currentDeviceData = {};
+
+document.addEventListener('DOMContentLoaded', function() {
+    addDeviceModal = new bootstrap.Modal(document.getElementById('addDeviceModal'));
+
+    // Scan-Form
+    document.getElementById('scanForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        startScan();
+    });
+
+    // Ger\u00e4t hinzuf\u00fcgen
+    document.getElementById('saveDeviceBtn').addEventListener('click', addDevice);
+});
+
+async function startScan() {
+    const networkPrefix = document.getElementById('networkPrefix').value;
+    const startBtn = document.getElementById('startScanBtn');
+    const progressDiv = document.getElementById('scanProgress');
+    const progressBar = document.getElementById('scanProgressBar');
+    const statusText = document.getElementById('scanStatus');
+    const resultsCard = document.getElementById('resultsCard');
+
+    // UI vorbereiten
+    startBtn.disabled = true;
+    progressDiv.style.display = 'block';
+    progressBar.style.width = '0%';
+    statusText.textContent = 'Starte Scan...';
+    resultsCard.style.display = 'none';
+
+    // Fortschritts-Animation
+    let progress = 0;
+    const progressInterval = setInterval(() => {
+        progress += 2;
+        if (progress <= 90) {
+            progressBar.style.width = progress + '%';
+        }
+    }, 600); // 30 Sekunden bis 90%
+
+    try {
+        statusText.textContent = 'Scanne Netzwerk ' + networkPrefix + '.0/24...';
+
+        const response = await fetch('{{ url_for("shelly.api_scan_network") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({network_prefix: networkPrefix})
+        });
+
+        const data = await response.json();
+
+        // Beende Progress
+        clearInterval(progressInterval);
+        progressBar.style.width = '100%';
+
+        if (data.success) {
+            statusText.textContent = `Scan abgeschlossen! ${data.count} Ger\u00e4t(e) gefunden.`;
+            displayResults(data.devices);
+
+            setTimeout(() => {
+                progressDiv.style.display = 'none';
+            }, 2000);
+        } else {
+            statusText.textContent = 'Fehler: ' + data.error;
+            progressBar.classList.remove('progress-bar-animated');
+            progressBar.classList.add('bg-danger');
+        }
+
+    } catch (error) {
+        console.error('Scan-Fehler:', error);
+        clearInterval(progressInterval);
+        statusText.textContent = 'Fehler beim Scannen: ' + error.message;
+        progressBar.classList.add('bg-danger');
+    } finally {
+        startBtn.disabled = false;
+    }
+}
+
+function displayResults(devices) {
+    const tableBody = document.getElementById('resultsTableBody');
+    const resultsCard = document.getElementById('resultsCard');
+    const resultCount = document.getElementById('resultCount');
+
+    tableBody.innerHTML = '';
+    resultCount.textContent = `${devices.length} Ger\u00e4t${devices.length !== 1 ? 'e' : ''}`;
+
+    if (devices.length === 0) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center text-muted py-4">
+                    <i class="bi bi-inbox fs-1"></i>
+                    <p class="mt-2">Keine Shelly-Ger\u00e4te gefunden.</p>
+                </td>
+            </tr>
+        `;
+    } else {
+        devices.forEach(device => {
+            const row = document.createElement('tr');
+            row.className = 'result-row-new' + (device.exists ? ' device-exists' : '');
+
+            row.innerHTML = `
+                <td>
+                    ${device.exists
+                        ? '<span class="badge bg-info">Bereits hinzugef\u00fcgt</span>'
+                        : '<span class="badge bg-success">Neu</span>'
+                    }
+                </td>
+                <td>${device.name || '<em class="text-muted">Unbenannt</em>'}</td>
+                <td><code>${device.type}</code></td>
+                <td><span class="font-monospace">${device.ip}</span></td>
+                <td><small class="font-monospace">${device.mac}</small></td>
+                <td><small>${device.fw}</small></td>
+                <td>
+                    ${device.is_on
+                        ? `<strong class="text-warning">${device.power.toFixed(1)} W</strong>`
+                        : '<span class="text-muted">Aus</span>'
+                    }
+                </td>
+                <td class="text-end">
+                    ${device.exists
+                        ? `<a href="/shelly/device/${device.device_id}" class="btn btn-sm btn-outline-primary">
+                             <i class="bi bi-eye"></i> Details
+                           </a>`
+                        : `<button class="btn btn-sm btn-primary add-device-btn"
+                                   data-ip="${device.ip}"
+                                   data-type="${device.type}"
+                                   data-mac="${device.mac}"
+                                   data-fw="${device.fw}"
+                                   data-name="${device.name || ''}">
+                             <i class="bi bi-plus-circle"></i> Hinzuf\u00fcgen
+                           </button>`
+                    }
+                </td>
+            `;
+
+            tableBody.appendChild(row);
+        });
+
+        // Event-Listener f\u00fcr Hinzuf\u00fcgen-Buttons
+        document.querySelectorAll('.add-device-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                openAddDeviceModal(this.dataset);
+            });
+        });
+    }
+
+    resultsCard.style.display = 'block';
+}
+
+function openAddDeviceModal(deviceData) {
+    currentDeviceData = deviceData;
+
+    document.getElementById('deviceIp').value = deviceData.ip;
+    document.getElementById('deviceType').value = deviceData.type;
+    document.getElementById('deviceMac').value = deviceData.mac;
+    document.getElementById('deviceFw').value = deviceData.fw;
+
+    document.getElementById('displayType').value = deviceData.type;
+    document.getElementById('displayIp').value = deviceData.ip;
+    document.getElementById('deviceName').value = deviceData.name || `Shelly ${deviceData.type}`;
+
+    addDeviceModal.show();
+}
+
+async function addDevice() {
+    const deviceName = document.getElementById('deviceName').value.trim();
+    if (!deviceName) {
+        alert('Bitte geben Sie einen Ger\u00e4tenamen ein.');
+        return;
+    }
+
+    const deviceData = {
+        ip_address: document.getElementById('deviceIp').value,
+        name: deviceName,
+        track_energy: document.getElementById('trackEnergy').checked
+    };
+
+    const saveBtn = document.getElementById('saveDeviceBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Hinzuf\u00fcgen...';
+
+    try {
+        const response = await fetch('{{ url_for("shelly.api_add_device") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(deviceData)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            addDeviceModal.hide();
+
+            // Zeige Erfolgs-Meldung
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success alert-dismissible fade show';
+            alert.innerHTML = `
+                <strong>Erfolg!</strong> Ger\u00e4t wurde hinzugef\u00fcgt.
+                <a href="/shelly/device/${data.device_id}" class="alert-link">Jetzt konfigurieren</a>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.container-fluid').insertBefore(alert, document.querySelector('.row'));
+
+            // Entferne Zeile aus Ergebnissen
+            const row = document.querySelector(`button[data-ip="${deviceData.ip_address}"]`).closest('tr');
+            row.style.opacity = '0.5';
+            row.querySelector('.add-device-btn').outerHTML = '<span class="badge bg-success">Hinzugef\u00fcgt</span>';
+
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+        }
+
+    } catch (error) {
+        console.error('Fehler:', error);
+        alert('Fehler beim Hinzuf\u00fcgen des Ger\u00e4ts');
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Ger\u00e4t hinzuf\u00fcgen';
+    }
+}
+</script>
+{% endblock %}

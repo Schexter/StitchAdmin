@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Offene Posten - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1><i class="bi bi-list-ul"></i> Offene Posten</h1>
+        <p class="text-muted">Übersicht aller offenen Forderungen</p>
+    </div>
+</div>
+
+<!-- Zurück Button -->
+<div class="row mb-3">
+    <div class="col-md-12">
+        <a href="{{ url_for('finanzen.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zur Finanzen-Übersicht
+        </a>
+    </div>
+</div>
+
+<!-- Filter -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <form method="GET" class="row g-3">
+                    <div class="col-md-3">
+                        <label for="filter_status" class="form-label">Status</label>
+                        <select class="form-select" name="status" id="filter_status">
+                            <option value="">Alle</option>
+                            <option value="ueberfaellig" {% if filter_status == 'ueberfaellig' %}selected{% endif %}>Überfällig</option>
+                            <option value="faellig_bald" {% if filter_status == 'faellig_bald' %}selected{% endif %}>Bald fällig</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="filter_kunde" class="form-label">Kunde</label>
+                        <input type="text" class="form-control" name="kunde" id="filter_kunde" placeholder="Kundenname suchen..." value="{{ filter_kunde }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="sortierung" class="form-label">Sortierung</label>
+                        <select class="form-select" name="sort" id="sortierung">
+                            <option value="faelligkeitsdatum" {% if sortierung == 'faelligkeitsdatum' %}selected{% endif %}>Fälligkeitsdatum</option>
+                            <option value="betrag" {% if sortierung == 'betrag' %}selected{% endif %}>Betrag</option>
+                            <option value="kunde" {% if sortierung == 'kunde' %}selected{% endif %}>Kunde</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-primary w-100">Filtern</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rechnungen Liste -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Offene Rechnungen ({{ rechnungen|length }})</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if rechnungen %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Rechnungsnr.</th>
+                                <th>Kunde</th>
+                                <th>Rechnungsdatum</th>
+                                <th>Fälligkeitsdatum</th>
+                                <th class="text-end">Betrag</th>
+                                <th class="text-end">Offen</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for rechnung in rechnungen %}
+                            <tr {% if rechnung.faelligkeitsdatum < heute %}class="table-danger"{% elif rechnung.faelligkeitsdatum < in_7_tagen %}class="table-warning"{% endif %}>
+                                <td><strong>{{ rechnung.rechnungsnummer }}</strong></td>
+                                <td>{{ rechnung.kunde.name if rechnung.kunde else 'Unbekannt' }}</td>
+                                <td>{{ rechnung.rechnungsdatum.strftime('%d.%m.%Y') if rechnung.rechnungsdatum else '-' }}</td>
+                                <td>{{ rechnung.faelligkeitsdatum.strftime('%d.%m.%Y') if rechnung.faelligkeitsdatum else '-' }}</td>
+                                <td class="text-end">{{ "{:,.2f}".format(rechnung.summe_brutto or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                                <td class="text-end"><strong>{{ "{:,.2f}".format(rechnung.offener_betrag or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</strong></td>
+                                <td>
+                                    {% if rechnung.faelligkeitsdatum < heute %}
+                                        <span class="badge bg-danger">Überfällig</span>
+                                    {% elif rechnung.faelligkeitsdatum < in_7_tagen %}
+                                        <span class="badge bg-warning">Bald fällig</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Offen</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('rechnung.detail', rechnung_id=rechnung.id) }}" class="btn btn-info" title="Details">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info m-3">
+                    <i class="bi bi-info-circle"></i> Keine offenen Posten gefunden.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

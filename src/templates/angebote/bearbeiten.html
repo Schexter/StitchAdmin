@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Angebot bearbeiten - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1><i class="bi bi-pencil"></i> Angebot bearbeiten</h1>
+        <p class="text-muted">{{ angebot.angebotsnummer }}</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Angebots-Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('angebote.bearbeiten', angebot_id=angebot.id) }}">
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Kunde</label>
+                            <input type="text" class="form-control" value="{{ angebot.kunde_name }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Titel</label>
+                        <input type="text" name="titel" class="form-control" value="{{ angebot.titel or '' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea name="beschreibung" class="form-control" rows="4">{{ angebot.beschreibung or '' }}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Bemerkungen (intern)</label>
+                        <textarea name="bemerkungen" class="form-control" rows="3">{{ angebot.bemerkungen or '' }}</textarea>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Gültig für (Tage)</label>
+                            <input type="number" name="gueltig_tage" class="form-control" value="{{ angebot.gueltig_tage or 30 }}" min="1" required>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Hinweis:</strong> Änderungen an Positionen sind in dieser Version noch nicht implementiert.
+                    </div>
+
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <a href="{{ url_for('angebote.show', angebot_id=angebot.id) }}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Änderungen speichern
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Angebots-Info</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-6">Nummer:</dt>
+                    <dd class="col-sm-6">{{ angebot.angebotsnummer }}</dd>
+
+                    <dt class="col-sm-6">Status:</dt>
+                    <dd class="col-sm-6">
+                        <span class="badge bg-secondary">{{ angebot.status }}</span>
+                    </dd>
+
+                    <dt class="col-sm-6">Erstellt am:</dt>
+                    <dd class="col-sm-6">{{ angebot.created_at.strftime('%d.%m.%Y') if angebot.created_at else '-' }}</dd>
+
+                    <dt class="col-sm-6">Erstellt von:</dt>
+                    <dd class="col-sm-6">{{ angebot.created_by or '-' }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

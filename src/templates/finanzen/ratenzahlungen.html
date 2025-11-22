@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Ratenzahlungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1><i class="bi bi-calendar-check"></i> Ratenzahlungen</h1>
+        <p class="text-muted">Verwaltung von Ratenzahlungsvereinbarungen</p>
+    </div>
+</div>
+
+<!-- Zurück Button -->
+<div class="row mb-3">
+    <div class="col-md-12">
+        <a href="{{ url_for('finanzen.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zur Finanzen-Übersicht
+        </a>
+    </div>
+</div>
+
+<!-- Ratenzahlungen Liste -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Aktive Ratenzahlungen ({{ ratenzahlungen|length }})</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if ratenzahlungen %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Kunde</th>
+                                <th>Rechnung</th>
+                                <th>Startdatum</th>
+                                <th class="text-end">Gesamtbetrag</th>
+                                <th class="text-end">Offen</th>
+                                <th>Raten</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ratenzahlung in ratenzahlungen %}
+                            <tr>
+                                <td>{{ ratenzahlung.rechnung.kunde.name if ratenzahlung.rechnung and ratenzahlung.rechnung.kunde else 'Unbekannt' }}</td>
+                                <td>{{ ratenzahlung.rechnung.rechnungsnummer if ratenzahlung.rechnung else '-' }}</td>
+                                <td>{{ ratenzahlung.startdatum.strftime('%d.%m.%Y') if ratenzahlung.startdatum else '-' }}</td>
+                                <td class="text-end">{{ "{:,.2f}".format(ratenzahlung.gesamtbetrag or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                                <td class="text-end">{{ "{:,.2f}".format(ratenzahlung.offener_betrag or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                                <td>{{ ratenzahlung.anzahl_raten }} x {{ "{:,.2f}".format(ratenzahlung.raten_betrag or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                                <td>
+                                    {% if ratenzahlung.status == 'aktiv' %}
+                                        <span class="badge bg-success">Aktiv</span>
+                                    {% elif ratenzahlung.status == 'abgeschlossen' %}
+                                        <span class="badge bg-secondary">Abgeschlossen</span>
+                                    {% elif ratenzahlung.status == 'gekuendigt' %}
+                                        <span class="badge bg-danger">Gekündigt</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">{{ ratenzahlung.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="#" class="btn btn-info" title="Details">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info m-3">
+                    <i class="bi bi-info-circle"></i> Keine Ratenzahlungen gefunden.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

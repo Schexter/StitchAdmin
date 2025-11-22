@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+
+{% block title %}Angebot {{ angebot.angebotsnummer }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1><i class="bi bi-file-earmark-text"></i> Angebot {{ angebot.angebotsnummer }}</h1>
+        <p class="text-muted">{{ angebot.kunde_name }}</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('angebote.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück
+        </a>
+        <a href="{{ url_for('angebote.pdf_generieren', angebot_id=angebot.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-file-pdf"></i> PDF
+        </a>
+    </div>
+</div>
+
+<!-- Status und Aktionen -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Status:
+                            {% if angebot.status == 'entwurf' %}
+                                <span class="badge bg-secondary">Entwurf</span>
+                            {% elif angebot.status == 'verschickt' %}
+                                <span class="badge bg-info">Verschickt</span>
+                            {% elif angebot.status == 'angenommen' %}
+                                <span class="badge bg-success">Angenommen</span>
+                            {% elif angebot.status == 'abgelehnt' %}
+                                <span class="badge bg-danger">Abgelehnt</span>
+                            {% elif angebot.status == 'abgelaufen' %}
+                                <span class="badge bg-secondary">Abgelaufen</span>
+                            {% endif %}
+                        </h5>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        {% if angebot.status == 'entwurf' %}
+                            <a href="{{ url_for('angebote.bearbeiten', angebot_id=angebot.id) }}" class="btn btn-sm btn-warning">
+                                <i class="bi bi-pencil"></i> Bearbeiten
+                            </a>
+                            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#versendenModal">
+                                <i class="bi bi-send"></i> Versenden
+                            </button>
+                        {% elif angebot.status == 'verschickt' %}
+                            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#annehmenModal">
+                                <i class="bi bi-check-circle"></i> Annehmen
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#ablehnenModal">
+                                <i class="bi bi-x-circle"></i> Ablehnen
+                            </button>
+                            <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#kontaktModal">
+                                <i class="bi bi-telephone"></i> Kontakt registrieren
+                            </button>
+                        {% elif angebot.status == 'angenommen' %}
+                            <form method="POST" action="{{ url_for('angebote.in_auftrag_umwandeln', angebot_id=angebot.id) }}" style="display: inline;">
+                                <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Angebot in Produktionsauftrag umwandeln?')">
+                                    <i class="bi bi-arrow-right-circle"></i> In Auftrag umwandeln
+                                </button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Angebots-Details -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Angebots-Details</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Nummer:</dt>
+                    <dd class="col-sm-9">{{ angebot.angebotsnummer }}</dd>
+
+                    <dt class="col-sm-3">Datum:</dt>
+                    <dd class="col-sm-9">{{ angebot.angebotsdatum.strftime('%d.%m.%Y') if angebot.angebotsdatum else '-' }}</dd>
+
+                    <dt class="col-sm-3">Gültig bis:</dt>
+                    <dd class="col-sm-9">
+                        {% if angebot.gueltig_bis %}
+                            {{ angebot.gueltig_bis.strftime('%d.%m.%Y') }}
+                            {% set today = now().date() %}
+                            {% if angebot.gueltig_bis < today %}
+                                <span class="badge bg-danger">Abgelaufen</span>
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-3">Titel:</dt>
+                    <dd class="col-sm-9">{{ angebot.titel or '-' }}</dd>
+
+                    <dt class="col-sm-3">Beschreibung:</dt>
+                    <dd class="col-sm-9">{{ angebot.beschreibung or '-' }}</dd>
+
+                    <dt class="col-sm-3">Bemerkungen:</dt>
+                    <dd class="col-sm-9">{{ angebot.bemerkungen or '-' }}</dd>
+                </dl>
+
+                <hr>
+
+                <h6>Positionen</h6>
+                {% if angebot.positionen %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Pos</th>
+                            <th>Artikel</th>
+                            <th class="text-end">Menge</th>
+                            <th class="text-end">Einzelpreis</th>
+                            <th class="text-end">Gesamt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pos in angebot.positionen %}
+                        <tr>
+                            <td>{{ pos.position }}</td>
+                            <td>{{ pos.artikel_name }}</td>
+                            <td class="text-end">{{ pos.menge }} {{ pos.einheit }}</td>
+                            <td class="text-end">{{ "{:,.2f}".format(pos.einzelpreis or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                            <td class="text-end">{{ "{:,.2f}".format(pos.brutto_betrag or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>Netto:</strong></td>
+                            <td class="text-end"><strong>{{ "{:,.2f}".format(angebot.netto_gesamt or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</strong></td>
+                        </tr>
+                        <tr>
+                            <td colspan="4" class="text-end">MwSt.:</td>
+                            <td class="text-end">{{ "{:,.2f}".format(angebot.mwst_gesamt or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                        </tr>
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>Brutto:</strong></td>
+                            <td class="text-end"><strong>{{ "{:,.2f}".format(angebot.brutto_gesamt or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                {% else %}
+                <p class="text-muted">Keine Positionen vorhanden</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Tracking Sidebar -->
+    <div class="col-md-4">
+        {% if tracking %}
+        <div class="card mb-3">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> CRM-Tracking</h5>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-6">Verkaufschance:</dt>
+                    <dd class="col-sm-6">
+                        <span class="badge bg-success">{{ tracking.verkaufschance_prozent }}%</span>
+                    </dd>
+
+                    <dt class="col-sm-6">Tage draußen:</dt>
+                    <dd class="col-sm-6">
+                        {% if tracking.tage_seit_versand %}
+                            {{ tracking.tage_seit_versand }} Tage
+                        {% else %}
+                            -
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-6">Nachfragen:</dt>
+                    <dd class="col-sm-6">{{ tracking.anzahl_nachfragen }}x</dd>
+
+                    <dt class="col-sm-6">Letzter Kontakt:</dt>
+                    <dd class="col-sm-6">
+                        {% if tracking.letzter_kontakt %}
+                            {{ tracking.letzter_kontakt.strftime('%d.%m.%Y') }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-sm-6">Nächster Kontakt:</dt>
+                    <dd class="col-sm-6">
+                        {% if tracking.naechster_kontakt_geplant %}
+                            {{ tracking.naechster_kontakt_geplant.strftime('%d.%m.%Y') }}
+                            {% set today = now().date() %}
+                            {% if tracking.naechster_kontakt_geplant <= today %}
+                                <span class="badge bg-warning">Fällig!</span>
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </dd>
+                </dl>
+
+                {% if tracking.naechste_schritte %}
+                <hr>
+                <h6>Nächste Schritte:</h6>
+                <p class="small">{{ tracking.naechste_schritte }}</p>
+                {% endif %}
+
+                {% if tracking.grund_fuer_verzoegerung %}
+                <hr>
+                <h6>Verzögerungsgrund:</h6>
+                <p class="small text-muted">{{ tracking.grund_fuer_verzoegerung }}</p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Kunde Info -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Kunde</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>{{ angebot.kunde_name }}</strong></p>
+                {% if angebot.kunde_adresse %}
+                <p class="small text-muted">{{ angebot.kunde_adresse }}</p>
+                {% endif %}
+                {% if angebot.kunde_email %}
+                <p class="small">
+                    <i class="bi bi-envelope"></i> {{ angebot.kunde_email }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Aktivitäten Timeline -->
+{% if aktivitaeten %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Aktivitäten</h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    {% for activity in aktivitaeten %}
+                    <div class="timeline-item mb-3">
+                        <div class="row">
+                            <div class="col-md-2 text-end">
+                                <small class="text-muted">{{ activity.created_at.strftime('%d.%m.%Y %H:%M') if activity.created_at else '-' }}</small>
+                            </div>
+                            <div class="col-md-10">
+                                <strong>{{ activity.titel }}</strong>
+                                {% if activity.beschreibung %}
+                                <p class="mb-0">{{ activity.beschreibung }}</p>
+                                {% endif %}
+                                {% if activity.ergebnis %}
+                                <p class="mb-0 small text-muted">Ergebnis: {{ activity.ergebnis }}</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Versenden Modal -->
+<div class="modal fade" id="versendenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('angebote.versenden', angebot_id=angebot.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Angebot versenden</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Follow-up in Tagen</label>
+                        <input type="number" name="follow_up_tage" class="form-control" value="7" min="1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Verkaufschance (%)</label>
+                        <input type="number" name="verkaufschance" class="form-control" value="50" min="0" max="100">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Versenden</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Annehmen Modal -->
+<div class="modal fade" id="annehmenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('angebote.annehmen', angebot_id=angebot.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Angebot annehmen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Möchten Sie dieses Angebot wirklich als angenommen markieren?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-success">Annehmen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Ablehnen Modal -->
+<div class="modal fade" id="ablehnenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('angebote.ablehnen', angebot_id=angebot.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Angebot ablehnen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Grund für Ablehnung</label>
+                        <textarea name="grund" class="form-control" rows="3" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger">Ablehnen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Kontakt Modal -->
+<div class="modal fade" id="kontaktModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('angebote.kontakt_durchgefuehrt', angebot_id=angebot.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Kontakt registrieren</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ergebnis / Notizen</label>
+                        <textarea name="ergebnis" class="form-control" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Verkaufschance aktualisieren (%)</label>
+                        <input type="number" name="verkaufschance" class="form-control" value="{{ tracking.verkaufschance_prozent if tracking else 50 }}" min="0" max="100">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nächster Kontakt in Tagen</label>
+                        <input type="number" name="naechster_kontakt_tage" class="form-control" value="7" min="1">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

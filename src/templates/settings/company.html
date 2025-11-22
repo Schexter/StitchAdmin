@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Firmeneinstellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="bi bi-building"></i> Firmeneinstellungen</h1>
+                <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück zu Einstellungen
+                </a>
+            </div>
+
+            <form method="POST" action="{{ url_for('settings.company_settings') }}">
+                <!-- Firmendaten -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-building"></i> Firmendaten</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="company_name" class="form-label">Firmenname *</label>
+                                    <input type="text" class="form-control" id="company_name" name="company_name"
+                                           value="{{ settings.company_name }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="company_addition" class="form-label">Rechtsform</label>
+                                    <input type="text" class="form-control" id="company_addition" name="company_addition"
+                                           value="{{ settings.company_addition or '' }}" placeholder="z.B. GmbH, e.K.">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="owner_name" class="form-label">Inhaber / Geschäftsführer</label>
+                            <input type="text" class="form-control" id="owner_name" name="owner_name"
+                                   value="{{ settings.owner_name or '' }}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Adresse -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-geo-alt"></i> Adresse</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-9">
+                                <div class="mb-3">
+                                    <label for="street" class="form-label">Straße</label>
+                                    <input type="text" class="form-control" id="street" name="street"
+                                           value="{{ settings.street or '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="house_number" class="form-label">Hausnummer</label>
+                                    <input type="text" class="form-control" id="house_number" name="house_number"
+                                           value="{{ settings.house_number or '' }}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="postal_code" class="form-label">PLZ</label>
+                                    <input type="text" class="form-control" id="postal_code" name="postal_code"
+                                           value="{{ settings.postal_code or '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="city" class="form-label">Stadt</label>
+                                    <input type="text" class="form-control" id="city" name="city"
+                                           value="{{ settings.city or '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="country" class="form-label">Land</label>
+                                    <input type="text" class="form-control" id="country" name="country"
+                                           value="{{ settings.country or 'Deutschland' }}">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kontaktdaten -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-telephone"></i> Kontaktdaten</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="phone" class="form-label">Telefon</label>
+                                    <input type="text" class="form-control" id="phone" name="phone"
+                                           value="{{ settings.phone or '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="fax" class="form-label">Fax</label>
+                                    <input type="text" class="form-control" id="fax" name="fax"
+                                           value="{{ settings.fax or '' }}">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">E-Mail</label>
+                                    <input type="email" class="form-control" id="email" name="email"
+                                           value="{{ settings.email or '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="website" class="form-label">Website</label>
+                                    <input type="text" class="form-control" id="website" name="website"
+                                           value="{{ settings.website or '' }}" placeholder="https://...">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Steuerdaten -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-file-earmark-text"></i> Steuerdaten</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="tax_id" class="form-label">Steuernummer</label>
+                                    <input type="text" class="form-control" id="tax_id" name="tax_id"
+                                           value="{{ settings.tax_id or '' }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="vat_id" class="form-label">Umsatzsteuer-ID (USt-IdNr.)</label>
+                                    <input type="text" class="form-control" id="vat_id" name="vat_id"
+                                           value="{{ settings.vat_id or '' }}" placeholder="DE123456789">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="tax_office" class="form-label">Finanzamt</label>
+                            <input type="text" class="form-control" id="tax_office" name="tax_office"
+                                   value="{{ settings.tax_office or '' }}" placeholder="z.B. Finanzamt München">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bankverbindung -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-bank"></i> Bankverbindung</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="bank_name" class="form-label">Bankname</label>
+                            <input type="text" class="form-control" id="bank_name" name="bank_name"
+                                   value="{{ settings.bank_name or '' }}">
+                        </div>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="iban" class="form-label">IBAN</label>
+                                    <input type="text" class="form-control" id="iban" name="iban"
+                                           value="{{ settings.iban or '' }}" placeholder="DE89 3704 0044 0532 0130 00">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="bic" class="form-label">BIC</label>
+                                    <input type="text" class="form-control" id="bic" name="bic"
+                                           value="{{ settings.bic or '' }}" placeholder="COBADEFFXXX">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="account_holder" class="form-label">Kontoinhaber (falls abweichend)</label>
+                            <input type="text" class="form-control" id="account_holder" name="account_holder"
+                                   value="{{ settings.account_holder or '' }}">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Handelsregister -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-journal-text"></i> Handelsregister (optional)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="commercial_register" class="form-label">Handelsregistereintrag</label>
+                            <input type="text" class="form-control" id="commercial_register" name="commercial_register"
+                                   value="{{ settings.commercial_register or '' }}" placeholder="z.B. HRB 12345, AG München">
+                            <small class="text-muted">Nur für eingetragene Unternehmen (GmbH, AG, etc.)</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rechnungseinstellungen -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-receipt"></i> Rechnungseinstellungen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="invoice_prefix" class="form-label">Rechnungspräfix</label>
+                                    <input type="text" class="form-control" id="invoice_prefix" name="invoice_prefix"
+                                           value="{{ settings.invoice_prefix or 'RE' }}" maxlength="10">
+                                    <small class="text-muted">z.B. RE → RE-2024-0001</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="payment_terms_days" class="form-label">Zahlungsziel (Tage)</label>
+                                    <input type="number" class="form-control" id="payment_terms_days" name="payment_terms_days"
+                                           value="{{ settings.payment_terms_days or 14 }}" min="0" max="365">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="default_tax_rate" class="form-label">Standard MwSt-Satz (%)</label>
+                                    <input type="number" class="form-control" id="default_tax_rate" name="default_tax_rate"
+                                           value="{{ settings.default_tax_rate or 19.0 }}" step="0.1" min="0" max="100">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="invoice_footer_text" class="form-label">Fußtext auf Rechnungen</label>
+                            <textarea class="form-control" id="invoice_footer_text" name="invoice_footer_text" rows="3">{{ settings.invoice_footer_text or '' }}</textarea>
+                            <small class="text-muted">Dieser Text erscheint am Ende jeder Rechnung</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kleinunternehmer -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-info-circle"></i> Kleinunternehmer nach § 19 UStG</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="small_business" name="small_business"
+                                   {% if settings.small_business %}checked{% endif %} onchange="toggleSmallBusiness()">
+                            <label class="form-check-label" for="small_business">
+                                <strong>Ich bin Kleinunternehmer nach § 19 UStG</strong>
+                            </label>
+                            <div class="text-muted small mt-1">
+                                Als Kleinunternehmer wird auf Rechnungen keine Umsatzsteuer ausgewiesen.
+                            </div>
+                        </div>
+                        <div id="small_business_text_container" style="display: {% if settings.small_business %}block{% else %}none{% endif %};">
+                            <div class="mb-3">
+                                <label for="small_business_text" class="form-label">Kleinunternehmer-Hinweis</label>
+                                <textarea class="form-control" id="small_business_text" name="small_business_text" rows="2">{{ settings.small_business_text or 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.' }}</textarea>
+                                <small class="text-muted">Dieser Hinweis erscheint auf allen Rechnungen</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Speichern Button -->
+                <div class="d-grid gap-2 mb-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-save"></i> Einstellungen speichern
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleSmallBusiness() {
+    const checkbox = document.getElementById('small_business');
+    const textContainer = document.getElementById('small_business_text_container');
+    textContainer.style.display = checkbox.checked ? 'block' : 'none';
+}
+</script>
+{% endblock %}

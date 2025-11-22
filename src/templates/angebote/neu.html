@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Neues Angebot - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1><i class="bi bi-plus-circle"></i> Neues Angebot</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Angebots-Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('angebote.neu') }}">
+                    {% if auftrag %}
+                    <!-- Aus Auftrag erstellen -->
+                    <input type="hidden" name="auftrag_id" value="{{ auftrag.id }}">
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Angebot wird aus <strong>Auftrag {{ auftrag.id }}</strong> erstellt.
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Kunde</label>
+                            <input type="text" class="form-control" value="{{ auftrag.customer.display_name }}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Gültig für (Tage)</label>
+                            <input type="number" name="gueltig_tage" class="form-control" value="30" min="1" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea class="form-control" rows="3" readonly>{{ auftrag.description }}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Gesamtpreis (aus Auftrag)</label>
+                        <input type="text" class="form-control" value="{{ '{:,.2f}'.format(auftrag.total_price or 0) }} €" readonly>
+                    </div>
+
+                    {% else %}
+                    <!-- Neues Angebot ohne Auftrag -->
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Hinweis:</strong> Es wird empfohlen, Angebote aus Aufträgen zu erstellen, da dort die Kalkulation bereits erfolgt ist.
+                        <a href="{{ url_for('orders.create_order') }}" class="alert-link">Jetzt Auftrag erstellen →</a>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Kunde *</label>
+                            <select name="kunde_id" class="form-select" required>
+                                <option value="">Bitte wählen...</option>
+                                {% for kunde in kunden %}
+                                <option value="{{ kunde.id }}">{{ kunde.display_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Titel</label>
+                        <input type="text" name="titel" class="form-control" placeholder="z.B. 500 Poloshirts mit Logostickerei">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea name="beschreibung" class="form-control" rows="4" placeholder="Detaillierte Beschreibung des Angebots..."></textarea>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Gültig für (Tage)</label>
+                            <input type="number" name="gueltig_tage" class="form-control" value="30" min="1" required>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Hinweis:</strong> Positionen können nach der Erstellung des Angebots hinzugefügt werden.
+                    </div>
+                    {% endif %}
+
+                    <div class="row mt-4">
+                        <div class="col-md-12">
+                            <a href="{{ url_for('angebote.index') }}" class="btn btn-secondary">
+                                <i class="bi bi-x-circle"></i> Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Angebot erstellen
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Workflow-Hinweis</h5>
+            </div>
+            <div class="card-body">
+                <h6>Empfohlener Ablauf:</h6>
+                <ol class="small">
+                    <li>Auftrag mit Kalkulation erstellen</li>
+                    <li>Aus Auftrag ein Angebot generieren</li>
+                    <li>Angebot versenden & Tracking aktivieren</li>
+                    <li>Follow-ups durchführen</li>
+                    <li>Bei Annahme: In Produktionsauftrag umwandeln</li>
+                </ol>
+
+                <hr>
+
+                <h6>Angebots-Status:</h6>
+                <ul class="small list-unstyled">
+                    <li><span class="badge bg-secondary">Entwurf</span> - In Bearbeitung</li>
+                    <li><span class="badge bg-info">Verschickt</span> - Beim Kunden</li>
+                    <li><span class="badge bg-success">Angenommen</span> - Auftrag folgt</li>
+                    <li><span class="badge bg-danger">Abgelehnt</span> - Verlustanalyse</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

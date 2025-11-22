@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block title %}Angebote - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1><i class="bi bi-file-earmark-text"></i> Angebote</h1>
+        <p class="text-muted">Angebotsverwaltung mit CRM-Tracking</p>
+    </div>
+</div>
+
+<!-- Schnellzugriff Buttons -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <a href="{{ url_for('angebote.neu') }}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Neues Angebot
+        </a>
+    </div>
+</div>
+
+<!-- Statistik Cards -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card border-secondary">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Gesamt</h6>
+                <h3 class="card-title">{{ stats.gesamt }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-warning">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Entwurf</h6>
+                <h3 class="card-title text-warning">{{ stats.entwurf }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-info">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Verschickt</h6>
+                <h3 class="card-title text-info">{{ stats.verschickt }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Angenommen</h6>
+                <h3 class="card-title text-success">{{ stats.angenommen }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Abgelehnt</h6>
+                <h3 class="card-title text-danger">{{ stats.abgelehnt }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card border-secondary">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Abgelaufen</h6>
+                <h3 class="card-title text-secondary">{{ stats.abgelaufen }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Follow-up Alert -->
+{% if follow_up_needed|length > 0 %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i>
+            <strong>{{ follow_up_needed|length }} Angebot(e)</strong> brauchen Follow-up!
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Filter -->
+<div class="row mb-3">
+    <div class="col-md-12">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select" onchange="this.form.submit()">
+                    <option value="alle" {% if status_filter == 'alle' %}selected{% endif %}>Alle</option>
+                    <option value="entwurf" {% if status_filter == 'entwurf' %}selected{% endif %}>Entwurf</option>
+                    <option value="verschickt" {% if status_filter == 'verschickt' %}selected{% endif %}>Verschickt</option>
+                    <option value="angenommen" {% if status_filter == 'angenommen' %}selected{% endif %}>Angenommen</option>
+                    <option value="abgelehnt" {% if status_filter == 'abgelehnt' %}selected{% endif %}>Abgelehnt</option>
+                    <option value="abgelaufen" {% if status_filter == 'abgelaufen' %}selected{% endif %}>Abgelaufen</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Kunde / Nummer</label>
+                <input type="text" name="kunde" class="form-control" value="{{ kunde_filter }}" placeholder="Suche...">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Sortierung</label>
+                <select name="sort" class="form-select" onchange="this.form.submit()">
+                    <option value="datum" {% if sortierung == 'datum' %}selected{% endif %}>Datum</option>
+                    <option value="nummer" {% if sortierung == 'nummer' %}selected{% endif %}>Nummer</option>
+                    <option value="kunde" {% if sortierung == 'kunde' %}selected{% endif %}>Kunde</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-primary form-control">Filter</button>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <a href="{{ url_for('angebote.index') }}" class="btn btn-secondary form-control">Zurücksetzen</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Angebote Tabelle -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Angebote ({{ angebote|length }})</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if angebote %}
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Nummer</th>
+                            <th>Kunde</th>
+                            <th>Titel</th>
+                            <th>Datum</th>
+                            <th>Gültig bis</th>
+                            <th class="text-end">Betrag</th>
+                            <th>Status</th>
+                            <th>Tracking</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for angebot in angebote %}
+                        <tr>
+                            <td>
+                                <strong>{{ angebot.angebotsnummer }}</strong>
+                            </td>
+                            <td>{{ angebot.kunde_name }}</td>
+                            <td>{{ angebot.titel or '-' }}</td>
+                            <td>{{ angebot.angebotsdatum.strftime('%d.%m.%Y') if angebot.angebotsdatum else '-' }}</td>
+                            <td>
+                                {% if angebot.gueltig_bis %}
+                                    {% set today = now().date() %}
+                                    {% if angebot.gueltig_bis < today %}
+                                        <span class="badge bg-danger">{{ angebot.gueltig_bis.strftime('%d.%m.%Y') }}</span>
+                                    {% else %}
+                                        {{ angebot.gueltig_bis.strftime('%d.%m.%Y') }}
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ "{:,.2f}".format(angebot.brutto_gesamt or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                            <td>
+                                {% if angebot.status == 'entwurf' %}
+                                    <span class="badge bg-secondary">Entwurf</span>
+                                {% elif angebot.status == 'verschickt' %}
+                                    <span class="badge bg-info">Verschickt</span>
+                                {% elif angebot.status == 'angenommen' %}
+                                    <span class="badge bg-success">Angenommen</span>
+                                {% elif angebot.status == 'abgelehnt' %}
+                                    <span class="badge bg-danger">Abgelehnt</span>
+                                {% elif angebot.status == 'abgelaufen' %}
+                                    <span class="badge bg-secondary">Abgelaufen</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if angebot.tracking %}
+                                    {% if angebot.tracking.braucht_follow_up %}
+                                        <span class="badge bg-warning">Follow-up fällig</span>
+                                    {% else %}
+                                        <small>{{ angebot.tracking.verkaufschance_prozent }}% Chance</small>
+                                    {% endif %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('angebote.show', angebot_id=angebot.id) }}" class="btn btn-sm btn-primary" title="Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-3 text-center text-muted">
+                    <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                    <p class="mb-0">Keine Angebote gefunden</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

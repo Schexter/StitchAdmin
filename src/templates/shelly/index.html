@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+
+{% block title %}Shelly-Ger\u00e4te{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-plug"></i> Shelly Smart Devices</h2>
+            <p class="text-muted mb-0">Energie-Monitoring und Ger\u00e4testeuerung</p>
+        </div>
+        <div>
+            <a href="{{ url_for('shelly.scan_page') }}" class="btn btn-primary">
+                <i class="bi bi-search"></i> Netzwerk scannen
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistiken -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2 opacity-75">Ger\u00e4te gesamt</h6>
+                            <h2 class="mb-0">{{ stats.total }}</h2>
+                        </div>
+                        <i class="bi bi-hdd-network fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2 opacity-75">Online</h6>
+                            <h2 class="mb-0">{{ stats.online }}</h2>
+                        </div>
+                        <i class="bi bi-wifi fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2 opacity-75">Zugeordnet</h6>
+                            <h2 class="mb-0">{{ stats.assigned }}</h2>
+                        </div>
+                        <i class="bi bi-link-45deg fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-subtitle mb-2 opacity-75">Aktuelle Leistung</h6>
+                            <h2 class="mb-0" id="total-power">{{ "%.0f"|format(stats.total_power) }} W</h2>
+                        </div>
+                        <i class="bi bi-lightning-charge fs-1 opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ger\u00e4teliste -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Ger\u00e4te\u00fcbersicht</h5>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoRefresh" checked>
+                <label class="form-check-label" for="autoRefresh">Auto-Refresh (5s)</label>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if devices %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Name</th>
+                            <th>Typ</th>
+                            <th>IP-Adresse</th>
+                            <th>Maschine</th>
+                            <th>Leistung</th>
+                            <th class="text-center">Schalter</th>
+                            <th class="text-end">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="device-table-body">
+                        {% for device in devices %}
+                        <tr data-device-id="{{ device.id }}" class="device-row">
+                            <td>
+                                {% if device.is_online %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-circle-fill"></i> Online
+                                </span>
+                                {% else %}
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-circle-fill"></i> Offline
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ device.name }}</strong>
+                                {% if device.track_energy %}
+                                <i class="bi bi-lightning-charge text-warning ms-1" title="Energie-Tracking aktiv"></i>
+                                {% endif %}
+                            </td>
+                            <td><code>{{ device.device_type or 'Unknown' }}</code></td>
+                            <td><span class="font-monospace">{{ device.ip_address }}</span></td>
+                            <td>
+                                {% if device.machine %}
+                                <span class="badge bg-primary">{{ device.machine.name }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="power-value">
+                                {% if device.is_online %}
+                                <strong class="text-warning">{{ "%.1f"|format(device.last_power_w or 0) }} W</strong>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if device.is_online %}
+                                <div class="form-check form-switch d-inline-block">
+                                    <input class="form-check-input device-switch"
+                                           type="checkbox"
+                                           {% if device.is_on %}checked{% endif %}
+                                           data-device-id="{{ device.id }}"
+                                           title="Ger\u00e4t ein/ausschalten">
+                                </div>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('shelly.device_detail', device_id=device.id) }}"
+                                       class="btn btn-outline-primary"
+                                       title="Details">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <button class="btn btn-outline-secondary assign-btn"
+                                            data-device-id="{{ device.id }}"
+                                            title="Maschine zuordnen">
+                                        <i class="bi bi-link-45deg"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger delete-btn"
+                                            data-device-id="{{ device.id }}"
+                                            data-device-name="{{ device.name }}"
+                                            title="L\u00f6schen">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+                <p class="text-muted mt-3">Noch keine Shelly-Ger\u00e4te hinzugef\u00fcgt.</p>
+                <a href="{{ url_for('shelly.scan_page') }}" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Jetzt Netzwerk scannen
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Maschinen-Zuordnungs-Modal -->
+<div class="modal fade" id="assignModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Maschine zuordnen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="assignForm">
+                    <input type="hidden" id="assignDeviceId">
+                    <div class="mb-3">
+                        <label for="machineSelect" class="form-label">Maschine ausw\u00e4hlen</label>
+                        <select class="form-select" id="machineSelect" required>
+                            <option value="">-- Keine Zuordnung --</option>
+                            <!-- Wird per AJAX gef\u00fcllt -->
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" id="saveAssignBtn">Zuordnen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.device-switch {
+    cursor: pointer;
+    width: 3rem;
+    height: 1.5rem;
+}
+
+.device-row {
+    transition: background-color 0.2s;
+}
+
+.device-row:hover {
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.power-value {
+    font-family: 'Courier New', monospace;
+}
+</style>
+
+<script>
+let autoRefreshInterval;
+
+// Auto-Refresh Toggle
+document.getElementById('autoRefresh').addEventListener('change', function() {
+    if (this.checked) {
+        startAutoRefresh();
+    } else {
+        stopAutoRefresh();
+    }
+});
+
+function startAutoRefresh() {
+    autoRefreshInterval = setInterval(refreshDeviceStatus, 5000);
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+}
+
+// Live-Status aktualisieren
+async function refreshDeviceStatus() {
+    try {
+        const response = await fetch('{{ url_for("shelly.api_dashboard_data") }}');
+        const data = await response.json();
+
+        if (data.success) {
+            let totalPower = 0;
+
+            data.devices.forEach(device => {
+                const row = document.querySelector(`tr[data-device-id="${device.id}"]`);
+                if (!row) return;
+
+                // Status-Badge aktualisieren
+                const statusCell = row.querySelector('td:first-child');
+                if (device.is_online) {
+                    statusCell.innerHTML = '<span class="badge bg-success"><i class="bi bi-circle-fill"></i> Online</span>';
+                } else {
+                    statusCell.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-circle-fill"></i> Offline</span>';
+                }
+
+                // Leistung aktualisieren
+                const powerCell = row.querySelector('.power-value');
+                if (device.is_online) {
+                    powerCell.innerHTML = `<strong class="text-warning">${device.power.toFixed(1)} W</strong>`;
+                    totalPower += device.power;
+                } else {
+                    powerCell.innerHTML = '<span class="text-muted">-</span>';
+                }
+
+                // Schalter aktualisieren
+                const switchInput = row.querySelector('.device-switch');
+                if (switchInput) {
+                    switchInput.checked = device.is_on;
+                }
+            });
+
+            // Gesamt-Leistung aktualisieren
+            document.getElementById('total-power').textContent = `${totalPower.toFixed(0)} W`;
+        }
+    } catch (error) {
+        console.error('Fehler beim Aktualisieren:', error);
+    }
+}
+
+// Ger\u00e4te-Schalter
+document.querySelectorAll('.device-switch').forEach(switchEl => {
+    switchEl.addEventListener('change', async function() {
+        const deviceId = this.dataset.deviceId;
+        const action = this.checked ? 'on' : 'off';
+
+        try {
+            const response = await fetch(`/shelly/api/device/${deviceId}/control`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: action})
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                alert('Fehler beim Schalten: ' + (data.error || 'Unbekannter Fehler'));
+                this.checked = !this.checked; // Zur\u00fccksetzen
+            } else {
+                // Leistung aktualisieren
+                const row = this.closest('tr');
+                const powerCell = row.querySelector('.power-value');
+                powerCell.innerHTML = `<strong class="text-warning">${data.power.toFixed(1)} W</strong>`;
+            }
+        } catch (error) {
+            console.error('Fehler:', error);
+            alert('Fehler beim Schalten des Ger\u00e4ts');
+            this.checked = !this.checked;
+        }
+    });
+});
+
+// Maschinen-Zuordnung
+let assignModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    assignModal = new bootstrap.Modal(document.getElementById('assignModal'));
+
+    // Lade Maschinen-Liste
+    loadMachines();
+
+    // Assign-Buttons
+    document.querySelectorAll('.assign-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const deviceId = this.dataset.deviceId;
+            document.getElementById('assignDeviceId').value = deviceId;
+            assignModal.show();
+        });
+    });
+
+    // Speichern
+    document.getElementById('saveAssignBtn').addEventListener('click', saveAssignment);
+
+    // Delete-Buttons
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const deviceId = this.dataset.deviceId;
+            const deviceName = this.dataset.deviceName;
+
+            if (confirm(`Ger\u00e4t "${deviceName}" wirklich l\u00f6schen?`)) {
+                deleteDevice(deviceId);
+            }
+        });
+    });
+
+    // Starte Auto-Refresh
+    startAutoRefresh();
+});
+
+async function loadMachines() {
+    try {
+        const response = await fetch('/machines/api/status');
+        const machines = await response.json();
+
+        const select = document.getElementById('machineSelect');
+        machines.forEach(machine => {
+            const option = document.createElement('option');
+            option.value = machine.id;
+            option.textContent = machine.name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Fehler beim Laden der Maschinen:', error);
+    }
+}
+
+async function saveAssignment() {
+    const deviceId = document.getElementById('assignDeviceId').value;
+    const machineId = document.getElementById('machineSelect').value;
+
+    try {
+        const response = await fetch(`/shelly/api/device/${deviceId}/assign`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                machine_id: machineId || null,
+                assigned_to_type: 'machine'
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            assignModal.hide();
+            location.reload(); // Seite neu laden
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+        }
+    } catch (error) {
+        console.error('Fehler:', error);
+        alert('Fehler beim Zuordnen');
+    }
+}
+
+async function deleteDevice(deviceId) {
+    try {
+        const response = await fetch(`/shelly/api/device/${deviceId}/delete`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler beim L\u00f6schen: ' + (data.error || 'Unbekannter Fehler'));
+        }
+    } catch (error) {
+        console.error('Fehler:', error);
+        alert('Fehler beim L\u00f6schen');
+    }
+}
+</script>
+{% endblock %}

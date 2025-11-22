@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}Finanzen-Übersicht - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1><i class="bi bi-cash-stack"></i> Finanzen-Übersicht</h1>
+        <p class="text-muted">Zentrale Übersicht über Liquidität, Forderungen und Zahlungseingänge</p>
+    </div>
+</div>
+
+<!-- Schnellzugriff Buttons -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('finanzen.offene_posten') }}" class="btn btn-primary">
+                <i class="bi bi-list-ul"></i> Offene Posten
+            </a>
+            <a href="{{ url_for('finanzen.mahnungen') }}" class="btn btn-warning">
+                <i class="bi bi-exclamation-triangle"></i> Mahnwesen
+            </a>
+            <a href="{{ url_for('finanzen.ratenzahlungen') }}" class="btn btn-info">
+                <i class="bi bi-calendar-check"></i> Ratenzahlungen
+            </a>
+            {% if current_user.is_admin %}
+            <a href="{{ url_for('finanzen.liquiditaet') }}" class="btn btn-success">
+                <i class="bi bi-graph-up"></i> Liquidität
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row mb-4">
+    <!-- Offene Forderungen -->
+    <div class="col-md-3">
+        <div class="card border-primary">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Forderungen Gesamt</h6>
+                <h2 class="card-title text-primary">{{ "{:,.2f}".format(forderungen_gesamt).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h2>
+                <p class="small text-muted mb-0">Alle offenen Rechnungen</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Überfällig -->
+    <div class="col-md-3">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Überfällig</h6>
+                <h2 class="card-title text-danger">{{ "{:,.2f}".format(forderungen_ueberfaellig).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h2>
+                <p class="small text-muted mb-0">{{ ueberfaellige_rechnungen|length }} Rechnungen</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Umsatz 30 Tage -->
+    <div class="col-md-3">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Umsatz (30 Tage)</h6>
+                <h2 class="card-title text-success">{{ "{:,.2f}".format(umsatz_30_tage).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h2>
+                <p class="small text-muted mb-0">Eingang: {{ "{:,.2f}".format(zahlungseingang_30_tage).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Verkaufschancen -->
+    <div class="col-md-3">
+        <div class="card border-warning">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">Verkaufschancen</h6>
+                <h2 class="card-title text-warning">{{ "{:,.2f}".format(gewichteter_umsatz).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h2>
+                <p class="small text-muted mb-0">{{ angebote_offen_count }} offene Angebote</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Überfällige Rechnungen & Nächste Mahnungen -->
+<div class="row mb-4">
+    <!-- Überfällige Rechnungen -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-exclamation-circle"></i> Überfällige Rechnungen (Top 10)</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if ueberfaellige_rechnungen %}
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Rechnung</th>
+                            <th>Kunde</th>
+                            <th>Fällig</th>
+                            <th class="text-end">Betrag</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rechnung in ueberfaellige_rechnungen %}
+                        <tr>
+                            <td><strong>{{ rechnung.rechnungsnummer }}</strong></td>
+                            <td>{{ rechnung.kunde_name }}</td>
+                            <td>
+                                <span class="badge bg-danger">
+                                    {{ (today - rechnung.faelligkeitsdatum).days }} Tage
+                                </span>
+                            </td>
+                            <td class="text-end">{{ "{:,.2f}".format(rechnung.offener_betrag).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('finanzen.mahnung_erstellen', rechnung_id=rechnung.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-warning" title="Mahnung erstellen">
+                                        <i class="bi bi-envelope"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-3 text-center text-success">
+                    <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                    <p class="mb-0">Keine überfälligen Rechnungen!</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Nächste Mahnungen -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0"><i class="bi bi-bell"></i> Fällige Mahnungen</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if naechste_mahnungen %}
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Rechnung</th>
+                            <th>Kunde</th>
+                            <th>Stufe</th>
+                            <th>Grund</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in naechste_mahnungen %}
+                        <tr>
+                            <td><strong>{{ item.rechnung.rechnungsnummer }}</strong></td>
+                            <td>{{ item.rechnung.kunde_name }}</td>
+                            <td>
+                                <span class="badge bg-{% if item.mahnstufe == 1 %}warning{% elif item.mahnstufe == 2 %}orange{% else %}danger{% endif %}">
+                                    {{ item.mahnstufe }}. Mahnung
+                                </span>
+                            </td>
+                            <td><small>{{ item.grund }}</small></td>
+                            <td>
+                                <form method="POST" action="{{ url_for('finanzen.mahnung_erstellen', rechnung_id=item.rechnung.id) }}" style="display: inline;">
+                                    <button type="submit" class="btn btn-sm btn-warning">
+                                        <i class="bi bi-envelope-plus"></i> Erstellen
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="p-3 text-center text-muted">
+                    <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                    <p class="mb-0">Keine Mahnungen fällig</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mahnwesen-Statistik & Ratenzahlungen -->
+<div class="row mb-4">
+    <!-- Mahnwesen -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Mahnwesen-Statistik</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-4">
+                        <h3 class="text-warning">{{ mahnungen_1 }}</h3>
+                        <p class="text-muted">1. Mahnung</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h3 class="text-orange">{{ mahnungen_2 }}</h3>
+                        <p class="text-muted">2. Mahnung</p>
+                    </div>
+                    <div class="col-md-4">
+                        <h3 class="text-danger">{{ mahnungen_3 }}</h3>
+                        <p class="text-muted">3. Mahnung</p>
+                    </div>
+                </div>
+                <hr>
+                <div class="row text-center">
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1">Mahngebühren</p>
+                        <h5>{{ "{:,.2f}".format(mahngebuehren_gesamt).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h5>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1">Verzugszinsen</p>
+                        <h5>{{ "{:,.2f}".format(verzugszinsen_gesamt).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ratenzahlungen -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-calendar-range"></i> Ratenzahlungen</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center mb-3">
+                    <div class="col-md-6">
+                        <h3 class="text-info">{{ ratenzahlungen_aktiv_count }}</h3>
+                        <p class="text-muted">Aktive Vereinbarungen</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h3 class="text-primary">{{ "{:,.2f}".format(raten_gesamt_offen).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h3>
+                        <p class="text-muted">Offen</p>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1">Heute fällig</p>
+                        <h5 class="text-danger">{{ raten_faellig_heute|length }} Raten</h5>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="text-muted mb-1">Diese Woche</p>
+                        <h5 class="text-warning">{{ raten_faellig_woche|length }} Raten</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Angebote mit Follow-up -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Angebote - Follow-up erforderlich</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if angebote_follow_up_count > 0 %}
+                <div class="alert alert-info m-3">
+                    <strong>{{ angebote_follow_up_count }} Angebot(e)</strong> brauchen Nachverfolgung!
+                    <a href="{{ url_for('angebote.index') }}" class="alert-link">Angebote ansehen →</a>
+                </div>
+                {% else %}
+                <div class="p-3 text-center text-muted">
+                    <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                    <p class="mb-0">Alle Angebote sind aktuell</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-Refresh alle 5 Minuten
+setTimeout(function() {
+    location.reload();
+}, 300000);
+</script>
+
+{% endblock %}

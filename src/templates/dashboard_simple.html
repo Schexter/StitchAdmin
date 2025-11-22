@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - StitchAdmin 2.0{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Kachel-Design */
+    .module-card {
+        transition: all 0.3s ease;
+        border: none;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        height: 100%;
+        min-height: 200px;
+    }
+    
+    .module-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+    }
+    
+    .module-card .card-body {
+        padding: 2rem;
+    }
+    
+    .module-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+    
+    .module-card h3 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .module-card p {
+        color: #6c757d;
+        margin-bottom: 1rem;
+    }
+    
+    .module-stats {
+        border-top: 2px solid #e9ecef;
+        padding-top: 1rem;
+        margin-top: 1rem;
+    }
+    
+    .stat-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    
+    .stat-item .label {
+        color: #6c757d;
+    }
+    
+    .stat-item .value {
+        font-weight: 700;
+        font-size: 1.2rem;
+    }
+    
+    /* Farbige Top-Borders */
+    .module-card.border-primary { border-top: 4px solid #0d6efd; }
+    .module-card.border-success { border-top: 4px solid #198754; }
+    .module-card.border-info { border-top: 4px solid #0dcaf0; }
+    .module-card.border-warning { border-top: 4px solid #ffc107; }
+    .module-card.border-danger { border-top: 4px solid #dc3545; }
+    .module-card.border-secondary { border-top: 4px solid #6c757d; }
+    .module-card.border-dark { border-top: 4px solid #212529; }
+    
+    /* Responsive Grid */
+    @media (max-width: 768px) {
+        .module-card {
+            min-height: 150px;
+        }
+        .module-icon {
+            font-size: 2rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1>🎨 StitchAdmin 2.0</h1>
+        <p class="text-muted">Ihr Textilveredlungs-ERP</p>
+    </div>
+</div>
+
+<!-- Module Grid -->
+<div class="row g-4">
+    
+    <!-- CRM -->
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('customers.index') }}" class="text-decoration-none">
+            <div class="card module-card border-primary">
+                <div class="card-body">
+                    <div class="module-icon">👥</div>
+                    <h3>CRM</h3>
+                    <p>Kunden & Kontakte</p>
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="label">Kunden gesamt</span>
+                            <span class="value">{{ stats.get('total_customers', 0) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Produktion -->
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('orders.index') }}" class="text-decoration-none">
+            <div class="card module-card border-success">
+                <div class="card-body">
+                    <div class="module-icon">🏭</div>
+                    <h3>Produktion</h3>
+                    <p>Aufträge & Fertigung</p>
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="label">Offene Aufträge</span>
+                            <span class="value">{{ stats.get('open_orders', 0) }}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">In Produktion</span>
+                            <span class="value">{{ stats.get('in_production', 0) }}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">Bereit zur Abholung</span>
+                            <span class="value">{{ stats.get('ready_pickup', 0) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Kasse / POS -->
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('kasse.kassen_index') }}" class="text-decoration-none">
+            <div class="card module-card border-warning">
+                <div class="card-body">
+                    <div class="module-icon">💰</div>
+                    <h3>Kasse / POS</h3>
+                    <p>Barverkauf & Abrechnung</p>
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="label">Umsatz heute</span>
+                            <span class="value">{{ "%.2f"|format(stats.get('today_revenue', 0)) }} €</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Buchhaltung -->
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('finanzen.index') }}" class="text-decoration-none">
+            <div class="card module-card border-info">
+                <div class="card-body">
+                    <div class="module-icon">📈</div>
+                    <h3>Buchhaltung</h3>
+                    <p>Finanzen & Rechnungen</p>
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="label">Offene Rechnungen</span>
+                            <span class="value">{{ stats.get('open_invoices', 0) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Dokumente & Post -->
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('documents.dashboard') }}" class="text-decoration-none">
+            <div class="card module-card border-secondary">
+                <div class="card-body">
+                    <div class="module-icon">📁</div>
+                    <h3>Dokumente & Post</h3>
+                    <p>DMS, Postbuch & E-Mails</p>
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="label">Dokumente</span>
+                            <span class="value">{{ stats.get('document_count', 0) }}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">Offene Post</span>
+                            <span class="value">{{ stats.get('open_post', 0) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Verwaltung -->
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('settings.index') }}" class="text-decoration-none">
+            <div class="card module-card border-dark">
+                <div class="card-body">
+                    <div class="module-icon">⚙️</div>
+                    <h3>Verwaltung</h3>
+                    <p>Einstellungen & System</p>
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="label">Artikel</span>
+                            <span class="value">{{ stats.get('article_count', 0) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Lager & Artikel -->
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('articles.index') }}" class="text-decoration-none">
+            <div class="card module-card border-primary">
+                <div class="card-body">
+                    <div class="module-icon">📦</div>
+                    <h3>Lager & Artikel</h3>
+                    <p>Bestand & Verwaltung</p>
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="label">Artikel im System</span>
+                            <span class="value">{{ stats.get('article_count', 0) }}</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="label">Garne</span>
+                            <span class="value">{{ stats.get('thread_count', 0) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <!-- Design-Archiv -->
+    <div class="col-md-6 col-lg-4">
+        <a href="{{ url_for('file_browser.browse') }}" class="text-decoration-none">
+            <div class="card module-card border-danger">
+                <div class="card-body">
+                    <div class="module-icon">🎨</div>
+                    <h3>Design-Archiv</h3>
+                    <p>Motive & DST-Dateien</p>
+                    <div class="module-stats">
+                        <div class="stat-item">
+                            <span class="label">Designs</span>
+                            <span class="value">{{ stats.get('design_count', 0) }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+</div>
+{% endblock %}

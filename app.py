@@ -190,6 +190,12 @@ def create_app():
     # Auth und Dashboard
     register_blueprint_safe('src.controllers.auth_controller', 'auth_bp', 'Authentifizierung')
 
+    # Dokumente & Post
+    register_blueprint_safe('src.controllers.documents.documents_controller', 'documents_bp', 'Dokumente & Post')
+
+    # E-Mail Integration
+    register_blueprint_safe('src.controllers.email_controller', 'email_bp', 'E-Mail Integration')
+
     # ==========================================
     # HAUPT-ROUTEN
     # ==========================================
@@ -204,18 +210,45 @@ def create_app():
     @login_required
     def dashboard():
         """Dashboard Hauptseite mit Statistiken"""
-        from src.models.models import Order, db
+        from src.models.models import Order, Customer, Article, Thread, db
         from datetime import datetime, date
         from sqlalchemy import func
 
         # Berechne Statistiken
         stats = {
+            # Produktion
             'open_orders': Order.query.filter(
                 Order.status.in_(['pending', 'approved', 'in_progress'])
             ).count(),
             'in_production': Order.query.filter_by(status='in_progress').count(),
             'ready_pickup': Order.query.filter_by(status='ready_for_pickup').count(),
-            'today_revenue': 0  # Placeholder - kann später erweitert werden
+            'today_revenue': 0,
+
+            # CRM
+            'total_customers': Customer.query.count(),
+            'open_leads': 0,  # Später mit Lead-System
+
+            # Dokumente & Post (werden später befüllt wenn Modul verfügbar)
+            'document_count': 0,
+            'open_post': 0,
+            'unread_emails': 0,
+
+            # Buchhaltung
+            'open_invoices': 0,  # Aus Rechnungsmodul
+            'overdue_payments': 0,
+            'today_transactions': 0,
+
+            # Verwaltung
+            'user_count': 0,  # User.query.count() wenn User-Model verfügbar
+            'article_count': Article.query.count(),
+
+            # Lager
+            'thread_count': Thread.query.count(),
+            'low_stock': 0,
+
+            # Design
+            'design_count': 0,
+            'dst_count': 0
         }
 
         # Tagesumsatz berechnen (wenn Rechnungsmodul vorhanden)
@@ -231,10 +264,23 @@ def create_app():
             ).scalar()
 
             stats['today_revenue'] = round(today_sum or 0, 2)
+            stats['today_transactions'] = KassenBeleg.query.filter(
+                KassenBeleg.datum >= today_start,
+                KassenBeleg.datum <= today_end
+            ).count()
         except (ImportError, Exception):
             pass
 
-        return render_template('dashboard.html', stats=stats)
+        # Dokumente-Statistiken (wenn Modul verfügbar)
+        try:
+            from src.models.document import Document, PostEntry, ArchivedEmail
+            stats['document_count'] = Document.query.filter_by(is_latest_version=True).count()
+            stats['open_post'] = PostEntry.query.filter_by(status='open').count()
+            stats['unread_emails'] = ArchivedEmail.query.filter_by(is_read=False).count()
+        except (ImportError, Exception):
+            pass
+
+        return render_template('dashboard_simple.html', stats=stats)
 
     # ==========================================
     # TEMPLATE FILTER

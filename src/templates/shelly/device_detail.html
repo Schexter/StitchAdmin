@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+
+{% block title %}{{ device.name }} - Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="bi bi-plug"></i> {{ device.name }}
+                {% if device.is_online %}
+                <span class="badge bg-success ms-2">Online</span>
+                {% else %}
+                <span class="badge bg-secondary ms-2">Offline</span>
+                {% endif %}
+            </h2>
+            <p class="text-muted mb-0">
+                <span class="font-monospace">{{ device.ip_address }}</span>
+                {% if device.machine %}
+                <span class="ms-3">
+                    <i class="bi bi-link-45deg"></i> Zugeordnet zu: <strong>{{ device.machine.name }}</strong>
+                </span>
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('shelly.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Zur\u00fcck
+            </a>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#settingsModal">
+                <i class="bi bi-gear"></i> Einstellungen
+            </button>
+        </div>
+    </div>
+
+    <!-- Live-Daten -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="text-muted">Aktuelle Leistung</h6>
+                    <h2 class="mb-0 text-warning" id="livePower">
+                        {% if live_data %}{{ "%.1f"|format(live_data.power) }}{% else %}0{% endif %} W
+                    </h2>
+                    <small class="text-muted">Echtzeit</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="text-muted">Spannung</h6>
+                    <h2 class="mb-0" id="liveVoltage">
+                        {% if live_data %}{{ "%.1f"|format(live_data.voltage) }}{% else %}0{% endif %} V
+                    </h2>
+                    <small class="text-muted">Volt</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="text-muted">Stromst\u00e4rke</h6>
+                    <h2 class="mb-0" id="liveCurrent">
+                        {% if live_data %}{{ "%.2f"|format(live_data.current) }}{% else %}0{% endif %} A
+                    </h2>
+                    <small class="text-muted">Ampere</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="text-muted">Temperatur</h6>
+                    <h2 class="mb-0" id="liveTemp">
+                        {% if live_data %}{{ "%.1f"|format(live_data.temperature or 0) }}{% else %}0{% endif %} \u00b0C
+                    </h2>
+                    <small class="text-muted">Celsius</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Steuerung & Info -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-toggle-on"></i> Steuerung</h5>
+                </div>
+                <div class="card-body">
+                    {% if device.is_online %}
+                    <div class="d-flex justify-content-center align-items-center py-4">
+                        <div class="form-check form-switch me-4">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   id="powerSwitch"
+                                   {% if live_data and live_data.is_on %}checked{% endif %}
+                                   style="width: 4rem; height: 2rem;">
+                            <label class="form-check-label ms-2 fs-4" for="powerSwitch" id="switchLabel">
+                                {% if live_data and live_data.is_on %}Eingeschaltet{% else %}Ausgeschaltet{% endif %}
+                            </label>
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" id="toggleBtn">
+                            <i class="bi bi-arrow-repeat"></i> Umschalten (Toggle)
+                        </button>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Ger\u00e4t ist offline. Steuerung nicht verf\u00fcgbar.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Ger\u00e4te-Informationen</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <th width="40%">Typ:</th>
+                            <td><code>{{ device.device_type or 'Unknown' }}</code></td>
+                        </tr>
+                        <tr>
+                            <th>MAC-Adresse:</th>
+                            <td><span class="font-monospace">{{ device.mac_address or '-' }}</span></td>
+                        </tr>
+                        <tr>
+                            <th>Firmware:</th>
+                            <td>{{ device.firmware_version or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Kanal:</th>
+                            <td>{{ device.channel }}</td>
+                        </tr>
+                        <tr>
+                            <th>Energie-Tracking:</th>
+                            <td>
+                                {% if device.track_energy %}
+                                <span class="badge bg-success">Aktiv</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inaktiv</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Strompreis:</th>
+                            <td>{{ "%.2f"|format(device.electricity_price_per_kwh) }} \u20ac/kWh</td>
+                        </tr>
+                        <tr>
+                            <th>Letzter Kontakt:</th>
+                            <td>{{ device.last_seen.strftime('%d.%m.%Y %H:%M:%S') if device.last_seen else '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Energie-Historie (24h) -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-graph-up"></i> Energie-Verlauf (24 Stunden)</h5>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoRefreshChart" checked>
+                <label class="form-check-label" for="autoRefreshChart">Auto-Refresh</label>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if energy_history %}
+            <canvas id="energyChart" height="80"></canvas>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-bar-chart fs-1 text-muted"></i>
+                <p class="text-muted mt-3">Noch keine Energie-Daten aufgezeichnet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Produktions-Energie -->
+    {% if production_energy %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Produktions-Energie</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Produktionsauftrag</th>
+                            <th>Startzeit</th>
+                            <th>Endzeit</th>
+                            <th>Dauer</th>
+                            <th>Energie</th>
+                            <th>\u00d8 Leistung</th>
+                            <th>Kosten</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prod in production_energy %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('production.schedule_detail', schedule_id=prod.production_schedule_id) }}">
+                                    Auftrag #{{ prod.production_schedule_id }}
+                                </a>
+                            </td>
+                            <td>{{ prod.start_time.strftime('%d.%m. %H:%M') }}</td>
+                            <td>{{ prod.end_time.strftime('%d.%m. %H:%M') if prod.end_time else '-' }}</td>
+                            <td>
+                                {% if prod.end_time %}
+                                {{ ((prod.end_time - prod.start_time).total_seconds() / 3600)|round(1) }} h
+                                {% else %}
+                                <span class="badge bg-warning">L\u00e4uft</span>
+                                {% endif %}
+                            </td>
+                            <td><strong>{{ "%.2f"|format(prod.total_energy_kwh) }} kWh</strong></td>
+                            <td>{{ "%.0f"|format(prod.avg_power_w or 0) }} W</td>
+                            <td><strong>{{ "%.2f"|format(prod.total_cost_eur or 0) }} \u20ac</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Einstellungs-Modal -->
+<div class="modal fade" id="settingsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Ger\u00e4te-Einstellungen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="settingsForm">
+                    <div class="mb-3">
+                        <label for="deviceName" class="form-label">Ger\u00e4tename</label>
+                        <input type="text" class="form-control" id="deviceName" value="{{ device.name }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="machineSelect" class="form-label">Zugeordnete Maschine</label>
+                        <select class="form-select" id="machineSelect">
+                            <option value="">-- Keine Zuordnung --</option>
+                            <!-- Wird per AJAX gef\u00fcllt -->
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="electricityPrice" class="form-label">Strompreis (\u20ac/kWh)</label>
+                        <input type="number"
+                               class="form-control"
+                               id="electricityPrice"
+                               step="0.01"
+                               min="0"
+                               value="{{ device.electricity_price_per_kwh }}">
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               id="trackEnergy"
+                               {% if device.track_energy %}checked{% endif %}>
+                        <label class="form-check-label" for="trackEnergy">
+                            Energie-Verbrauch aufzeichnen
+                        </label>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               id="autoControl"
+                               {% if device.auto_control %}checked{% endif %}>
+                        <label class="form-check-label" for="autoControl">
+                            Automatische Steuerung aktivieren
+                        </label>
+                        <small class="form-text text-muted d-block">
+                            Ger\u00e4t wird automatisch mit Produktionsplanung ein-/ausgeschaltet
+                        </small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" id="saveSettingsBtn">Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+const deviceId = {{ device.id }};
+let energyChart;
+let autoRefreshInterval;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialisiere Chart
+    {% if energy_history %}
+    initEnergyChart();
+    {% endif %}
+
+    // Power Switch
+    const powerSwitch = document.getElementById('powerSwitch');
+    if (powerSwitch) {
+        powerSwitch.addEventListener('change', function() {
+            controlDevice(this.checked ? 'on' : 'off');
+        });
+    }
+
+    // Toggle Button
+    const toggleBtn = document.getElementById('toggleBtn');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function() {
+            controlDevice('toggle');
+        });
+    }
+
+    // Einstellungen
+    loadMachines();
+    document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+
+    // Auto-Refresh
+    document.getElementById('autoRefreshChart')?.addEventListener('change', function() {
+        if (this.checked) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    });
+
+    startAutoRefresh();
+});
+
+function initEnergyChart() {
+    const ctx = document.getElementById('energyChart').getContext('2d');
+
+    const energyData = {{ energy_history | map(attribute='energy_wh') | list | tojson }};
+    const powerData = {{ energy_history | map(attribute='power_w') | list | tojson }};
+    const timestamps = [
+        {% for reading in energy_history %}
+        '{{ reading.timestamp.strftime("%H:%M") }}',
+        {% endfor %}
+    ];
+
+    energyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: timestamps,
+            datasets: [{
+                label: 'Leistung (W)',
+                data: powerData,
+                borderColor: 'rgb(255, 193, 7)',
+                backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                yAxisID: 'y',
+                tension: 0.4
+            }, {
+                label: 'Energie (Wh)',
+                data: energyData,
+                borderColor: 'rgb(13, 110, 253)',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                yAxisID: 'y1',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            plugins: {
+                legend: {
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Leistung (W)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Energie (Wh)'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+async function controlDevice(action) {
+    try {
+        const response = await fetch(`/shelly/api/device/${deviceId}/control`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: action})
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            // Update UI
+            const powerSwitch = document.getElementById('powerSwitch');
+            const switchLabel = document.getElementById('switchLabel');
+
+            if (powerSwitch) {
+                powerSwitch.checked = data.is_on;
+            }
+            if (switchLabel) {
+                switchLabel.textContent = data.is_on ? 'Eingeschaltet' : 'Ausgeschaltet';
+            }
+
+            // Update Power
+            document.getElementById('livePower').textContent = data.power.toFixed(1) + ' W';
+
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+        }
+    } catch (error) {
+        console.error('Fehler:', error);
+        alert('Fehler bei der Steuerung');
+    }
+}
+
+async function refreshLiveData() {
+    try {
+        const response = await fetch(`/shelly/api/device/${deviceId}/status`);
+        const data = await response.json();
+
+        if (data.success && data.is_online) {
+            document.getElementById('livePower').textContent = data.power.toFixed(1) + ' W';
+            document.getElementById('liveVoltage').textContent = data.voltage.toFixed(1) + ' V';
+            document.getElementById('liveCurrent').textContent = data.current.toFixed(2) + ' A';
+            document.getElementById('liveTemp').textContent = data.temperature.toFixed(1) + ' \u00b0C';
+
+            const powerSwitch = document.getElementById('powerSwitch');
+            if (powerSwitch) {
+                powerSwitch.checked = data.is_on;
+            }
+        }
+    } catch (error) {
+        console.error('Fehler beim Aktualisieren:', error);
+    }
+}
+
+function startAutoRefresh() {
+    autoRefreshInterval = setInterval(refreshLiveData, 5000);
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+}
+
+async function loadMachines() {
+    try {
+        const response = await fetch('/machines/api/status');
+        const machines = await response.json();
+
+        const select = document.getElementById('machineSelect');
+        machines.forEach(machine => {
+            const option = document.createElement('option');
+            option.value = machine.id;
+            option.textContent = machine.name;
+            if (machine.id === '{{ device.machine_id }}') {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Fehler beim Laden der Maschinen:', error);
+    }
+}
+
+async function saveSettings() {
+    const saveBtn = document.getElementById('saveSettingsBtn');
+    saveBtn.disabled = true;
+
+    try {
+        // Update Zuordnung
+        const machineId = document.getElementById('machineSelect').value;
+        await fetch(`/shelly/api/device/${deviceId}/assign`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                machine_id: machineId || null,
+                assigned_to_type: 'machine'
+            })
+        });
+
+        // Weitere Einstellungen k\u00f6nnten hier gespeichert werden
+        // (ben\u00f6tigt zus\u00e4tzlichen API-Endpoint)
+
+        alert('Einstellungen gespeichert!');
+        location.reload();
+
+    } catch (error) {
+        console.error('Fehler:', error);
+        alert('Fehler beim Speichern');
+    } finally {
+        saveBtn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

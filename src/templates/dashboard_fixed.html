@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - StitchAdmin 2.0{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Dashboard Container */
+    .dashboard-wrapper {
+        min-height: calc(100vh - 80px);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+    }
+
+    /* Dashboard Header */
+    .dashboard-header {
+        background: white;
+        padding: 1.5rem 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .dashboard-header h1 {
+        margin: 0;
+        color: #2c3e50;
+        font-size: 2rem;
+    }
+
+    .user-info {
+        text-align: right;
+    }
+
+    .user-info .username {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    .user-info .company {
+        color: #7f8c8d;
+        font-size: 0.9rem;
+    }
+
+    /* Module Grid */
+    .module-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 1.5rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* Module Cards */
+    .module-card {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        text-decoration: none;
+        color: #333;
+        transition: all 0.3s ease;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        position: relative;
+        overflow: hidden;
+        display: block;
+    }
+
+    .module-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        text-decoration: none;
+    }
+
+    .module-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+    }
+
+    /* Farbige Akzente für Module */
+    .module-card.crm::before { background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%); }
+    .module-card.marketing::before { background: linear-gradient(90deg, #fa709a 0%, #fee140 100%); }
+    .module-card.production::before { background: linear-gradient(90deg, #30cfd0 0%, #330867 100%); }
+    .module-card.pos::before { background: linear-gradient(90deg, #a8edea 0%, #fed6e3 100%); }
+    .module-card.accounting::before { background: linear-gradient(90deg, #ff9a9e 0%, #fecfef 100%); }
+    .module-card.documents::before { background: linear-gradient(90deg, #ffecd2 0%, #fcb69f 100%); }
+    .module-card.admin::before { background: linear-gradient(90deg, #fddb92 0%, #d1fdff 100%); }
+    .module-card.warehouse::before { background: linear-gradient(90deg, #89f7fe 0%, #66a6ff 100%); }
+
+    .module-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        display: block;
+    }
+
+    .module-card h2 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        color: #2c3e50;
+    }
+
+    .module-card p {
+        color: #7f8c8d;
+        margin-bottom: 1rem;
+        font-size: 0.95rem;
+    }
+
+    .module-stats {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid #ecf0f1;
+        font-size: 0.9rem;
+    }
+
+    .module-stat-item {
+        display: flex;
+        justify-content: space-between;
+        color: #95a5a6;
+    }
+
+    .module-stat-item .value {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+        margin-top: 1rem;
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .quick-action-btn {
+        padding: 0.4rem 0.8rem;
+        background: #667eea;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .quick-action-btn:hover {
+        background: #5568d3;
+        transform: translateY(-2px);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .module-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .dashboard-header {
+            flex-direction: column;
+            text-align: center;
+        }
+        
+        .user-info {
+            text-align: center;
+            margin-top: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-wrapper">
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div>
+            <h1>🎨 StitchAdmin 2.0</h1>
+            <p style="margin: 0; color: #7f8c8d;">Ihr Textilveredlungs-ERP</p>
+        </div>
+        <div class="user-info">
+            <div class="username">{{ current_user.username }}</div>
+            {% if branding and branding.company_name %}
+            <div class="company">{{ branding.company_name }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Module Grid -->
+    <div class="module-grid">
+        
+        <!-- CRM Kachel -->
+        <a href="{{ url_for('customers.list') }}" class="module-card crm">
+            <div class="module-icon">👥</div>
+            <h2>CRM</h2>
+            <p>Kunden & Kontakte</p>
+            <div class="module-stats">
+                <div class="module-stat-item">
+                    <span>Kunden gesamt</span>
+                    <span class="value">{{ stats.get('total_customers', 0) }}</span>
+                </div>
+                <div class="module-stat-item">
+                    <span>Offene Leads</span>
+                    <span class="value">{{ stats.get('open_leads', 0) }}</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Produktion Kachel -->
+        <a href="{{ url_for('orders.list') }}" class="module-card production">
+            <div class="module-icon">🏭</div>
+            <h2>Produktion</h2>
+            <p>Aufträge & Fertigung</p>
+            <div class="module-stats">
+                <div class="module-stat-item">
+                    <span>Offene Aufträge</span>
+                    <span class="value">{{ stats.get('open_orders', 0) }}</span>
+                </div>
+                <div class="module-stat-item">
+                    <span>In Produktion</span>
+                    <span class="value">{{ stats.get('in_production', 0) }}</span>
+                </div>
+                <div class="module-stat-item">
+                    <span>Bereit zur Abholung</span>
+                    <span class="value">{{ stats.get('ready_pickup', 0) }}</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Kasse Kachel -->
+        <a href="{{ url_for('kasse.register') }}" class="module-card pos">
+            <div class="module-icon">💰</div>
+            <h2>Kasse / POS</h2>
+            <p>Barverkauf & Kassenabrechnung</p>
+            <div class="module-stats">
+                <div class="module-stat-item">
+                    <span>Umsatz heute</span>
+                    <span class="value">{{ "%.2f"|format(stats.get('today_revenue', 0)) }} €</span>
+                </div>
+                <div class="module-stat-item">
+                    <span>Transaktionen heute</span>
+                    <span class="value">{{ stats.get('today_transactions', 0) }}</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Buchhaltung Kachel -->
+        <a href="{{ url_for('finanzen.dashboard') }}" class="module-card accounting">
+            <div class="module-icon">📈</div>
+            <h2>Buchhaltung</h2>
+            <p>Finanzen & Rechnungen</p>
+            <div class="module-stats">
+                <div class="module-stat-item">
+                    <span>Offene Rechnungen</span>
+                    <span class="value">{{ stats.get('open_invoices', 0) }}</span>
+                </div>
+                <div class="module-stat-item">
+                    <span>Überfällige Zahlungen</span>
+                    <span class="value">{{ stats.get('overdue_payments', 0) }}</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Dokumente & Post Kachel -->
+        <a href="{{ url_for('documents.dashboard') }}" class="module-card documents">
+            <div class="module-icon">📁</div>
+            <h2>Dokumente & Post</h2>
+            <p>DMS, Postbuch & E-Mails</p>
+            <div class="module-stats">
+                <div class="module-stat-item">
+                    <span>Dokumente</span>
+                    <span class="value">{{ stats.get('document_count', 0) }}</span>
+                </div>
+                <div class="module-stat-item">
+                    <span>Offene Post</span>
+                    <span class="value">{{ stats.get('open_post', 0) }}</span>
+                </div>
+                <div class="module-stat-item">
+                    <span>Ungelesene E-Mails</span>
+                    <span class="value">{{ stats.get('unread_emails', 0) }}</span>
+                </div>
+            </div>
+            <div class="quick-actions">
+                <button class="quick-action-btn" onclick="event.preventDefault(); window.location='{{ url_for('documents.upload') }}'">
+                    📤 Upload
+                </button>
+                <button class="quick-action-btn" onclick="event.preventDefault(); window.location='{{ url_for('documents.post_new') }}'">
+                    ✉️ Post erfassen
+                </button>
+            </div>
+        </a>
+
+        <!-- Verwaltung Kachel -->
+        <a href="{{ url_for('settings.index') }}" class="module-card admin">
+            <div class="module-icon">⚙️</div>
+            <h2>Verwaltung</h2>
+            <p>Einstellungen & System</p>
+            <div class="module-stats">
+                <div class="module-stat-item">
+                    <span>Benutzer</span>
+                    <span class="value">{{ stats.get('user_count', 0) }}</span>
+                </div>
+                <div class="module-stat-item">
+                    <span>Artikel</span>
+                    <span class="value">{{ stats.get('article_count', 0) }}</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Lager Kachel -->
+        <a href="{{ url_for('threads.list') }}" class="module-card warehouse">
+            <div class="module-icon">📦</div>
+            <h2>Lager</h2>
+            <p>Garne, Artikel & Bestand</p>
+            <div class="module-stats">
+                <div class="module-stat-item">
+                    <span>Garnfarben</span>
+                    <span class="value">{{ stats.get('thread_count', 0) }}</span>
+                </div>
+                <div class="module-stat-item">
+                    <span>Nachbestellung nötig</span>
+                    <span class="value">{{ stats.get('low_stock', 0) }}</span>
+                </div>
+            </div>
+        </a>
+
+        <!-- Design-Archiv Kachel -->
+        <a href="{{ url_for('design_workflow.archive') }}" class="module-card warehouse">
+            <div class="module-icon">🎨</div>
+            <h2>Design-Archiv</h2>
+            <p>Motive & DST-Dateien</p>
+            <div class="module-stats">
+                <div class="module-stat-item">
+                    <span>Designs</span>
+                    <span class="value">{{ stats.get('design_count', 0) }}</span>
+                </div>
+                <div class="module-stat-item">
+                    <span>DST-Dateien</span>
+                    <span class="value">{{ stats.get('dst_count', 0) }}</span>
+                </div>
+            </div>
+        </a>
+
+    </div>
+</div>
+{% endblock %}

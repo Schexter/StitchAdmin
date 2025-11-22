@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+
+{% block title %}Dokumente & Post - StitchAdmin 2.0{% endblock %}
+
+{% block extra_css %}
+<style>
+    .documents-dashboard {
+        padding: 2rem;
+    }
+
+    .doc-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .doc-header h2 {
+        margin: 0;
+        color: #2c3e50;
+    }
+
+    .doc-actions {
+        display: flex;
+        gap: 1rem;
+    }
+
+    /* Stats Cards */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        border-left: 4px solid #667eea;
+    }
+
+    .stat-card.warning {
+        border-left-color: #ffa726;
+    }
+
+    .stat-card.danger {
+        border-left-color: #ef5350;
+    }
+
+    .stat-card .stat-label {
+        color: #7f8c8d;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-card .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    /* Recent Activity */
+    .activity-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
+    }
+
+    .activity-section h3 {
+        margin-top: 0;
+        color: #2c3e50;
+        border-bottom: 2px solid #ecf0f1;
+        padding-bottom: 0.5rem;
+    }
+
+    .activity-list {
+        list-style: none;
+        padding: 0;
+    }
+
+    .activity-item {
+        padding: 1rem;
+        border-bottom: 1px solid #ecf0f1;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+
+    .activity-item:hover {
+        background: #f8f9fa;
+    }
+
+    .activity-icon {
+        font-size: 1.5rem;
+        margin-right: 1rem;
+    }
+
+    .activity-info {
+        flex: 1;
+    }
+
+    .activity-title {
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    .activity-meta {
+        font-size: 0.85rem;
+        color: #7f8c8d;
+    }
+
+    .activity-action {
+        margin-left: 1rem;
+    }
+
+    /* Reminder Cards */
+    .reminder-card {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border-radius: 5px;
+    }
+
+    .reminder-card.overdue {
+        background: #f8d7da;
+        border-left-color: #dc3545;
+    }
+
+    /* Buttons */
+    .btn {
+        padding: 0.5rem 1rem;
+        border-radius: 5px;
+        text-decoration: none;
+        display: inline-block;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .btn-primary {
+        background: #667eea;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #5568d3;
+    }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .btn-success:hover {
+        background: #218838;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .btn-secondary:hover {
+        background: #5a6268;
+    }
+
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="documents-dashboard">
+    
+    <!-- Header -->
+    <div class="doc-header">
+        <h2>📁 Dokumente & Post</h2>
+        <div class="doc-actions">
+            <a href="{{ url_for('documents.upload') }}" class="btn btn-primary">
+                📤 Dokument hochladen
+            </a>
+            <a href="{{ url_for('documents.post_new') }}" class="btn btn-success">
+                ✉️ Post erfassen
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistiken -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Dokumente gesamt</div>
+            <div class="stat-value">{{ total_documents }}</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-label">Diesen Monat</div>
+            <div class="stat-value">{{ documents_this_month }}</div>
+        </div>
+        
+        <div class="stat-card warning">
+            <div class="stat-label">Offene Post</div>
+            <div class="stat-value">{{ open_post }}</div>
+        </div>
+        
+        <div class="stat-card danger">
+            <div class="stat-label">Überfällige Post</div>
+            <div class="stat-value">{{ overdue_post }}</div>
+        </div>
+        
+        <div class="stat-card warning">
+            <div class="stat-label">Ungelesene E-Mails</div>
+            <div class="stat-value">{{ unread_emails }}</div>
+        </div>
+    </div>
+
+    <!-- Wiedervorlagen -->
+    {% if reminders %}
+    <div class="activity-section">
+        <h3>🔔 Wiedervorlagen</h3>
+        {% for reminder in reminders %}
+        <div class="reminder-card {% if reminder.is_overdue() %}overdue{% endif %}">
+            <strong>{{ reminder.subject }}</strong><br>
+            <small>
+                Fällig: {{ reminder.reminder_date|format_date }}
+                {% if reminder.customer %}
+                | Kunde: {{ reminder.customer.name }}
+                {% endif %}
+            </small>
+            <a href="{{ url_for('documents.post_list') }}" class="btn btn-sm btn-primary" style="float: right;">
+                Anzeigen
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Zwei-Spalten Layout -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+        
+        <!-- Letzte Dokumente -->
+        <div class="activity-section">
+            <h3>📄 Letzte Dokumente</h3>
+            <ul class="activity-list">
+                {% for doc in recent_documents %}
+                <li class="activity-item">
+                    <span class="activity-icon">
+                        {% if doc.is_pdf() %}📄{% elif doc.is_image() %}🖼️{% else %}📎{% endif %}
+                    </span>
+                    <div class="activity-info">
+                        <div class="activity-title">{{ doc.title }}</div>
+                        <div class="activity-meta">
+                            {{ doc.created_at|format_datetime }}
+                            {% if doc.customer %}
+                            | {{ doc.customer.name }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="activity-action">
+                        <a href="{{ url_for('documents.view', id=doc.id) }}" class="btn btn-sm btn-primary">
+                            Ansehen
+                        </a>
+                    </div>
+                </li>
+                {% else %}
+                <li style="padding: 1rem; text-align: center; color: #7f8c8d;">
+                    Noch keine Dokumente vorhanden
+                </li>
+                {% endfor %}
+            </ul>
+            <div style="margin-top: 1rem; text-align: center;">
+                <a href="{{ url_for('documents.list_documents') }}" class="btn btn-secondary">
+                    Alle Dokumente anzeigen
+                </a>
+            </div>
+        </div>
+
+        <!-- Letzte Post-Einträge -->
+        <div class="activity-section">
+            <h3>✉️ Letzte Post-Einträge</h3>
+            <ul class="activity-list">
+                {% for entry in recent_post %}
+                <li class="activity-item">
+                    <span class="activity-icon">
+                        {% if entry.direction == 'inbound' %}📥{% else %}📤{% endif %}
+                    </span>
+                    <div class="activity-info">
+                        <div class="activity-title">{{ entry.subject }}</div>
+                        <div class="activity-meta">
+                            {{ entry.entry_date|format_datetime }}
+                            | {{ entry.type }}
+                            {% if entry.customer %}
+                            | {{ entry.customer.name }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="activity-action">
+                        <a href="{{ url_for('documents.post_list') }}" class="btn btn-sm btn-primary">
+                            Ansehen
+                        </a>
+                    </div>
+                </li>
+                {% else %}
+                <li style="padding: 1rem; text-align: center; color: #7f8c8d;">
+                    Noch keine Post-Einträge vorhanden
+                </li>
+                {% endfor %}
+            </ul>
+            <div style="margin-top: 1rem; text-align: center;">
+                <a href="{{ url_for('documents.post_list') }}" class="btn btn-secondary">
+                    Postbuch anzeigen
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Quick Links -->
+    <div style="margin-top: 2rem; text-align: center;">
+        <a href="{{ url_for('documents.email_accounts') }}" class="btn btn-secondary">
+            📧 E-Mail-Konten verwalten
+        </a>
+        <a href="{{ url_for('documents.email_archived') }}" class="btn btn-secondary">
+            📬 Archivierte E-Mails
+        </a>
+        <a href="{{ url_for('documents.search') }}" class="btn btn-secondary">
+            🔍 Dokumente durchsuchen
+        </a>
+    </div>
+
+</div>
+{% endblock %}
