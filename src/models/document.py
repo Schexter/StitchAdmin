@@ -195,6 +195,72 @@ class DocumentAccessLog(db.Model):
         return f'<DocumentAccessLog {self.action} by User {self.user_id} at {self.timestamp}>'
 
 
+class ShippingBulk(db.Model):
+    """
+    Versand-Bulk für Massen-Versand
+    Gruppiert mehrere Sendungen für gemeinsamen Export/Druck
+    """
+    __tablename__ = 'shipping_bulks'
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Basis-Daten
+    bulk_number = db.Column(db.String(50), unique=True, nullable=False)  # BULK-2025-001
+    name = db.Column(db.String(200))  # "Weihnachtsversand 2025"
+    carrier = db.Column(db.String(50))  # DHL, DPD, etc.
+
+    # Status
+    status = db.Column(db.String(20), default='draft')  # draft, ready, printed, shipped, completed
+
+    # Versand-Details
+    planned_ship_date = db.Column(db.Date)  # Geplantes Versanddatum
+    actual_ship_date = db.Column(db.Date)  # Tatsächliches Versanddatum
+
+    # Export-Informationen
+    csv_exported = db.Column(db.Boolean, default=False)
+    csv_export_date = db.Column(db.DateTime)
+    csv_file_path = db.Column(db.String(500))  # Pfad zur generierten CSV
+
+    # Druck-Informationen
+    labels_printed = db.Column(db.Boolean, default=False)
+    labels_print_date = db.Column(db.DateTime)
+
+    # Statistiken
+    total_items = db.Column(db.Integer, default=0)
+    total_weight = db.Column(db.Numeric(10, 2))  # kg
+    total_cost = db.Column(db.Numeric(10, 2))
+
+    # Notizen
+    notes = db.Column(db.Text)
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    creator = db.relationship('User', backref='shipping_bulks', foreign_keys=[created_by])
+
+    def __repr__(self):
+        return f'<ShippingBulk {self.bulk_number}: {self.name}>'
+
+    @staticmethod
+    def generate_bulk_number():
+        """Generiert eine eindeutige Bulk-Nummer: BULK-YYYY-NNN"""
+        year = datetime.now().year
+        last_bulk = ShippingBulk.query.filter(
+            ShippingBulk.bulk_number.like(f'BULK-{year}-%')
+        ).order_by(ShippingBulk.id.desc()).first()
+
+        if last_bulk:
+            last_number = int(last_bulk.bulk_number.split('-')[-1])
+            new_number = last_number + 1
+        else:
+            new_number = 1
+
+        return f'BULK-{year}-{new_number:03d}'
+
+
 class PostEntry(db.Model):
     """
     Postbuch - Ein- und ausgehende Post
@@ -254,7 +320,24 @@ class PostEntry(db.Model):
     # Notizen
     notes = db.Column(db.Text)
     internal_notes = db.Column(db.Text)  # Nicht für Kunden sichtbar
-    
+
+    # Bulk-Versand (für Massen-Versand)
+    shipping_bulk_id = db.Column(db.Integer, db.ForeignKey('shipping_bulks.id'), nullable=True)
+
+    # Erwartete Lieferung
+    expected_delivery_date = db.Column(db.Date)  # Für erwartete Eingänge
+
+    # Versand-Workflow
+    email_notification_sent = db.Column(db.Boolean, default=False)
+    email_notification_date = db.Column(db.DateTime)
+    printed_at = db.Column(db.DateTime)  # Wann Versandetikett gedruckt
+    shipped_at = db.Column(db.DateTime)  # Wann tatsächlich versendet
+
+    # Workflow-Integration (Packlisten & Lieferscheine)
+    packing_list_id = db.Column(db.Integer, db.ForeignKey('packing_lists.id'), nullable=True)
+    delivery_note_id = db.Column(db.Integer, db.ForeignKey('delivery_notes.id'), nullable=True)
+    is_auto_created = db.Column(db.Boolean, default=False)  # Automatisch aus Workflow erstellt
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -264,6 +347,7 @@ class PostEntry(db.Model):
     order = db.relationship('Order', backref='post_entries', foreign_keys=[order_id])
     document = db.relationship('Document', backref='post_entries', foreign_keys=[document_id])
     handler = db.relationship('User', backref='handled_post_entries', foreign_keys=[handled_by])
+    shipping_bulk = db.relationship('ShippingBulk', backref='post_entries', foreign_keys=[shipping_bulk_id])
     
     def __repr__(self):
         return f'<PostEntry {self.entry_number}: {self.subject}>'

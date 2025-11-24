@@ -8,11 +8,9 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     
-    <!-- Favicon -->
+    <!-- Favicon (optional) -->
     {% if branding and branding.logo_path %}
         <link rel="icon" href="{{ url_for('static', filename=branding.logo_path) }}">
-    {% else %}
-        <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
     {% endif %}
 
     <!-- Dynamisches Farbschema -->
@@ -35,7 +33,10 @@
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('dashboard') }}">
                 {% if branding and branding.logo_path %}
-                    <img src="{{ url_for('static', filename=branding.logo_path) }}" alt="Logo" height="30" class="d-inline-block align-text-top">
+                    <img src="{{ url_for('static', filename=branding.logo_path) }}" alt="Logo" height="30" class="d-inline-block align-text-top me-2">
+                {% endif %}
+                {% if branding and branding.company_name %}
+                    {{ branding.company_name }}
                 {% else %}
                     StitchAdmin
                 {% endif %}
@@ -76,8 +77,14 @@
                             <i class="bi bi-person-circle"></i> {{ current_user.username }}
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
+                            <li>
+                                <a class="dropdown-item" href="{{ url_for('dashboard_api.my_modules') }}">
+                                    <i class="bi bi-grid-3x3"></i> Meine Module
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider"></li>
                             {% if current_user.is_admin %}
-                            <li><a class="dropdown-item" href="{{ url_for('settings.index') }}">Einstellungen</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('settings.index') }}"><i class="bi bi-gear"></i> Einstellungen</a></li>
                             <li><hr class="dropdown-divider"></li>
                             {% endif %}
                             <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a></li>

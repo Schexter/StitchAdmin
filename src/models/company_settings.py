@@ -59,6 +59,23 @@ class CompanySettings(db.Model):
     # Logo
     logo_path = db.Column(db.String(500))  # Pfad zum Logo
 
+    # Workflow-Automatisierung
+    # Rechnungserstellung
+    invoice_creation_mode = db.Column(db.String(20), default='manual')  # manual, after_delivery, delayed
+    invoice_creation_delay_days = db.Column(db.Integer, default=0)  # Tage nach Versand (bei 'delayed')
+
+    # Automatisierung
+    auto_create_packing_list = db.Column(db.Boolean, default=True)
+    auto_create_delivery_note = db.Column(db.Boolean, default=True)
+    auto_send_tracking_email = db.Column(db.Boolean, default=True)
+
+    # Qualitätskontrolle
+    require_qc_before_packing = db.Column(db.Boolean, default=False)
+    require_qc_photos = db.Column(db.Boolean, default=False)
+
+    # Lagerbuchung
+    auto_inventory_booking = db.Column(db.Boolean, default=True)
+
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)

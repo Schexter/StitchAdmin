@@ -1,342 +1,322 @@
 {% extends "base.html" %}
 
-{% block title %}Dokumente & Post - StitchAdmin 2.0{% endblock %}
-
-{% block extra_css %}
-<style>
-    .documents-dashboard {
-        padding: 2rem;
-    }
-
-    .doc-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 2rem;
-    }
-
-    .doc-header h2 {
-        margin: 0;
-        color: #2c3e50;
-    }
-
-    .doc-actions {
-        display: flex;
-        gap: 1rem;
-    }
-
-    /* Stats Cards */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-
-    .stat-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        border-left: 4px solid #667eea;
-    }
-
-    .stat-card.warning {
-        border-left-color: #ffa726;
-    }
-
-    .stat-card.danger {
-        border-left-color: #ef5350;
-    }
-
-    .stat-card .stat-label {
-        color: #7f8c8d;
-        font-size: 0.9rem;
-        margin-bottom: 0.5rem;
-    }
-
-    .stat-card .stat-value {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #2c3e50;
-    }
-
-    /* Recent Activity */
-    .activity-section {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        margin-bottom: 1.5rem;
-    }
-
-    .activity-section h3 {
-        margin-top: 0;
-        color: #2c3e50;
-        border-bottom: 2px solid #ecf0f1;
-        padding-bottom: 0.5rem;
-    }
-
-    .activity-list {
-        list-style: none;
-        padding: 0;
-    }
-
-    .activity-item {
-        padding: 1rem;
-        border-bottom: 1px solid #ecf0f1;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .activity-item:last-child {
-        border-bottom: none;
-    }
-
-    .activity-item:hover {
-        background: #f8f9fa;
-    }
-
-    .activity-icon {
-        font-size: 1.5rem;
-        margin-right: 1rem;
-    }
-
-    .activity-info {
-        flex: 1;
-    }
-
-    .activity-title {
-        font-weight: bold;
-        color: #2c3e50;
-    }
-
-    .activity-meta {
-        font-size: 0.85rem;
-        color: #7f8c8d;
-    }
-
-    .activity-action {
-        margin-left: 1rem;
-    }
-
-    /* Reminder Cards */
-    .reminder-card {
-        background: #fff3cd;
-        border-left: 4px solid #ffc107;
-        padding: 1rem;
-        margin-bottom: 0.5rem;
-        border-radius: 5px;
-    }
-
-    .reminder-card.overdue {
-        background: #f8d7da;
-        border-left-color: #dc3545;
-    }
-
-    /* Buttons */
-    .btn {
-        padding: 0.5rem 1rem;
-        border-radius: 5px;
-        text-decoration: none;
-        display: inline-block;
-        border: none;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .btn-primary {
-        background: #667eea;
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background: #5568d3;
-    }
-
-    .btn-success {
-        background: #28a745;
-        color: white;
-    }
-
-    .btn-success:hover {
-        background: #218838;
-    }
-
-    .btn-secondary {
-        background: #6c757d;
-        color: white;
-    }
-
-    .btn-secondary:hover {
-        background: #5a6268;
-    }
-
-    .btn-sm {
-        padding: 0.25rem 0.5rem;
-        font-size: 0.875rem;
-    }
-</style>
-{% endblock %}
+{% block title %}Dokumente & Post - StitchAdmin{% endblock %}
 
 {% block content %}
-<div class="documents-dashboard">
-    
-    <!-- Header -->
-    <div class="doc-header">
-        <h2>📁 Dokumente & Post</h2>
-        <div class="doc-actions">
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-folder2-open"></i> Dokumente & Post</h1>
+
+        <div class="mb-3">
             <a href="{{ url_for('documents.upload') }}" class="btn btn-primary">
-                📤 Dokument hochladen
+                <i class="bi bi-cloud-upload"></i> Dokument hochladen
             </a>
             <a href="{{ url_for('documents.post_new') }}" class="btn btn-success">
-                ✉️ Post erfassen
+                <i class="bi bi-envelope-plus"></i> Post erfassen
+            </a>
+            <a href="{{ url_for('documents.list_documents') }}" class="btn btn-secondary">
+                <i class="bi bi-file-earmark-text"></i> Alle Dokumente
+            </a>
+            <a href="{{ url_for('documents.post_list') }}" class="btn btn-secondary">
+                <i class="bi bi-mailbox"></i> Postbuch
             </a>
         </div>
     </div>
+</div>
 
-    <!-- Statistiken -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-label">Dokumente gesamt</div>
-            <div class="stat-value">{{ total_documents }}</div>
-        </div>
-        
-        <div class="stat-card">
-            <div class="stat-label">Diesen Monat</div>
-            <div class="stat-value">{{ documents_this_month }}</div>
-        </div>
-        
-        <div class="stat-card warning">
-            <div class="stat-label">Offene Post</div>
-            <div class="stat-value">{{ open_post }}</div>
-        </div>
-        
-        <div class="stat-card danger">
-            <div class="stat-label">Überfällige Post</div>
-            <div class="stat-value">{{ overdue_post }}</div>
-        </div>
-        
-        <div class="stat-card warning">
-            <div class="stat-label">Ungelesene E-Mails</div>
-            <div class="stat-value">{{ unread_emails }}</div>
+<!-- Statistik-Kacheln -->
+<div class="row mb-3">
+    <div class="col-md-3">
+        <div class="card border-primary">
+            <div class="card-body">
+                <h6 class="text-muted"><i class="bi bi-file-earmark"></i> Dokumente gesamt</h6>
+                <h3 class="mb-0">{{ total_documents }}</h3>
+                <small class="text-muted">Aktuellste Versionen</small>
+            </div>
         </div>
     </div>
 
-    <!-- Wiedervorlagen -->
-    {% if reminders %}
-    <div class="activity-section">
-        <h3>🔔 Wiedervorlagen</h3>
-        {% for reminder in reminders %}
-        <div class="reminder-card {% if reminder.is_overdue() %}overdue{% endif %}">
-            <strong>{{ reminder.subject }}</strong><br>
-            <small>
-                Fällig: {{ reminder.reminder_date|format_date }}
-                {% if reminder.customer %}
-                | Kunde: {{ reminder.customer.name }}
+    <div class="col-md-3">
+        <div class="card border-info">
+            <div class="card-body">
+                <h6 class="text-muted"><i class="bi bi-calendar-month"></i> Diesen Monat</h6>
+                <h3 class="mb-0">{{ documents_this_month }}</h3>
+                <small class="text-muted">Neue Dokumente</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card border-warning">
+            <div class="card-body">
+                <h6 class="text-muted"><i class="bi bi-mailbox"></i> Offene Post</h6>
+                <h3 class="mb-0">{{ open_post }}</h3>
+                <small class="text-muted">Zu bearbeiten</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card border-danger">
+            <div class="card-body">
+                <h6 class="text-muted"><i class="bi bi-exclamation-triangle"></i> Überfällige Post</h6>
+                <h3 class="mb-0">{{ overdue_post }}</h3>
+                <small class="text-muted">Dringend</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-3">
+        <div class="card border-secondary">
+            <div class="card-body">
+                <h6 class="text-muted"><i class="bi bi-envelope-open"></i> Ungelesene E-Mails</h6>
+                <h3 class="mb-0">{{ unread_emails }}</h3>
+                <small class="text-muted">Im Archiv</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Wiedervorlagen -->
+{% if reminders %}
+<div class="card mb-3 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0"><i class="bi bi-alarm"></i> Wiedervorlagen ({{ reminders|length }})</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Fällig</th>
+                        <th>Betreff</th>
+                        <th>Kunde</th>
+                        <th>Status</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for reminder in reminders %}
+                    <tr class="{% if reminder.is_overdue() %}table-danger{% endif %}">
+                        <td>
+                            {{ reminder.reminder_date.strftime('%d.%m.%Y') }}
+                            {% if reminder.is_overdue() %}
+                            <span class="badge bg-danger">Überfällig</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ reminder.subject }}</strong></td>
+                        <td>
+                            {% if reminder.customer %}
+                            {{ reminder.customer.name }}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if reminder.status == 'open' %}
+                                <span class="badge bg-warning">Offen</span>
+                            {% elif reminder.status == 'in_progress' %}
+                                <span class="badge bg-info">In Bearbeitung</span>
+                            {% elif reminder.status == 'completed' %}
+                                <span class="badge bg-success">Erledigt</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('documents.post_view', id=reminder.id) }}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-eye"></i> Anzeigen
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Zwei-Spalten Layout für letzte Aktivitäten -->
+<div class="row">
+
+    <!-- Letzte Dokumente -->
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> Letzte Dokumente ({{ recent_documents|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_documents %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Typ</th>
+                                <th>Titel</th>
+                                <th>Datum</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for doc in recent_documents %}
+                            <tr>
+                                <td>
+                                    {% if doc.is_pdf() %}
+                                        <i class="bi bi-file-pdf text-danger" title="PDF"></i>
+                                    {% elif doc.is_image() %}
+                                        <i class="bi bi-file-image text-info" title="Bild"></i>
+                                    {% else %}
+                                        <i class="bi bi-file-earmark" title="Dokument"></i>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ doc.title }}</strong>
+                                    {% if doc.customer %}
+                                    <br><small class="text-muted">{{ doc.customer.name }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>{{ doc.created_at.strftime('%d.%m.%Y') }}</small>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('documents.view', id=doc.id) }}"
+                                       class="btn btn-sm btn-info" title="Ansehen">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('documents.download', id=doc.id) }}"
+                                       class="btn btn-sm btn-success" title="Download">
+                                        <i class="bi bi-download"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">Noch keine Dokumente vorhanden</p>
                 {% endif %}
-            </small>
-            <a href="{{ url_for('documents.post_list') }}" class="btn btn-sm btn-primary" style="float: right;">
-                Anzeigen
-            </a>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
 
-    <!-- Zwei-Spalten Layout -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-        
-        <!-- Letzte Dokumente -->
-        <div class="activity-section">
-            <h3>📄 Letzte Dokumente</h3>
-            <ul class="activity-list">
-                {% for doc in recent_documents %}
-                <li class="activity-item">
-                    <span class="activity-icon">
-                        {% if doc.is_pdf() %}📄{% elif doc.is_image() %}🖼️{% else %}📎{% endif %}
-                    </span>
-                    <div class="activity-info">
-                        <div class="activity-title">{{ doc.title }}</div>
-                        <div class="activity-meta">
-                            {{ doc.created_at|format_datetime }}
-                            {% if doc.customer %}
-                            | {{ doc.customer.name }}
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="activity-action">
-                        <a href="{{ url_for('documents.view', id=doc.id) }}" class="btn btn-sm btn-primary">
-                            Ansehen
-                        </a>
-                    </div>
-                </li>
-                {% else %}
-                <li style="padding: 1rem; text-align: center; color: #7f8c8d;">
-                    Noch keine Dokumente vorhanden
-                </li>
-                {% endfor %}
-            </ul>
-            <div style="margin-top: 1rem; text-align: center;">
-                <a href="{{ url_for('documents.list_documents') }}" class="btn btn-secondary">
-                    Alle Dokumente anzeigen
-                </a>
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('documents.list_documents') }}" class="btn btn-secondary">
+                        <i class="bi bi-list"></i> Alle Dokumente anzeigen
+                    </a>
+                </div>
             </div>
         </div>
-
-        <!-- Letzte Post-Einträge -->
-        <div class="activity-section">
-            <h3>✉️ Letzte Post-Einträge</h3>
-            <ul class="activity-list">
-                {% for entry in recent_post %}
-                <li class="activity-item">
-                    <span class="activity-icon">
-                        {% if entry.direction == 'inbound' %}📥{% else %}📤{% endif %}
-                    </span>
-                    <div class="activity-info">
-                        <div class="activity-title">{{ entry.subject }}</div>
-                        <div class="activity-meta">
-                            {{ entry.entry_date|format_datetime }}
-                            | {{ entry.type }}
-                            {% if entry.customer %}
-                            | {{ entry.customer.name }}
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="activity-action">
-                        <a href="{{ url_for('documents.post_list') }}" class="btn btn-sm btn-primary">
-                            Ansehen
-                        </a>
-                    </div>
-                </li>
-                {% else %}
-                <li style="padding: 1rem; text-align: center; color: #7f8c8d;">
-                    Noch keine Post-Einträge vorhanden
-                </li>
-                {% endfor %}
-            </ul>
-            <div style="margin-top: 1rem; text-align: center;">
-                <a href="{{ url_for('documents.post_list') }}" class="btn btn-secondary">
-                    Postbuch anzeigen
-                </a>
-            </div>
-        </div>
-
     </div>
 
-    <!-- Quick Links -->
-    <div style="margin-top: 2rem; text-align: center;">
-        <a href="{{ url_for('documents.email_accounts') }}" class="btn btn-secondary">
-            📧 E-Mail-Konten verwalten
-        </a>
-        <a href="{{ url_for('documents.email_archived') }}" class="btn btn-secondary">
-            📬 Archivierte E-Mails
-        </a>
-        <a href="{{ url_for('documents.search') }}" class="btn btn-secondary">
-            🔍 Dokumente durchsuchen
-        </a>
+    <!-- Letzte Post-Einträge -->
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-mailbox"></i> Letzte Post-Einträge ({{ recent_post|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_post %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th><i class="bi bi-arrow-left-right"></i></th>
+                                <th>Betreff</th>
+                                <th>Datum</th>
+                                <th>Status</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in recent_post %}
+                            <tr>
+                                <td>
+                                    {% if entry.direction == 'inbound' %}
+                                        <i class="bi bi-box-arrow-in-down text-success" title="Eingang"></i>
+                                    {% else %}
+                                        <i class="bi bi-box-arrow-up text-primary" title="Ausgang"></i>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>{{ entry.subject }}</strong>
+                                    <br><small class="text-muted">{{ entry.type }}</small>
+                                    {% if entry.customer %}
+                                    <br><small class="text-muted">{{ entry.customer.name }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>{{ entry.entry_date.strftime('%d.%m.%Y') if entry.entry_date else '-' }}</small>
+                                </td>
+                                <td>
+                                    {% if entry.status == 'open' %}
+                                        <span class="badge bg-warning">Offen</span>
+                                    {% elif entry.status == 'in_progress' %}
+                                        <span class="badge bg-info">In Bearbeitung</span>
+                                    {% elif entry.status == 'completed' %}
+                                        <span class="badge bg-success">Erledigt</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('documents.post_view', id=entry.id) }}"
+                                       class="btn btn-sm btn-info" title="Ansehen">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">Noch keine Post-Einträge vorhanden</p>
+                {% endif %}
+
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('documents.post_list') }}" class="btn btn-secondary">
+                        <i class="bi bi-list"></i> Postbuch anzeigen
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>
+
+<!-- Quick Links -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-link-45deg"></i> Schnellzugriff</h5>
+    </div>
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col-md-3 mb-2">
+                <a href="{{ url_for('documents.email_accounts') }}" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-envelope-at"></i><br>
+                    E-Mail-Konten verwalten
+                </a>
+            </div>
+            <div class="col-md-3 mb-2">
+                <a href="{{ url_for('documents.email_archived') }}" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-archive"></i><br>
+                    Archivierte E-Mails
+                </a>
+            </div>
+            <div class="col-md-3 mb-2">
+                <a href="{{ url_for('documents.search') }}" class="btn btn-outline-info w-100">
+                    <i class="bi bi-search"></i><br>
+                    Dokumente durchsuchen
+                </a>
+            </div>
+            <div class="col-md-3 mb-2">
+                <a href="{{ url_for('documents.upload') }}" class="btn btn-outline-success w-100">
+                    <i class="bi bi-cloud-upload"></i><br>
+                    Dokument hochladen
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

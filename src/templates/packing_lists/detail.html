@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+
+{% block title %}Packliste {{ packing_list.packing_list_number }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>
+                <i class="bi bi-box-seam"></i> Packliste {{ packing_list.display_number }}
+            </h1>
+            <div>
+                <span class="badge bg-{{ packing_list.get_status_color() }} fs-5">
+                    {{ packing_list.get_status_label() }}
+                </span>
+            </div>
+        </div>
+        <div class="mt-3">
+            <a href="{{ url_for('packing_lists.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Zurück
+            </a>
+            <a href="{{ url_for('packing_lists.edit', id=packing_list.id) }}" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> Bearbeiten
+            </a>
+            <a href="{{ url_for('packing_lists.print_packing_list', id=packing_list.id) }}"
+               class="btn btn-info" target="_blank">
+                <i class="bi bi-printer"></i> Drucken
+            </a>
+            {% if packing_list.status in ['ready', 'qc_passed'] %}
+            <a href="{{ url_for('packing_lists.qc', id=packing_list.id) }}" class="btn btn-warning">
+                <i class="bi bi-clipboard-check"></i> Qualitätskontrolle
+            </a>
+            {% endif %}
+            {% if packing_list.status == 'qc_passed' and not packing_list.packed_confirmed %}
+            <form method="POST" action="{{ url_for('packing_lists.pack', id=packing_list.id) }}"
+                  style="display: inline;">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-box-seam-fill"></i> Als verpackt markieren
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Basis-Informationen -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> Basis-Informationen</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th style="width: 40%;">Packlisten-Nr.:</th>
+                        <td>{{ packing_list.packing_list_number }}</td>
+                    </tr>
+                    <tr>
+                        <th>Erstellt am:</th>
+                        <td>{{ packing_list.created_at.strftime('%d.%m.%Y %H:%M') if packing_list.created_at else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Erstellt von:</th>
+                        <td>{{ packing_list.creator.username if packing_list.creator else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Kunde:</th>
+                        <td>
+                            {% if packing_list.customer %}
+                            <a href="{{ url_for('customers.show', customer_id=packing_list.customer_id) }}">
+                                {% if packing_list.customer.company_name %}
+                                    {{ packing_list.customer.company_name }}
+                                {% else %}
+                                    {{ packing_list.customer.first_name }} {{ packing_list.customer.last_name }}
+                                {% endif %}
+                            </a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Auftrag:</th>
+                        <td>
+                            {% if packing_list.order %}
+                            <a href="{{ url_for('orders.show', order_id=packing_list.order_id) }}">
+                                {{ packing_list.order.order_number or packing_list.order_id }}
+                            </a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if packing_list.is_partial_delivery %}
+                    <tr>
+                        <th>Teillieferung:</th>
+                        <td>
+                            <span class="badge bg-info">
+                                <i class="bi bi-boxes"></i> {{ packing_list.carton_label }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-rulers"></i> Paket-Informationen</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th style="width: 40%;">Gewicht:</th>
+                        <td>{{ packing_list.total_weight|round(2) if packing_list.total_weight else '-' }} kg</td>
+                    </tr>
+                    <tr>
+                        <th>Länge:</th>
+                        <td>{{ packing_list.package_length|round(2) if packing_list.package_length else '-' }} cm</td>
+                    </tr>
+                    <tr>
+                        <th>Breite:</th>
+                        <td>{{ packing_list.package_width|round(2) if packing_list.package_width else '-' }} cm</td>
+                    </tr>
+                    <tr>
+                        <th>Höhe:</th>
+                        <td>{{ packing_list.package_height|round(2) if packing_list.package_height else '-' }} cm</td>
+                    </tr>
+                    <tr>
+                        <th>Volumen:</th>
+                        <td>
+                            {% if packing_list.package_length and packing_list.package_width and packing_list.package_height %}
+                                {{ (packing_list.package_length * packing_list.package_width * packing_list.package_height / 1000)|round(2) }} L
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Artikel-Liste -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-list-check"></i> Artikel</h5>
+            </div>
+            <div class="card-body">
+                {% if items %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Artikel</th>
+                                <th>EAN</th>
+                                <th class="text-end">Menge</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in items %}
+                            <tr>
+                                <td>{{ item.name }}</td>
+                                <td>{{ item.ean or '-' }}</td>
+                                <td class="text-end">{{ item.quantity }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Keine Artikel in dieser Packliste.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Qualitätskontrolle -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-clipboard-check"></i> Qualitätskontrolle</h5>
+            </div>
+            <div class="card-body">
+                {% if packing_list.qc_performed %}
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle-fill"></i> <strong>QC durchgeführt</strong>
+                </div>
+                <table class="table table-sm">
+                    <tr>
+                        <th style="width: 40%;">Durchgeführt von:</th>
+                        <td>{{ packing_list.qc_user.username if packing_list.qc_user else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Datum:</th>
+                        <td>{{ packing_list.qc_date.strftime('%d.%m.%Y %H:%M') if packing_list.qc_date else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Notizen:</th>
+                        <td>{{ packing_list.qc_notes or '-' }}</td>
+                    </tr>
+                </table>
+                {% if qc_photos %}
+                <div class="mt-3">
+                    <strong>Fotos:</strong><br>
+                    <div class="row g-2 mt-2">
+                        {% for photo in qc_photos %}
+                        <div class="col-md-4">
+                            <img src="/{{ photo }}" class="img-thumbnail" alt="QC Foto">
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> QC noch nicht durchgeführt
+                </div>
+                {% if packing_list.status in ['ready', 'qc_passed'] %}
+                <a href="{{ url_for('packing_lists.qc', id=packing_list.id) }}" class="btn btn-warning">
+                    <i class="bi bi-clipboard-check"></i> QC jetzt durchführen
+                </a>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-box-seam-fill"></i> Verpackung</h5>
+            </div>
+            <div class="card-body">
+                {% if packing_list.packed_confirmed %}
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle-fill"></i> <strong>Verpackt</strong>
+                </div>
+                <table class="table table-sm">
+                    <tr>
+                        <th style="width: 40%;">Verpackt von:</th>
+                        <td>{{ packing_list.packer.username if packing_list.packer else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Datum:</th>
+                        <td>{{ packing_list.packed_at.strftime('%d.%m.%Y %H:%M') if packing_list.packed_at else '-' }}</td>
+                    </tr>
+                </table>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Noch nicht verpackt
+                </div>
+                {% if packing_list.status == 'qc_passed' %}
+                <form method="POST" action="{{ url_for('packing_lists.pack', id=packing_list.id) }}">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-box-seam-fill"></i> Als verpackt markieren
+                    </button>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notizen -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-chat-left-text"></i> Kundenvorgaben</h5>
+            </div>
+            <div class="card-body">
+                <p>{{ packing_list.customer_notes or '-' }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-sticky"></i> Interne Notizen</h5>
+            </div>
+            <div class="card-body">
+                <p>{{ packing_list.packing_notes or '-' }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Verknüpfte Dokumente -->
+<div class="row mt-4 mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-link-45deg"></i> Verknüpfte Dokumente</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th style="width: 30%;">Lieferschein:</th>
+                        <td>
+                            {% if packing_list.delivery_note_id %}
+                                <a href="{{ url_for('delivery_notes.detail', id=packing_list.delivery_note_id) }}">
+                                    Lieferschein anzeigen
+                                </a>
+                            {% else %}
+                                <span class="text-muted">Noch nicht erstellt</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Post-Eintrag:</th>
+                        <td>
+                            {% if packing_list.post_entry_id %}
+                                <a href="{{ url_for('documents.post_detail', id=packing_list.post_entry_id) }}">
+                                    Post-Eintrag anzeigen
+                                </a>
+                            {% else %}
+                                <span class="text-muted">Noch nicht erstellt</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Lagerbuchung:</th>
+                        <td>
+                            {% if packing_list.inventory_booked %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> Gebucht am
+                                    {{ packing_list.inventory_booking_date.strftime('%d.%m.%Y') if packing_list.inventory_booking_date else '-' }}
+                                </span>
+                            {% else %}
+                                <span class="badge bg-warning">Noch nicht gebucht</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lösch-Button (nur bei Entwürfen) -->
+{% if packing_list.status == 'draft' %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5><i class="bi bi-trash"></i> Gefahrenzone</h5>
+            </div>
+            <div class="card-body">
+                <p>Das Löschen dieser Packliste kann nicht rückgängig gemacht werden.</p>
+                <form method="POST" action="{{ url_for('packing_lists.delete', id=packing_list.id) }}"
+                      onsubmit="return confirm('Sind Sie sicher, dass Sie diese Packliste löschen möchten?');">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Packliste löschen
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}{% if packing_list %}Packliste bearbeiten{% else %}Neue Packliste{% endif %} - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <h1>
+            <i class="bi bi-box-seam"></i>
+            {% if packing_list %}
+                Packliste bearbeiten: {{ packing_list.packing_list_number }}
+            {% else %}
+                Neue Packliste erstellen
+            {% endif %}
+        </h1>
+        <div class="mt-3">
+            <a href="{% if packing_list %}{{ url_for('packing_lists.detail', id=packing_list.id) }}{% else %}{{ url_for('packing_lists.index') }}{% endif %}"
+               class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Zurück
+            </a>
+        </div>
+    </div>
+</div>
+
+<form method="POST" class="mt-4">
+    <div class="row">
+        <!-- Linke Spalte -->
+        <div class="col-md-6">
+            <!-- Basis-Informationen -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5><i class="bi bi-info-circle"></i> Basis-Informationen</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Auftrag -->
+                    <div class="mb-3">
+                        <label for="order_id" class="form-label">Auftrag</label>
+                        <select class="form-control" id="order_id" name="order_id"
+                                onchange="loadOrderItems()">
+                            <option value="">-- Auftrag wählen --</option>
+                            {% for order in orders %}
+                            <option value="{{ order.id }}"
+                                    {% if (packing_list and packing_list.order_id == order.id) or (preselected_order and preselected_order.id == order.id) %}selected{% endif %}>
+                                {{ order.order_number or order.id }} -
+                                {% if order.customer %}
+                                    {% if order.customer.company_name %}
+                                        {{ order.customer.company_name }}
+                                    {% else %}
+                                        {{ order.customer.first_name }} {{ order.customer.last_name }}
+                                    {% endif %}
+                                {% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Kunde -->
+                    <div class="mb-3">
+                        <label for="customer_id" class="form-label">Kunde</label>
+                        <select class="form-control" id="customer_id" name="customer_id">
+                            <option value="">-- Kunde wählen --</option>
+                            {% for customer in customers %}
+                            <option value="{{ customer.id }}"
+                                    {% if packing_list and packing_list.customer_id == customer.id %}selected{% endif %}>
+                                {% if customer.company_name %}
+                                    {{ customer.company_name }}
+                                {% else %}
+                                    {{ customer.first_name }} {{ customer.last_name }}
+                                {% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Status -->
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Status</label>
+                        <select class="form-control" id="status" name="status">
+                            <option value="draft" {% if packing_list and packing_list.status == 'draft' %}selected{% endif %}>Entwurf</option>
+                            <option value="ready" {% if (packing_list and packing_list.status == 'ready') or not packing_list %}selected{% endif %}>Bereit zur Verpackung</option>
+                            <option value="qc_passed" {% if packing_list and packing_list.status == 'qc_passed' %}selected{% endif %}>QK bestanden</option>
+                            <option value="packed" {% if packing_list and packing_list.status == 'packed' %}selected{% endif %}>Verpackt</option>
+                            <option value="shipped" {% if packing_list and packing_list.status == 'shipped' %}selected{% endif %}>Versendet</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Teillieferung / Cartons -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5><i class="bi bi-boxes"></i> Teillieferung (Cartons)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="carton_number" class="form-label">Carton-Nummer</label>
+                                <input type="number" class="form-control" id="carton_number"
+                                       name="carton_number" min="1"
+                                       value="{{ packing_list.carton_number if packing_list else 1 }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="total_cartons" class="form-label">Gesamt-Anzahl Cartons</label>
+                                <input type="number" class="form-control" id="total_cartons"
+                                       name="total_cartons" min="1"
+                                       value="{{ packing_list.total_cartons if packing_list else 1 }}">
+                                <small class="form-text text-muted">
+                                    Anzahl &gt; 1 = Teillieferung
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rechte Spalte -->
+        <div class="col-md-6">
+            <!-- Paket-Informationen -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5><i class="bi bi-rulers"></i> Paket-Informationen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="total_weight" class="form-label">Gewicht (kg)</label>
+                        <input type="number" class="form-control" id="total_weight"
+                               name="total_weight" step="0.01" min="0"
+                               value="{{ packing_list.total_weight if packing_list else '' }}">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="package_length" class="form-label">Länge (cm)</label>
+                                <input type="number" class="form-control" id="package_length"
+                                       name="package_length" step="0.1" min="0"
+                                       value="{{ packing_list.package_length if packing_list else '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="package_width" class="form-label">Breite (cm)</label>
+                                <input type="number" class="form-control" id="package_width"
+                                       name="package_width" step="0.1" min="0"
+                                       value="{{ packing_list.package_width if packing_list else '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="package_height" class="form-label">Höhe (cm)</label>
+                                <input type="number" class="form-control" id="package_height"
+                                       name="package_height" step="0.1" min="0"
+                                       value="{{ packing_list.package_height if packing_list else '' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notizen -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5><i class="bi bi-chat-left-text"></i> Notizen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="customer_notes" class="form-label">Kundenvorgaben</label>
+                        <textarea class="form-control" id="customer_notes" name="customer_notes"
+                                  rows="3">{{ packing_list.customer_notes if packing_list else '' }}</textarea>
+                        <small class="form-text text-muted">
+                            z.B. "Einzeln verpacken", "Vorsicht zerbrechlich"
+                        </small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="packing_notes" class="form-label">Interne Notizen</label>
+                        <textarea class="form-control" id="packing_notes" name="packing_notes"
+                                  rows="3">{{ packing_list.packing_notes if packing_list else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Artikel-Liste -->
+    <div class="row mt-3">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-list-check"></i> Artikel</h5>
+                </div>
+                <div class="card-body">
+                    <div id="items-container">
+                        <!-- Items werden dynamisch hinzugefügt -->
+                        {% if packing_list %}
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Artikel</th>
+                                        <th>EAN</th>
+                                        <th>Menge</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="items-tbody">
+                                    {% for item in packing_list.get_items_list() %}
+                                    <tr>
+                                        <td>
+                                            <input type="text" class="form-control item-name"
+                                                   value="{{ item.name }}" required>
+                                        </td>
+                                        <td>
+                                            <input type="text" class="form-control item-ean"
+                                                   value="{{ item.ean or '' }}">
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control item-quantity"
+                                                   value="{{ item.quantity }}" min="1" required>
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn btn-danger btn-sm"
+                                                    onclick="removeItem(this)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="table-responsive">
+                            <table class="table table-striped" id="items-table">
+                                <thead>
+                                    <tr>
+                                        <th>Artikel</th>
+                                        <th>EAN</th>
+                                        <th>Menge</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="items-tbody">
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="addItem()">
+                        <i class="bi bi-plus-lg"></i> Artikel hinzufügen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden Field für Items JSON -->
+    <input type="hidden" id="items_json" name="items_json" value="">
+
+    <!-- Speichern-Button -->
+    <div class="row mt-4 mb-4">
+        <div class="col-md-12">
+            <button type="submit" class="btn btn-success btn-lg">
+                <i class="bi bi-save"></i>
+                {% if packing_list %}Änderungen speichern{% else %}Packliste erstellen{% endif %}
+            </button>
+            <a href="{% if packing_list %}{{ url_for('packing_lists.detail', id=packing_list.id) }}{% else %}{{ url_for('packing_lists.index') }}{% endif %}"
+               class="btn btn-secondary btn-lg">
+                <i class="bi bi-x-lg"></i> Abbrechen
+            </a>
+        </div>
+    </div>
+</form>
+
+<script>
+// Items-Verwaltung
+function addItem() {
+    const tbody = document.getElementById('items-tbody');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>
+            <input type="text" class="form-control item-name" placeholder="Artikelname" required>
+        </td>
+        <td>
+            <input type="text" class="form-control item-ean" placeholder="EAN">
+        </td>
+        <td>
+            <input type="number" class="form-control item-quantity" min="1" value="1" required>
+        </td>
+        <td>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(row);
+}
+
+function removeItem(button) {
+    button.closest('tr').remove();
+}
+
+// Lade Items von Auftrag
+function loadOrderItems() {
+    const orderId = document.getElementById('order_id').value;
+    if (!orderId) return;
+
+    fetch(`/packing_lists/api/from-order/${orderId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Setze Kunde
+                if (data.customer_id) {
+                    document.getElementById('customer_id').value = data.customer_id;
+                }
+                // Setze Kundenvorgaben
+                if (data.customer_notes) {
+                    document.getElementById('customer_notes').value = data.customer_notes;
+                }
+                // Füge Items hinzu
+                const tbody = document.getElementById('items-tbody');
+                tbody.innerHTML = '';
+                data.items.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>
+                            <input type="text" class="form-control item-name" value="${item.name}" required>
+                        </td>
+                        <td>
+                            <input type="text" class="form-control item-ean" value="${item.ean || ''}">
+                        </td>
+                        <td>
+                            <input type="number" class="form-control item-quantity" value="${item.quantity}" min="1" required>
+                        </td>
+                        <td>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="removeItem(this)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+// Vor dem Absenden: Items als JSON speichern
+document.querySelector('form').addEventListener('submit', function(e) {
+    const items = [];
+    document.querySelectorAll('#items-tbody tr').forEach(row => {
+        const name = row.querySelector('.item-name').value;
+        const ean = row.querySelector('.item-ean').value;
+        const quantity = parseInt(row.querySelector('.item-quantity').value);
+        if (name && quantity) {
+            items.push({
+                name: name,
+                ean: ean,
+                quantity: quantity
+            });
+        }
+    });
+    document.getElementById('items_json').value = JSON.stringify(items);
+});
+
+// Auto-load bei preselected order
+{% if preselected_order %}
+window.addEventListener('DOMContentLoaded', function() {
+    loadOrderItems();
+});
+{% endif %}
+</script>
+
+{% endblock %}

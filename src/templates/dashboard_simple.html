@@ -4,13 +4,29 @@
 
 {% block extra_css %}
 <style>
-    /* Kachel-Design */
+    /* Grid Container */
+    .row.g-4 {
+        align-items: stretch !important;
+    }
+    
+    /* Kachel-Design - alle exakt gleich groß */
+    .col-md-6, .col-lg-4 {
+        display: flex;
+    }
+    
+    .col-md-6 > a, .col-lg-4 > a {
+        display: flex;
+        width: 100%;
+    }
+    
     .module-card {
         transition: all 0.3s ease;
         border: none;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        height: 100%;
-        min-height: 200px;
+        width: 100%;
+        min-height: 350px;
+        display: flex;
+        flex-direction: column;
     }
     
     .module-card:hover {
@@ -20,6 +36,9 @@
     
     .module-card .card-body {
         padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
     }
     
     .module-icon {
@@ -41,7 +60,8 @@
     .module-stats {
         border-top: 2px solid #e9ecef;
         padding-top: 1rem;
-        margin-top: 1rem;
+        margin-top: auto;
+        min-height: 100px;
     }
     
     .stat-item {
@@ -60,19 +80,25 @@
         font-size: 1.2rem;
     }
     
-    /* Farbige Top-Borders */
-    .module-card.border-primary { border-top: 4px solid #0d6efd; }
-    .module-card.border-success { border-top: 4px solid #198754; }
-    .module-card.border-info { border-top: 4px solid #0dcaf0; }
-    .module-card.border-warning { border-top: 4px solid #ffc107; }
-    .module-card.border-danger { border-top: 4px solid #dc3545; }
-    .module-card.border-secondary { border-top: 4px solid #6c757d; }
-    .module-card.border-dark { border-top: 4px solid #212529; }
+    /* Farbige Top-Borders - ALLE GLEICH aus Branding */
+    .module-card.border-primary,
+    .module-card.border-success,
+    .module-card.border-info,
+    .module-card.border-warning,
+    .module-card.border-danger,
+    .module-card.border-secondary,
+    .module-card.border-dark {
+        {% if branding and branding.primary_color %}
+        border-top: 4px solid {{ branding.primary_color }} !important;
+        {% else %}
+        border-top: 4px solid #0d6efd !important;
+        {% endif %}
+    }
     
     /* Responsive Grid */
     @media (max-width: 768px) {
         .module-card {
-            min-height: 150px;
+            min-height: 280px;
         }
         .module-icon {
             font-size: 2rem;
@@ -84,8 +110,14 @@
 {% block content %}
 <div class="row mb-4">
     <div class="col-md-12">
-        <h1>🎨 StitchAdmin 2.0</h1>
-        <p class="text-muted">Ihr Textilveredlungs-ERP</p>
+        <h1>
+            {% if branding and branding.company_name %}
+                {{ branding.company_name }}'s Dashboard
+            {% else %}
+                Dashboard
+            {% endif %}
+        </h1>
+        <p class="text-muted">Willkommen {{ current_user.username }}</p>
     </div>
 </div>
 
@@ -261,4 +293,40 @@
     </div>
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// WICHTIG: Kacheln gleich groß machen
+function equalizeCardHeights() {
+    const rows = document.querySelectorAll('.row.g-4');
+    
+    rows.forEach(row => {
+        const cards = row.querySelectorAll('.module-card');
+        let maxHeight = 0;
+        
+        // Erst alle Höhen zurücksetzen
+        cards.forEach(card => {
+            card.style.minHeight = '';
+        });
+        
+        // Finde maximale Höhe
+        cards.forEach(card => {
+            const height = card.offsetHeight;
+            if (height > maxHeight) {
+                maxHeight = height;
+            }
+        });
+        
+        // Setze alle auf maximale Höhe
+        cards.forEach(card => {
+            card.style.minHeight = maxHeight + 'px';
+        });
+    });
+}
+
+// Beim Laden und bei Resize
+window.addEventListener('load', equalizeCardHeights);
+window.addEventListener('resize', equalizeCardHeights);
+</script>
 {% endblock %}

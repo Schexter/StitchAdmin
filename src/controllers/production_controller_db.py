@@ -6,7 +6,7 @@ Produktions-Verwaltung mit Datenbank
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
-from src.models import db, Order, Machine, ProductionSchedule, ActivityLog
+from src.models import db, Order, Machine, ProductionSchedule, ActivityLog, PackingList, PostEntry, CompanySettings
 from sqlalchemy import and_
 import json
 import os
@@ -578,6 +578,71 @@ def complete_production(order_id):
     # Aktivität protokollieren
     log_activity('production_completed',
                 f'Produktion abgeschlossen: Auftrag {order.id}')
+
+    # WORKFLOW-AUTOMATISIERUNG: Packliste & Post-Eintrag erstellen
+    try:
+        settings = CompanySettings.get_settings()
+
+        # 1. Packliste erstellen (wenn aktiviert)
+        if settings.auto_create_packing_list and order.auto_create_packing_list:
+            # Prüfe ob bereits eine Packliste existiert
+            existing_pl = PackingList.query.filter_by(order_id=order.id).first()
+            if not existing_pl:
+                # Erstelle Packliste
+                packing_list = PackingList(
+                    packing_list_number=PackingList.generate_packing_list_number(),
+                    order_id=order.id,
+                    customer_id=order.customer_id,
+                    status='ready',
+                    customer_notes=order.customer_notes or '',
+                    created_by=current_user.id
+                )
+
+                # Items aus Auftrag übernehmen
+                items = []
+                if order.order_items:
+                    for order_item in order.order_items:
+                        items.append({
+                            'article_id': order_item.article_id,
+                            'name': order_item.article.name if order_item.article else 'Unbekannt',
+                            'quantity': order_item.quantity,
+                            'ean': order_item.article.ean if order_item.article else ''
+                        })
+                packing_list.set_items_list(items)
+
+                db.session.add(packing_list)
+                db.session.flush()  # Um ID zu erhalten
+
+                # Verknüpfe mit Auftrag
+                order.packing_list_id = packing_list.id
+
+                # 2. Post-Eintrag erstellen (wenn Packliste erstellt wurde)
+                post_entry = PostEntry(
+                    type='outgoing',
+                    customer_id=order.customer_id,
+                    status='draft',
+                    packing_list_id=packing_list.id,
+                    is_auto_created=True,
+                    created_by=current_user.id,
+                    created_at=datetime.utcnow()
+                )
+                db.session.add(post_entry)
+                db.session.flush()
+
+                # Verknüpfe Post-Eintrag mit Packliste
+                packing_list.post_entry_id = post_entry.id
+
+                db.session.commit()
+
+                log_activity('packing_list_auto_created',
+                           f'Packliste {packing_list.packing_list_number} automatisch erstellt für Auftrag {order.id}')
+
+                flash(f'Packliste {packing_list.packing_list_number} und Post-Eintrag wurden automatisch erstellt.', 'info')
+    except Exception as e:
+        print(f"[WARNUNG] Workflow-Automatisierung fehlgeschlagen: {e}")
+        import traceback
+        traceback.print_exc()
+        # Nicht kritisch - Produktion wurde erfolgreich abgeschlossen
 
     flash(f'Produktion für Auftrag {order.id} wurde abgeschlossen!', 'success')
     return redirect(url_for('production.index'))

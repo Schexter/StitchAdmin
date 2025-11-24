@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Packlisten - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-box-seam"></i> Packlisten</h1>
+        <div class="mt-3">
+            <a href="{{ url_for('packing_lists.new') }}" class="btn btn-success btn-lg">
+                <i class="bi bi-plus-lg"></i> Neue Packliste
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Filter -->
+<div class="card mt-3 mb-3">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Suche</label>
+                <input type="text" class="form-control" name="search"
+                       value="{{ search_query or '' }}"
+                       placeholder="Packlisten-Nr., Kunde, Auftrag...">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Status</label>
+                <select class="form-control" name="status">
+                    <option value="">Alle</option>
+                    <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Entwurf</option>
+                    <option value="ready" {% if status_filter == 'ready' %}selected{% endif %}>Bereit zur Verpackung</option>
+                    <option value="qc_passed" {% if status_filter == 'qc_passed' %}selected{% endif %}>QK bestanden</option>
+                    <option value="packed" {% if status_filter == 'packed' %}selected{% endif %}>Verpackt</option>
+                    <option value="shipped" {% if status_filter == 'shipped' %}selected{% endif %}>Versendet</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-funnel"></i> Filtern
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tabs für Status -->
+<ul class="nav nav-tabs mt-3" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="ready-tab" data-bs-toggle="tab"
+                data-bs-target="#ready" type="button" role="tab">
+            <i class="bi bi-box"></i> Bereit zur Verpackung
+            <span class="badge bg-warning">{{ lists_by_status.ready|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="qc-tab" data-bs-toggle="tab"
+                data-bs-target="#qc_passed" type="button" role="tab">
+            <i class="bi bi-check-circle"></i> QK bestanden
+            <span class="badge bg-info">{{ lists_by_status.qc_passed|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="packed-tab" data-bs-toggle="tab"
+                data-bs-target="#packed" type="button" role="tab">
+            <i class="bi bi-box-seam-fill"></i> Verpackt
+            <span class="badge bg-success">{{ lists_by_status.packed|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="shipped-tab" data-bs-toggle="tab"
+                data-bs-target="#shipped" type="button" role="tab">
+            <i class="bi bi-truck"></i> Versendet
+            <span class="badge bg-primary">{{ lists_by_status.shipped|length }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="draft-tab" data-bs-toggle="tab"
+                data-bs-target="#draft" type="button" role="tab">
+            <i class="bi bi-pencil"></i> Entwürfe
+            <span class="badge bg-secondary">{{ lists_by_status.draft|length }}</span>
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content mt-3">
+    <!-- Ready Tab -->
+    <div class="tab-pane fade show active" id="ready" role="tabpanel">
+        {% include 'packing_lists/_table.html' with packing_lists=lists_by_status.ready %}
+    </div>
+
+    <!-- QC Passed Tab -->
+    <div class="tab-pane fade" id="qc_passed" role="tabpanel">
+        {% include 'packing_lists/_table.html' with packing_lists=lists_by_status.qc_passed %}
+    </div>
+
+    <!-- Packed Tab -->
+    <div class="tab-pane fade" id="packed" role="tabpanel">
+        {% include 'packing_lists/_table.html' with packing_lists=lists_by_status.packed %}
+    </div>
+
+    <!-- Shipped Tab -->
+    <div class="tab-pane fade" id="shipped" role="tabpanel">
+        {% include 'packing_lists/_table.html' with packing_lists=lists_by_status.shipped %}
+    </div>
+
+    <!-- Draft Tab -->
+    <div class="tab-pane fade" id="draft" role="tabpanel">
+        {% include 'packing_lists/_table.html' with packing_lists=lists_by_status.draft %}
+    </div>
+</div>
+
+{% endblock %}

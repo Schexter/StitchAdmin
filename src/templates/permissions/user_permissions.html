@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Berechtigungen für {{ user.username }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1>
+            <i class="bi bi-person-lock"></i> Berechtigungen: {{ user.username }}
+            {% if user.is_admin %}
+            <span class="badge bg-danger">Admin</span>
+            {% endif %}
+        </h1>
+        <p class="text-muted">{{ user.email }}</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <!-- Schnell-Zuweisung -->
+        <div class="btn-group">
+            <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-lightning"></i> Schnell-Zuweisung
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <a class="dropdown-item quick-assign" href="#" data-level="view">
+                        <i class="bi bi-eye"></i> Alle: Nur Ansehen
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item quick-assign" href="#" data-level="edit">
+                        <i class="bi bi-pencil"></i> Alle: Ansehen + Bearbeiten
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item quick-assign" href="#" data-level="full">
+                        <i class="bi bi-star"></i> Alle: Voller Zugriff
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% if user.is_admin %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> 
+    <strong>Administrator:</strong> Dieser Benutzer hat automatisch Vollzugriff auf alle Module.
+    Die unten aufgeführten Berechtigungen gelten nur, wenn der Admin-Status entfernt wird.
+</div>
+{% endif %}
+
+<form method="POST" action="{{ url_for('permissions.update_user_permissions', user_id=user.id) }}">
+    
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Modul-Berechtigungen</h5>
+        </div>
+        <div class="card-body">
+            
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th style="width: 40%;">Modul</th>
+                            <th class="text-center">
+                                <i class="bi bi-eye"></i><br>
+                                <small>Ansehen</small>
+                            </th>
+                            <th class="text-center">
+                                <i class="bi bi-plus-circle"></i><br>
+                                <small>Erstellen</small>
+                            </th>
+                            <th class="text-center">
+                                <i class="bi bi-pencil"></i><br>
+                                <small>Bearbeiten</small>
+                            </th>
+                            <th class="text-center">
+                                <i class="bi bi-trash"></i><br>
+                                <small>Löschen</small>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for module in modules %}
+                        <tr>
+                            <td>
+                                <span style="font-size: 1.5rem;">{{ module.icon }}</span>
+                                <strong class="ms-2">{{ module.display_name }}</strong>
+                                <br>
+                                <small class="text-muted ms-5">{{ module.description }}</small>
+                                
+                                {% if module.requires_admin %}
+                                <br>
+                                <span class="badge bg-danger ms-5">Nur für Admins</span>
+                                {% endif %}
+                            </td>
+                            
+                            {% set perm = permissions.get(module.id) %}
+                            {% set disabled = (module.requires_admin and not user.is_admin) %}
+                            
+                            <td class="text-center">
+                                <input type="checkbox" 
+                                       class="form-check-input" 
+                                       name="module_{{ module.id }}_view"
+                                       {% if perm and perm.can_view %}checked{% endif %}
+                                       {% if disabled %}disabled{% endif %}>
+                            </td>
+                            <td class="text-center">
+                                <input type="checkbox" 
+                                       class="form-check-input" 
+                                       name="module_{{ module.id }}_create"
+                                       {% if perm and perm.can_create %}checked{% endif %}
+                                       {% if disabled %}disabled{% endif %}>
+                            </td>
+                            <td class="text-center">
+                                <input type="checkbox" 
+                                       class="form-check-input" 
+                                       name="module_{{ module.id }}_edit"
+                                       {% if perm and perm.can_edit %}checked{% endif %}
+                                       {% if disabled %}disabled{% endif %}>
+                            </td>
+                            <td class="text-center">
+                                <input type="checkbox" 
+                                       class="form-check-input" 
+                                       name="module_{{ module.id }}_delete"
+                                       {% if perm and perm.can_delete %}checked{% endif %}
+                                       {% if disabled %}disabled{% endif %}>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-between">
+        <a href="{{ url_for('permissions.index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück
+        </a>
+        <button type="submit" class="btn btn-success">
+            <i class="bi bi-check-lg"></i> Berechtigungen speichern
+        </button>
+    </div>
+    
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Schnell-Zuweisung
+document.querySelectorAll('.quick-assign').forEach(link => {
+    link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const level = this.dataset.level;
+        
+        if (!confirm(`Alle Module mit "${level}" Berechtigung zuweisen?`)) {
+            return;
+        }
+        
+        fetch('/admin/permissions/quick-assign', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: {{ user.id }},
+                level: level
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Fehler: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Fehler bei der Zuweisung');
+        });
+    });
+});
+
+// Auto-Select: Wenn "Ansehen" nicht gecheckt, dann auch andere nicht
+document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+    if (checkbox.name.includes('_view')) {
+        checkbox.addEventListener('change', function() {
+            const moduleId = this.name.match(/module_(\d+)_view/)[1];
+            const createBox = document.querySelector(`input[name="module_${moduleId}_create"]`);
+            const editBox = document.querySelector(`input[name="module_${moduleId}_edit"]`);
+            const deleteBox = document.querySelector(`input[name="module_${moduleId}_delete"]`);
+            
+            if (!this.checked) {
+                createBox.checked = false;
+                editBox.checked = false;
+                deleteBox.checked = false;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

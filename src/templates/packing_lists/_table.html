@@ -1,0 +1,125 @@
+<div class="card">
+    <div class="card-body">
+        {% if packing_lists %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Packlisten-Nr.</th>
+                        <th>Datum</th>
+                        <th>Kunde</th>
+                        <th>Auftrag</th>
+                        <th>Carton</th>
+                        <th>Status</th>
+                        <th>QC</th>
+                        <th>Verpackt</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pl in packing_lists %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('packing_lists.detail', id=pl.id) }}">
+                                <strong>{{ pl.packing_list_number }}</strong>
+                            </a>
+                            {% if pl.is_partial_delivery %}
+                            <br>
+                            <small class="text-muted">
+                                <i class="bi bi-boxes"></i> {{ pl.carton_label }}
+                            </small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>{{ pl.created_at.strftime('%d.%m.%Y %H:%M') if pl.created_at else '-' }}</small>
+                        </td>
+                        <td>
+                            {% if pl.customer %}
+                            <a href="{{ url_for('customers.show', customer_id=pl.customer_id) }}">
+                                {% if pl.customer.company_name %}
+                                    {{ pl.customer.company_name }}
+                                {% else %}
+                                    {{ pl.customer.first_name }} {{ pl.customer.last_name }}
+                                {% endif %}
+                            </a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if pl.order %}
+                            <a href="{{ url_for('orders.show', order_id=pl.order_id) }}">
+                                {{ pl.order.order_number or pl.order_id }}
+                            </a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if pl.total_cartons > 1 %}
+                                <span class="badge bg-info">
+                                    {{ pl.carton_number }}/{{ pl.total_cartons }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ pl.get_status_color() }}">
+                                {{ pl.get_status_label() }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if pl.qc_performed %}
+                                <i class="bi bi-check-circle-fill text-success" title="QC durchgeführt"></i>
+                                <br>
+                                <small class="text-muted">
+                                    {{ pl.qc_date.strftime('%d.%m.%Y') if pl.qc_date else '' }}
+                                </small>
+                            {% else %}
+                                <i class="bi bi-circle text-muted" title="QC ausstehend"></i>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if pl.packed_confirmed %}
+                                <i class="bi bi-check-circle-fill text-success" title="Verpackt"></i>
+                                <br>
+                                <small class="text-muted">
+                                    {{ pl.packed_at.strftime('%d.%m.%Y') if pl.packed_at else '' }}
+                                </small>
+                            {% else %}
+                                <i class="bi bi-circle text-muted" title="Nicht verpackt"></i>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a href="{{ url_for('packing_lists.detail', id=pl.id) }}"
+                                   class="btn btn-outline-primary"
+                                   title="Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{{ url_for('packing_lists.edit', id=pl.id) }}"
+                                   class="btn btn-outline-secondary"
+                                   title="Bearbeiten">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{{ url_for('packing_lists.print_packing_list', id=pl.id) }}"
+                                   class="btn btn-outline-info"
+                                   title="Drucken"
+                                   target="_blank">
+                                    <i class="bi bi-printer"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Keine Packlisten in diesem Status vorhanden.
+        </div>
+        {% endif %}
+    </div>
+</div>

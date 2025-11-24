@@ -153,7 +153,6 @@ def create_app():
     register_blueprint_safe('src.controllers.thread_controller_db', 'thread_bp', 'Garne')
     register_blueprint_safe('src.controllers.production_controller_db', 'production_bp', 'Produktion')
     register_blueprint_safe('src.controllers.shipping_controller_db', 'shipping_bp', 'Versand')
-    register_blueprint_safe('src.controllers.packing_list_controller', 'packing_list_bp', 'Packlisten')
 
     # Verwaltungs-Module
     register_blueprint_safe('src.controllers.supplier_controller_db', 'supplier_bp', 'Lieferanten')
@@ -193,14 +192,9 @@ def create_app():
 
     # Dokumente & Post
     register_blueprint_safe('src.controllers.documents.documents_controller', 'documents_bp', 'Dokumente & Post')
-    register_blueprint_safe('src.controllers.shipping_bulk_controller', 'shipping_bulk_bp', 'Versand-Bulk')
 
     # E-Mail Integration
     register_blueprint_safe('src.controllers.email_controller', 'email_bp', 'E-Mail Integration')
-
-    # Permission-System
-    register_blueprint_safe('src.controllers.permissions_controller', 'permissions_bp', 'Berechtigungsverwaltung')
-    register_blueprint_safe('src.controllers.dashboard_api_controller', 'dashboard_api_bp', 'Dashboard-API')
 
     # ==========================================
     # HAUPT-ROUTEN
@@ -215,20 +209,10 @@ def create_app():
     @app.route('/dashboard')
     @login_required
     def dashboard():
-        """Dashboard Hauptseite mit personalisierten Modulen"""
+        """Dashboard Hauptseite mit Statistiken"""
         from src.models.models import Order, Customer, Article, Thread, db
-        from src.utils.permissions import get_user_dashboard_modules
         from datetime import datetime, date
         from sqlalchemy import func
-
-        # Hole Module basierend auf Berechtigungen & Layout
-        try:
-            user_modules = get_user_dashboard_modules(current_user)
-        except Exception as e:
-            print(f"[FEHLER] Dashboard Module konnten nicht geladen werden: {e}")
-            import traceback
-            traceback.print_exc()
-            user_modules = []
 
         # Berechne Statistiken
         stats = {
@@ -242,20 +226,20 @@ def create_app():
 
             # CRM
             'total_customers': Customer.query.count(),
-            'open_leads': 0,
+            'open_leads': 0,  # Später mit Lead-System
 
-            # Dokumente & Post
+            # Dokumente & Post (werden später befüllt wenn Modul verfügbar)
             'document_count': 0,
             'open_post': 0,
             'unread_emails': 0,
 
             # Buchhaltung
-            'open_invoices': 0,
+            'open_invoices': 0,  # Aus Rechnungsmodul
             'overdue_payments': 0,
             'today_transactions': 0,
 
             # Verwaltung
-            'user_count': 0,
+            'user_count': 0,  # User.query.count() wenn User-Model verfügbar
             'article_count': Article.query.count(),
 
             # Lager
@@ -267,7 +251,7 @@ def create_app():
             'dst_count': 0
         }
 
-        # Tagesumsatz berechnen
+        # Tagesumsatz berechnen (wenn Rechnungsmodul vorhanden)
         try:
             from src.controllers.rechnungsmodul.models import KassenBeleg
             today = date.today()
@@ -287,7 +271,7 @@ def create_app():
         except (ImportError, Exception):
             pass
 
-        # Dokumente-Statistiken
+        # Dokumente-Statistiken (wenn Modul verfügbar)
         try:
             from src.models.document import Document, PostEntry, ArchivedEmail
             stats['document_count'] = Document.query.filter_by(is_latest_version=True).count()
@@ -296,10 +280,11 @@ def create_app():
         except (ImportError, Exception):
             pass
 
-        return render_template('dashboard_personalized.html', 
-                             user_modules=user_modules, 
-                             stats=stats)
+        return render_template('dashboard_simple.html', stats=stats)
 
+    # ==========================================
+    # TEMPLATE FILTER
+    # ==========================================
     @app.template_filter('format_date')
     def format_date_filter(date_obj, format_string='%d.%m.%Y'):
         """Formatiert Datum für Templates"""
@@ -381,17 +366,9 @@ def create_app():
         except (ImportError, Exception):
             branding_settings = None
 
-        
-        # Permission-Helper registrieren
-        try:
-            from src.utils.permissions import register_permission_helpers
-            register_permission_helpers(app)
-        except (ImportError, Exception):
-            pass
-
         return {
             'app_name': 'StitchAdmin 2.0',
-            'app_version': '2.0.2',
+            'app_version': '2.0.1',
             'branding': branding_settings
         }
 
@@ -423,4 +400,4 @@ if __name__ == '__main__':
             db.session.commit()
             print("[OK] Admin-User erstellt (admin/admin)")
 
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=app.config['DEBUG'])

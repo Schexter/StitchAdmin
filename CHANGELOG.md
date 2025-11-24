@@ -15,7 +15,97 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/)
 - Testing-Framework mit Pytest
 - Legacy-Controller-Bereinigung
 - Flask-Migrate Integration
-- API-Dokumentation
+
+---
+
+## [2.0.2] - 2025-11-23
+
+### 🔐 Permission-System & Personalisierbares Dashboard
+
+#### Added - Neue Features
+- **Permission-System**
+  - Modul-basierte Berechtigungen (View, Create, Edit, Delete)
+  - Admin-Interface für Berechtigungsverwaltung
+  - User-spezifische Modul-Zugriffe
+  - Admin-Only Module
+  - Schnell-Zuweisung für Berechtigungen
+
+- **Personalisierbares Dashboard**
+  - Drag & Drop Funktionalität (SortableJS)
+  - Module ein-/ausblenden per User
+  - Individuelle Reihenfolge pro User
+  - Auto-Save der Dashboard-Konfiguration
+  - Edit-Mode mit visueller Rückmeldung
+
+- **Neue Datenmodelle**
+  - `Module` - Systemmodule definieren
+  - `ModulePermission` - Berechtigungen pro User & Modul
+  - `DashboardLayout` - Persönliche Dashboard-Layouts
+
+- **API-Endpunkte**
+  - `/api/dashboard/layout` - Layout laden/speichern
+  - `/api/dashboard/module/<id>/toggle` - Sichtbarkeit umschalten
+  - `/api/dashboard/reset` - Dashboard zurücksetzen
+  - `/admin/permissions/*` - Berechtigungsverwaltung
+
+- **Helper-Funktionen**
+  - `has_module_permission()` - Berechtigungsprüfung
+  - `@module_required` - Route-Decorator
+  - `get_user_modules()` - User-Module abrufen
+  - `get_user_dashboard_modules()` - Dashboard-Module mit Layout
+
+- **Templates**
+  - `dashboard_personalized.html` - Neues Dashboard mit Drag & Drop
+  - `permissions/index.html` - Berechtigungsverwaltung
+  - `permissions/user_permissions.html` - User-Berechtigungen bearbeiten
+
+- **Setup-Scripts**
+  - `scripts/setup_permissions.py` - Tabellen erstellen
+  - `scripts/init_modules.py` - Basis-Module initialisieren
+  - `scripts/update_app_for_permissions.py` - app.py automatisch updaten
+
+#### Changed - Änderungen
+- Dashboard-Route aktualisiert:
+  - Nutzt jetzt `get_user_dashboard_modules()`
+  - Rendert `dashboard_personalized.html`
+  - Berücksichtigt Berechtigungen & Layouts
+
+- Context Processor erweitert:
+  - Permission-Helper in Templates verfügbar
+  - `has_permission()` Template-Funktion
+  - `get_user_modules()` Template-Funktion
+
+- App-Version erhöht: 2.0.1 → 2.0.2
+
+#### Documentation
+- `docs/PERMISSION_SYSTEM.md` - Vollständige Dokumentation
+  - Installation & Setup
+  - Verwendung (Admin & User)
+  - API-Dokumentation
+  - Entwickler-Guide
+  - Troubleshooting
+  - Beispiel-Workflows
+
+#### Technical Details
+- 8 Basis-Module initialisiert:
+  - CRM (Kundenverwaltung)
+  - Production (Aufträge & Fertigung)
+  - POS (Kasse)
+  - Accounting (Buchhaltung)
+  - Documents (Dokumente & Post)
+  - Administration (Verwaltung) - Admin-Only
+  - Warehouse (Lager)
+  - Design Archive (Design-Archiv)
+
+- SortableJS 1.15.0 für Drag & Drop
+- Bootstrap 5 Toast für Benachrichtigungen
+- JSON-Speicherung für Dashboard-Layouts
+
+#### Migration Notes
+- Bestehende User: Müssen Berechtigungen vom Admin erhalten
+- Admin-User: Haben automatisch Vollzugriff
+- Neue User: Bekommen Standard-Berechtigungen (default_enabled)
+- Backup der app.py wird automatisch erstellt
 
 ---
 

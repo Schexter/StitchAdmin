@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}Berechtigungsverwaltung - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h1><i class="bi bi-shield-lock"></i> Berechtigungsverwaltung</h1>
+        <p class="text-muted">Modul-Zugriff und Dashboard-Rechte verwalten</p>
+    </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#users">
+            <i class="bi bi-people"></i> Benutzer-Berechtigungen
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#modules">
+            <i class="bi bi-grid-3x3"></i> Module verwalten
+        </a>
+    </li>
+</ul>
+
+<div class="tab-content">
+    
+    <!-- Benutzer-Berechtigungen Tab -->
+    <div class="tab-pane fade show active" id="users">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Benutzer & ihre Berechtigungen</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Benutzer</th>
+                            <th>E-Mail</th>
+                            <th>Rolle</th>
+                            <th>Module mit Zugriff</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        <tr>
+                            <td>
+                                <strong>{{ user.username }}</strong>
+                                {% if user.is_admin %}
+                                <span class="badge bg-danger ms-2">Admin</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user.email }}</td>
+                            <td>
+                                {% if user.is_admin %}
+                                <span class="badge bg-danger">Administrator</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Benutzer</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% set perm_count = user.module_permissions|length %}
+                                {% if user.is_admin %}
+                                <span class="text-success">
+                                    <i class="bi bi-check-circle"></i> Alle Module (Admin)
+                                </span>
+                                {% elif perm_count > 0 %}
+                                <span class="badge bg-info">{{ perm_count }} Module</span>
+                                {% else %}
+                                <span class="text-muted">Keine Berechtigungen</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('permissions.user_permissions', user_id=user.id) }}" 
+                                   class="btn btn-sm btn-primary">
+                                    <i class="bi bi-pencil"></i> Berechtigungen
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Module verwalten Tab -->
+    <div class="tab-pane fade" id="modules">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Verfügbare Module</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Modul</th>
+                            <th>Kategorie</th>
+                            <th>Route</th>
+                            <th>Status</th>
+                            <th>Nur Admin</th>
+                            <th>Standard aktiv</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for module in modules|sort(attribute='sort_order') %}
+                        <tr>
+                            <td>
+                                <span style="font-size: 1.5rem;">{{ module.icon }}</span>
+                                <strong class="ms-2">{{ module.display_name }}</strong>
+                                <br>
+                                <small class="text-muted">{{ module.description }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ module.category }}</span>
+                            </td>
+                            <td>
+                                <code>{{ module.route }}</code>
+                            </td>
+                            <td>
+                                {% if module.is_active %}
+                                <span class="badge bg-success">Aktiv</span>
+                                {% else %}
+                                <span class="badge bg-danger">Inaktiv</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if module.requires_admin %}
+                                <i class="bi bi-check-circle text-success"></i>
+                                {% else %}
+                                <i class="bi bi-x-circle text-muted"></i>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if module.default_enabled %}
+                                <i class="bi bi-check-circle text-success"></i>
+                                {% else %}
+                                <i class="bi bi-x-circle text-muted"></i>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('permissions.edit_module', module_id=module.id) }}" 
+                                   class="btn btn-sm btn-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <button class="btn btn-sm btn-{% if module.is_active %}danger{% else %}success{% endif %} toggle-module" 
+                                        data-module-id="{{ module.id }}">
+                                    <i class="bi bi-{% if module.is_active %}x{% else %}check{% endif %}-circle"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Toggle Module Status
+document.querySelectorAll('.toggle-module').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const moduleId = this.dataset.moduleId;
+        
+        fetch(`/admin/permissions/module/${moduleId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Fehler: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Fehler beim Umschalten');
+        });
+    });
+});
+</script>
+{% endblock %}

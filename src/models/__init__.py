@@ -32,6 +32,19 @@ from .supplier_contact import SupplierContact, SupplierCommunicationLog
 # Artikel-Varianten (L-Shop Integration)
 from .article_variant import ArticleVariant
 
+# Workflow: Packlisten & Lieferscheine
+from .packing_list import PackingList
+from .delivery_note import DeliveryNote
+
+# Dokumente & Post
+from .document import Document, PostEntry, ArchivedEmail
+
+# Company Settings
+from .company_settings import CompanySettings
+
+# Branding Settings
+from .branding_settings import BrandingSettings
+
 # Erweiterte Settings
 from .settings import (
     TaxRate,
@@ -111,7 +124,20 @@ __all__ = [
     # Versand
     'Shipment',
     'ShipmentItem',
-    
+
+    # Workflow: Packlisten & Lieferscheine
+    'PackingList',
+    'DeliveryNote',
+
+    # Dokumente & Post
+    'Document',
+    'PostEntry',
+    'ArchivedEmail',
+
+    # Einstellungen (Company & Branding)
+    'CompanySettings',
+    'BrandingSettings',
+
     # Lieferanten
     'Supplier',
     'SupplierOrder',

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}{% if bulk %}Bulk bearbeiten{% else %}Neuer Bulk{% endif %} - StitchAdmin{% endblock %}
+
+{% block content %}
+<h1>{% if bulk %}Bulk bearbeiten{% else %}Neuer Bulk{% endif %}</h1>
+
+<div class="card">
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label">Name</label>
+                <input type="text" class="form-control" name="name" value="{{ bulk.name if bulk else '' }}" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Carrier</label>
+                <select class="form-control" name="carrier">
+                    <option value="DHL" {% if bulk and bulk.carrier == 'DHL' %}selected{% endif %}>DHL</option>
+                    <option value="DPD" {% if bulk and bulk.carrier == 'DPD' %}selected{% endif %}>DPD</option>
+                    <option value="Hermes" {% if bulk and bulk.carrier == 'Hermes' %}selected{% endif %}>Hermes</option>
+                    <option value="UPS" {% if bulk and bulk.carrier == 'UPS' %}selected{% endif %}>UPS</option>
+                    <option value="GLS" {% if bulk and bulk.carrier == 'GLS' %}selected{% endif %}>GLS</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Geplantes Versanddatum</label>
+                <input type="date" class="form-control" name="planned_ship_date"
+                       value="{{ bulk.planned_ship_date.strftime('%Y-%m-%d') if bulk and bulk.planned_ship_date else '' }}">
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Notizen</label>
+                <textarea class="form-control" name="notes" rows="3">{{ bulk.notes if bulk else '' }}</textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save"></i> Speichern
+            </button>
+            <a href="{{ url_for('shipping_bulk.index') }}" class="btn btn-secondary">Abbrechen</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

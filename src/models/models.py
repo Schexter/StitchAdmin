@@ -341,7 +341,13 @@ class Order(db.Model):
     updated_by = db.Column(db.String(80))
     completed_at = db.Column(db.DateTime)
     completed_by = db.Column(db.String(80))
-    
+
+    # Workflow-Integration
+    workflow_status = db.Column(db.String(50))  # offer, ordered, in_production, packing, ready_to_ship, shipped, invoiced, completed
+    packing_list_id = db.Column(db.Integer, db.ForeignKey('packing_lists.id'))
+    delivery_note_id = db.Column(db.Integer, db.ForeignKey('delivery_notes.id'))
+    auto_create_packing_list = db.Column(db.Boolean, default=True)
+
     # Relationships
     items = db.relationship('OrderItem', backref='order', lazy='dynamic', cascade='all, delete-orphan')
     status_history = db.relationship('OrderStatusHistory', backref='order', lazy='dynamic', cascade='all, delete-orphan')

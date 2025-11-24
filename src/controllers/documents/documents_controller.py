@@ -11,6 +11,7 @@ from werkzeug.utils import secure_filename
 from src.models.models import db
 from src.models.document import Document, DocumentAccessLog, PostEntry, EmailAccount, ArchivedEmail
 from src.models.models import Customer, Order
+from src.models.company_settings import CompanySettings
 from datetime import datetime, date, timedelta
 import os
 import mimetypes
@@ -105,7 +106,7 @@ def list_documents():
     documents = query.order_by(Document.created_at.desc()).all()
     
     # Kunden für Filter laden
-    customers = Customer.query.order_by(Customer.name).all()
+    customers = Customer.query.order_by(Customer.company_name, Customer.first_name).all()
     
     # Kategorien
     categories = db.session.query(Document.category)\
@@ -205,7 +206,7 @@ def upload():
                 return redirect(request.url)
     
     # GET - Formular anzeigen
-    customers = Customer.query.order_by(Customer.name).all()
+    customers = Customer.query.order_by(Customer.company_name, Customer.first_name).all()
     
     categories = [
         'rechnung', 'angebot', 'lieferschein', 'vertrag', 
@@ -365,71 +366,315 @@ def search():
 
 # Postbuch Routen
 
+@documents_bp.route('/post/expected')
+@login_required
+def post_expected():
+    """Erwartete Eingänge"""
+    from datetime import date
+
+    # Erwartete Lieferungen (Eingänge mit expected_delivery_date)
+    expected = PostEntry.query.filter(
+        PostEntry.direction == 'inbound',
+        PostEntry.expected_delivery_date.isnot(None),
+        PostEntry.status.in_(['open', 'in_progress'])
+    ).order_by(PostEntry.expected_delivery_date).all()
+
+    # Gruppiere nach Status
+    today = date.today()
+    overdue = [e for e in expected if e.expected_delivery_date < today]
+    today_expected = [e for e in expected if e.expected_delivery_date == today]
+    upcoming = [e for e in expected if e.expected_delivery_date > today]
+
+    return render_template('documents/post_expected.html',
+                         overdue=overdue,
+                         today_expected=today_expected,
+                         upcoming=upcoming)
+
+
 @documents_bp.route('/post')
 @login_required
 def post_list():
     """Postbuch-Übersicht"""
-    
+
     # Filter
     direction = request.args.get('direction', '')
     status = request.args.get('status', '')
+    search = request.args.get('search', '')
     date_from = request.args.get('date_from', '')
     date_to = request.args.get('date_to', '')
-    
+
     query = PostEntry.query
-    
+
     if direction:
         query = query.filter_by(direction=direction)
-    
+
     if status:
         query = query.filter_by(status=status)
-    
+
+    if search:
+        search_pattern = f'%{search}%'
+        query = query.filter(
+            db.or_(
+                PostEntry.subject.ilike(search_pattern),
+                PostEntry.sender.ilike(search_pattern),
+                PostEntry.recipient.ilike(search_pattern),
+                PostEntry.reference_number.ilike(search_pattern),
+                PostEntry.tracking_number.ilike(search_pattern)
+            )
+        )
+
     if date_from:
         query = query.filter(PostEntry.entry_date >= datetime.strptime(date_from, '%Y-%m-%d'))
-    
+
     if date_to:
         query = query.filter(PostEntry.entry_date <= datetime.strptime(date_to, '%Y-%m-%d'))
-    
+
     entries = query.order_by(PostEntry.entry_date.desc()).all()
-    
-    return render_template('documents/post_list.html', entries=entries)
+
+    return render_template('documents/post_list.html',
+                         entries=entries,
+                         direction=direction,
+                         status=status,
+                         search=search,
+                         date_from=date_from,
+                         date_to=date_to)
 
 
 @documents_bp.route('/post/new', methods=['GET', 'POST'])
 @login_required
 def post_new():
     """Neuen Postbuch-Eintrag erstellen"""
-    
+
     if request.method == 'POST':
         try:
+            # Datums-Felder konvertieren
+            due_date = None
+            if request.form.get('due_date'):
+                due_date = datetime.strptime(request.form.get('due_date'), '%Y-%m-%d').date()
+
+            reminder_date = None
+            if request.form.get('reminder_date'):
+                reminder_date = datetime.strptime(request.form.get('reminder_date'), '%Y-%m-%d').date()
+
+            delivery_date = None
+            if request.form.get('delivery_date'):
+                delivery_date = datetime.strptime(request.form.get('delivery_date'), '%Y-%m-%dT%H:%M')
+
             entry = PostEntry(
                 entry_number=PostEntry.generate_entry_number(),
                 entry_date=datetime.now(),
                 direction=request.form.get('direction'),
                 type=request.form.get('type'),
                 sender=request.form.get('sender'),
+                sender_address=request.form.get('sender_address'),
                 recipient=request.form.get('recipient'),
+                recipient_address=request.form.get('recipient_address'),
                 subject=request.form.get('subject'),
+                reference_number=request.form.get('reference_number'),
                 customer_id=request.form.get('customer_id') or None,
                 order_id=request.form.get('order_id') or None,
                 tracking_number=request.form.get('tracking_number'),
                 carrier=request.form.get('carrier'),
+                shipping_cost=request.form.get('shipping_cost') or None,
+                delivery_status=request.form.get('delivery_status'),
+                delivery_date=delivery_date,
+                signature_received=bool(request.form.get('signature_received')),
+                signature_name=request.form.get('signature_name'),
                 handled_by=current_user.id,
+                status=request.form.get('status', 'open'),
+                priority=request.form.get('priority', 'normal'),
+                due_date=due_date,
+                reminder_date=reminder_date,
                 notes=request.form.get('notes')
             )
-            
+
             db.session.add(entry)
             db.session.commit()
-            
+
             flash('Postbuch-Eintrag erfolgreich erstellt', 'success')
-            return redirect(url_for('documents.post_list'))
-            
+            return redirect(url_for('documents.post_view', id=entry.id))
+
         except Exception as e:
             db.session.rollback()
             flash(f'Fehler: {str(e)}', 'error')
-    
-    customers = Customer.query.order_by(Customer.name).all()
-    return render_template('documents/post_new.html', customers=customers)
+
+    customers = Customer.query.order_by(Customer.company_name, Customer.first_name).all()
+    company = CompanySettings.get_settings()
+    return render_template('documents/post_new.html', customers=customers, company=company)
+
+
+@documents_bp.route('/post/<int:id>')
+@login_required
+def post_view(id):
+    """Post-Eintrag anzeigen"""
+
+    entry = PostEntry.query.get_or_404(id)
+    return render_template('documents/post_view.html', entry=entry)
+
+
+@documents_bp.route('/post/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def post_edit(id):
+    """Post-Eintrag bearbeiten"""
+
+    entry = PostEntry.query.get_or_404(id)
+
+    if request.method == 'POST':
+        try:
+            # Datums-Felder konvertieren
+            due_date = None
+            if request.form.get('due_date'):
+                due_date = datetime.strptime(request.form.get('due_date'), '%Y-%m-%d').date()
+
+            reminder_date = None
+            if request.form.get('reminder_date'):
+                reminder_date = datetime.strptime(request.form.get('reminder_date'), '%Y-%m-%d').date()
+
+            delivery_date = None
+            if request.form.get('delivery_date'):
+                delivery_date = datetime.strptime(request.form.get('delivery_date'), '%Y-%m-%dT%H:%M')
+
+            # Felder aktualisieren
+            entry.direction = request.form.get('direction')
+            entry.type = request.form.get('type')
+            entry.sender = request.form.get('sender')
+            entry.sender_address = request.form.get('sender_address')
+            entry.recipient = request.form.get('recipient')
+            entry.recipient_address = request.form.get('recipient_address')
+            entry.subject = request.form.get('subject')
+            entry.reference_number = request.form.get('reference_number')
+            entry.customer_id = request.form.get('customer_id') or None
+            entry.order_id = request.form.get('order_id') or None
+            entry.tracking_number = request.form.get('tracking_number')
+            entry.carrier = request.form.get('carrier')
+            entry.shipping_cost = request.form.get('shipping_cost') or None
+            entry.delivery_status = request.form.get('delivery_status')
+            entry.delivery_date = delivery_date
+            entry.signature_received = bool(request.form.get('signature_received'))
+            entry.signature_name = request.form.get('signature_name')
+            entry.status = request.form.get('status')
+            entry.priority = request.form.get('priority')
+            entry.due_date = due_date
+            entry.reminder_date = reminder_date
+            entry.notes = request.form.get('notes')
+
+            db.session.commit()
+
+            flash('Postbuch-Eintrag erfolgreich aktualisiert', 'success')
+            return redirect(url_for('documents.post_view', id=entry.id))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Fehler: {str(e)}', 'error')
+
+    customers = Customer.query.order_by(Customer.company_name, Customer.first_name).all()
+    return render_template('documents/post_edit.html', entry=entry, customers=customers)
+
+
+@documents_bp.route('/post/<int:id>/complete', methods=['POST'])
+@login_required
+def post_complete(id):
+    """Post-Eintrag als erledigt markieren"""
+
+    try:
+        entry = PostEntry.query.get_or_404(id)
+        entry.status = 'completed'
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Eintrag als erledigt markiert'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@documents_bp.route('/post/<int:id>/send_notification', methods=['POST'])
+@login_required
+def send_shipping_notification(id):
+    """Sendet Versandbenachrichtigung per E-Mail"""
+    entry = PostEntry.query.get_or_404(id)
+
+    # Prüfe ob es ein Ausgang ist
+    if entry.direction != 'outbound':
+        return jsonify({'success': False, 'error': 'Nur für ausgehende Sendungen'}), 400
+
+    # Hole E-Mail-Adresse
+    customer_email = None
+    if entry.customer:
+        customer_email = entry.customer.email
+
+    if not customer_email:
+        return jsonify({'success': False, 'error': 'Keine E-Mail-Adresse hinterlegt'}), 400
+
+    try:
+        # Hole ersten aktiven E-Mail-Account
+        email_account = EmailAccount.query.filter_by(is_active=True).first()
+        if not email_account:
+            return jsonify({'success': False, 'error': 'Kein E-Mail-Account konfiguriert'}), 400
+
+        # Erstelle Versandbenachrichtigung
+        from src.services.email_service import EmailIntegrationService
+
+        service = EmailIntegrationService(email_account.id)
+
+        # Tracking-Link generieren
+        tracking_link = ''
+        if entry.tracking_number and entry.carrier:
+            carriers = {
+                'DHL': f'https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode={entry.tracking_number}',
+                'DPD': f'https://tracking.dpd.de/parcelstatus?query={entry.tracking_number}',
+                'Hermes': f'https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsinformation#{entry.tracking_number}',
+                'UPS': f'https://www.ups.com/track?tracknum={entry.tracking_number}',
+                'GLS': f'https://gls-group.eu/DE/de/paketverfolgung?match={entry.tracking_number}'
+            }
+            tracking_link = carriers.get(entry.carrier, '')
+
+        # E-Mail-Inhalt
+        subject = f'Versandbenachrichtigung - {entry.subject}'
+
+        body = f"""
+Sehr geehrte Damen und Herren,
+
+Ihre Sendung wurde versendet:
+
+Referenz: {entry.reference_number or entry.entry_number}
+Betreff: {entry.subject}
+"""
+
+        if entry.tracking_number:
+            body += f"\nSendungsnummer: {entry.tracking_number}\n"
+
+        if tracking_link:
+            body += f"\nVerfolgen Sie Ihre Sendung: {tracking_link}\n"
+
+        body += f"""
+Carrier: {entry.carrier or 'Post'}
+
+Mit freundlichen Grüßen
+{email_account.email_address}
+"""
+
+        # E-Mail senden
+        success = service.send_email(
+            to_address=customer_email,
+            subject=subject,
+            body=body,
+            html=False
+        )
+
+        if success:
+            entry.email_notification_sent = True
+            entry.email_notification_date = datetime.utcnow()
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': f'Versandbenachrichtigung an {customer_email} gesendet'
+            })
+        else:
+            return jsonify({'success': False, 'error': 'E-Mail konnte nicht gesendet werden'}), 500
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 # E-Mail Routen
