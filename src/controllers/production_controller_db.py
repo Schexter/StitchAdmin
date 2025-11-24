@@ -575,6 +575,37 @@ def complete_production(order_id):
 
     db.session.commit()
 
+    # WORKFLOW-INTEGRATION: Automatische Packlisten-Erstellung
+    try:
+        # Erstelle Mock-Production-Objekt für Workflow
+        class ProductionMock:
+            def __init__(self, order_id, completed_by):
+                self.id = None
+                self.order_id = order_id
+                self.completed_by = completed_by
+
+        production_mock = ProductionMock(order_id, current_user.username)
+
+        from src.utils.workflow_helpers import complete_production_workflow
+        workflow_result = complete_production_workflow(
+            production=production_mock,
+            order=order,
+            current_user=current_user
+        )
+
+        if workflow_result['success']:
+            if workflow_result.get('packing_list'):
+                flash(f"Packliste {workflow_result['packing_list'].packing_list_number} automatisch erstellt!", 'success')
+            if workflow_result.get('post_entry'):
+                flash(f"Postbuch-Eintrag {workflow_result['post_entry'].entry_number} automatisch erstellt!", 'info')
+        elif workflow_result.get('errors'):
+            for error in workflow_result['errors']:
+                flash(f"Workflow-Fehler: {error}", 'warning')
+
+    except Exception as e:
+        print(f"[WARNUNG] Workflow-Integration fehlgeschlagen: {e}")
+        # Nicht kritisch - Produktion ist trotzdem abgeschlossen
+
     # Aktivität protokollieren
     log_activity('production_completed',
                 f'Produktion abgeschlossen: Auftrag {order.id}')

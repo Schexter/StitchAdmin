@@ -168,6 +168,7 @@ def create_app():
 
     # API
     register_blueprint_safe('src.controllers.api_controller', 'api_bp', 'API')
+    register_blueprint_safe('src.controllers.photo_upload_controller', 'photo_upload_bp', 'Foto-Upload')
 
     # Rechnungsmodul
     try:

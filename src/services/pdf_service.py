@@ -459,12 +459,624 @@ class PDFService:
     def create_receipt_pdf(self, receipt_data: Dict[str, Any]) -> bytes:
         """
         Erstelle PDF für einen Kassenbeleg
-        
+
         Args:
             receipt_data: Belegdaten
-            
+
         Returns:
             PDF als Bytes
         """
         # Ähnlich wie Rechnung, aber kompakter
         return self.create_invoice_pdf(receipt_data)  # Vorerst gleiche Implementierung
+
+    def create_packing_list_pdf(self, packing_list_data: Dict[str, Any], output_path: str = None) -> bytes:
+        """
+        Erstelle PDF für eine Packliste
+
+        Args:
+            packing_list_data: Packlisten-Daten
+            output_path: Optionaler Pfad zum Speichern
+
+        Returns:
+            PDF als Bytes
+        """
+        if not REPORTLAB_AVAILABLE:
+            return self._create_fallback_pdf()
+
+        try:
+            # Buffer für PDF
+            buffer = BytesIO()
+
+            # Dokument erstellen
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+                rightMargin=2*cm,
+                leftMargin=2*cm,
+                topMargin=2*cm,
+                bottomMargin=2*cm
+            )
+
+            # Story aufbauen
+            story = []
+
+            # Header
+            story.extend(self._create_packing_list_header(packing_list_data))
+
+            # Kundeninfo & Auftrag
+            story.extend(self._create_packing_list_info(packing_list_data))
+
+            # Artikeltabelle
+            story.extend(self._create_packing_list_items(packing_list_data))
+
+            # Kundenvorgaben
+            if packing_list_data.get('customer_notes'):
+                story.extend(self._create_customer_notes_section(packing_list_data))
+
+            # QK-Bereich
+            story.extend(self._create_qc_section(packing_list_data))
+
+            # Verpackungs-Bereich
+            story.extend(self._create_packing_section(packing_list_data))
+
+            # QR-Code
+            story.extend(self._create_qr_code_section(packing_list_data))
+
+            # PDF generieren
+            doc.build(story)
+
+            # Speichern falls Pfad angegeben
+            if output_path:
+                with open(output_path, 'wb') as f:
+                    f.write(buffer.getvalue())
+
+            # Buffer zurücksetzen und Inhalt zurückgeben
+            buffer.seek(0)
+            return buffer.getvalue()
+
+        except Exception as e:
+            logger.error(f"Fehler bei Packlisten-PDF-Erstellung: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return self._create_fallback_pdf()
+
+    def _create_packing_list_header(self, data: Dict) -> List:
+        """Erstelle Header für Packliste"""
+        elements = []
+
+        # Logo (falls vorhanden)
+        logo_path = data.get('logo_path')
+        if logo_path and os.path.exists(logo_path):
+            try:
+                logo = Image(logo_path, width=6*cm, height=2*cm)
+                logo.hAlign = 'LEFT'
+                elements.append(logo)
+                elements.append(Spacer(1, 0.5*cm))
+            except Exception as e:
+                logger.warning(f"Logo konnte nicht geladen werden: {e}")
+
+        # Firma links, PACKLISTE rechts
+        header_data = [[
+            Paragraph(f"<b>{data.get('company_name', 'StitchAdmin')}</b><br/>" +
+                     f"{data.get('company_street', '')}<br/>" +
+                     f"{data.get('company_postcode', '')} {data.get('company_city', '')}",
+                     self.styles['Normal']),
+            Paragraph("<b>PACKLISTE</b><br/>" +
+                     f"{data.get('packing_list_number', '')}<br/>" +
+                     f"{self._format_date(data.get('created_at', datetime.now()))}",
+                     self.styles['Heading2'])
+        ]]
+
+        header_table = Table(header_data, colWidths=[10*cm, 6*cm])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ]))
+
+        elements.append(header_table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_packing_list_info(self, data: Dict) -> List:
+        """Erstelle Info-Bereich für Packliste"""
+        elements = []
+
+        # Kunden & Auftragsinfo
+        info_data = [
+            ["Kunde:", data.get('customer_name', '')],
+            ["Auftrag:", data.get('order_number', '')],
+        ]
+
+        # Carton-Info bei Teillieferung
+        if data.get('carton_label'):
+            info_data.append(["Lieferung:", data['carton_label']])
+
+        info_table = Table(info_data, colWidths=[4*cm, 12*cm])
+        info_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+
+        elements.append(info_table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_packing_list_items(self, data: Dict) -> List:
+        """Erstelle Artikeltabelle für Packliste"""
+        elements = []
+
+        # Überschrift
+        elements.append(Paragraph("<b>ARTIKELLISTE</b>", self.styles['Heading3']))
+        elements.append(Spacer(1, 0.3*cm))
+
+        # Tabellenkopf
+        headers = ['Pos.', 'Artikel', 'Menge', 'EAN/SKU']
+
+        # Daten vorbereiten
+        table_data = [headers]
+
+        items = data.get('items', [])
+        for idx, item in enumerate(items, 1):
+            table_data.append([
+                str(idx),
+                item.get('name', item.get('description', '')),
+                str(item.get('quantity', 1)),
+                item.get('ean', item.get('sku', '-'))
+            ])
+
+        # Tabelle erstellen
+        table = Table(table_data, colWidths=[2*cm, 9*cm, 3*cm, 4*cm])
+
+        # Styling
+        table.setStyle(TableStyle([
+            # Header
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+
+            # Daten
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # Pos
+            ('ALIGN', (2, 1), (2, -1), 'CENTER'),  # Menge
+            ('ALIGN', (3, 1), (3, -1), 'CENTER'),  # EAN
+
+            # Gitter
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+            # Alternierende Zeilen
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#ecf0f1')]),
+        ]))
+
+        elements.append(table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_customer_notes_section(self, data: Dict) -> List:
+        """Erstelle Kundenvorgaben-Bereich"""
+        elements = []
+
+        elements.append(Paragraph("<b>KUNDENVORGABEN:</b>", self.styles['Heading3']))
+        elements.append(Spacer(1, 0.2*cm))
+
+        # Kundenvorgaben in Box
+        notes_data = [[Paragraph(data.get('customer_notes', ''), self.styles['Normal'])]]
+        notes_table = Table(notes_data, colWidths=[16*cm])
+        notes_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#fff3cd')),
+            ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#ffc107')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ]))
+
+        elements.append(notes_table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_qc_section(self, data: Dict) -> List:
+        """Erstelle QK-Bereich"""
+        elements = []
+
+        elements.append(Paragraph("<b>QUALITÄTSKONTROLLE:</b>", self.styles['Heading3']))
+        elements.append(Spacer(1, 0.3*cm))
+
+        # QK-Checkboxen
+        qc_items = [
+            "☐ Stickqualität geprüft",
+            "☐ Farben korrekt",
+            "☐ Vollständigkeit geprüft",
+            "☐ Keine Beschädigungen"
+        ]
+
+        for item in qc_items:
+            elements.append(Paragraph(item, self.styles['Normal']))
+            elements.append(Spacer(1, 0.2*cm))
+
+        # Unterschriftenfelder
+        elements.append(Spacer(1, 0.5*cm))
+        sig_data = [
+            ["Geprüft von:", "_" * 40, "Datum:", "_" * 20]
+        ]
+        sig_table = Table(sig_data, colWidths=[3*cm, 7*cm, 2*cm, 4*cm])
+        sig_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (2, 0), (2, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+        ]))
+
+        elements.append(sig_table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_packing_section(self, data: Dict) -> List:
+        """Erstelle Verpackungs-Bereich"""
+        elements = []
+
+        elements.append(Paragraph("<b>VERPACKUNG:</b>", self.styles['Heading3']))
+        elements.append(Spacer(1, 0.3*cm))
+
+        # Gewicht & Maße
+        packing_data = [
+            ["Gewicht:", "_" * 15 + " kg"],
+            ["Maße (L×B×H):", "_" * 10 + " × " + "_" * 10 + " × " + "_" * 10 + " cm"],
+        ]
+
+        packing_table = Table(packing_data, colWidths=[4*cm, 12*cm])
+        packing_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+
+        elements.append(packing_table)
+        elements.append(Spacer(1, 0.5*cm))
+
+        # Unterschriftenfeld
+        sig_data = [
+            ["Verpackt von:", "_" * 40, "Datum:", "_" * 20]
+        ]
+        sig_table = Table(sig_data, colWidths=[3*cm, 7*cm, 2*cm, 4*cm])
+        sig_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, 0), 'Helvetica-Bold'),
+            ('FONTNAME', (2, 0), (2, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('VALIGN', (0, 0), (-1, -1), 'BOTTOM'),
+        ]))
+
+        elements.append(sig_table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_qr_code_section(self, data: Dict) -> List:
+        """Erstelle QR-Code für Tracking"""
+        elements = []
+
+        try:
+            # QR-Code mit Packlisten-Nummer
+            from reportlab.graphics.barcode import qr
+            from reportlab.graphics.shapes import Drawing
+
+            qr_code = qr.QrCodeWidget(data.get('packing_list_number', ''))
+            qr_drawing = Drawing(3*cm, 3*cm)
+            qr_drawing.add(qr_code)
+
+            # QR-Code zentrieren
+            qr_table = Table([[qr_drawing]], colWidths=[16*cm])
+            qr_table.setStyle(TableStyle([
+                ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+            ]))
+
+            elements.append(qr_table)
+
+        except Exception as e:
+            logger.warning(f"QR-Code konnte nicht erstellt werden: {e}")
+
+        return elements
+
+    def create_delivery_note_pdf(self, delivery_note_data: Dict[str, Any], output_path: str = None) -> bytes:
+        """
+        Erstelle PDF für einen Lieferschein
+
+        Args:
+            delivery_note_data: Lieferschein-Daten
+            output_path: Optionaler Pfad zum Speichern
+
+        Returns:
+            PDF als Bytes
+        """
+        if not REPORTLAB_AVAILABLE:
+            return self._create_fallback_pdf()
+
+        try:
+            # Buffer für PDF
+            buffer = BytesIO()
+
+            # Dokument erstellen
+            doc = SimpleDocTemplate(
+                buffer,
+                pagesize=A4,
+                rightMargin=2*cm,
+                leftMargin=2*cm,
+                topMargin=2*cm,
+                bottomMargin=2*cm
+            )
+
+            # Story aufbauen
+            story = []
+
+            # Header
+            story.extend(self._create_delivery_note_header(delivery_note_data))
+
+            # Lieferadresse
+            story.extend(self._create_delivery_address(delivery_note_data))
+
+            # Lieferinfo
+            story.extend(self._create_delivery_info(delivery_note_data))
+
+            # Artikeltabelle
+            story.extend(self._create_delivery_items(delivery_note_data))
+
+            # Paketinfo
+            story.extend(self._create_package_info(delivery_note_data))
+
+            # Unterschriftenfeld
+            story.extend(self._create_signature_field(delivery_note_data))
+
+            # Fußzeile
+            story.extend(self._create_delivery_footer())
+
+            # PDF generieren
+            doc.build(story)
+
+            # Speichern falls Pfad angegeben
+            if output_path:
+                with open(output_path, 'wb') as f:
+                    f.write(buffer.getvalue())
+
+            # Buffer zurücksetzen und Inhalt zurückgeben
+            buffer.seek(0)
+            return buffer.getvalue()
+
+        except Exception as e:
+            logger.error(f"Fehler bei Lieferschein-PDF-Erstellung: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return self._create_fallback_pdf()
+
+    def _create_delivery_note_header(self, data: Dict) -> List:
+        """Erstelle Header für Lieferschein"""
+        elements = []
+
+        # Logo (falls vorhanden)
+        logo_path = data.get('logo_path')
+        if logo_path and os.path.exists(logo_path):
+            try:
+                logo = Image(logo_path, width=6*cm, height=2*cm)
+                logo.hAlign = 'LEFT'
+                elements.append(logo)
+                elements.append(Spacer(1, 0.5*cm))
+            except Exception as e:
+                logger.warning(f"Logo konnte nicht geladen werden: {e}")
+
+        # Firma links, LIEFERSCHEIN rechts
+        header_data = [[
+            Paragraph(f"<b>{data.get('company_name', 'StitchAdmin')}</b><br/>" +
+                     f"{data.get('company_street', '')}<br/>" +
+                     f"{data.get('company_postcode', '')} {data.get('company_city', '')}",
+                     self.styles['Normal']),
+            Paragraph("<b>LIEFERSCHEIN</b><br/>" +
+                     f"{data.get('delivery_note_number', '')}<br/>" +
+                     f"{self._format_date(data.get('delivery_date', datetime.now()))}",
+                     self.styles['Heading2'])
+        ]]
+
+        header_table = Table(header_data, colWidths=[10*cm, 6*cm])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ]))
+
+        elements.append(header_table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_delivery_address(self, data: Dict) -> List:
+        """Erstelle Lieferadresse"""
+        elements = []
+
+        elements.append(Paragraph("<b>LIEFERANSCHRIFT:</b>", self.styles['Heading3']))
+        elements.append(Spacer(1, 0.3*cm))
+
+        # Adresse in Box
+        address = f"<b>{data.get('customer_name', '')}</b><br/>" + \
+                 f"{data.get('customer_street', '')}<br/>" + \
+                 f"{data.get('customer_postcode', '')} {data.get('customer_city', '')}"
+
+        address_data = [[Paragraph(address, self.styles['Normal'])]]
+        address_table = Table(address_data, colWidths=[16*cm])
+        address_table.setStyle(TableStyle([
+            ('BOX', (0, 0), (-1, -1), 1, colors.grey),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+        ]))
+
+        elements.append(address_table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_delivery_info(self, data: Dict) -> List:
+        """Erstelle Lieferinformationen"""
+        elements = []
+
+        # Lieferinfo
+        info_data = [
+            ["Auftragsnummer:", data.get('order_number', '')],
+            ["Lieferdatum:", self._format_date(data.get('delivery_date', datetime.now()))],
+        ]
+
+        # Versandart & Tracking (falls vorhanden)
+        if data.get('shipping_method'):
+            info_data.append(["Versandart:", data['shipping_method']])
+
+        if data.get('tracking_number'):
+            info_data.append(["Sendungsnummer:", data['tracking_number']])
+
+        info_table = Table(info_data, colWidths=[4*cm, 12*cm])
+        info_table.setStyle(TableStyle([
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+
+        elements.append(info_table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_delivery_items(self, data: Dict) -> List:
+        """Erstelle Artikeltabelle für Lieferschein"""
+        elements = []
+
+        # Überschrift
+        elements.append(Paragraph("<b>GELIEFERTE ARTIKEL</b>", self.styles['Heading3']))
+        elements.append(Spacer(1, 0.3*cm))
+
+        # Tabellenkopf
+        headers = ['Pos.', 'Bezeichnung', 'Menge', 'Einheit']
+
+        # Daten vorbereiten
+        table_data = [headers]
+
+        items = data.get('items', [])
+        for idx, item in enumerate(items, 1):
+            table_data.append([
+                str(idx),
+                item.get('name', item.get('description', '')),
+                str(item.get('quantity', 1)),
+                item.get('unit', 'Stk.')
+            ])
+
+        # Tabelle erstellen
+        table = Table(table_data, colWidths=[2*cm, 10*cm, 2*cm, 2*cm])
+
+        # Styling
+        table.setStyle(TableStyle([
+            # Header
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2c3e50')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+
+            # Daten
+            ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 1), (-1, -1), 10),
+            ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # Pos
+            ('ALIGN', (2, 1), (3, -1), 'CENTER'),  # Menge & Einheit
+
+            # Gitter
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+
+            # Alternierende Zeilen
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#ecf0f1')]),
+        ]))
+
+        elements.append(table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_package_info(self, data: Dict) -> List:
+        """Erstelle Paket-Informationen"""
+        elements = []
+
+        # Paketinfo
+        package_data = []
+
+        if data.get('total_cartons'):
+            package_data.append(["Anzahl Pakete:", str(data['total_cartons'])])
+
+        if data.get('total_weight'):
+            package_data.append(["Gesamtgewicht:", f"{data['total_weight']} kg"])
+
+        if package_data:
+            package_table = Table(package_data, colWidths=[4*cm, 12*cm])
+            package_table.setStyle(TableStyle([
+                ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ]))
+
+            elements.append(package_table)
+            elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_signature_field(self, data: Dict) -> List:
+        """Erstelle Unterschriftenfeld"""
+        elements = []
+
+        elements.append(Paragraph("<b>UNTERSCHRIFT EMPFÄNGER:</b>", self.styles['Heading3']))
+        elements.append(Spacer(1, 1*cm))
+
+        # Unterschriftenfelder
+        sig_data = [
+            ["_" * 80],
+            ["Name (Druckschrift)"],
+            [""],
+            ["_" * 40 + "        " + "_" * 30],
+            ["Unterschrift                                 Datum"]
+        ]
+
+        sig_table = Table(sig_data, colWidths=[16*cm])
+        sig_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ]))
+
+        elements.append(sig_table)
+        elements.append(Spacer(1, 1*cm))
+
+        return elements
+
+    def _create_delivery_footer(self) -> List:
+        """Erstelle Fußzeile für Lieferschein"""
+        elements = []
+
+        # Rechtlicher Hinweis
+        footer_text = "Dies ist kein steuerliches Dokument. Die Rechnung folgt separat."
+
+        elements.append(Spacer(1, 1*cm))
+
+        footer_data = [[Paragraph(footer_text, self.styles['Normal'])]]
+        footer_table = Table(footer_data, colWidths=[16*cm])
+        footer_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8f9fa')),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ALIGN', (0, 0), (0, 0), 'CENTER'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ]))
+
+        elements.append(footer_table)
+
+        return elements

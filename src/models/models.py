@@ -318,7 +318,11 @@ class Order(db.Model):
     design_file_path = db.Column(db.String(255))  # Vollständiger Pfad zur Design-Datei
     design_thumbnail_path = db.Column(db.String(255))  # Thumbnail-Pfad
     production_file = db.Column(db.String(255))
-    
+
+    # Fotos (JSON Array für mobile QM/Dokumentation)
+    # Format: [{"path": "...", "type": "color|position|sample|other", "description": "...", "timestamp": "..."}]
+    photos = db.Column(db.Text)  # JSON Array mit Foto-Metadaten
+
     # Preise
     total_price = db.Column(db.Float, default=0)
     deposit_amount = db.Column(db.Float, default=0)
@@ -374,7 +378,34 @@ class Order(db.Model):
             self.selected_threads = None
         else:
             self.selected_threads = json.dumps(threads_list)
-    
+
+    def get_photos(self):
+        """Gibt Fotos als Liste zurück"""
+        if self.photos:
+            try:
+                return json.loads(self.photos)
+            except (json.JSONDecodeError, TypeError):
+                return []
+        return []
+
+    def add_photo(self, photo_path, photo_type='other', description=''):
+        """Fügt ein Foto hinzu"""
+        from datetime import datetime
+        photos = self.get_photos()
+        photos.append({
+            'path': photo_path,
+            'type': photo_type,
+            'description': description,
+            'timestamp': datetime.now().isoformat()
+        })
+        self.photos = json.dumps(photos)
+
+    def remove_photo(self, photo_path):
+        """Entfernt ein Foto"""
+        photos = self.get_photos()
+        photos = [p for p in photos if p.get('path') != photo_path]
+        self.photos = json.dumps(photos) if photos else None
+
     def can_start_production(self):
         """Prüft ob Auftrag produktionsbereit ist"""
         # Design-Check

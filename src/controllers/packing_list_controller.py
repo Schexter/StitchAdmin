@@ -295,27 +295,21 @@ def pack(id):
 
     # Automatisch Lieferschein erstellen (wenn aktiviert)
     if settings.auto_create_delivery_note and not packing_list.delivery_note_id:
-        # Erstelle Lieferschein
-        delivery_note = DeliveryNote(
-            delivery_note_number=DeliveryNote.generate_delivery_note_number(),
-            order_id=packing_list.order_id,
-            packing_list_id=packing_list.id,
-            customer_id=packing_list.customer_id,
-            delivery_date=datetime.utcnow().date(),
-            items=packing_list.items,
-            status='ready',
-            created_by=current_user.id
-        )
-        db.session.add(delivery_note)
+        try:
+            # Nutze workflow_helpers für konsistente Erstellung
+            from src.utils.workflow_helpers import create_delivery_note_from_packing_list
+            delivery_note = create_delivery_note_from_packing_list(packing_list)
 
-        # Verknüpfe Lieferschein mit Packliste
-        packing_list.delivery_note_id = delivery_note.id
-        db.session.commit()
+            # Verknüpfe Lieferschein mit Packliste
+            packing_list.delivery_note_id = delivery_note.id
+            db.session.commit()
 
-        log_activity('delivery_note_auto_created',
-                    f'Lieferschein {delivery_note.delivery_note_number} automatisch erstellt')
+            log_activity('delivery_note_auto_created',
+                        f'Lieferschein {delivery_note.delivery_note_number} automatisch erstellt')
 
-        flash(f'Lieferschein {delivery_note.delivery_note_number} wurde automatisch erstellt.', 'info')
+            flash(f'Lieferschein {delivery_note.delivery_note_number} wurde automatisch erstellt.', 'info')
+        except Exception as e:
+            flash(f'Fehler beim Erstellen des Lieferscheins: {str(e)}', 'error')
 
     log_activity('packing_list_packed',
                 f'Packliste {packing_list.packing_list_number} als verpackt markiert')
