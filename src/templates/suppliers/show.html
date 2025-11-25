@@ -74,7 +74,7 @@
             <div class="card-body">
                 <div class="row">
                     <div class="col-md-6">
-                        <p><strong>E-Mail:</strong> 
+                        <p><strong>E-Mail:</strong>
                             {% if supplier.email %}
                                 <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a>
                             {% else %}
@@ -84,7 +84,7 @@
                         <p><strong>Telefon:</strong> {{ supplier.phone or '-' }}</p>
                     </div>
                     <div class="col-md-6">
-                        <p><strong>Website:</strong> 
+                        <p><strong>Website:</strong>
                             {% if supplier.website %}
                                 <a href="{{ supplier.website }}" target="_blank">{{ supplier.website }}</a>
                             {% else %}
@@ -93,6 +93,69 @@
                         </p>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <!-- Ansprechpartner -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-people"></i> Ansprechpartner</h5>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#contactModal">
+                    <i class="bi bi-plus"></i> Hinzufügen
+                </button>
+            </div>
+            <div class="card-body">
+                {% if contacts %}
+                <div class="list-group list-group-flush">
+                    {% for contact in contacts %}
+                    <div class="list-group-item px-0 {% if loop.first %}pt-0{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">
+                                    {{ contact.salutation }} {{ contact.first_name }} {{ contact.last_name }}
+                                    {% if contact.is_primary_contact %}
+                                    <span class="badge bg-primary">Hauptkontakt</span>
+                                    {% endif %}
+                                </h6>
+                                {% if contact.position or contact.department %}
+                                <small class="text-muted d-block">
+                                    {{ contact.position }}{% if contact.position and contact.department %}, {% endif %}{{ contact.department }}
+                                </small>
+                                {% endif %}
+                                <div class="mt-2">
+                                    {% if contact.email %}
+                                    <a href="mailto:{{ contact.email }}" class="btn btn-sm btn-outline-secondary me-1">
+                                        <i class="bi bi-envelope"></i> {{ contact.email }}
+                                    </a>
+                                    {% endif %}
+                                    {% if contact.phone %}
+                                    <a href="tel:{{ contact.phone }}" class="btn btn-sm btn-outline-secondary me-1">
+                                        <i class="bi bi-telephone"></i> {{ contact.phone }}
+                                    </a>
+                                    {% endif %}
+                                    {% if contact.mobile %}
+                                    <a href="tel:{{ contact.mobile }}" class="btn btn-sm btn-outline-secondary">
+                                        <i class="bi bi-phone"></i> {{ contact.mobile }}
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-link text-muted" data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots-vertical"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" onclick="editContact({{ contact.id }})"><i class="bi bi-pencil me-2"></i>Bearbeiten</a></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteContact({{ contact.id }})"><i class="bi bi-trash me-2"></i>Löschen</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">Keine Ansprechpartner hinterlegt</p>
+                {% endif %}
             </div>
         </div>
         
@@ -176,8 +239,77 @@
                 <p><strong>Anzahl Bestellungen:</strong> {{ total_orders }}</p>
                 <p><strong>Gesamtvolumen:</strong> {{ "%.2f"|format(total_amount) }} €</p>
                 <p><strong>Erstellt am:</strong> {{ supplier.created_at.strftime('%d.%m.%Y') if supplier.created_at else '-' }}</p>
+                {% if supplier.avg_delivery_days %}
+                <p><strong>Ø Lieferzeit:</strong> {{ "%.1f"|format(supplier.avg_delivery_days) }} Tage</p>
+                {% endif %}
+                {% if supplier.on_time_delivery_rate %}
+                <p><strong>Pünktlichkeit:</strong> {{ "%.0f"|format(supplier.on_time_delivery_rate) }}%</p>
+                {% endif %}
             </div>
         </div>
+
+        <!-- Bewertung -->
+        {% if supplier.rating_overall or ratings %}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-star-fill text-warning"></i> Bewertung</h5>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#ratingModal">
+                    <i class="bi bi-plus"></i> Bewerten
+                </button>
+            </div>
+            <div class="card-body">
+                {% if supplier.rating_overall %}
+                <div class="text-center mb-3">
+                    <span class="display-4 fw-bold text-warning">{{ "%.1f"|format(supplier.rating_overall) }}</span>
+                    <span class="text-muted">/ 5</span>
+                </div>
+                <div class="progress-stacked mb-3" style="height: 6px;">
+                    {% set rating_percent = (supplier.rating_overall / 5) * 100 %}
+                    <div class="progress-bar bg-warning" style="width: {{ rating_percent }}%"></div>
+                </div>
+                {% endif %}
+
+                <div class="small">
+                    {% if supplier.rating_quality %}
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Qualität:</span>
+                        <span>{{ "%.1f"|format(supplier.rating_quality) }}</span>
+                    </div>
+                    {% endif %}
+                    {% if supplier.rating_delivery %}
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Lieferung:</span>
+                        <span>{{ "%.1f"|format(supplier.rating_delivery) }}</span>
+                    </div>
+                    {% endif %}
+                    {% if supplier.rating_price %}
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Preis/Leistung:</span>
+                        <span>{{ "%.1f"|format(supplier.rating_price) }}</span>
+                    </div>
+                    {% endif %}
+                    {% if supplier.rating_communication %}
+                    <div class="d-flex justify-content-between">
+                        <span>Kommunikation:</span>
+                        <span>{{ "%.1f"|format(supplier.rating_communication) }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-star"></i> Bewertung</h5>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#ratingModal">
+                    <i class="bi bi-plus"></i> Bewerten
+                </button>
+            </div>
+            <div class="card-body text-center text-muted">
+                <p class="mb-0">Noch keine Bewertung</p>
+            </div>
+        </div>
+        {% endif %}
         
         <!-- Aktionen -->
         <div class="card">
@@ -196,9 +328,51 @@
     </div>
 </div>
 
+<!-- Umsatz nach Jahren -->
+{% if yearly_stats %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Umsatz nach Jahren</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Jahr</th>
+                                <th class="text-center">Bestellungen</th>
+                                <th class="text-end">Umsatz</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for year, stats in yearly_stats.items() %}
+                            <tr>
+                                <td><strong>{{ year }}</strong></td>
+                                <td class="text-center">{{ stats.count }}</td>
+                                <td class="text-end">{{ "%.2f"|format(stats.amount) }} €</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <th>Gesamt</th>
+                                <th class="text-center">{{ total_orders }}</th>
+                                <th class="text-end">{{ "%.2f"|format(total_amount) }} €</th>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Letzte Bestellungen -->
 {% if recent_orders %}
-<div class="card">
+<div class="card mb-4">
     <div class="card-header">
         <h5 class="mb-0">Letzte Bestellungen</h5>
     </div>
@@ -241,6 +415,48 @@
 </div>
 {% endif %}
 
+<!-- Bewertungshistorie -->
+{% if ratings %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-chat-quote"></i> Bewertungshistorie</h5>
+    </div>
+    <div class="card-body">
+        {% for rating in ratings[:5] %}
+        <div class="border-bottom pb-3 mb-3 {% if loop.last %}border-0 pb-0 mb-0{% endif %}">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                    <span class="text-warning">
+                        {% for i in range(5) %}
+                            {% if i < rating.overall_rating|int %}
+                                <i class="bi bi-star-fill"></i>
+                            {% else %}
+                                <i class="bi bi-star"></i>
+                            {% endif %}
+                        {% endfor %}
+                    </span>
+                    <span class="ms-2 fw-bold">{{ "%.1f"|format(rating.overall_rating) }}</span>
+                </div>
+                <small class="text-muted">{{ rating.rated_at.strftime('%d.%m.%Y') if rating.rated_at else '' }}</small>
+            </div>
+            {% if rating.comment %}
+            <p class="mb-2 small">{{ rating.comment }}</p>
+            {% endif %}
+            <div class="small text-muted">
+                <span class="me-3">Qualität: {{ "%.1f"|format(rating.quality) }}</span>
+                <span class="me-3">Lieferung: {{ "%.1f"|format(rating.delivery_speed) }}</span>
+                <span class="me-3">Preis: {{ "%.1f"|format(rating.price_performance) }}</span>
+                <span>Kommunikation: {{ "%.1f"|format(rating.communication) }}</span>
+            </div>
+            {% if rating.rated_by %}
+            <small class="text-muted">von {{ rating.rated_by }}</small>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Lösch-Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog">
@@ -262,4 +478,239 @@
         </div>
     </div>
 </div>
+
+<!-- Ansprechpartner Modal -->
+<div class="modal fade" id="contactModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('suppliers.add_contact', supplier_id=supplier.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-person-plus"></i> Ansprechpartner hinzufügen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Anrede</label>
+                            <select class="form-select" name="salutation">
+                                <option value="">-</option>
+                                <option value="Herr">Herr</option>
+                                <option value="Frau">Frau</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Vorname</label>
+                            <input type="text" class="form-control" name="first_name">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Nachname *</label>
+                            <input type="text" class="form-control" name="last_name" required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Position</label>
+                            <input type="text" class="form-control" name="position" placeholder="z.B. Vertriebsleiter">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Abteilung</label>
+                            <input type="text" class="form-control" name="department" placeholder="z.B. Vertrieb">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">E-Mail</label>
+                        <input type="email" class="form-control" name="email">
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Telefon</label>
+                            <input type="tel" class="form-control" name="phone">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Mobil</label>
+                            <input type="tel" class="form-control" name="mobile">
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="is_primary" id="is_primary">
+                        <label class="form-check-label" for="is_primary">
+                            Hauptansprechpartner
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Bewertung Modal -->
+<div class="modal fade" id="ratingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('suppliers.add_rating', supplier_id=supplier.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-star"></i> Lieferant bewerten</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Qualität *</label>
+                        <div class="star-rating" data-field="quality">
+                            <input type="hidden" name="quality" id="quality" value="3" required>
+                            <i class="bi bi-star-fill text-warning star" data-value="1"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="2"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="3"></i>
+                            <i class="bi bi-star star" data-value="4"></i>
+                            <i class="bi bi-star star" data-value="5"></i>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Liefergeschwindigkeit *</label>
+                        <div class="star-rating" data-field="delivery_speed">
+                            <input type="hidden" name="delivery_speed" id="delivery_speed" value="3" required>
+                            <i class="bi bi-star-fill text-warning star" data-value="1"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="2"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="3"></i>
+                            <i class="bi bi-star star" data-value="4"></i>
+                            <i class="bi bi-star star" data-value="5"></i>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Preis/Leistung *</label>
+                        <div class="star-rating" data-field="price_performance">
+                            <input type="hidden" name="price_performance" id="price_performance" value="3" required>
+                            <i class="bi bi-star-fill text-warning star" data-value="1"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="2"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="3"></i>
+                            <i class="bi bi-star star" data-value="4"></i>
+                            <i class="bi bi-star star" data-value="5"></i>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Kommunikation *</label>
+                        <div class="star-rating" data-field="communication">
+                            <input type="hidden" name="communication" id="communication" value="3" required>
+                            <i class="bi bi-star-fill text-warning star" data-value="1"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="2"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="3"></i>
+                            <i class="bi bi-star star" data-value="4"></i>
+                            <i class="bi bi-star star" data-value="5"></i>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Verpackung</label>
+                        <div class="star-rating" data-field="packaging">
+                            <input type="hidden" name="packaging" id="packaging" value="3">
+                            <i class="bi bi-star-fill text-warning star" data-value="1"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="2"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="3"></i>
+                            <i class="bi bi-star star" data-value="4"></i>
+                            <i class="bi bi-star star" data-value="5"></i>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Zuverlässigkeit</label>
+                        <div class="star-rating" data-field="reliability">
+                            <input type="hidden" name="reliability" id="reliability" value="3">
+                            <i class="bi bi-star-fill text-warning star" data-value="1"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="2"></i>
+                            <i class="bi bi-star-fill text-warning star" data-value="3"></i>
+                            <i class="bi bi-star star" data-value="4"></i>
+                            <i class="bi bi-star star" data-value="5"></i>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Kommentar</label>
+                        <textarea class="form-control" name="comment" rows="3" placeholder="Optionaler Kommentar zur Bewertung..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">Bewertung speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Star Rating Interaktion
+document.querySelectorAll('.star-rating').forEach(container => {
+    const stars = container.querySelectorAll('.star');
+    const field = container.dataset.field;
+    const input = container.querySelector('input[type="hidden"]');
+
+    stars.forEach(star => {
+        star.addEventListener('click', () => {
+            const value = parseInt(star.dataset.value);
+            input.value = value;
+
+            stars.forEach((s, index) => {
+                if (index < value) {
+                    s.classList.remove('bi-star');
+                    s.classList.add('bi-star-fill', 'text-warning');
+                } else {
+                    s.classList.remove('bi-star-fill', 'text-warning');
+                    s.classList.add('bi-star');
+                }
+            });
+        });
+
+        star.addEventListener('mouseenter', () => {
+            const value = parseInt(star.dataset.value);
+            stars.forEach((s, index) => {
+                if (index < value) {
+                    s.classList.add('text-warning');
+                }
+            });
+        });
+
+        star.addEventListener('mouseleave', () => {
+            const currentValue = parseInt(input.value);
+            stars.forEach((s, index) => {
+                if (index >= currentValue) {
+                    s.classList.remove('text-warning');
+                }
+            });
+        });
+    });
+});
+
+// Ansprechpartner bearbeiten/löschen
+function editContact(contactId) {
+    // TODO: Implement edit modal
+    alert('Bearbeiten wird noch implementiert');
+}
+
+function deleteContact(contactId) {
+    if (confirm('Ansprechpartner wirklich löschen?')) {
+        fetch(`{{ url_for('suppliers.show', supplier_id=supplier.id) }}/contact/${contactId}/delete`, {
+            method: 'POST'
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Fehler: ' + data.error);
+            }
+        });
+    }
+}
+</script>
+
+<style>
+.star-rating .star {
+    cursor: pointer;
+    font-size: 1.5rem;
+    transition: color 0.2s;
+}
+.star-rating .star:hover {
+    transform: scale(1.1);
+}
+</style>
 {% endblock %}

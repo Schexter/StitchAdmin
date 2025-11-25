@@ -157,6 +157,7 @@ def create_app():
 
     # Verwaltungs-Module
     register_blueprint_safe('src.controllers.supplier_controller_db', 'supplier_bp', 'Lieferanten')
+    register_blueprint_safe('src.controllers.purchasing_controller', 'purchasing_bp', 'Einkauf')
     register_blueprint_safe('src.controllers.user_controller_db', 'user_bp', 'Benutzer')
     register_blueprint_safe('src.controllers.settings_controller_unified', 'settings_bp', 'Einstellungen')
     register_blueprint_safe('src.controllers.calculation_settings_controller', 'calc_settings_bp', 'Kalkulationseinstellungen')
@@ -185,6 +186,12 @@ def create_app():
     except ImportError as e:
         print(f"[WARNUNG] Rechnungsmodul nicht verfuegbar: {e}")
 
+    # Design-Freigabe System
+    register_blueprint_safe('src.controllers.design_approval_controller', 'design_approval_bp', 'Design-Freigabe')
+
+    # Multi-Position-Design API
+    register_blueprint_safe('src.controllers.order_design_controller', 'order_design_bp', 'Design-Positionen API')
+
     # Smart Home Integration
     register_blueprint_safe('src.controllers.shelly_controller', 'shelly_bp', 'Shelly-Geräte')
 
@@ -201,6 +208,13 @@ def create_app():
 
     # E-Mail Integration
     register_blueprint_safe('src.controllers.email_controller', 'email_bp', 'E-Mail Integration')
+    register_blueprint_safe('src.controllers.email_api_controller', 'email_api_bp', 'E-Mail API')
+
+    # CRM - Kundenkontakt-Management
+    register_blueprint_safe('src.controllers.crm_controller', 'crm_bp', 'CRM')
+
+    # Update & Backup System
+    register_blueprint_safe('src.controllers.update_controller', 'update_bp', 'Updates & Backups')
 
     # Permission-System
     register_blueprint_safe('src.controllers.permissions_controller', 'permissions_bp', 'Berechtigungsverwaltung')
@@ -268,8 +282,27 @@ def create_app():
 
             # Design
             'design_count': 0,
-            'dst_count': 0
+            'dst_count': 0,
+
+            # Einkauf/Bestellungen
+            'pending_supplier_orders': 0,
+            'items_to_order': 0
         }
+
+        # Einkauf-Statistiken berechnen
+        try:
+            from src.models.models import SupplierOrder, OrderItem
+            stats['pending_supplier_orders'] = SupplierOrder.query.filter(
+                SupplierOrder.status.in_(['draft', 'ordered'])
+            ).count()
+            # Items die bestellt werden müssen (Bestand < Auftragsmenge)
+            stats['items_to_order'] = OrderItem.query.filter(
+                OrderItem.supplier_order_status.in_(['none', 'to_order'])
+            ).join(Article).filter(
+                OrderItem.quantity > Article.stock
+            ).count()
+        except Exception:
+            pass
 
         # Tagesumsatz berechnen
         try:

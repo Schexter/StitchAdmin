@@ -240,6 +240,30 @@
             </div>
         </div>
         
+        <!-- CRM - Kontakt -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-chat-dots"></i> Kontakt</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if customer.email %}
+                    <a href="{{ url_for('crm.send_email', customer_id=customer.id) }}" class="btn btn-primary">
+                        <i class="bi bi-envelope"></i> E-Mail schreiben
+                    </a>
+                    {% endif %}
+                    {% if customer.phone or customer.mobile %}
+                    <a href="{{ url_for('crm.phone_note', customer_id=customer.id) }}" class="btn btn-success">
+                        <i class="bi bi-telephone"></i> Telefon-Notiz
+                    </a>
+                    {% endif %}
+                    <a href="{{ url_for('crm.customer_contacts', customer_id=customer.id) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-clock-history"></i> Kontakthistorie
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <!-- Schnellaktionen -->
         <div class="card">
             <div class="card-header">
@@ -247,21 +271,13 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
-                    {% if customer.email %}
-                    <a href="mailto:{{ customer.email }}" class="btn btn-info">
-                        <i class="bi bi-envelope"></i> E-Mail senden
-                    </a>
-                    {% endif %}
                     <a href="{{ url_for('orders.new') }}?customer_id={{ customer.id }}" class="btn btn-success">
                         <i class="bi bi-plus-circle"></i> Neuer Auftrag
                     </a>
-                    <button class="btn btn-secondary" onclick="alert('Kaufhistorie wird in der nächsten Version implementiert')">
-                        <i class="bi bi-clock-history"></i> Kaufhistorie
-                    </button>
                     {% if customer.get('customer_type', 'private') == 'business' %}
-                    <button class="btn btn-secondary" onclick="alert('Rechnungshistorie wird in der nächsten Version implementiert')">
-                        <i class="bi bi-receipt"></i> Rechnungen
-                    </button>
+                    <a href="{{ url_for('rechnung.neue_rechnung') }}?kunde_id={{ customer.id }}" class="btn btn-outline-primary">
+                        <i class="bi bi-receipt"></i> Neue Rechnung
+                    </a>
                     {% endif %}
                 </div>
             </div>

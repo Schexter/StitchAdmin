@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Beleg #{{ beleg.beleg_nummer }} - StitchAdmin{% endblock %}
+{% block title %}Beleg #{{ beleg.belegnummer }} - StitchAdmin{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -11,10 +11,10 @@
                 <div class="card-header bg-secondary text-white">
                     <div class="row">
                         <div class="col">
-                            <h4><i class="bi bi-receipt"></i> Kassenbeleg #{{ beleg.beleg_nummer }}</h4>
+                            <h4><i class="bi bi-receipt"></i> Kassenbeleg #{{ beleg.belegnummer }}</h4>
                         </div>
                         <div class="col text-end">
-                            <span class="badge bg-light text-dark">{{ beleg.datum.strftime('%d.%m.%Y %H:%M') }}</span>
+                            <span class="badge bg-light text-dark">{{ beleg.erstellt_am.strftime('%d.%m.%Y %H:%M') if beleg.erstellt_am else '-' }}</span>
                         </div>
                     </div>
                 </div>
@@ -69,15 +69,15 @@
                         <tfoot>
                             <tr>
                                 <td colspan="3" class="text-end">Zwischensumme:</td>
-                                <td class="text-end">{{ "%.2f"|format(beleg.summe_netto) }} €</td>
+                                <td class="text-end">{{ "%.2f"|format(beleg.netto_gesamt|default(0)) }} €</td>
                             </tr>
                             <tr>
-                                <td colspan="3" class="text-end">MwSt ({{ beleg.mwst_satz }}%):</td>
-                                <td class="text-end">{{ "%.2f"|format(beleg.summe_mwst) }} €</td>
+                                <td colspan="3" class="text-end">MwSt:</td>
+                                <td class="text-end">{{ "%.2f"|format(beleg.mwst_gesamt|default(0)) }} €</td>
                             </tr>
                             <tr class="table-secondary">
                                 <td colspan="3" class="text-end"><strong>Gesamtbetrag:</strong></td>
-                                <td class="text-end"><strong>{{ "%.2f"|format(beleg.summe_brutto) }} €</strong></td>
+                                <td class="text-end"><strong>{{ "%.2f"|format(beleg.brutto_gesamt|default(0)) }} €</strong></td>
                             </tr>
                         </tfoot>
                     </table>

@@ -132,6 +132,57 @@ def index():
                          settings_overview=settings_overview,
                          legacy_settings=legacy_settings,
                          advanced_settings=advanced_settings)
+
+
+@settings_bp.route('/email', methods=['GET', 'POST'])
+@login_required
+def email():
+    """E-Mail Einstellungen"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können E-Mail-Einstellungen ändern.', 'danger')
+        return redirect(url_for('settings.index'))
+
+    from src.models.company_settings import CompanySettings
+    company_settings = CompanySettings.get_settings()
+
+    if request.method == 'POST':
+        # E-Mail-Methode - sicherstellen dass ein gültiger Wert gespeichert wird
+        email_method = request.form.get('email_method', 'outlook')
+        if email_method not in ['outlook', 'smtp', 'mailto']:
+            email_method = 'outlook'
+        company_settings.email_method = email_method
+
+        # Outlook-Konto speichern
+        company_settings.outlook_account = request.form.get('outlook_account', '')
+
+        # SMTP-Einstellungen
+        company_settings.smtp_server = request.form.get('smtp_server', '')
+        company_settings.smtp_port = int(request.form.get('smtp_port', 587) or 587)
+        company_settings.smtp_username = request.form.get('smtp_username', '')
+        company_settings.smtp_use_tls = request.form.get('smtp_use_tls') == 'on'
+        company_settings.smtp_from_email = request.form.get('smtp_from_email', '')
+        company_settings.smtp_from_name = request.form.get('smtp_from_name', '')
+
+        # Passwort nur aktualisieren wenn eingegeben
+        smtp_password = request.form.get('smtp_password')
+        if smtp_password:
+            company_settings.smtp_password = smtp_password
+
+        # E-Mail-Vorlagen
+        company_settings.invoice_email_subject = request.form.get('invoice_email_subject', 'Rechnung {invoice_number}')
+        company_settings.invoice_email_template = request.form.get('invoice_email_template', '')
+
+        # E-Mail-Signatur
+        company_settings.email_signature = request.form.get('email_signature', '')
+
+        db.session.commit()
+
+        flash('E-Mail Einstellungen wurden gespeichert!', 'success')
+        return redirect(url_for('settings.email'))
+
+    return render_template('settings/email.html', settings=company_settings)
+
+
 @settings_bp.route('/integrations/sumup')
 @login_required
 def sumup_integration():

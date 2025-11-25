@@ -3,54 +3,75 @@
 {% block title %}Rechnungen - StitchAdmin{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <h1><i class="bi bi-file-text"></i> Rechnungsverwaltung</h1>
-    
-    <!-- Übersicht -->
+
+    <!-- Tabs für Eingang/Ausgang -->
+    <ul class="nav nav-tabs mb-4" id="rechnungsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if tab == 'ausgang' %}active{% endif %}"
+               href="{{ url_for('rechnung.rechnungs_index', tab='ausgang') }}">
+                <i class="bi bi-box-arrow-up-right"></i> Ausgangsrechnungen
+                <span class="badge bg-primary ms-1">{{ ausgang_total_count|default(0) }}</span>
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if tab == 'eingang' %}active{% endif %}"
+               href="{{ url_for('rechnung.rechnungs_index', tab='eingang') }}">
+                <i class="bi bi-box-arrow-in-left"></i> Eingangsrechnungen
+                <span class="badge bg-secondary ms-1">{{ eingang_total_count|default(0) }}</span>
+            </a>
+        </li>
+    </ul>
+
+    {% if tab == 'ausgang' %}
+    <!-- AUSGANGSRECHNUNGEN -->
+
+    <!-- Statistik-Karten -->
     <div class="row mb-4">
         <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">Offene Rechnungen</h5>
-                    <h2 class="text-danger">{{ open_invoices_count }}</h2>
-                    <p class="text-muted">{{ "%.2f"|format(open_invoices_total) }} €</p>
+            <div class="card border-warning h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-warning"><i class="bi bi-clock"></i> Offen</h5>
+                    <h2 class="text-warning">{{ ausgang_offen_count|default(0) }}</h2>
+                    <p class="text-muted mb-0">{{ "%.2f"|format(ausgang_offen_total|default(0)) }} €</p>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">Überfällig</h5>
-                    <h2 class="text-warning">{{ overdue_invoices_count }}</h2>
-                    <p class="text-muted">{{ "%.2f"|format(overdue_invoices_total) }} €</p>
+            <div class="card border-danger h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-danger"><i class="bi bi-exclamation-triangle"></i> Überfällig</h5>
+                    <h2 class="text-danger">{{ ausgang_ueberfaellig_count|default(0) }}</h2>
+                    <p class="text-muted mb-0">{{ "%.2f"|format(ausgang_ueberfaellig_total|default(0)) }} €</p>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">Bezahlt (Monat)</h5>
-                    <h2 class="text-success">{{ paid_this_month_count }}</h2>
-                    <p class="text-muted">{{ "%.2f"|format(paid_this_month_total) }} €</p>
+            <div class="card border-success h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-success"><i class="bi bi-check-circle"></i> Bezahlt (Monat)</h5>
+                    <h2 class="text-success">{{ ausgang_bezahlt_count|default(0) }}</h2>
+                    <p class="text-muted mb-0">{{ "%.2f"|format(ausgang_bezahlt_total|default(0)) }} €</p>
                 </div>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">Gesamt (Jahr)</h5>
-                    <h2 class="text-primary">{{ year_total_count }}</h2>
-                    <p class="text-muted">{{ "%.2f"|format(year_total_amount) }} €</p>
+            <div class="card border-primary h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-primary"><i class="bi bi-graph-up"></i> Gesamt</h5>
+                    <h2 class="text-primary">{{ ausgang_total_count|default(0) }}</h2>
+                    <p class="text-muted mb-0">{{ "%.2f"|format(year_total_amount|default(0)) }} €</p>
                 </div>
             </div>
         </div>
     </div>
-    
-    <!-- Hauptaktionen -->
+
+    <!-- Aktionsbuttons -->
     <div class="row mb-4">
         <div class="col-md-4">
             <a href="{{ url_for('rechnung.neue_rechnung') }}" class="btn btn-success btn-lg w-100">
-                <i class="bi bi-plus-circle"></i> Neue Rechnung
+                <i class="bi bi-plus-circle"></i> Neue Rechnung erstellen
             </a>
         </div>
         <div class="col-md-4">
@@ -59,66 +80,26 @@
             </a>
         </div>
         <div class="col-md-4">
-            <button class="btn btn-info btn-lg w-100" data-bs-toggle="modal" data-bs-target="#importModal">
-                <i class="bi bi-upload"></i> Import/Export
+            <button class="btn btn-outline-secondary btn-lg w-100" data-bs-toggle="modal" data-bs-target="#exportModal">
+                <i class="bi bi-download"></i> Export
             </button>
         </div>
     </div>
-    
-    <!-- Filter -->
-    <div class="card mb-3">
-        <div class="card-body">
-            <form method="GET" class="row g-3">
-                <div class="col-md-3">
-                    <label class="form-label">Status</label>
-                    <select class="form-control" name="status">
-                        <option value="">Alle</option>
-                        <option value="draft" {% if request.args.get('status') == 'draft' %}selected{% endif %}>Entwurf</option>
-                        <option value="sent" {% if request.args.get('status') == 'sent' %}selected{% endif %}>Versendet</option>
-                        <option value="paid" {% if request.args.get('status') == 'paid' %}selected{% endif %}>Bezahlt</option>
-                        <option value="overdue" {% if request.args.get('status') == 'overdue' %}selected{% endif %}>Überfällig</option>
-                        <option value="cancelled" {% if request.args.get('status') == 'cancelled' %}selected{% endif %}>Storniert</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Kunde</label>
-                    <input type="text" class="form-control" name="customer" placeholder="Kundenname..." 
-                           value="{{ request.args.get('customer', '') }}">
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">Zeitraum</label>
-                    <select class="form-control" name="period">
-                        <option value="">Alle</option>
-                        <option value="today" {% if request.args.get('period') == 'today' %}selected{% endif %}>Heute</option>
-                        <option value="week" {% if request.args.get('period') == 'week' %}selected{% endif %}>Diese Woche</option>
-                        <option value="month" {% if request.args.get('period') == 'month' %}selected{% endif %}>Dieser Monat</option>
-                        <option value="year" {% if request.args.get('period') == 'year' %}selected{% endif %}>Dieses Jahr</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label">&nbsp;</label>
-                    <button type="submit" class="btn btn-primary d-block w-100">
-                        <i class="bi bi-funnel"></i> Filtern
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Rechnungsliste -->
+
+    <!-- Rechnungsliste Ausgang -->
     <div class="card">
-        <div class="card-header">
-            <h5><i class="bi bi-list-ul"></i> Rechnungen</h5>
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Ausgangsrechnungen (an Kunden)</h5>
         </div>
         <div class="card-body">
+            {% if ausgangsrechnungen %}
             <div class="table-responsive">
                 <table class="table table-hover">
-                    <thead>
+                    <thead class="table-light">
                         <tr>
                             <th>Rechnungs-Nr.</th>
                             <th>Datum</th>
                             <th>Kunde</th>
-                            <th>Beschreibung</th>
                             <th class="text-end">Netto</th>
                             <th class="text-end">Brutto</th>
                             <th>Fälligkeit</th>
@@ -127,219 +108,210 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for rechnung in rechnungen %}
+                        {% for rechnung in ausgangsrechnungen %}
                         <tr>
                             <td>
                                 <a href="{{ url_for('rechnung.rechnung_detail', rechnung_id=rechnung.id) }}">
-                                    {{ rechnung.rechnungsnummer }}
+                                    <strong>{{ rechnung.rechnungsnummer }}</strong>
                                 </a>
                             </td>
-                            <td>{{ rechnung.rechnungsdatum.strftime('%d.%m.%Y') }}</td>
+                            <td>{{ rechnung.rechnungsdatum.strftime('%d.%m.%Y') if rechnung.rechnungsdatum else '-' }}</td>
                             <td>
                                 {% if rechnung.kunde %}
-                                    <a href="{{ url_for('customers.show', customer_id=rechnung.kunde_id) }}">
-                                        {{ rechnung.kunde.display_name }}
-                                    </a>
+                                    {{ rechnung.kunde_name or rechnung.kunde.display_name }}
                                 {% else %}
-                                    <span class="text-muted">Kunde gelöscht</span>
+                                    {{ rechnung.kunde_name or '-' }}
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ "%.2f"|format(rechnung.netto_gesamt|float) }} €</td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(rechnung.brutto_gesamt|float) }} €</strong></td>
+                            <td>
+                                {% if rechnung.faelligkeitsdatum %}
+                                    {{ rechnung.faelligkeitsdatum.strftime('%d.%m.%Y') }}
+                                {% else %}
+                                    -
                                 {% endif %}
                             </td>
                             <td>
-                                <div class="text-truncate" style="max-width: 200px;">
-                                    {{ rechnung.betreff or 'Keine Beschreibung' }}
-                                </div>
-                            </td>
-                            <td class="text-end">{{ "%.2f"|format(rechnung.summe_netto) }} €</td>
-                            <td class="text-end"><strong>{{ "%.2f"|format(rechnung.summe_brutto) }} €</strong></td>
-                            <td>
-                                {{ rechnung.faelligkeitsdatum.strftime('%d.%m.%Y') }}
-                                {% if rechnung.ist_ueberfaellig() %}
-                                    <span class="badge bg-danger">{{ rechnung.tage_ueberfaellig() }} Tage</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if rechnung.status == 'draft' %}
-                                    <span class="badge bg-secondary">Entwurf</span>
-                                {% elif rechnung.status == 'sent' %}
-                                    <span class="badge bg-primary">Versendet</span>
-                                {% elif rechnung.status == 'paid' %}
+                                {% if rechnung.status.value == 'BEZAHLT' %}
                                     <span class="badge bg-success">Bezahlt</span>
-                                {% elif rechnung.status == 'overdue' %}
+                                {% elif rechnung.status.value == 'OFFEN' %}
+                                    <span class="badge bg-warning">Offen</span>
+                                {% elif rechnung.status.value == 'ENTWURF' %}
+                                    <span class="badge bg-secondary">Entwurf</span>
+                                {% elif rechnung.status.value == 'UEBERFAELLIG' %}
                                     <span class="badge bg-danger">Überfällig</span>
-                                {% elif rechnung.status == 'cancelled' %}
+                                {% elif rechnung.status.value == 'STORNIERT' %}
                                     <span class="badge bg-dark">Storniert</span>
+                                {% else %}
+                                    <span class="badge bg-info">{{ rechnung.status.value }}</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <div class="dropdown">
-                                    <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" 
-                                            data-bs-toggle="dropdown">
-                                        Aktionen
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('rechnung.rechnung_detail', rechnung_id=rechnung.id) }}"
+                                       class="btn btn-outline-primary" title="Anzeigen">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('rechnung.rechnung_pdf', rechnung_id=rechnung.id) }}"
+                                       class="btn btn-outline-secondary" title="PDF" target="_blank">
+                                        <i class="bi bi-file-pdf"></i>
+                                    </a>
+                                    {% if rechnung.status.value in ['ENTWURF', 'OFFEN'] %}
+                                    <button class="btn btn-outline-success" title="Als bezahlt markieren"
+                                            onclick="markAsPaid({{ rechnung.id }})">
+                                        <i class="bi bi-check-circle"></i>
                                     </button>
-                                    <ul class="dropdown-menu">
-                                        <li>
-                                            <a class="dropdown-item" href="{{ url_for('rechnung.rechnung_detail', rechnung_id=rechnung.id) }}">
-                                                <i class="bi bi-eye"></i> Anzeigen
-                                            </a>
-                                        </li>
-                                        {% if rechnung.status == 'draft' %}
-                                        <li>
-                                            <a class="dropdown-item" href="{{ url_for('rechnung.rechnung_bearbeiten', rechnung_id=rechnung.id) }}">
-                                                <i class="bi bi-pencil"></i> Bearbeiten
-                                            </a>
-                                        </li>
-                                        {% endif %}
-                                        <li>
-                                            <a class="dropdown-item" href="{{ url_for('rechnung.rechnung_pdf', rechnung_id=rechnung.id) }}" 
-                                               target="_blank">
-                                                <i class="bi bi-file-pdf"></i> PDF anzeigen
-                                            </a>
-                                        </li>
-                                        <li>
-                                            <a class="dropdown-item" href="{{ url_for('rechnung.rechnung_download', rechnung_id=rechnung.id) }}">
-                                                <i class="bi bi-download"></i> Herunterladen
-                                            </a>
-                                        </li>
-                                        {% if rechnung.status != 'paid' and rechnung.status != 'cancelled' %}
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            <button class="dropdown-item" onclick="markAsPaid('{{ rechnung.id }}')">
-                                                <i class="bi bi-check-circle text-success"></i> Als bezahlt markieren
-                                            </button>
-                                        </li>
-                                        {% endif %}
-                                        {% if rechnung.status == 'sent' %}
-                                        <li>
-                                            <button class="dropdown-item" onclick="sendReminder('{{ rechnung.id }}')">
-                                                <i class="bi bi-envelope text-warning"></i> Zahlungserinnerung
-                                            </button>
-                                        </li>
-                                        {% endif %}
-                                        {% if rechnung.status != 'cancelled' %}
-                                        <li><hr class="dropdown-divider"></li>
-                                        <li>
-                                            <button class="dropdown-item text-danger" onclick="cancelInvoice('{{ rechnung.id }}')">
-                                                <i class="bi bi-x-circle"></i> Stornieren
-                                            </button>
-                                        </li>
-                                        {% endif %}
-                                    </ul>
+                                    {% endif %}
                                 </div>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="9" class="text-center text-muted">
-                                Keine Rechnungen gefunden
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+                <h4 class="text-muted mt-3">Keine Ausgangsrechnungen vorhanden</h4>
+                <p class="text-muted">Erstellen Sie Ihre erste Rechnung</p>
+                <a href="{{ url_for('rechnung.neue_rechnung') }}" class="btn btn-success">
+                    <i class="bi bi-plus-circle"></i> Neue Rechnung erstellen
+                </a>
+            </div>
+            {% endif %}
         </div>
     </div>
-</div>
 
-<!-- Import/Export Modal -->
-<div class="modal fade" id="importModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Import/Export</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="d-grid gap-2">
-                    <button class="btn btn-outline-primary" onclick="exportInvoices('csv')">
-                        <i class="bi bi-file-earmark-spreadsheet"></i> Als CSV exportieren
-                    </button>
-                    <button class="btn btn-outline-primary" onclick="exportInvoices('excel')">
-                        <i class="bi bi-file-earmark-excel"></i> Als Excel exportieren
-                    </button>
-                    <button class="btn btn-outline-primary" onclick="exportInvoices('datev')">
-                        <i class="bi bi-calculator"></i> DATEV-Export
-                    </button>
-                    <hr>
-                    <button class="btn btn-outline-success" onclick="showImportDialog()">
-                        <i class="bi bi-upload"></i> Rechnungen importieren
-                    </button>
+    {% else %}
+    <!-- EINGANGSRECHNUNGEN -->
+
+    <!-- Statistik-Karten Eingang -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-warning h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-warning"><i class="bi bi-clock"></i> Zu bezahlen</h5>
+                    <h2 class="text-warning">{{ eingang_offen_count|default(0) }}</h2>
+                    <p class="text-muted mb-0">{{ "%.2f"|format(eingang_offen_total|default(0)) }} €</p>
                 </div>
             </div>
         </div>
+        <div class="col-md-4">
+            <div class="card border-primary h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-primary"><i class="bi bi-receipt"></i> Gesamt</h5>
+                    <h2 class="text-primary">{{ eingang_total_count|default(0) }}</h2>
+                    <p class="text-muted mb-0">Eingangsrechnungen</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <a href="{{ url_for('rechnung.neue_eingangsrechnung') }}" class="btn btn-success btn-lg w-100 h-100 d-flex align-items-center justify-content-center">
+                <i class="bi bi-plus-circle me-2"></i> Eingangsrechnung erfassen
+            </a>
+        </div>
     </div>
+
+    <!-- Rechnungsliste Eingang -->
+    <div class="card">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Eingangsrechnungen (von Lieferanten)</h5>
+        </div>
+        <div class="card-body">
+            {% if eingangsrechnungen %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Rechnungs-Nr.</th>
+                            <th>Datum</th>
+                            <th>Lieferant</th>
+                            <th class="text-end">Netto</th>
+                            <th class="text-end">Brutto</th>
+                            <th>Fälligkeit</th>
+                            <th>Status</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rechnung in eingangsrechnungen %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('rechnung.rechnung_detail', rechnung_id=rechnung.id) }}">
+                                    <strong>{{ rechnung.rechnungsnummer }}</strong>
+                                </a>
+                            </td>
+                            <td>{{ rechnung.rechnungsdatum.strftime('%d.%m.%Y') if rechnung.rechnungsdatum else '-' }}</td>
+                            <td>{{ rechnung.lieferant_name or '-' }}</td>
+                            <td class="text-end">{{ "%.2f"|format(rechnung.netto_gesamt|float) }} €</td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(rechnung.brutto_gesamt|float) }} €</strong></td>
+                            <td>
+                                {% if rechnung.faelligkeitsdatum %}
+                                    {{ rechnung.faelligkeitsdatum.strftime('%d.%m.%Y') }}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if rechnung.status.value == 'BEZAHLT' %}
+                                    <span class="badge bg-success">Bezahlt</span>
+                                {% elif rechnung.status.value == 'OFFEN' %}
+                                    <span class="badge bg-warning">Offen</span>
+                                {% else %}
+                                    <span class="badge bg-info">{{ rechnung.status.value }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('rechnung.rechnung_detail', rechnung_id=rechnung.id) }}"
+                                       class="btn btn-outline-primary" title="Anzeigen">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if rechnung.status.value == 'OFFEN' %}
+                                    <button class="btn btn-outline-success" title="Als bezahlt markieren"
+                                            onclick="markAsPaid({{ rechnung.id }})">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+                <h4 class="text-muted mt-3">Keine Eingangsrechnungen vorhanden</h4>
+                <p class="text-muted">Erfassen Sie Rechnungen von Ihren Lieferanten</p>
+                <a href="{{ url_for('rechnung.neue_eingangsrechnung') }}" class="btn btn-success">
+                    <i class="bi bi-plus-circle"></i> Eingangsrechnung erfassen
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <script>
 function markAsPaid(rechnungId) {
     if (confirm('Rechnung als bezahlt markieren?')) {
-        fetch(`/rechnungen/api/${rechnungId}/bezahlt`, {
+        fetch(`/rechnung/api/${rechnungId}/bezahlt`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                payment_date: new Date().toISOString().split('T')[0],
-                payment_method: 'bank_transfer'
-            })
+            headers: {'Content-Type': 'application/json'}
         })
-        .then(response => response.json())
+        .then(res => res.json())
         .then(data => {
             if (data.success) {
                 location.reload();
             } else {
-                alert('Fehler: ' + data.message);
+                alert('Fehler: ' + data.error);
             }
         });
     }
-}
-
-function sendReminder(rechnungId) {
-    if (confirm('Zahlungserinnerung versenden?')) {
-        fetch(`/rechnungen/api/${rechnungId}/mahnung`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Zahlungserinnerung wurde versendet');
-            } else {
-                alert('Fehler: ' + data.message);
-            }
-        });
-    }
-}
-
-function cancelInvoice(rechnungId) {
-    if (confirm('Rechnung wirklich stornieren? Diese Aktion kann nicht rückgängig gemacht werden.')) {
-        fetch(`/rechnungen/api/${rechnungId}/stornieren`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Fehler: ' + data.message);
-            }
-        });
-    }
-}
-
-function exportInvoices(format) {
-    const params = new URLSearchParams(window.location.search);
-    params.set('format', format);
-    window.location.href = `/rechnungen/export?${params.toString()}`;
-}
-
-function showImportDialog() {
-    alert('Import-Funktion wird noch implementiert');
 }
 </script>
 {% endblock %}

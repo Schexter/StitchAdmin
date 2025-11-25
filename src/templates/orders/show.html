@@ -176,73 +176,89 @@
             </div>
         </div>
         
-        <!-- Design-Details -->
+        <!-- Design-Details (nur anzeigen wenn relevante Daten vorhanden) -->
+        {% set has_design_info = order.design_description or order.description or order.embroidery_position or order.thread_colors or order.stitch_count or order.print_method or order.print_position or order.design_file_path or (order.designs and order.designs.count() > 0) %}
+        {% if has_design_info %}
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Design & Veredelung</h5>
             </div>
             <div class="card-body">
+                {% if order.design_description or order.description %}
                 <div class="row mb-2">
                     <div class="col-md-3"><strong>Design:</strong></div>
-                    <div class="col-md-9">{{ order.design_description or order.description or '-' }}</div>
+                    <div class="col-md-9">{{ order.design_description or order.description }}</div>
                 </div>
-                
+                {% endif %}
+
                 {% if order.order_type == 'embroidery' or order.order_type == 'combined' %}
-                <div class="row mb-2">
-                    <div class="col-md-3"><strong>Stickposition:</strong></div>
-                    <div class="col-md-9">{{ order.embroidery_position or '-' }}</div>
-                </div>
-                <div class="row mb-2">
-                    <div class="col-md-3"><strong>Stickgröße:</strong></div>
-                    <div class="col-md-9">{{ order.embroidery_size or '-' }}</div>
-                </div>
-                <div class="row mb-2">
-                    <div class="col-md-3"><strong>Garn-Farben:</strong></div>
-                    <div class="col-md-9">{{ order.thread_colors or '-' }}</div>
-                </div>
-                {% if order.stitch_count > 0 %}
-                <div class="row mb-2">
-                    <div class="col-md-3"><strong>Stichanzahl:</strong></div>
-                    <div class="col-md-9">{{ "{:,}".format(order.stitch_count) }} Stiche</div>
-                </div>
-                {% endif %}
-                {% endif %}
-                
-                {% if order.order_type == 'printing' or order.order_type == 'combined' %}
-                <div class="row mb-2">
-                    <div class="col-md-3"><strong>Druckverfahren:</strong></div>
-                    <div class="col-md-9">{{ order.print_method or '-' }}</div>
-                </div>
-                <div class="row mb-2">
-                    <div class="col-md-3"><strong>Druckposition:</strong></div>
-                    <div class="col-md-9">{{ order.print_position or '-' }}</div>
-                </div>
-                <div class="row mb-2">
-                    <div class="col-md-3"><strong>Druckfarben:</strong></div>
-                    <div class="col-md-9">
-                        {% if order.selected_print_colors %}
-                            <div class="d-flex flex-wrap gap-1">
-                                {% for color in order.selected_print_colors %}
-                                    <span class="badge" 
-                                          style="background-color: {{ color.hex }}; color: {{ '#FFFFFF' if color.hex in ['#000000', '#000080', '#800080'] else '#000000' }};"
-                                          title="{{ color.name }}{% if color.pantone %} | Pantone {{ color.pantone }}{% endif %}{% if color.hex %} | {{ color.hex }}{% endif %}{% if color.rgb %} | RGB({{ color.rgb }}){% endif %}{% if color.cmyk %} | {{ color.cmyk }}{% endif %}">
-                                        {{ color.name }}
-                                    </span>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            {{ order.print_colors or '-' }}
-                        {% endif %}
+                    {% if order.embroidery_position %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><strong>Stickposition:</strong></div>
+                        <div class="col-md-9">{{ order.embroidery_position }}</div>
                     </div>
-                </div>
-                {% if order.print_width_cm > 0 and order.print_height_cm > 0 %}
-                <div class="row mb-2">
-                    <div class="col-md-3"><strong>Druckgröße:</strong></div>
-                    <div class="col-md-9">{{ order.print_width_cm }} × {{ order.print_height_cm }} cm</div>
-                </div>
+                    {% endif %}
+                    {% if order.embroidery_size %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><strong>Stickgröße:</strong></div>
+                        <div class="col-md-9">{{ order.embroidery_size }}</div>
+                    </div>
+                    {% endif %}
+                    {% if order.thread_colors %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><strong>Garn-Farben:</strong></div>
+                        <div class="col-md-9">{{ order.thread_colors }}</div>
+                    </div>
+                    {% endif %}
+                    {% if order.stitch_count and order.stitch_count > 0 %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><strong>Stichanzahl:</strong></div>
+                        <div class="col-md-9">{{ "{:,}".format(order.stitch_count) }} Stiche</div>
+                    </div>
+                    {% endif %}
                 {% endif %}
+
+                {% if order.order_type == 'printing' or order.order_type == 'combined' %}
+                    {% if order.print_method %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><strong>Druckverfahren:</strong></div>
+                        <div class="col-md-9">{{ order.print_method }}</div>
+                    </div>
+                    {% endif %}
+                    {% if order.print_position %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><strong>Druckposition:</strong></div>
+                        <div class="col-md-9">{{ order.print_position }}</div>
+                    </div>
+                    {% endif %}
+                    {% if order.selected_print_colors or order.print_colors %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><strong>Druckfarben:</strong></div>
+                        <div class="col-md-9">
+                            {% if order.selected_print_colors %}
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for color in order.selected_print_colors %}
+                                        <span class="badge"
+                                              style="background-color: {{ color.hex }}; color: {{ '#FFFFFF' if color.hex in ['#000000', '#000080', '#800080'] else '#000000' }};"
+                                              title="{{ color.name }}{% if color.pantone %} | Pantone {{ color.pantone }}{% endif %}{% if color.hex %} | {{ color.hex }}{% endif %}{% if color.rgb %} | RGB({{ color.rgb }}){% endif %}{% if color.cmyk %} | {{ color.cmyk }}{% endif %}">
+                                            {{ color.name }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                {{ order.print_colors }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if order.print_width_cm and order.print_height_cm and order.print_width_cm > 0 and order.print_height_cm > 0 %}
+                    <div class="row mb-2">
+                        <div class="col-md-3"><strong>Druckgröße:</strong></div>
+                        <div class="col-md-9">{{ order.print_width_cm }} × {{ order.print_height_cm }} cm</div>
+                    </div>
+                    {% endif %}
                 {% endif %}
-                
+
                 {% if order.special_instructions %}
                 <div class="row mb-2">
                     <div class="col-md-3"><strong>Besondere Hinweise:</strong></div>
@@ -319,8 +335,13 @@
                 </div>
             </div>
         </div>
+        {% endif %}
+
+        <!-- Multi-Position Design-Verwaltung -->
+        {% include 'orders/includes/design_positions.html' %}
+
     </div>
-    
+
     <div class="col-md-4">
         <!-- Status-Aktionen -->
         <div class="card mb-4">
@@ -383,7 +404,8 @@
             </div>
         </div>
         
-        <!-- Notizen -->
+        <!-- Notizen (nur anzeigen wenn vorhanden) -->
+        {% if order.notes or order.internal_notes or order.customer_notes %}
         <div class="card mb-4">
             <div class="card-header">
                 <h5 class="mb-0">Notizen</h5>
@@ -391,12 +413,17 @@
             <div class="card-body">
                 {% if order.notes %}
                     <p>{{ order.notes|nl2br }}</p>
-                {% else %}
-                    <p class="text-muted">Keine Notizen vorhanden</p>
+                {% endif %}
+                {% if order.internal_notes %}
+                    <p><strong>Intern:</strong> {{ order.internal_notes|nl2br }}</p>
+                {% endif %}
+                {% if order.customer_notes %}
+                    <p><strong>Kundenhinweis:</strong> {{ order.customer_notes|nl2br }}</p>
                 {% endif %}
             </div>
         </div>
-        
+        {% endif %}
+
         <!-- Aktionen -->
         <div class="card">
             <div class="card-header">

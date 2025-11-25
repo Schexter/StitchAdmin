@@ -516,8 +516,14 @@ class LShopImportService:
                             if hasattr(existing_article, field):
                                 setattr(existing_article, field, value)
                         existing_article.updated_at = datetime.utcnow()
+
+                        # *** NEU: Automatische Lieferantenzuordnung auch bei Update ***
+                        matched_supplier = existing_article.auto_assign_supplier()
+                        if matched_supplier and index < 3:
+                            print(f"DEBUG: Lieferant für Update zugeordnet: {matched_supplier.name}")
+
                         updated_count += 1
-                        
+
                         if index < 3:
                             print(f"DEBUG: Artikel aktualisiert: {existing_article.id}")
                     else:
@@ -567,8 +573,15 @@ class LShopImportService:
                                 article.price = article.purchase_price_single * 2.0
                         
                         db.session.add(article)
+
+                        # *** NEU: Automatische Lieferantenzuordnung ***
+                        matched_supplier = article.auto_assign_supplier()
+                        if matched_supplier:
+                            if index < 3:
+                                print(f"DEBUG: Lieferant automatisch zugeordnet: {matched_supplier.name}")
+
                         imported_count += 1
-                        
+
                         if index < 3:
                             print(f"DEBUG: Artikel zur Session hinzugefügt: {article.id} - {article.article_number}")
                     
@@ -636,3 +649,75 @@ class LShopImportService:
             return float(value_str)
         except:
             return None
+
+    @staticmethod
+    def assign_suppliers_to_all_articles():
+        """
+        Ordnet allen Artikeln ohne Supplier-Zuordnung automatisch einen Lieferanten zu.
+        Nützlich für Batch-Update nach Import oder bei bestehenden Daten.
+
+        Returns:
+            dict: Ergebnis mit Anzahl zugeordneter und nicht zuordenbarer Artikel
+        """
+        from src.models import Article, Supplier
+
+        assigned_count = 0
+        not_assigned_count = 0
+        errors = []
+
+        # Hole alle Artikel die einen Lieferantennamen haben
+        articles_with_supplier_name = Article.query.filter(
+            Article.supplier.isnot(None),
+            Article.supplier != ''
+        ).all()
+
+        # Hole alle aktiven Lieferanten für schnelleren Zugriff
+        suppliers = Supplier.query.filter_by(active=True).all()
+        supplier_lookup = {s.name.lower(): s for s in suppliers}
+
+        for article in articles_with_supplier_name:
+            try:
+                supplier_name = article.supplier.strip().lower()
+                matched_supplier = None
+
+                # 1. Exakter Match (case-insensitive)
+                if supplier_name in supplier_lookup:
+                    matched_supplier = supplier_lookup[supplier_name]
+                else:
+                    # 2. Supplier Name enthält Artikel-Lieferant
+                    for s_name, supplier in supplier_lookup.items():
+                        if supplier_name in s_name:
+                            matched_supplier = supplier
+                            break
+
+                    # 3. Artikel-Lieferant enthält Supplier Name
+                    if not matched_supplier:
+                        for s_name, supplier in supplier_lookup.items():
+                            if s_name in supplier_name:
+                                matched_supplier = supplier
+                                break
+
+                if matched_supplier:
+                    assigned_count += 1
+                else:
+                    not_assigned_count += 1
+
+            except Exception as e:
+                errors.append(f"Artikel {article.id}: {str(e)}")
+
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+        return {
+            'success': True,
+            'assigned_count': assigned_count,
+            'not_assigned_count': not_assigned_count,
+            'total_processed': len(articles_with_supplier_name),
+            'errors': errors[:10]
+        }

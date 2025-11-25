@@ -26,6 +26,11 @@ except ImportError:
     db = SQLAlchemy()
 
 # Enums für Status-Felder
+class RechnungsRichtung(Enum):
+    """Rechnungs-Richtung (Eingang/Ausgang)"""
+    AUSGANG = "AUSGANG"  # Wir stellen Rechnung (Ausgangsrechnung)
+    EINGANG = "EINGANG"  # Wir erhalten Rechnung (Eingangsrechnung/Lieferantenrechnung)
+
 class BelegTyp(Enum):
     """Beleg-Typen"""
     RECHNUNG = "RECHNUNG"
@@ -397,11 +402,11 @@ class Rechnung(db.Model):
     # Rechnungs-Identifikation
     rechnungsnummer = db.Column(db.String(50), unique=True, nullable=False, index=True)
     
-    # Kunde
-    kunde_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=False)
-    
+    # Kunde (nullable für Eingangsrechnungen)
+    kunde_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=True)
+
     # Kunde-Snapshot (für unveränderliche Rechnungen)
-    kunde_name = db.Column(db.String(200), nullable=False)
+    kunde_name = db.Column(db.String(200), nullable=True)
     kunde_adresse = db.Column(db.Text)
     kunde_email = db.Column(db.String(120))
     kunde_steuernummer = db.Column(db.String(50))
@@ -427,7 +432,14 @@ class Rechnung(db.Model):
     
     # Status
     status = db.Column(db.Enum(RechnungsStatus), nullable=False, default=RechnungsStatus.ENTWURF)
-    
+
+    # Richtung (Eingang/Ausgang)
+    richtung = db.Column(db.Enum(RechnungsRichtung), nullable=False, default=RechnungsRichtung.AUSGANG)
+
+    # Lieferant (für Eingangsrechnungen)
+    lieferant_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=True)
+    lieferant_name = db.Column(db.String(200))  # Snapshot
+
     # ZUGPFERD-Konfiguration
     zugpferd_profil = db.Column(db.Enum(ZugpferdProfil), nullable=False, default=ZugpferdProfil.BASIC)
     zugpferd_xml = db.Column(db.Text)  # Generiertes XML
@@ -489,13 +501,17 @@ class Rechnung(db.Model):
     
     def calculate_totals(self):
         """Berechnet Gesamtsummen aus Positionen"""
-        self.netto_gesamt = sum(pos.netto_betrag for pos in self.positionen)
-        self.mwst_gesamt = sum(pos.mwst_betrag for pos in self.positionen)
-        
+        from decimal import Decimal
+        self.netto_gesamt = sum((pos.netto_betrag or Decimal('0')) for pos in self.positionen)
+        self.mwst_gesamt = sum((pos.mwst_betrag or Decimal('0')) for pos in self.positionen)
+
+        # Rabatt absichern (None -> 0)
+        rabatt = self.rabatt_betrag if self.rabatt_betrag is not None else Decimal('0')
+
         # Rabatt abziehen
-        netto_nach_rabatt = self.netto_gesamt - self.rabatt_betrag
-        mwst_nach_rabatt = netto_nach_rabatt * (self.mwst_gesamt / self.netto_gesamt if self.netto_gesamt > 0 else 0)
-        
+        netto_nach_rabatt = self.netto_gesamt - rabatt
+        mwst_nach_rabatt = netto_nach_rabatt * (self.mwst_gesamt / self.netto_gesamt if self.netto_gesamt > 0 else Decimal('0'))
+
         self.brutto_gesamt = netto_nach_rabatt + mwst_nach_rabatt
     
     def is_overdue(self):
@@ -556,16 +572,28 @@ class RechnungsPosition(db.Model):
     
     def calculate_amounts(self):
         """Berechnet alle Beträge basierend auf Grunddaten"""
+        from decimal import Decimal
+
+        # Sichere Defaults für None-Werte
+        if self.menge is None:
+            self.menge = Decimal('1')
+        if self.einzelpreis is None:
+            self.einzelpreis = Decimal('0')
+        if self.mwst_satz is None:
+            self.mwst_satz = Decimal('19')
+        if self.rabatt_prozent is None:
+            self.rabatt_prozent = Decimal('0')
+
         # Netto-Gesamtbetrag
         netto_gesamt = self.menge * self.einzelpreis
-        
+
         # Rabatt abziehen
-        self.rabatt_betrag = netto_gesamt * (self.rabatt_prozent / 100)
+        self.rabatt_betrag = netto_gesamt * (self.rabatt_prozent / Decimal('100'))
         self.netto_betrag = netto_gesamt - self.rabatt_betrag
-        
+
         # MwSt berechnen
-        self.mwst_betrag = self.netto_betrag * (self.mwst_satz / 100)
-        
+        self.mwst_betrag = self.netto_betrag * (self.mwst_satz / Decimal('100'))
+
         # Brutto-Betrag
         self.brutto_betrag = self.netto_betrag + self.mwst_betrag
     

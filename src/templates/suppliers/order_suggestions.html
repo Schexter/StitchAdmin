@@ -26,6 +26,86 @@
     </div>
 </div>
 
+<!-- Offene Bestellungen (Entwürfe) zum Drucken/Absenden -->
+{% if pending_orders %}
+<div class="card mb-4 border-primary">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">
+            <i class="bi bi-file-earmark-text"></i> Erstellte Bestellungen ({{ pending_orders|length }})
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Bestellnummer</th>
+                        <th>Lieferant</th>
+                        <th>Datum</th>
+                        <th>Status</th>
+                        <th>Artikel</th>
+                        <th class="text-end">Betrag</th>
+                        <th class="text-end">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in pending_orders %}
+                    <tr>
+                        <td><strong>{{ order.order_number }}</strong></td>
+                        <td>
+                            {% if order.supplier %}
+                                {{ order.supplier.name }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ order.created_at.strftime('%d.%m.%Y %H:%M') if order.created_at else '-' }}</td>
+                        <td>
+                            {% if order.status == 'draft' %}
+                                <span class="badge bg-secondary">Entwurf</span>
+                            {% elif order.status == 'ordered' %}
+                                <span class="badge bg-primary">Bestellt</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if order.items %}
+                                {% set item_count = order.items | length %}
+                                {{ item_count }} Pos.
+                            {% else %}
+                                0 Pos.
+                            {% endif %}
+                        </td>
+                        <td class="text-end">{{ '%.2f'|format(order.total_amount or 0)|replace('.', ',') }} &euro;</td>
+                        <td class="text-end">
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('suppliers.print_supplier_order', supplier_id=order.supplier_id, order_id=order.id) }}"
+                                   class="btn btn-sm btn-success" title="Drucken" target="_blank">
+                                    <i class="bi bi-printer"></i> Drucken
+                                </a>
+                                {% if order.status == 'draft' %}
+                                <form method="POST" action="{{ url_for('suppliers.update_order_status', supplier_id=order.supplier_id, order_id=order.id) }}" style="display:inline;">
+                                    <input type="hidden" name="status" value="ordered">
+                                    <button type="submit" class="btn btn-sm btn-primary" title="Als bestellt markieren">
+                                        <i class="bi bi-check"></i> Bestellt
+                                    </button>
+                                </form>
+                                {% endif %}
+                                <a href="{{ url_for('suppliers.show_order', supplier_id=order.supplier_id, order_id=order.id) }}"
+                                   class="btn btn-sm btn-outline-secondary" title="Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Neue Bestellvorschläge -->
 {% if supplier_suggestions %}
     {% for supplier_id, data in supplier_suggestions.items() %}
     <div class="card mb-4">
@@ -40,17 +120,18 @@
             </h5>
         </div>
         <div class="card-body">
-            {% if supplier_id != 'no_supplier' %}
+            {% if data.supplier %}
             <form method="POST" action="{{ url_for('suppliers.create_order_from_suggestions') }}">
-                <input type="hidden" name="supplier_id" value="{{ supplier_id }}">
+                <input type="hidden" name="supplier_id" value="{{ data.supplier.id }}">
                 
                 <div class="table-responsive">
                     <table class="table table-hover">
                         <thead>
                             <tr>
                                 <th width="40">
-                                    <input type="checkbox" class="form-check-input select-all" 
-                                           data-supplier="{{ supplier_id }}">
+                                    <input type="checkbox" class="form-check-input select-all"
+                                           data-supplier="{{ supplier_id }}"
+                                           checked>
                                 </th>
                                 <th>Artikel</th>
                                 <th>Auftrag</th>
@@ -62,13 +143,14 @@
                             </tr>
                         </thead>
                         <tbody>
-                            {% for item_data in data.items %}
+                            {% for item_data in data.order_items %}
                             <tr>
                                 <td>
-                                    <input type="checkbox" class="form-check-input item-checkbox" 
-                                           name="selected_items" 
+                                    <input type="checkbox" class="form-check-input item-checkbox"
+                                           name="selected_items"
                                            value="{{ item_data.order_item.id }}"
-                                           data-supplier="{{ supplier_id }}">
+                                           data-supplier="{{ supplier_id }}"
+                                           checked>
                                 </td>
                                 <td>
                                     <strong>{{ item_data.article.name }}</strong><br>
@@ -145,7 +227,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item_data in data.items %}
+                        {% for item_data in data.order_items %}
                         <tr>
                             <td>
                                 <a href="{{ url_for('articles.edit', article_id=item_data.article.id) }}">
@@ -233,8 +315,21 @@ document.querySelectorAll('.item-checkbox').forEach(checkbox => {
     checkbox.addEventListener('change', updateTotals);
 });
 
-// Initial calculation
-updateTotals();
+// Initial calculation - mit kurzer Verzögerung damit DOM bereit ist
+setTimeout(updateTotals, 100);
+
+// Formular-Validierung vor Absenden
+document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        const checkboxes = this.querySelectorAll('.item-checkbox:checked');
+        if (checkboxes.length === 0) {
+            e.preventDefault();
+            alert('Bitte wählen Sie mindestens einen Artikel aus.');
+            return false;
+        }
+        return true;
+    });
+});
 </script>
 
 {% endblock %}

@@ -19,6 +19,7 @@ from .models import (
     ShipmentItem,
     Supplier,
     SupplierOrder,
+    SupplierRating,
     ActivityLog,
     ProductCategory,
     Brand,
@@ -35,6 +36,9 @@ from .article_variant import ArticleVariant
 # Workflow: Packlisten & Lieferscheine
 from .packing_list import PackingList
 from .delivery_note import DeliveryNote
+
+# Auftrags-Workflow: Multi-Position & Personalisierung
+from .order_workflow import OrderDesign, OrderItemPersonalization, OrderDesignNameList
 
 # Dokumente & Post
 from .document import Document, PostEntry, ArchivedEmail
@@ -111,6 +115,11 @@ __all__ = [
     'Order',
     'OrderItem',
     'OrderStatusHistory',
+
+    # Auftrags-Workflow (Multi-Position & Personalisierung)
+    'OrderDesign',
+    'OrderItemPersonalization',
+    'OrderDesignNameList',
     
     # Produktion
     'Machine',
@@ -143,6 +152,7 @@ __all__ = [
     'SupplierOrder',
     'SupplierContact',
     'SupplierCommunicationLog',
+    'SupplierRating',
     
     # Einstellungen
     'PriceCalculationSettings',

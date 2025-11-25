@@ -671,12 +671,53 @@ def print_datasheet(article_id):
     # Füge aktuelles Datum für das Template hinzu
     from datetime import datetime
     now = datetime.now()
-    
+
     # Aktivität protokollieren
-    log_activity('article_datasheet_printed', 
+    log_activity('article_datasheet_printed',
                 f'Produktdatenblatt gedruckt für Artikel: {article.name} ({article.article_number or article.id})')
-    
-    return render_template('articles/datasheet.html', 
+
+    return render_template('articles/datasheet.html',
                          article=article,
                          now=now)
+
+
+@article_bp.route('/api/search')
+@login_required
+def api_search():
+    """
+    API-Endpunkt für Artikel-Suche (für Rechnungen, Aufträge etc.)
+    """
+    query = request.args.get('q', '').strip()
+    limit = request.args.get('limit', 20, type=int)
+
+    if len(query) < 2:
+        return jsonify({'articles': []})
+
+    # Suche in Name, Artikelnummer, Beschreibung
+    from sqlalchemy import or_
+
+    articles = Article.query.filter(
+        or_(
+            Article.name.ilike(f'%{query}%'),
+            Article.article_number.ilike(f'%{query}%'),
+            Article.description.ilike(f'%{query}%'),
+            Article.supplier_article_number.ilike(f'%{query}%')
+        ),
+        Article.active == True
+    ).limit(limit).all()
+
+    return jsonify({
+        'articles': [{
+            'id': a.id,
+            'name': a.name,
+            'article_number': a.article_number,
+            'supplier_article_number': a.supplier_article_number,
+            'description': a.description or '',
+            'price': float(a.price or 0),
+            'purchase_price': float(a.purchase_price_single or 0),
+            'stock': a.stock or 0,
+            'category': a.category,
+            'brand': a.brand
+        } for a in articles]
+    })
 

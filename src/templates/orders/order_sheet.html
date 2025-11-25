@@ -366,10 +366,15 @@
     <!-- Header mit Barcode -->
     <div class="page-header">
         <div class="company-info">
-            <div class="company-name">STITCHADMIN</div>
+            <div class="company-name">{{ company.company_name if company and company.company_name else 'StitchAdmin' }}</div>
             <div class="company-details">
-                Erstellt von: Hans Hahn - Alle Rechte vorbehalten<br>
-                Musterstraße 123 • 12345 Musterstadt • Tel: +49 123 456789 • info@stitchadmin.de
+                {% if company %}
+                    {{ company.street }} {{ company.house_number or '' }} • {{ company.postal_code }} {{ company.city }}<br>
+                    {% if company.phone %}Tel: {{ company.phone }} • {% endif %}
+                    {% if company.email %}{{ company.email }}{% endif %}
+                {% else %}
+                    Firmenadresse nicht konfiguriert
+                {% endif %}
             </div>
         </div>
         <div class="order-info">
@@ -651,9 +656,8 @@
     
     <!-- Footer -->
     <div class="page-footer">
-        <strong>STITCHADMIN</strong> - Professionelle Textilveredelung • 
-        Generiert am {{ now.strftime('%d.%m.%Y um %H:%M') }} Uhr • 
-        Erstellt von: Hans Hahn - Alle Rechte vorbehalten
+        <strong>{{ company.company_name if company and company.company_name else 'StitchAdmin' }}</strong> •
+        Generiert am {{ now.strftime('%d.%m.%Y um %H:%M') }} Uhr
     </div>
     
     <!-- JsBarcode Library -->

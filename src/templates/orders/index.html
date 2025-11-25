@@ -76,7 +76,7 @@
                         <td>
                             {% if order.customer %}
                             <a href="{{ url_for('customers.show', customer_id=order.customer_id) }}">
-                                {{ order.customer.first_name }} {{ order.customer.last_name }}
+                                {{ order.customer.display_name }}
                             </a>
                             {% else %}
                                 <span class="text-muted">Kunde gelöscht</span>

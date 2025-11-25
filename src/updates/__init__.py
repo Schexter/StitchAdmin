@@ -1,10 +1,18 @@
+# -*- coding: utf-8 -*-
 """
-StitchAdmin 2.0 - Update-Modul
+StitchAdmin 2.0 - Updates Package
+Backup und Update Management
+
 Erstellt von Hans Hahn - Alle Rechte vorbehalten
-
-Dieses Modul enthält die Update-Logik:
-- Versions-Management
-- Update-Checker
 """
 
-__version__ = "1.0.0"
+from .backup_manager import BackupManager, get_backup_manager
+from .update_manager import UpdateManager, UpdateInfo, UpdateResult
+
+__all__ = [
+    'BackupManager',
+    'get_backup_manager',
+    'UpdateManager', 
+    'UpdateInfo',
+    'UpdateResult',
+]

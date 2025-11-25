@@ -168,7 +168,61 @@ class Article(db.Model):
     def get(self, key, default=None):
         """Kompatibilität mit Dictionary-Zugriff"""
         return getattr(self, key, default)
-    
+
+    def auto_assign_supplier(self):
+        """
+        Ordnet automatisch einen Lieferanten zu basierend auf dem supplier-Feld.
+        Sucht nach teilweisem Match (case-insensitive).
+
+        Returns:
+            Supplier oder None wenn kein Match gefunden
+        """
+        if not self.supplier:
+            return None
+
+        from . import Supplier
+
+        supplier_name = self.supplier.strip().lower()
+
+        # 1. Exakter Match (case-insensitive)
+        supplier = Supplier.query.filter(
+            db.func.lower(Supplier.name) == supplier_name
+        ).first()
+
+        if supplier:
+            return supplier
+
+        # 2. Supplier Name enthält Artikel-Lieferant
+        supplier = Supplier.query.filter(
+            db.func.lower(Supplier.name).contains(supplier_name)
+        ).first()
+
+        if supplier:
+            return supplier
+
+        # 3. Artikel-Lieferant enthält Supplier Name
+        all_suppliers = Supplier.query.filter_by(active=True).all()
+        for s in all_suppliers:
+            if s.name.lower() in supplier_name:
+                return s
+
+        return None
+
+    @staticmethod
+    def normalize_supplier_name(name):
+        """
+        Normalisiert einen Lieferantennamen für besseren Match.
+        Entfernt typische Zusätze wie GmbH, AG, etc.
+        """
+        if not name:
+            return ''
+
+        normalized = name.strip().lower()
+        # Entferne übliche Firmenzusätze
+        for suffix in [' gmbh', ' ag', ' kg', ' ohg', ' e.k.', ' gbr', ' ug', ' ltd', ' inc']:
+            normalized = normalized.replace(suffix, '')
+        return normalized.strip()
+
     def calculate_prices(self, use_new_system=True):
         """Berechne VK-Preise basierend auf EK und erweiterten Einstellungen"""
         if use_new_system:
@@ -254,7 +308,7 @@ class Article(db.Model):
         # Berechne VK-Preise: EK * Faktor * (1 + Steuersatz/100)
         tax_multiplier = 1 + (default_tax_rate / 100)
         self.price_calculated = round(base_price * factor_calculated * tax_multiplier, 2)
-        self.price_recommended = round(base_price * rec_factor * tax_multiplier, 2)
+        self.price_recommended = round(base_price * factor_recommended * tax_multiplier, 2)
         
         # Setze aktuellen Preis auf kalkulierten Preis, wenn noch kein Preis gesetzt
         if not self.price:
@@ -347,10 +401,50 @@ class Order(db.Model):
     completed_by = db.Column(db.String(80))
 
     # Workflow-Integration
-    workflow_status = db.Column(db.String(50))  # offer, ordered, in_production, packing, ready_to_ship, shipped, invoiced, completed
+    workflow_status = db.Column(db.String(50))  # offer, confirmed, design_pending, design_approved, in_production, packing, ready_to_ship, shipped, invoiced, completed
     packing_list_id = db.Column(db.Integer, db.ForeignKey('packing_lists.id'))
     delivery_note_id = db.Column(db.Integer, db.ForeignKey('delivery_notes.id'))
     auto_create_packing_list = db.Column(db.Boolean, default=True)
+
+    # Angebots-Felder
+    is_offer = db.Column(db.Boolean, default=False)  # True wenn es ein Angebot ist
+    offer_valid_until = db.Column(db.Date)  # Angebot gültig bis
+    offer_sent_at = db.Column(db.DateTime)  # Wann wurde Angebot versendet
+    offer_accepted_at = db.Column(db.DateTime)  # Wann wurde Angebot angenommen
+    offer_rejected_at = db.Column(db.DateTime)  # Wann wurde Angebot abgelehnt
+    offer_rejection_reason = db.Column(db.Text)  # Grund für Ablehnung
+
+    # Design-Freigabe Felder
+    design_approval_status = db.Column(db.String(50))  # pending, sent, approved, rejected, revision_requested
+    design_approval_token = db.Column(db.String(100), unique=True)  # Einzigartiger Link-Token für Freigabe
+    design_approval_sent_at = db.Column(db.DateTime)  # Wann wurde Freigabe-Anfrage gesendet
+    design_approval_date = db.Column(db.DateTime)  # Wann wurde freigegeben
+    design_approval_signature = db.Column(db.Text)  # Base64 Signatur-Bild
+    design_approval_ip = db.Column(db.String(50))  # IP-Adresse bei Freigabe
+    design_approval_user_agent = db.Column(db.String(500))  # Browser-Info bei Freigabe
+    design_approval_notes = db.Column(db.Text)  # Anmerkungen vom Kunden
+
+    # Rechnungs-Verknüpfung
+    invoice_id = db.Column(db.Integer, db.ForeignKey('rechnungen.id'))  # Verknüpfung zur Rechnung
+
+    # Zahlungs-Status (NEU für vollständigen Workflow)
+    payment_status = db.Column(db.String(20), default='pending')  # pending, deposit_paid, paid, refunded
+    deposit_paid_at = db.Column(db.DateTime)  # Wann wurde Anzahlung bezahlt
+    deposit_payment_method = db.Column(db.String(50))  # bar, ueberweisung, paypal, sumup
+    deposit_transaction_id = db.Column(db.String(100))  # Transaktions-ID für Nachverfolgung
+    final_payment_at = db.Column(db.DateTime)  # Wann wurde Restbetrag bezahlt
+    final_payment_method = db.Column(db.String(50))
+
+    # Lieferart (Abholung vs. Versand)
+    delivery_type = db.Column(db.String(20), default='pickup')  # pickup, shipping
+    pickup_confirmed_at = db.Column(db.DateTime)  # Wann wurde Abholung bestätigt
+    pickup_signature = db.Column(db.Text)  # Base64 Signatur bei Abholung
+    pickup_signature_name = db.Column(db.String(100))  # Name des Abholers
+
+    # Archivierung
+    archived_at = db.Column(db.DateTime)  # Wann wurde archiviert
+    archived_by = db.Column(db.String(80))  # Wer hat archiviert
+    archive_reason = db.Column(db.String(100))  # Grund: completed, cancelled, etc.
 
     # Relationships
     items = db.relationship('OrderItem', backref='order', lazy='dynamic', cascade='all, delete-orphan')
@@ -459,11 +553,285 @@ class Order(db.Model):
     def is_design_ready(self):
         """Prüft ob Design produktionsbereit ist"""
         return self.design_status in ['customer_provided', 'ready']
-    
+
+    # ==========================================
+    # Angebots-Methoden
+    # ==========================================
+    def is_offer_pending(self):
+        """Prüft ob Angebot noch offen/ausstehend ist"""
+        return self.is_offer and not self.offer_accepted_at and not self.offer_rejected_at
+
+    def is_offer_expired(self):
+        """Prüft ob Angebot abgelaufen ist"""
+        if not self.is_offer or not self.offer_valid_until:
+            return False
+        from datetime import date
+        return date.today() > self.offer_valid_until
+
+    def accept_offer(self):
+        """Wandelt Angebot in Auftrag um"""
+        self.is_offer = False
+        self.offer_accepted_at = datetime.utcnow()
+        self.workflow_status = 'confirmed'
+        self.status = 'confirmed'
+
+    def reject_offer(self, reason=None):
+        """Lehnt Angebot ab"""
+        self.offer_rejected_at = datetime.utcnow()
+        self.offer_rejection_reason = reason
+        self.status = 'cancelled'
+        self.workflow_status = 'cancelled'
+
+    # ==========================================
+    # Design-Freigabe Methoden
+    # ==========================================
+    def generate_approval_token(self):
+        """Generiert einzigartigen Token für Design-Freigabe"""
+        import secrets
+        self.design_approval_token = secrets.token_urlsafe(32)
+        return self.design_approval_token
+
+    def send_design_approval_request(self):
+        """Markiert Design-Freigabe als gesendet"""
+        self.design_approval_status = 'sent'
+        self.design_approval_sent_at = datetime.utcnow()
+        if not self.design_approval_token:
+            self.generate_approval_token()
+        self.workflow_status = 'design_pending'
+
+    def approve_design(self, signature=None, ip_address=None, user_agent=None, notes=None):
+        """Genehmigt das Design"""
+        self.design_approval_status = 'approved'
+        self.design_approval_date = datetime.utcnow()
+        self.design_approval_signature = signature
+        self.design_approval_ip = ip_address
+        self.design_approval_user_agent = user_agent
+        self.design_approval_notes = notes
+        self.workflow_status = 'design_approved'
+
+    def reject_design(self, notes=None, ip_address=None):
+        """Lehnt Design ab (Änderung gewünscht)"""
+        self.design_approval_status = 'revision_requested'
+        self.design_approval_notes = notes
+        self.design_approval_ip = ip_address
+
+    def is_design_approval_pending(self):
+        """Prüft ob Design-Freigabe ausstehend ist"""
+        return self.design_approval_status in ['pending', 'sent']
+
+    def is_design_approved(self):
+        """Prüft ob Design freigegeben wurde"""
+        return self.design_approval_status == 'approved'
+
+    def needs_design_approval(self):
+        """Prüft ob Design-Freigabe benötigt wird"""
+        # Design-Freigabe wird benötigt wenn:
+        # - Auftrag bestätigt wurde (kein Angebot mehr)
+        # - Design vorhanden ist
+        # - Noch keine Freigabe erfolgt ist
+        return (not self.is_offer and
+                self.has_design_file() and
+                self.design_approval_status not in ['approved'])
+
+    # ==========================================
+    # Workflow-Methoden
+    # ==========================================
+    def get_workflow_status_display(self):
+        """Gibt den Workflow-Status als benutzerfreundlichen Text zurück"""
+        status_map = {
+            'offer': 'Angebot',
+            'confirmed': 'Bestätigt',
+            'design_pending': 'Warte auf Design-Freigabe',
+            'design_approved': 'Design freigegeben',
+            'in_production': 'In Produktion',
+            'packing': 'Wird verpackt',
+            'ready_to_ship': 'Versandbereit',
+            'shipped': 'Versendet',
+            'invoiced': 'Rechnung erstellt',
+            'completed': 'Abgeschlossen',
+            'cancelled': 'Storniert'
+        }
+        return status_map.get(self.workflow_status, self.workflow_status or 'Neu')
+
+    def get_workflow_status_badge_class(self):
+        """Gibt die Bootstrap-Badge-Klasse für den Workflow-Status zurück"""
+        badge_map = {
+            'offer': 'bg-info',
+            'confirmed': 'bg-primary',
+            'design_pending': 'bg-warning',
+            'design_approved': 'bg-success',
+            'in_production': 'bg-primary',
+            'packing': 'bg-info',
+            'ready_to_ship': 'bg-success',
+            'shipped': 'bg-success',
+            'invoiced': 'bg-secondary',
+            'completed': 'bg-success',
+            'cancelled': 'bg-danger'
+        }
+        return badge_map.get(self.workflow_status, 'bg-secondary')
+
+    def can_create_invoice(self):
+        """Prüft ob eine Rechnung erstellt werden kann"""
+        # Rechnung kann erstellt werden wenn:
+        # - Kein Angebot mehr
+        # - Noch keine Rechnung verknüpft
+        # - Status erlaubt Rechnungserstellung
+        allowed_statuses = ['completed', 'shipped', 'ready_to_ship', 'design_approved', 'in_production']
+        return (not self.is_offer and
+                not self.invoice_id and
+                self.workflow_status in allowed_statuses)
+
+    # ==========================================
+    # Zahlungs-Methoden
+    # ==========================================
+    def get_payment_status_display(self):
+        """Gibt Zahlungsstatus als Text zurück"""
+        status_map = {
+            'pending': 'Ausstehend',
+            'deposit_paid': 'Anzahlung bezahlt',
+            'paid': 'Vollständig bezahlt',
+            'refunded': 'Erstattet'
+        }
+        return status_map.get(self.payment_status, self.payment_status or 'Ausstehend')
+
+    def get_payment_status_badge_class(self):
+        """Bootstrap-Badge-Klasse für Zahlungsstatus"""
+        badge_map = {
+            'pending': 'bg-warning',
+            'deposit_paid': 'bg-info',
+            'paid': 'bg-success',
+            'refunded': 'bg-secondary'
+        }
+        return badge_map.get(self.payment_status, 'bg-secondary')
+
+    def record_deposit_payment(self, amount=None, method=None, transaction_id=None):
+        """Verbucht Anzahlung"""
+        self.payment_status = 'deposit_paid'
+        self.deposit_paid_at = datetime.utcnow()
+        if amount:
+            self.deposit_amount = amount
+        if method:
+            self.deposit_payment_method = method
+        if transaction_id:
+            self.deposit_transaction_id = transaction_id
+
+    def record_final_payment(self, method=None):
+        """Verbucht Restzahlung"""
+        self.payment_status = 'paid'
+        self.final_payment_at = datetime.utcnow()
+        if method:
+            self.final_payment_method = method
+
+    def get_open_amount(self):
+        """Berechnet offenen Betrag"""
+        if self.payment_status == 'paid':
+            return 0
+        if self.payment_status == 'deposit_paid':
+            return (self.total_price or 0) - (self.deposit_amount or 0)
+        return self.total_price or 0
+
+    def is_fully_paid(self):
+        """Prüft ob vollständig bezahlt"""
+        return self.payment_status == 'paid'
+
+    # ==========================================
+    # Lieferart-Methoden (Abholung/Versand)
+    # ==========================================
+    def get_delivery_type_display(self):
+        """Gibt Lieferart als Text zurück"""
+        type_map = {
+            'pickup': 'Abholung',
+            'shipping': 'Versand'
+        }
+        return type_map.get(self.delivery_type, 'Abholung')
+
+    def confirm_pickup(self, signature=None, signature_name=None):
+        """Bestätigt Abholung durch Kunden"""
+        self.pickup_confirmed_at = datetime.utcnow()
+        if signature:
+            self.pickup_signature = signature
+        if signature_name:
+            self.pickup_signature_name = signature_name
+        self.workflow_status = 'completed'
+
+    def is_picked_up(self):
+        """Prüft ob bereits abgeholt"""
+        return self.pickup_confirmed_at is not None
+
+    # ==========================================
+    # Archivierungs-Methoden
+    # ==========================================
+    def can_archive(self):
+        """Prüft ob Auftrag archiviert werden kann"""
+        # Kann archiviert werden wenn:
+        # - Vollständig bezahlt
+        # - Versendet oder abgeholt
+        # - Nicht bereits archiviert
+        if self.archived_at:
+            return False, "Bereits archiviert"
+        if self.payment_status != 'paid':
+            return False, "Noch nicht vollständig bezahlt"
+        if self.workflow_status not in ['completed', 'shipped']:
+            return False, "Noch nicht abgeschlossen/versendet"
+        return True, "OK"
+
+    def archive(self, user=None, reason='completed'):
+        """Archiviert den Auftrag"""
+        self.archived_at = datetime.utcnow()
+        self.archived_by = user
+        self.archive_reason = reason
+
+    def unarchive(self):
+        """Hebt Archivierung auf"""
+        self.archived_at = None
+        self.archived_by = None
+        self.archive_reason = None
+
+    def is_archived(self):
+        """Prüft ob archiviert"""
+        return self.archived_at is not None
+
+    # ==========================================
+    # Workflow-Prüfungen (erweitert)
+    # ==========================================
+    def can_start_packing(self):
+        """Prüft ob Verpackung gestartet werden kann"""
+        if self.workflow_status != 'in_production':
+            return False, "Nicht in Produktion"
+        return True, "OK"
+
+    def can_mark_ready_to_ship(self):
+        """Prüft ob als versandbereit markiert werden kann"""
+        if self.workflow_status != 'packing':
+            return False, "Nicht im Verpackungsprozess"
+        return True, "OK"
+
+    def get_next_workflow_actions(self):
+        """Gibt mögliche nächste Workflow-Aktionen zurück"""
+        actions = []
+        if self.workflow_status == 'confirmed':
+            if self.has_design_file():
+                actions.append(('send_approval', 'Design-Freigabe senden'))
+            actions.append(('start_production', 'Produktion starten'))
+        elif self.workflow_status == 'design_approved':
+            actions.append(('start_production', 'Produktion starten'))
+        elif self.workflow_status == 'in_production':
+            actions.append(('start_packing', 'Verpackung starten'))
+        elif self.workflow_status == 'packing':
+            actions.append(('ready_to_ship', 'Versandbereit markieren'))
+        elif self.workflow_status == 'ready_to_ship':
+            if self.delivery_type == 'pickup':
+                actions.append(('confirm_pickup', 'Abholung bestätigen'))
+            else:
+                actions.append(('mark_shipped', 'Als versendet markieren'))
+        elif self.workflow_status == 'shipped':
+            actions.append(('complete', 'Abschließen'))
+        return actions
+
     def get(self, key, default=None):
         """Kompatibilität mit Dictionary-Zugriff"""
         return getattr(self, key, default)
-    
+
     def __repr__(self):
         return f'<Order {self.order_number}>'
 
@@ -1003,17 +1371,96 @@ class Supplier(db.Model):
     # Status
     active = db.Column(db.Boolean, default=True)
     preferred = db.Column(db.Boolean, default=False)
-    
+
+    # Bewertung & Analyse
+    rating_overall = db.Column(db.Float, default=0)  # Gesamtbewertung 1-5
+    rating_quality = db.Column(db.Float, default=0)  # Qualitätsbewertung 1-5
+    rating_delivery = db.Column(db.Float, default=0)  # Liefergeschwindigkeit 1-5
+    rating_price = db.Column(db.Float, default=0)  # Preis-Leistung 1-5
+    rating_communication = db.Column(db.Float, default=0)  # Kommunikation 1-5
+    rating_count = db.Column(db.Integer, default=0)  # Anzahl Bewertungen
+
+    # Lieferstatistik (automatisch berechnet)
+    avg_delivery_days = db.Column(db.Float)  # Durchschnittliche Lieferzeit in Tagen
+    on_time_delivery_rate = db.Column(db.Float)  # % pünktlicher Lieferungen
+    total_orders = db.Column(db.Integer, default=0)  # Gesamtanzahl Bestellungen
+    total_order_value = db.Column(db.Float, default=0)  # Gesamtumsatz mit Lieferant
+
+    # Umsatzhistorie (JSON: {"2024": 12500.00, "2025": 8900.00})
+    yearly_revenue = db.Column(db.Text)  # JSON
+
+    # Bankverbindung
+    bank_name = db.Column(db.String(100))
+    iban = db.Column(db.String(34))
+    bic = db.Column(db.String(11))
+    bank_account_holder = db.Column(db.String(200))
+
+    # Kategorien/Tags
+    categories = db.Column(db.String(500))  # Komma-getrennte Tags: "Garne,Stoffe,Zubehör"
+    notes = db.Column(db.Text)  # Interne Notizen
+
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(80))
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
-    
+
     # Relationships
     orders = db.relationship('SupplierOrder', backref='supplier', lazy='dynamic')
-    
+    # contacts wird in supplier_contact.py definiert (über backref)
+    ratings = db.relationship('SupplierRating', backref='supplier', lazy='dynamic', cascade='all, delete-orphan')
+
     def __repr__(self):
         return f'<Supplier {self.name}>'
+
+    def get_yearly_revenue(self):
+        """Holt die Umsatzhistorie als Dict"""
+        import json
+        if self.yearly_revenue:
+            try:
+                return json.loads(self.yearly_revenue)
+            except:
+                return {}
+        return {}
+
+    def update_statistics(self):
+        """Aktualisiert die Lieferstatistiken basierend auf Bestellungen"""
+        from datetime import date
+        orders = self.orders.filter_by(status='delivered').all()
+
+        if not orders:
+            return
+
+        self.total_orders = len(orders)
+        self.total_order_value = sum(o.total_amount or 0 for o in orders)
+
+        # Durchschnittliche Lieferzeit berechnen
+        delivery_times = []
+        on_time_count = 0
+        for order in orders:
+            if order.order_date and order.delivery_date:
+                days = (order.delivery_date - order.order_date).days
+                delivery_times.append(days)
+                # Prüfe ob pünktlich (innerhalb erwarteter Lieferzeit)
+                if self.delivery_time_days and days <= self.delivery_time_days:
+                    on_time_count += 1
+
+        if delivery_times:
+            self.avg_delivery_days = sum(delivery_times) / len(delivery_times)
+            self.on_time_delivery_rate = (on_time_count / len(delivery_times)) * 100
+
+    def update_rating(self):
+        """Berechnet die Durchschnittsbewertung aus allen Ratings"""
+        ratings = self.ratings.all()
+        if not ratings:
+            return
+
+        self.rating_count = len(ratings)
+        self.rating_quality = sum(r.quality or 0 for r in ratings) / len(ratings)
+        self.rating_delivery = sum(r.delivery_speed or 0 for r in ratings) / len(ratings)
+        self.rating_price = sum(r.price_performance or 0 for r in ratings) / len(ratings)
+        self.rating_communication = sum(r.communication or 0 for r in ratings) / len(ratings)
+        self.rating_overall = (self.rating_quality + self.rating_delivery +
+                              self.rating_price + self.rating_communication) / 4
 
 
 class SupplierOrder(db.Model):
@@ -1099,6 +1546,46 @@ class SupplierOrder(db.Model):
     
     def __repr__(self):
         return f'<SupplierOrder {self.order_number}>'
+
+
+class SupplierRating(db.Model):
+    """Bewertungen für Lieferanten"""
+    __tablename__ = 'supplier_ratings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    supplier_id = db.Column(db.String(50), db.ForeignKey('suppliers.id'), nullable=False)
+
+    # Bewertungskriterien (1-5 Sterne)
+    quality = db.Column(db.Integer)  # Produktqualität
+    delivery_speed = db.Column(db.Integer)  # Liefergeschwindigkeit
+    price_performance = db.Column(db.Integer)  # Preis-Leistung
+    communication = db.Column(db.Integer)  # Kommunikation/Support
+    packaging = db.Column(db.Integer)  # Verpackungsqualität
+    reliability = db.Column(db.Integer)  # Zuverlässigkeit
+
+    # Gesamtbewertung (berechnet oder manuell)
+    overall_rating = db.Column(db.Float)
+
+    # Details
+    order_id = db.Column(db.String(50), db.ForeignKey('supplier_orders.id'))  # Bezug zur Bestellung
+    comment = db.Column(db.Text)  # Kommentar zur Bewertung
+    positive_aspects = db.Column(db.Text)  # Was war gut?
+    negative_aspects = db.Column(db.Text)  # Was war schlecht?
+
+    # Metadaten
+    rated_by = db.Column(db.String(80))  # Wer hat bewertet
+    rated_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def calculate_overall(self):
+        """Berechnet die Gesamtbewertung"""
+        ratings = [r for r in [self.quality, self.delivery_speed, self.price_performance,
+                              self.communication, self.packaging, self.reliability] if r]
+        if ratings:
+            self.overall_rating = sum(ratings) / len(ratings)
+        return self.overall_rating
+
+    def __repr__(self):
+        return f'<SupplierRating {self.supplier_id} - {self.overall_rating}>'
 
 
 class ActivityLog(db.Model):

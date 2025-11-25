@@ -108,27 +108,39 @@ def security():
 @admin_required
 def email():
     """E-Mail Einstellungen"""
-    settings = load_settings()
-    
+    from src.models.company_settings import CompanySettings
+    from src.models import db
+
+    company_settings = CompanySettings.get_settings()
+
     if request.method == 'POST':
-        settings['smtp_server'] = request.form.get('smtp_server', '')
-        settings['smtp_port'] = int(request.form.get('smtp_port', 587))
-        settings['smtp_username'] = request.form.get('smtp_username', '')
-        settings['smtp_from_email'] = request.form.get('smtp_from_email', '')
-        settings['enable_email_notifications'] = request.form.get('enable_email_notifications', False) == 'on'
-        
+        # E-Mail-Methode
+        company_settings.email_method = request.form.get('email_method', 'outlook')
+
+        # SMTP-Einstellungen
+        company_settings.smtp_server = request.form.get('smtp_server', '')
+        company_settings.smtp_port = int(request.form.get('smtp_port', 587) or 587)
+        company_settings.smtp_username = request.form.get('smtp_username', '')
+        company_settings.smtp_use_tls = request.form.get('smtp_use_tls') == 'on'
+        company_settings.smtp_from_email = request.form.get('smtp_from_email', '')
+        company_settings.smtp_from_name = request.form.get('smtp_from_name', '')
+
         # Passwort nur aktualisieren wenn eingegeben
         smtp_password = request.form.get('smtp_password')
         if smtp_password:
-            settings['smtp_password'] = smtp_password  # In Produktion verschlüsseln!
-        
-        save_settings(settings)
+            company_settings.smtp_password = smtp_password  # In Produktion verschluesseln!
+
+        # E-Mail-Vorlagen
+        company_settings.invoice_email_subject = request.form.get('invoice_email_subject', 'Rechnung {invoice_number}')
+        company_settings.invoice_email_template = request.form.get('invoice_email_template', '')
+
+        db.session.commit()
         log_activity(session['username'], 'update_settings', 'E-Mail Einstellungen wurden aktualisiert')
-        
+
         flash('E-Mail Einstellungen wurden gespeichert!', 'success')
         return redirect(url_for('settings.email'))
-    
-    return render_template('settings/email.html', settings=settings)
+
+    return render_template('settings/email.html', settings=company_settings)
 
 @settings_bp.route('/shipping', methods=['GET', 'POST'])
 @admin_required

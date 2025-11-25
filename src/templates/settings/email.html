@@ -3,9 +3,6 @@
 {% block title %}E-Mail Einstellungen - StitchAdmin{% endblock %}
 
 {% block content %}
-<!-- Bootstrap Icons -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-
 <div class="row">
     <div class="col-md-12">
         <h1><i class="bi bi-envelope"></i> E-Mail Einstellungen</h1>
@@ -20,95 +17,327 @@
 
 <div class="row mt-4">
     <div class="col-md-8">
-        <div class="card">
-            <div class="card-body">
-                <form method="POST">
-                    <h5 class="card-title">SMTP-Server Konfiguration</h5>
-                    
+        <form method="POST" id="emailSettingsForm">
+            <!-- Versandmethode -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-send"></i> Versandmethode</h5>
+                </div>
+                <div class="card-body">
                     <div class="mb-3">
-                        <label for="smtp_server" class="form-label">SMTP-Server</label>
-                        <input type="text" class="form-control" id="smtp_server" name="smtp_server" 
-                               value="{{ settings.smtp_server }}" placeholder="smtp.gmail.com">
-                        <small class="text-muted">Hostname oder IP-Adresse des SMTP-Servers</small>
+                        <label class="form-label">E-Mail-Versand über:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="email_method" id="method_outlook"
+                                   value="outlook" {% if settings.email_method == 'outlook' or not settings.email_method %}checked{% endif %}
+                                   onchange="toggleEmailMethod()">
+                            <label class="form-check-label" for="method_outlook">
+                                <i class="bi bi-microsoft text-primary"></i> <strong>Outlook (empfohlen)</strong>
+                            </label>
+                            <div class="text-muted small ms-4">
+                                Nutzt das lokal installierte Outlook. E-Mails erscheinen im Gesendet-Ordner und nutzen Ihre Signatur.
+                            </div>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="radio" name="email_method" id="method_mailto"
+                                   value="mailto" {% if settings.email_method == 'mailto' %}checked{% endif %}
+                                   onchange="toggleEmailMethod()">
+                            <label class="form-check-label" for="method_mailto">
+                                <i class="bi bi-link-45deg text-success"></i> <strong>Standard-Mailprogramm (mailto:)</strong>
+                            </label>
+                            <div class="text-muted small ms-4">
+                                Oeffnet das Standard-E-Mail-Programm des Betriebssystems. Anhaenge muessen manuell hinzugefuegt werden.
+                            </div>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="radio" name="email_method" id="method_smtp"
+                                   value="smtp" {% if settings.email_method == 'smtp' %}checked{% endif %}
+                                   onchange="toggleEmailMethod()">
+                            <label class="form-check-label" for="method_smtp">
+                                <i class="bi bi-server text-warning"></i> <strong>SMTP-Server</strong>
+                            </label>
+                            <div class="text-muted small ms-4">
+                                Direkter E-Mail-Versand ueber SMTP. Erfordert Zugangsdaten.
+                            </div>
+                        </div>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="smtp_port" class="form-label">SMTP-Port</label>
-                        <input type="number" class="form-control" id="smtp_port" name="smtp_port" 
-                               value="{{ settings.smtp_port }}" min="1" max="65535">
-                        <small class="text-muted">Standard: 587 (TLS) oder 465 (SSL)</small>
+
+                    <!-- Outlook-Status -->
+                    <div id="outlook_status" class="alert alert-info" style="display: none;">
+                        <i class="bi bi-info-circle"></i>
+                        <span id="outlook_status_text">Pruefe Outlook-Verfuegbarkeit...</span>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="smtp_username" class="form-label">SMTP-Benutzername</label>
-                        <input type="text" class="form-control" id="smtp_username" name="smtp_username" 
-                               value="{{ settings.smtp_username }}">
-                        <small class="text-muted">Benutzername für die SMTP-Authentifizierung</small>
+
+                    <!-- WSL-Warnung (initial versteckt) -->
+                    <div id="wsl_warning" class="alert alert-warning" style="display: none;">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Hinweis:</strong> Sie scheinen StitchAdmin unter Linux/WSL zu starten.
+                        Die Outlook-Integration funktioniert nur, wenn die App direkt unter Windows gestartet wird.
+                        <br><br>
+                        <strong>Loesung:</strong> Starten Sie StitchAdmin mit <code>python app.py</code> in einer Windows PowerShell oder CMD, nicht im WSL-Terminal.
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="smtp_password" class="form-label">SMTP-Passwort</label>
-                        <input type="password" class="form-control" id="smtp_password" name="smtp_password" 
-                               placeholder="********">
-                        <small class="text-muted">Leer lassen um das aktuelle Passwort beizubehalten</small>
+
+                    <!-- Outlook-Kontoauswahl (wird dynamisch befuellt) -->
+                    <div id="outlook_accounts_section" style="display: none;">
+                        <div class="mb-3">
+                            <label for="outlook_account" class="form-label">Outlook-Konto auswählen:</label>
+                            <select class="form-select" id="outlook_account" name="outlook_account">
+                                <option value="">Standard-Konto verwenden</option>
+                            </select>
+                            <small class="text-muted">Wählen Sie das Konto, über das E-Mails versendet werden sollen.</small>
+                        </div>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="smtp_from_email" class="form-label">Absender E-Mail</label>
-                        <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" 
-                               value="{{ settings.smtp_from_email }}" placeholder="noreply@example.com">
-                        <small class="text-muted">E-Mail-Adresse die als Absender verwendet wird</small>
+                </div>
+            </div>
+
+            <!-- SMTP-Einstellungen (nur sichtbar wenn SMTP ausgewaehlt) -->
+            <div id="smtp_settings" class="card mb-4" style="display: {% if settings.email_method == 'smtp' %}block{% else %}none{% endif %};">
+                <div class="card-header">
+                    <h5><i class="bi bi-server"></i> SMTP-Server Konfiguration</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="smtp_server" class="form-label">SMTP-Server</label>
+                                <input type="text" class="form-control" id="smtp_server" name="smtp_server"
+                                       value="{{ settings.smtp_server or '' }}" placeholder="smtp.gmail.com">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="smtp_port" class="form-label">Port</label>
+                                <input type="number" class="form-control" id="smtp_port" name="smtp_port"
+                                       value="{{ settings.smtp_port or 587 }}" min="1" max="65535">
+                            </div>
+                        </div>
                     </div>
-                    
-                    <hr>
-                    
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="smtp_username" class="form-label">Benutzername</label>
+                                <input type="text" class="form-control" id="smtp_username" name="smtp_username"
+                                       value="{{ settings.smtp_username or '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="smtp_password" class="form-label">Passwort</label>
+                                <input type="password" class="form-control" id="smtp_password" name="smtp_password"
+                                       placeholder="{% if settings.smtp_password %}********{% endif %}">
+                                <small class="text-muted">Leer lassen um das aktuelle Passwort beizubehalten</small>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="enable_email_notifications" name="enable_email_notifications"
-                               {% if settings.enable_email_notifications %}checked{% endif %}>
-                        <label class="form-check-label" for="enable_email_notifications">
-                            <strong>E-Mail-Benachrichtigungen aktivieren</strong>
-                        </label>
-                        <small class="text-muted d-block">Sendet E-Mails bei wichtigen Ereignissen</small>
+                        <input type="checkbox" class="form-check-input" id="smtp_use_tls" name="smtp_use_tls"
+                               {% if settings.smtp_use_tls or settings.smtp_use_tls == None %}checked{% endif %}>
+                        <label class="form-check-label" for="smtp_use_tls">TLS-Verschluesselung verwenden</label>
                     </div>
-                    
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="bi bi-save"></i> Speichern
-                        </button>
-                        <button type="button" class="btn btn-warning" onclick="testEmail()">
-                            <i class="bi bi-send"></i> Test-E-Mail senden
-                        </button>
-                        <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
-                            <i class="bi bi-x-circle"></i> Abbrechen
-                        </a>
+
+                    <hr>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="smtp_from_email" class="form-label">Absender E-Mail</label>
+                                <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email"
+                                       value="{{ settings.smtp_from_email or '' }}" placeholder="rechnung@firma.de">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="smtp_from_name" class="form-label">Absender Name</label>
+                                <input type="text" class="form-control" id="smtp_from_name" name="smtp_from_name"
+                                       value="{{ settings.smtp_from_name or '' }}" placeholder="Firma GmbH">
+                            </div>
+                        </div>
                     </div>
-                </form>
+                </div>
+            </div>
+
+            <!-- E-Mail-Vorlagen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-file-earmark-text"></i> E-Mail-Vorlage fuer Rechnungen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="invoice_email_subject" class="form-label">Betreff</label>
+                        <input type="text" class="form-control" id="invoice_email_subject" name="invoice_email_subject"
+                               value="{{ settings.invoice_email_subject or 'Rechnung {invoice_number}' }}">
+                        <small class="text-muted">Verfuegbare Platzhalter: {invoice_number}, {customer_name}, {amount}</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="invoice_email_template" class="form-label">E-Mail-Text (optional)</label>
+                        <textarea class="form-control" id="invoice_email_template" name="invoice_email_template" rows="6"
+                                  placeholder="Sehr geehrte Damen und Herren,
+
+anbei erhalten Sie unsere Rechnung {invoice_number} ueber {amount}.
+
+Mit freundlichen Gruessen">{{ settings.invoice_email_template or '' }}</textarea>
+                        <small class="text-muted">
+                            Leer lassen fuer Standard-Vorlage. Bei Outlook wird Ihre Signatur automatisch angehaengt.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-save"></i> Speichern
+                </button>
+                <button type="button" class="btn btn-warning" onclick="testEmail()">
+                    <i class="bi bi-send"></i> Test-E-Mail senden
+                </button>
+                <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">
+                    <i class="bi bi-x-circle"></i> Abbrechen
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-md-4">
+        <!-- Outlook-Info -->
+        <div class="card bg-primary text-white mb-3">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-microsoft"></i> Outlook-Integration</h5>
+                <p class="mb-2"><strong>Vorteile:</strong></p>
+                <ul class="mb-0 ps-3">
+                    <li>Keine SMTP-Konfiguration noetig</li>
+                    <li>Nutzt Ihre E-Mail-Signatur</li>
+                    <li>E-Mails im Gesendet-Ordner</li>
+                    <li>Funktioniert mit Exchange/M365</li>
+                    <li>Sie koennen vor dem Senden pruefen</li>
+                </ul>
             </div>
         </div>
-    </div>
-    
-    <div class="col-md-4">
+
+        <!-- SMTP-Hilfe -->
         <div class="card bg-info text-white">
             <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-info-circle"></i> E-Mail Beispiele</h5>
-                <p><strong>Gmail:</strong><br>
+                <h5 class="card-title"><i class="bi bi-info-circle"></i> SMTP-Beispiele</h5>
+                <p class="mb-1"><strong>Gmail:</strong><br>
                 Server: smtp.gmail.com<br>
                 Port: 587 (TLS)<br>
-                Benötigt App-Passwort</p>
-                
-                <p><strong>Outlook:</strong><br>
+                <small>Benoetigt App-Passwort!</small></p>
+
+                <p class="mb-1"><strong>Outlook.com:</strong><br>
                 Server: smtp-mail.outlook.com<br>
                 Port: 587 (TLS)</p>
-                
-                <p class="mb-0"><strong>Hinweis:</strong> Viele E-Mail-Provider benötigen App-spezifische Passwörter für SMTP.</p>
+
+                <p class="mb-0"><strong>IONOS:</strong><br>
+                Server: smtp.ionos.de<br>
+                Port: 587 (TLS)</p>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-function testEmail() {
-    alert('Test-E-Mail Funktion wird in der nächsten Version implementiert.');
+function toggleEmailMethod() {
+    const method = document.querySelector('input[name="email_method"]:checked').value;
+    const smtpSettings = document.getElementById('smtp_settings');
+    const outlookStatus = document.getElementById('outlook_status');
+
+    // SMTP-Einstellungen ein-/ausblenden
+    smtpSettings.style.display = method === 'smtp' ? 'block' : 'none';
+
+    // Outlook-Status anzeigen wenn Outlook gewaehlt
+    if (method === 'outlook') {
+        outlookStatus.style.display = 'block';
+        checkOutlookAvailability();
+    } else {
+        outlookStatus.style.display = 'none';
+    }
 }
+
+function checkOutlookAvailability() {
+    const statusText = document.getElementById('outlook_status_text');
+    const statusDiv = document.getElementById('outlook_status');
+    const accountsSection = document.getElementById('outlook_accounts_section');
+    const accountSelect = document.getElementById('outlook_account');
+    const wslWarning = document.getElementById('wsl_warning');
+
+    // API-Aufruf um Outlook-Status zu pruefen
+    fetch('/api/email/check-outlook')
+        .then(response => response.json())
+        .then(data => {
+            if (data.available) {
+                statusDiv.className = 'alert alert-success';
+                statusText.innerHTML = '<i class="bi bi-check-circle"></i> Outlook ist verfuegbar. Standard-E-Mail: ' + (data.email || 'Nicht erkannt');
+                wslWarning.style.display = 'none';
+
+                // Konten anzeigen wenn mehrere vorhanden
+                if (data.accounts && data.accounts.length > 0) {
+                    accountsSection.style.display = 'block';
+                    // Bestehende Optionen entfernen (außer Standard)
+                    while (accountSelect.options.length > 1) {
+                        accountSelect.remove(1);
+                    }
+                    // Konten hinzufügen
+                    data.accounts.forEach(function(account) {
+                        const option = document.createElement('option');
+                        option.value = account.email || account.name;
+                        option.textContent = account.name + (account.email ? ' (' + account.email + ')' : '');
+                        accountSelect.appendChild(option);
+                    });
+                } else {
+                    accountsSection.style.display = 'none';
+                }
+            } else {
+                statusDiv.className = 'alert alert-warning';
+                statusText.innerHTML = '<i class="bi bi-exclamation-triangle"></i> ' + (data.message || 'Outlook nicht gefunden');
+                accountsSection.style.display = 'none';
+
+                // Zeige WSL-Warnung wenn Linux erkannt
+                if (data.message && data.message.includes('Linux')) {
+                    wslWarning.style.display = 'block';
+                }
+            }
+        })
+        .catch(error => {
+            statusDiv.className = 'alert alert-secondary';
+            statusText.innerHTML = '<i class="bi bi-question-circle"></i> Outlook-Status konnte nicht geprueft werden.';
+            accountsSection.style.display = 'none';
+        });
+}
+
+function testEmail() {
+    const method = document.querySelector('input[name="email_method"]:checked').value;
+
+    if (method === 'outlook') {
+        // Outlook-Test
+        fetch('/api/email/test-outlook', {method: 'POST'})
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Test-E-Mail wurde in Outlook geoeffnet!');
+                } else {
+                    alert('Fehler: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Fehler beim Testen: ' + error);
+            });
+    } else if (method === 'smtp') {
+        // SMTP-Test - erst Formular speichern dann testen
+        alert('Bitte speichern Sie zuerst die Einstellungen, dann kann ein Test durchgefuehrt werden.');
+    } else {
+        // mailto-Test
+        window.location.href = 'mailto:test@example.com?subject=StitchAdmin%20Test&body=Dies%20ist%20eine%20Test-E-Mail.';
+    }
+}
+
+// Beim Laden pruefen
+document.addEventListener('DOMContentLoaded', function() {
+    const method = document.querySelector('input[name="email_method"]:checked');
+    if (method && method.value === 'outlook') {
+        document.getElementById('outlook_status').style.display = 'block';
+        checkOutlookAvailability();
+    }
+});
 </script>
 {% endblock %}

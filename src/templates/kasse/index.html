@@ -90,8 +90,8 @@
                     <tbody>
                         {% for beleg in recent_receipts %}
                         <tr>
-                            <td>{{ beleg.datum.strftime('%H:%M') }}</td>
-                            <td>{{ beleg.beleg_nummer }}</td>
+                            <td>{{ beleg.erstellt_am.strftime('%H:%M') if beleg.erstellt_am else '-' }}</td>
+                            <td>{{ beleg.belegnummer }}</td>
                             <td>
                                 {% if beleg.kunde %}
                                     {{ beleg.kunde.first_name }} {{ beleg.kunde.last_name }}
@@ -99,7 +99,7 @@
                                     Laufkunde
                                 {% endif %}
                             </td>
-                            <td>{{ "%.2f"|format(beleg.summe_brutto) }} €</td>
+                            <td>{{ "%.2f"|format(beleg.brutto_gesamt|default(0)) }} €</td>
                             <td>
                                 {% if beleg.zahlungsart == 'cash' %}
                                     <i class="bi bi-cash"></i> Bar

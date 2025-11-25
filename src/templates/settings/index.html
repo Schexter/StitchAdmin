@@ -99,12 +99,22 @@
                         <i class="bi bi-building"></i> Firmeneinstellungen
                     </a>
 
+                    <a href="{{ url_for('settings.email') }}" class="btn btn-outline-success">
+                        <i class="bi bi-envelope"></i> E-Mail Einstellungen
+                    </a>
+
                     <a href="{{ url_for('settings.sumup_integration') }}" class="btn btn-outline-primary">
                         <i class="bi bi-credit-card"></i> SumUp Kartenzahlung
                     </a>
 
                     <a href="{{ url_for('shelly.index') }}" class="btn btn-outline-secondary">
                         <i class="bi bi-plug"></i> Shelly-Geräte verwalten
+                    </a>
+
+                    <hr class="my-2">
+
+                    <a href="{{ url_for('updates.index') }}" class="btn btn-outline-dark">
+                        <i class="bi bi-arrow-repeat"></i> Updates & Backups
                     </a>
                     {% endif %}
                 </div>

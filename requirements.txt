@@ -66,12 +66,17 @@ pyembroidery==1.5.1
 fints>=3.0.0            # FinTS/HBCI für Banking-Integration (Deutschland)
 
 # ==========================================
-# E-MAIL INTEGRATION (NEU!)
+# E-MAIL INTEGRATION
 # ==========================================
 # Keine zusätzlichen Packages nötig - Python Standard Library:
 # - imaplib (built-in)
-# - smtplib (built-in)  
+# - smtplib (built-in)
 # - email (built-in)
+
+# ==========================================
+# WINDOWS-SPEZIFISCH (nur Windows)
+# ==========================================
+pywin32>=306; sys_platform == "win32"  # Outlook-Integration via COM
 
 # ==========================================
 # VERSCHLÜSSELUNG (NEU!)

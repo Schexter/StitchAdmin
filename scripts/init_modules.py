@@ -107,6 +107,18 @@ INITIAL_MODULES = [
         'requires_admin': False,
         'default_enabled': True,
         'sort_order': 8
+    },
+    {
+        'name': 'purchasing',
+        'display_name': 'Einkauf & Bestellungen',
+        'description': 'Lieferantenbestellungen & Wareneingang',
+        'icon': 'EK',
+        'color': 'warning',
+        'route': 'suppliers.order_suggestions',
+        'category': 'core',
+        'requires_admin': False,
+        'default_enabled': True,
+        'sort_order': 9
     }
 ]
 

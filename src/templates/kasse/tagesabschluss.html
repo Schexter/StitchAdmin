@@ -166,8 +166,8 @@
                     <tbody>
                         {% for beleg in belege %}
                         <tr {% if beleg.storniert %}class="text-muted text-decoration-line-through"{% endif %}>
-                            <td>{{ beleg.datum.strftime('%H:%M') }}</td>
-                            <td>{{ beleg.beleg_nummer }}</td>
+                            <td>{{ beleg.erstellt_am.strftime('%H:%M') if beleg.erstellt_am else '-' }}</td>
+                            <td>{{ beleg.belegnummer }}</td>
                             <td>
                                 {% if beleg.kunde %}
                                     {{ beleg.kunde.first_name }} {{ beleg.kunde.last_name }}
@@ -184,7 +184,7 @@
                                     <i class="bi bi-receipt"></i> Rechnung
                                 {% endif %}
                             </td>
-                            <td class="text-end">{{ "%.2f"|format(beleg.summe_brutto) }} €</td>
+                            <td class="text-end">{{ "%.2f"|format(beleg.brutto_gesamt|default(0)) }} €</td>
                             <td>
                                 {% if beleg.storniert %}
                                     <span class="badge bg-danger">Storniert</span>
@@ -245,16 +245,16 @@
         <div class="card-body">
             <dl class="row">
                 <dt class="col-sm-3">Abschluss-Zeit:</dt>
-                <dd class="col-sm-9">{{ abschluss.created_at.strftime('%d.%m.%Y %H:%M') }}</dd>
-                
+                <dd class="col-sm-9">{{ abschluss.erstellt_am.strftime('%d.%m.%Y %H:%M') if abschluss.erstellt_am else '-' }}</dd>
+
                 <dt class="col-sm-3">Durchgeführt von:</dt>
-                <dd class="col-sm-9">{{ abschluss.created_by }}</dd>
+                <dd class="col-sm-9">{{ abschluss.erstellt_von or '-' }}</dd>
                 
                 <dt class="col-sm-3">Anzahl Belege:</dt>
                 <dd class="col-sm-9">{{ abschluss.anzahl_belege }}</dd>
                 
                 <dt class="col-sm-3">Umsatz (Brutto):</dt>
-                <dd class="col-sm-9">{{ "%.2f"|format(abschluss.summe_brutto) }} €</dd>
+                <dd class="col-sm-9">{{ "%.2f"|format(abschluss.umsatz_brutto|default(0)) }} €</dd>
                 
                 <dt class="col-sm-3">TSE-Signatur:</dt>
                 <dd class="col-sm-9">

@@ -13,7 +13,35 @@
 <!-- Schnellzugriff Buttons -->
 <div class="row mb-4">
     <div class="col-md-12">
-        <div class="btn-group" role="group">
+        <div class="d-flex flex-wrap gap-2">
+            <!-- Rechnungen erstellen -->
+            <div class="btn-group" role="group">
+                <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-success">
+                    <i class="bi bi-file-text"></i> Rechnungen
+                </a>
+                <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('rechnung.neue_rechnung') }}">
+                        <i class="bi bi-plus-circle me-2"></i>Blanko-Rechnung erstellen
+                    </a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('rechnung.neue_rechnung_aus_auftrag') }}">
+                        <i class="bi bi-file-earmark-text me-2"></i>Rechnung aus Auftrag
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="{{ url_for('rechnung.neue_eingangsrechnung') }}">
+                        <i class="bi bi-box-arrow-in-left me-2"></i>Eingangsrechnung erfassen
+                    </a></li>
+                </ul>
+            </div>
+
+            <!-- Buchungen -->
+            <a href="{{ url_for('buchungen.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-journal-text"></i> Buchungsjournal
+            </a>
+
+            <!-- Offene Posten etc. -->
             <a href="{{ url_for('finanzen.offene_posten') }}" class="btn btn-primary">
                 <i class="bi bi-list-ul"></i> Offene Posten
             </a>
@@ -24,7 +52,7 @@
                 <i class="bi bi-calendar-check"></i> Ratenzahlungen
             </a>
             {% if current_user.is_admin %}
-            <a href="{{ url_for('finanzen.liquiditaet') }}" class="btn btn-success">
+            <a href="{{ url_for('finanzen.liquiditaet') }}" class="btn btn-outline-success">
                 <i class="bi bi-graph-up"></i> Liquidität
             </a>
             {% endif %}

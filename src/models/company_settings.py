@@ -76,6 +76,21 @@ class CompanySettings(db.Model):
     # Lagerbuchung
     auto_inventory_booking = db.Column(db.Boolean, default=True)
 
+    # E-Mail-Versand Einstellungen
+    email_method = db.Column(db.String(20), default='outlook')  # outlook, smtp, mailto
+    # SMTP-Einstellungen (falls email_method='smtp')
+    smtp_server = db.Column(db.String(200))
+    smtp_port = db.Column(db.Integer, default=587)
+    smtp_username = db.Column(db.String(200))
+    smtp_password = db.Column(db.String(500))  # Verschlüsselt speichern!
+    smtp_use_tls = db.Column(db.Boolean, default=True)
+    smtp_from_email = db.Column(db.String(200))
+    smtp_from_name = db.Column(db.String(200))
+
+    # E-Mail-Vorlagen
+    invoice_email_subject = db.Column(db.String(500), default='Rechnung {invoice_number}')
+    invoice_email_template = db.Column(db.Text)  # HTML-Template für Rechnungsmail
+
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)

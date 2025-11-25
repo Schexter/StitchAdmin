@@ -29,16 +29,54 @@
                     <h5 class="mb-0"><i class="bi bi-info-circle"></i> Auftrags-Details</h5>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-info">
-                        <strong>Kunde:</strong> {{ order.customer.display_name if order.customer else 'Unbekannt' }}<br>
-                        <strong>Typ:</strong> 
-                        {% if order.order_type == 'embroidery' %}Bestickung
-                        {% elif order.order_type == 'printing' %}Textildruck
-                        {% elif order.order_type == 'dtf' %}DTF
-                        {% elif order.order_type == 'combined' %}Kombiniert
-                        {% endif %}<br>
-                        <strong>Artikel:</strong> {{ order.items.count() }} Position(en)<br>
-                        <strong>Preis:</strong> {{ "%.2f"|format(order.total_price) }} €
+                    <!-- Kundenauswahl -->
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="customer_id" class="form-label"><strong>Kunde</strong></label>
+                            <select class="form-select" id="customer_id" name="customer_id">
+                                <option value="">-- Kein Kunde --</option>
+                                {% for customer_id, customer_data in customers.items() %}
+                                <option value="{{ customer_id }}" {% if order.customer_id == customer_id %}selected{% endif %}>
+                                    {{ customer_data.display_name }}
+                                    {% if customer_data.customer_number %} ({{ customer_data.customer_number }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            {% if order.customer %}
+                            <a href="{{ url_for('customers.show', customer_id=order.customer_id) }}" class="btn btn-outline-primary">
+                                <i class="bi bi-person"></i> Zum Kunden
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label"><strong>Auftragstyp</strong></label>
+                            <select class="form-select" name="order_type">
+                                <option value="embroidery" {% if order.order_type == 'embroidery' %}selected{% endif %}>Bestickung</option>
+                                <option value="printing" {% if order.order_type == 'printing' %}selected{% endif %}>Textildruck</option>
+                                <option value="dtf" {% if order.order_type == 'dtf' %}selected{% endif %}>DTF</option>
+                                <option value="combined" {% if order.order_type == 'combined' %}selected{% endif %}>Kombiniert</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Artikel</label>
+                            <div class="form-control-plaintext">{{ order.items.count() }} Position(en)</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Aktueller Status</label>
+                            <div class="form-control-plaintext">
+                                {% if order.status == 'accepted' %}<span class="badge bg-primary">Angenommen</span>
+                                {% elif order.status == 'in_progress' %}<span class="badge bg-warning">In Arbeit</span>
+                                {% elif order.status == 'ready' %}<span class="badge bg-info">Abholbereit</span>
+                                {% elif order.status == 'completed' %}<span class="badge bg-success">Abgeschlossen</span>
+                                {% elif order.status == 'cancelled' %}<span class="badge bg-danger">Storniert</span>
+                                {% else %}<span class="badge bg-secondary">{{ order.status }}</span>{% endif %}
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="row">
@@ -127,18 +165,19 @@
                     {% endif %}
                 </div>
             </div>
-            
-            <!-- Design-Details -->
+
+            <!-- Design-Details (Legacy - für alte Aufträge ohne Multi-Position) -->
             <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-palette"></i> Design-Details</h5>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-palette"></i> Design-Details (Legacy)</h5>
+                    <small class="text-muted">Nur für Aufträge ohne Multi-Position-Designs</small>
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
                         <label for="description" class="form-label">Design-Beschreibung</label>
                         <textarea class="form-control" id="description" name="description" rows="3">{{ order.description or '' }}</textarea>
                     </div>
-                    
+
                     {% if order.order_type == 'embroidery' or order.order_type == 'combined' %}
                     <div class="mb-3">
                         <label for="embroidery_position" class="form-label">Stickerei-Position</label>
@@ -286,6 +325,13 @@
         </div>
     </div>
 </form>
+
+<!-- MULTI-POSITION DESIGN-VERWALTUNG (außerhalb des Hauptformulars) -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        {% include 'orders/includes/design_positions.html' %}
+    </div>
+</div>
 
 <script src="{{ url_for('static', filename='js/thread_selector.js') }}"></script>
 <script src="{{ url_for('static', filename='js/print_color_selector.js') }}"></script>

@@ -130,12 +130,20 @@ def verkauf_abschliessen():
     """
     Schließt einen Verkauf ab (Bar/EC über SumUp TSE).
     """
-    data = request.get_json()
+    # Debug: Request-Details loggen
+    logger.info(f"Request Content-Type: {request.content_type}")
+    logger.info(f"Request Data (raw): {request.data}")
+
+    data = request.get_json(silent=True) or {}
     zahlungsart = data.get('zahlungsart', 'BAR')
 
-    # Akzeptiere BAR, EC und SUMUP (alle über SumUp TSE)
-    if zahlungsart not in ['BAR', 'EC', 'SUMUP']:
-        return jsonify({'success': False, 'error': 'Ungültige Zahlungsart.'}), 400
+    logger.info(f"Verkauf abschliessen - Zahlungsart: '{zahlungsart}', Data: {data}")
+
+    # Akzeptiere BAR, EC, SUMUP und RECHNUNG
+    allowed_payment_types = ['BAR', 'EC', 'SUMUP', 'RECHNUNG']
+    if zahlungsart not in allowed_payment_types:
+        logger.error(f"Ungültige Zahlungsart: '{zahlungsart}' - Erlaubt: {allowed_payment_types}")
+        return jsonify({'success': False, 'error': f'Ungültige Zahlungsart: {zahlungsart}'}), 400
 
     warenkorb = get_warenkorb()
     result = _finalize_sale(
@@ -284,20 +292,20 @@ def kassen_index():
 
         # Heutige Statistiken
         today_receipts_query = KassenBeleg.query.filter(
-            db.func.date(KassenBeleg.datum) == today,
+            db.func.date(KassenBeleg.erstellt_am) == today,
             KassenBeleg.storniert == False
         )
 
         today_receipts = today_receipts_query.count()
-        today_revenue = db.session.query(db.func.sum(KassenBeleg.summe_brutto)).filter(
-            db.func.date(KassenBeleg.datum) == today,
+        today_revenue = db.session.query(db.func.sum(KassenBeleg.brutto_gesamt)).filter(
+            db.func.date(KassenBeleg.erstellt_am) == today,
             KassenBeleg.storniert == False
         ).scalar() or 0
 
         # Letzte Belege
         recent_receipts = KassenBeleg.query.filter(
-            db.func.date(KassenBeleg.datum) == today
-        ).order_by(KassenBeleg.datum.desc()).limit(10).all()
+            db.func.date(KassenBeleg.erstellt_am) == today
+        ).order_by(KassenBeleg.erstellt_am.desc()).limit(10).all()
 
         return render_template('kasse/index.html',
                              today_revenue=today_revenue,
@@ -334,7 +342,7 @@ def tagesabschluss():
 
         # Tagesstatistiken
         belege = KassenBeleg.query.filter(
-            db.func.date(KassenBeleg.datum) == today,
+            db.func.date(KassenBeleg.erstellt_am) == today,
             KassenBeleg.storniert == False
         ).all()
 
@@ -701,3 +709,82 @@ def berichte():
 def z_bericht():
     """Z-Bericht (Kassenjournal)"""
     return render_template('kasse/z_bericht.html')
+
+# ==========================================
+# BELEG DRUCKEN / EMAIL
+# ==========================================
+
+@kasse_bp.route('/beleg/<int:beleg_id>/drucken')
+def beleg_drucken(beleg_id):
+    """Beleg-Druckansicht"""
+    try:
+        beleg = KassenBeleg.query.get_or_404(beleg_id)
+        positionen = BelegPosition.query.filter_by(beleg_id=beleg_id).all()
+
+        # Lade Kunde wenn vorhanden
+        kunde = None
+        if beleg.kunde_id:
+            kunde = Customer.query.get(beleg.kunde_id)
+
+        # Lade Firmeneinstellungen für Beleg-Header
+        from src.models.models import Settings
+        settings = Settings.query.first()
+
+        return render_template('kasse/beleg_drucken.html',
+                             beleg=beleg,
+                             positionen=positionen,
+                             kunde=kunde,
+                             settings=settings)
+    except Exception as e:
+        logger.error(f"Fehler beim Laden des Belegs zum Drucken: {e}")
+        return f"Fehler: {str(e)}", 500
+
+@kasse_bp.route('/beleg/<int:beleg_id>/email', methods=['POST'])
+def beleg_email(beleg_id):
+    """Beleg per Email senden"""
+    try:
+        data = request.get_json() or {}
+        email = data.get('email', '').strip()
+
+        if not email:
+            return jsonify({'success': False, 'error': 'Keine E-Mail-Adresse angegeben'}), 400
+
+        beleg = KassenBeleg.query.get_or_404(beleg_id)
+        positionen = BelegPosition.query.filter_by(beleg_id=beleg_id).all()
+
+        # Lade Kunde wenn vorhanden
+        kunde = None
+        if beleg.kunde_id:
+            kunde = Customer.query.get(beleg.kunde_id)
+
+        # Lade Firmeneinstellungen
+        from src.models.models import Settings
+        settings = Settings.query.first()
+
+        # Erstelle Email-HTML
+        from flask import render_template_string
+        email_html = render_template('kasse/beleg_email.html',
+                                    beleg=beleg,
+                                    positionen=positionen,
+                                    kunde=kunde,
+                                    settings=settings)
+
+        # Sende Email
+        from src.services.email_service import EmailService
+        email_service = EmailService()
+
+        result = email_service.send_email(
+            to=email,
+            subject=f"Ihr Kassenbeleg {beleg.belegnummer}",
+            html_content=email_html
+        )
+
+        if result:
+            logger.info(f"Beleg {beleg.belegnummer} erfolgreich an {email} gesendet")
+            return jsonify({'success': True, 'message': f'Beleg an {email} gesendet'})
+        else:
+            return jsonify({'success': False, 'error': 'E-Mail konnte nicht gesendet werden'}), 500
+
+    except Exception as e:
+        logger.error(f"Fehler beim E-Mail-Versand des Belegs: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500

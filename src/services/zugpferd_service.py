@@ -60,7 +60,18 @@ class ZugpferdService:
     def __init__(self):
         """Initialisiere ZUGPFERD Service"""
         self.profile = self.PROFILE_BASIC  # Standard-Profil
-        
+
+    def _safe_str(self, value, default: str = '') -> str:
+        """Konvertiert einen Wert sicher zu String, ersetzt None durch default"""
+        if value is None:
+            return default
+        return str(value)
+
+    def _safe_get(self, data: Dict, key: str, default: Any = '') -> Any:
+        """Holt einen Wert aus Dict, ersetzt None durch default"""
+        value = data.get(key, default)
+        return default if value is None else value
+
     def create_invoice_xml(self, invoice_data: Dict[str, Any], profile: str = None) -> str:
         """
         Erstelle ZUGPFERD-konformes XML für eine Rechnung
@@ -150,98 +161,103 @@ class ZugpferdService:
     def _add_line_item(self, transaction: ET.Element, item: Dict):
         """Füge eine Rechnungsposition hinzu"""
         line_item = ET.SubElement(transaction, '{%s}IncludedSupplyChainTradeLineItem' % self.NAMESPACES['ram'])
-        
+
         # Line ID
         doc = ET.SubElement(line_item, '{%s}AssociatedDocumentLineDocument' % self.NAMESPACES['ram'])
         line_id = ET.SubElement(doc, '{%s}LineID' % self.NAMESPACES['ram'])
-        line_id.text = str(item.get('position', 1))
-        
+        line_id.text = self._safe_str(self._safe_get(item, 'position', 1))
+
         # Product
         product = ET.SubElement(line_item, '{%s}SpecifiedTradeProduct' % self.NAMESPACES['ram'])
         name = ET.SubElement(product, '{%s}Name' % self.NAMESPACES['ram'])
-        name.text = item.get('description', '')
-        
+        name.text = self._safe_str(self._safe_get(item, 'description', 'Artikel'))
+
         # Agreement
         agreement = ET.SubElement(line_item, '{%s}SpecifiedLineTradeAgreement' % self.NAMESPACES['ram'])
-        
+
         # Gross Price
         gross_price = ET.SubElement(agreement, '{%s}GrossPriceProductTradePrice' % self.NAMESPACES['ram'])
         charge_amount = ET.SubElement(gross_price, '{%s}ChargeAmount' % self.NAMESPACES['ram'])
-        charge_amount.text = str(item.get('unit_price', 0))
-        
+        charge_amount.text = self._safe_str(self._safe_get(item, 'unit_price', 0))
+
         # Delivery
         delivery = ET.SubElement(line_item, '{%s}SpecifiedLineTradeDelivery' % self.NAMESPACES['ram'])
         quantity = ET.SubElement(delivery, '{%s}BilledQuantity' % self.NAMESPACES['ram'])
-        quantity.set('unitCode', item.get('unit', 'C62'))  # C62 = Stück
-        quantity.text = str(item.get('quantity', 1))
-        
+        # Unit-Code mapping: Stück -> C62, etc.
+        unit = self._safe_get(item, 'unit', 'Stück')
+        unit_code_map = {'Stück': 'C62', 'Stk': 'C62', 'Std': 'HUR', 'Stunde': 'HUR', 'm': 'MTR', 'kg': 'KGM'}
+        unit_code = unit_code_map.get(unit, 'C62')
+        quantity.set('unitCode', unit_code)
+        quantity.text = self._safe_str(self._safe_get(item, 'quantity', 1))
+
         # Settlement
         settlement = ET.SubElement(line_item, '{%s}SpecifiedLineTradeSettlement' % self.NAMESPACES['ram'])
-        
+
         # Tax
         tax = ET.SubElement(settlement, '{%s}ApplicableTradeTax' % self.NAMESPACES['ram'])
         tax_type = ET.SubElement(tax, '{%s}TypeCode' % self.NAMESPACES['ram'])
         tax_type.text = 'VAT'
         tax_rate = ET.SubElement(tax, '{%s}RateApplicablePercent' % self.NAMESPACES['ram'])
-        tax_rate.text = str(item.get('tax_rate', 19))
-        
+        tax_rate.text = self._safe_str(self._safe_get(item, 'tax_rate', 19))
+
         # Monetary Summation
         summation = ET.SubElement(settlement, '{%s}SpecifiedTradeSettlementLineMonetarySummation' % self.NAMESPACES['ram'])
         line_total = ET.SubElement(summation, '{%s}LineTotalAmount' % self.NAMESPACES['ram'])
-        line_total.text = str(item.get('total_net', 0))
+        line_total.text = self._safe_str(self._safe_get(item, 'total_net', 0))
         
     def _add_seller(self, agreement: ET.Element, seller_data: Dict):
         """Füge Verkäufer-Informationen hinzu"""
         seller = ET.SubElement(agreement, '{%s}SellerTradeParty' % self.NAMESPACES['ram'])
-        
+
         # Name
         name = ET.SubElement(seller, '{%s}Name' % self.NAMESPACES['ram'])
-        name.text = seller_data.get('name', 'StitchAdmin GmbH')
-        
+        name.text = self._safe_str(self._safe_get(seller_data, 'name', 'StitchAdmin'))
+
         # Address
         address = ET.SubElement(seller, '{%s}PostalTradeAddress' % self.NAMESPACES['ram'])
-        
+
         line_one = ET.SubElement(address, '{%s}LineOne' % self.NAMESPACES['ram'])
-        line_one.text = seller_data.get('street', '')
-        
+        line_one.text = self._safe_str(self._safe_get(seller_data, 'street', ''))
+
         postcode = ET.SubElement(address, '{%s}PostcodeCode' % self.NAMESPACES['ram'])
-        postcode.text = seller_data.get('postcode', '')
-        
+        postcode.text = self._safe_str(self._safe_get(seller_data, 'postcode', ''))
+
         city = ET.SubElement(address, '{%s}CityName' % self.NAMESPACES['ram'])
-        city.text = seller_data.get('city', '')
-        
+        city.text = self._safe_str(self._safe_get(seller_data, 'city', ''))
+
         country = ET.SubElement(address, '{%s}CountryID' % self.NAMESPACES['ram'])
-        country.text = seller_data.get('country', 'DE')
-        
+        country.text = self._safe_str(self._safe_get(seller_data, 'country', 'DE'))
+
         # Tax Registration
-        if 'tax_number' in seller_data:
+        tax_number = self._safe_get(seller_data, 'tax_number', '')
+        if tax_number:
             tax_reg = ET.SubElement(seller, '{%s}SpecifiedTaxRegistration' % self.NAMESPACES['ram'])
             tax_id = ET.SubElement(tax_reg, '{%s}ID' % self.NAMESPACES['ram'])
             tax_id.set('schemeID', 'VA')
-            tax_id.text = seller_data['tax_number']
+            tax_id.text = self._safe_str(tax_number)
             
     def _add_buyer(self, agreement: ET.Element, buyer_data: Dict):
         """Füge Käufer-Informationen hinzu"""
         buyer = ET.SubElement(agreement, '{%s}BuyerTradeParty' % self.NAMESPACES['ram'])
-        
+
         # Name
         name = ET.SubElement(buyer, '{%s}Name' % self.NAMESPACES['ram'])
-        name.text = buyer_data.get('name', '')
-        
+        name.text = self._safe_str(self._safe_get(buyer_data, 'name', 'Kunde'))
+
         # Address
         address = ET.SubElement(buyer, '{%s}PostalTradeAddress' % self.NAMESPACES['ram'])
-        
+
         line_one = ET.SubElement(address, '{%s}LineOne' % self.NAMESPACES['ram'])
-        line_one.text = buyer_data.get('street', '')
-        
+        line_one.text = self._safe_str(self._safe_get(buyer_data, 'street', ''))
+
         postcode = ET.SubElement(address, '{%s}PostcodeCode' % self.NAMESPACES['ram'])
-        postcode.text = buyer_data.get('postcode', '')
-        
+        postcode.text = self._safe_str(self._safe_get(buyer_data, 'postcode', ''))
+
         city = ET.SubElement(address, '{%s}CityName' % self.NAMESPACES['ram'])
-        city.text = buyer_data.get('city', '')
-        
+        city.text = self._safe_str(self._safe_get(buyer_data, 'city', ''))
+
         country = ET.SubElement(address, '{%s}CountryID' % self.NAMESPACES['ram'])
-        country.text = buyer_data.get('country', 'DE')
+        country.text = self._safe_str(self._safe_get(buyer_data, 'country', 'DE'))
         
     def _add_delivery(self, delivery: ET.Element, invoice_data: Dict):
         """Füge Lieferinformationen hinzu"""
@@ -259,52 +275,52 @@ class ZugpferdService:
     def _add_payment_terms(self, settlement: ET.Element, invoice_data: Dict):
         """Füge Zahlungsbedingungen hinzu"""
         payment_ref = ET.SubElement(settlement, '{%s}PaymentReference' % self.NAMESPACES['ram'])
-        payment_ref.text = invoice_data.get('payment_reference', '')
-        
+        payment_ref.text = self._safe_str(self._safe_get(invoice_data, 'payment_reference', ''))
+
         # Currency
         currency = ET.SubElement(settlement, '{%s}InvoiceCurrencyCode' % self.NAMESPACES['ram'])
-        currency.text = invoice_data.get('currency', 'EUR')
-        
+        currency.text = self._safe_str(self._safe_get(invoice_data, 'currency', 'EUR'))
+
         # Payment Terms
         terms = ET.SubElement(settlement, '{%s}SpecifiedTradePaymentTerms' % self.NAMESPACES['ram'])
         desc = ET.SubElement(terms, '{%s}Description' % self.NAMESPACES['ram'])
-        desc.text = invoice_data.get('payment_terms', 'Zahlbar innerhalb 14 Tagen')
-        
+        desc.text = self._safe_str(self._safe_get(invoice_data, 'payment_terms', 'Zahlbar innerhalb 14 Tagen'))
+
         # Due Date
         due_date_elem = ET.SubElement(terms, '{%s}DueDateDateTime' % self.NAMESPACES['ram'])
         date_elem = ET.SubElement(due_date_elem, '{%s}DateTimeString' % self.NAMESPACES['udt'])
         date_elem.set('format', '102')
-        
-        due_date = invoice_data.get('due_date', datetime.now())
+
+        due_date = self._safe_get(invoice_data, 'due_date', datetime.now())
         if isinstance(due_date, (date, datetime)):
             date_elem.text = due_date.strftime('%Y%m%d')
         else:
-            date_elem.text = due_date
+            date_elem.text = self._safe_str(due_date)
             
     def _add_monetary_summation(self, settlement: ET.Element, invoice_data: Dict):
         """Füge Rechnungssummen hinzu"""
         summation = ET.SubElement(settlement, '{%s}SpecifiedTradeSettlementHeaderMonetarySummation' % self.NAMESPACES['ram'])
-        
+
         # Line Total
         line_total = ET.SubElement(summation, '{%s}LineTotalAmount' % self.NAMESPACES['ram'])
-        line_total.text = str(invoice_data.get('total_net', 0))
-        
+        line_total.text = self._safe_str(self._safe_get(invoice_data, 'total_net', 0))
+
         # Tax Basis Total
         tax_basis = ET.SubElement(summation, '{%s}TaxBasisTotalAmount' % self.NAMESPACES['ram'])
-        tax_basis.text = str(invoice_data.get('total_net', 0))
-        
+        tax_basis.text = self._safe_str(self._safe_get(invoice_data, 'total_net', 0))
+
         # Tax Total
         tax_total = ET.SubElement(summation, '{%s}TaxTotalAmount' % self.NAMESPACES['ram'])
-        tax_total.set('currencyID', invoice_data.get('currency', 'EUR'))
-        tax_total.text = str(invoice_data.get('total_tax', 0))
-        
+        tax_total.set('currencyID', self._safe_str(self._safe_get(invoice_data, 'currency', 'EUR')))
+        tax_total.text = self._safe_str(self._safe_get(invoice_data, 'total_tax', 0))
+
         # Grand Total
         grand_total = ET.SubElement(summation, '{%s}GrandTotalAmount' % self.NAMESPACES['ram'])
-        grand_total.text = str(invoice_data.get('total_gross', 0))
-        
+        grand_total.text = self._safe_str(self._safe_get(invoice_data, 'total_gross', 0))
+
         # Due Payable Amount
         due_amount = ET.SubElement(summation, '{%s}DuePayableAmount' % self.NAMESPACES['ram'])
-        due_amount.text = str(invoice_data.get('total_gross', 0))
+        due_amount.text = self._safe_str(self._safe_get(invoice_data, 'total_gross', 0))
         
     def validate_xml(self, xml_string: str, xsd_path: Optional[str] = None) -> Dict[str, Any]:
         """

@@ -291,6 +291,70 @@
     </div>
 </div>
 
+<!-- Verkauf Erfolgs-Modal mit Email/Drucken Optionen -->
+<div class="modal fade" id="saleSuccessModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-check-circle"></i> Verkauf erfolgreich!
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-4">
+                    <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                    <h4 class="mt-3">Beleg erstellt</h4>
+                    <p class="text-muted mb-0">Belegnummer:</p>
+                    <h3 class="text-primary" id="success-beleg-nummer">-</h3>
+                    <p class="text-muted">Betrag: <strong id="success-betrag">0,00 €</strong></p>
+                </div>
+
+                <hr>
+
+                <p class="text-center mb-3"><strong>Was möchten Sie tun?</strong></p>
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-lg" onclick="printReceipt()">
+                        <i class="bi bi-printer"></i> Beleg drucken
+                    </button>
+                    <button class="btn btn-info btn-lg" onclick="openEmailModal()" id="btn-email-receipt">
+                        <i class="bi bi-envelope"></i> Per E-Mail senden
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="closeSaleSuccessModal()">
+                        <i class="bi bi-x"></i> Ohne Beleg fortfahren
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Email-Versand Modal -->
+<div class="modal fade" id="emailReceiptModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-envelope"></i> Beleg per E-Mail senden</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="receipt-email" class="form-label">E-Mail-Adresse</label>
+                    <input type="email" class="form-control form-control-lg" id="receipt-email"
+                           placeholder="kunde@beispiel.de">
+                    <div class="form-text">Die E-Mail-Adresse des Kunden</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="sendReceiptEmail()">
+                    <i class="bi bi-send"></i> Senden
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- NEU: SumUp "Warten" Modal -->
 <div class="modal fade" id="sumupWaitingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
     <div class="modal-dialog modal-dialog-centered">
@@ -606,12 +670,17 @@ function startPayment(method) {
 let cashModal = null;
 let invoiceModal = null;
 let manualPaymentModal = null;
+let saleSuccessModal = null;
+let emailReceiptModal = null;
+let lastSaleResult = null;  // Speichert das letzte Verkaufsergebnis
 
 // Initialisiere Modals
 document.addEventListener('DOMContentLoaded', function() {
     cashModal = new bootstrap.Modal(document.getElementById('cashModal'));
     invoiceModal = new bootstrap.Modal(document.getElementById('invoiceModal'));
     manualPaymentModal = new bootstrap.Modal(document.getElementById('manualPaymentModal'));
+    saleSuccessModal = new bootstrap.Modal(document.getElementById('saleSuccessModal'));
+    emailReceiptModal = new bootstrap.Modal(document.getElementById('emailReceiptModal'));
 
     // Event-Listener für Rückgeld-Berechnung
     document.getElementById('cash-given').addEventListener('input', calculateChange);
@@ -871,24 +940,101 @@ function handleSaleCompletion(result) {
     if (sumupPollingInterval) clearInterval(sumupPollingInterval);
     sumupPollingInterval = null;
 
-    // Schließe alle Modals
+    // Schließe alle Zahlungs-Modals
     sumupWaitingModal.hide();
-    // bootstrap.Modal.getInstance(document.getElementById('cashModal'))?.hide();
+    if (manualPaymentModal) manualPaymentModal.hide();
+    if (cashModal) cashModal.hide();
+    if (invoiceModal) invoiceModal.hide();
 
     if (result.success) {
-        alert('Verkauf erfolgreich abgeschlossen! ' + (result.message || ''));
-        
+        // Speichere Ergebnis für Druck/Email
+        lastSaleResult = result;
+
+        // Zeige Erfolgs-Modal mit Optionen
+        document.getElementById('success-beleg-nummer').textContent = result.beleg_nummer || '-';
+
+        // Berechne Betrag aus Warenkorb (vor dem Leeren)
+        const total = cart.reduce((sum, item) => sum + (item.brutto_betrag || 0), 0);
+        document.getElementById('success-betrag').textContent = formatCurrency(total);
+
+        // Prüfe ob Kunde mit Email vorhanden
+        const customerEmail = document.getElementById('customer-email')?.value || '';
+        if (customerEmail) {
+            document.getElementById('receipt-email').value = customerEmail;
+        }
+
+        // Zeige Erfolgs-Modal
+        saleSuccessModal.show();
+
         // Warenkorb leeren und UI aktualisieren
-        fetchWarenkorb(); 
-        
-        // Fokus zurück auf das Suchfeld
-        document.getElementById('articleSearch').focus();
+        fetchWarenkorb();
     } else {
         alert('Fehler beim Abschluss des Verkaufs: ' + (result.error || 'Unbekannter Fehler'));
     }
-    
+
     // Buttons wieder aktivieren
     document.getElementById('payment-buttons').querySelectorAll('button').forEach(b => b.disabled = false);
+}
+
+// Erfolgs-Modal schließen und fortfahren
+function closeSaleSuccessModal() {
+    saleSuccessModal.hide();
+    lastSaleResult = null;
+    document.getElementById('articleSearch').focus();
+}
+
+// Beleg drucken
+function printReceipt() {
+    if (!lastSaleResult || !lastSaleResult.beleg_id) {
+        alert('Kein Beleg zum Drucken vorhanden');
+        return;
+    }
+
+    // Öffne Druckansicht in neuem Fenster
+    const printUrl = `/kasse/beleg/${lastSaleResult.beleg_id}/drucken`;
+    window.open(printUrl, '_blank', 'width=400,height=600');
+}
+
+// Email-Modal öffnen
+function openEmailModal() {
+    saleSuccessModal.hide();
+    emailReceiptModal.show();
+}
+
+// Beleg per Email senden
+function sendReceiptEmail() {
+    const email = document.getElementById('receipt-email').value.trim();
+
+    if (!email) {
+        alert('Bitte geben Sie eine E-Mail-Adresse ein');
+        return;
+    }
+
+    if (!lastSaleResult || !lastSaleResult.beleg_id) {
+        alert('Kein Beleg zum Senden vorhanden');
+        return;
+    }
+
+    // Sende Email
+    fetch(`/kasse/beleg/${lastSaleResult.beleg_id}/email`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ email: email })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('Beleg wurde erfolgreich an ' + email + ' gesendet!');
+            emailReceiptModal.hide();
+            closeSaleSuccessModal();
+        } else {
+            alert('Fehler beim Senden: ' + (data.error || 'Unbekannter Fehler'));
+        }
+    })
+    .catch(error => {
+        console.error('Fehler:', error);
+        alert('Fehler beim Senden der E-Mail');
+    });
 }
 
 // Hilfsfunktion

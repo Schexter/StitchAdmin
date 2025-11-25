@@ -6,7 +6,7 @@ Auftrags-Verwaltung mit Datenbank
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app
 from flask_login import login_required, current_user
 from datetime import datetime
-from src.models import db, Order, Customer, Article, OrderItem, ActivityLog, Supplier
+from src.models import db, Order, Customer, Article, OrderItem, ActivityLog, Supplier, CompanySettings
 from sqlalchemy import text
 from src.utils.dst_analyzer import analyze_dst_file_robust
 from werkzeug.utils import secure_filename
@@ -83,6 +83,25 @@ def index():
 def new():
     """Neuen Auftrag erstellen"""
     if request.method == 'POST':
+        # Hilfsfunktion zum Parsen von Datumsfeldern
+        def parse_date(date_str):
+            """Parst Datumsstring zu date-Objekt oder None (für Date-Spalten)"""
+            if not date_str or date_str.strip() == '':
+                return None
+            try:
+                return datetime.strptime(date_str.strip(), '%Y-%m-%d').date()
+            except (ValueError, AttributeError):
+                return None
+
+        def parse_datetime(date_str):
+            """Parst Datumsstring zu datetime-Objekt oder None (für DateTime-Spalten)"""
+            if not date_str or date_str.strip() == '':
+                return None
+            try:
+                return datetime.strptime(date_str.strip(), '%Y-%m-%d')
+            except (ValueError, AttributeError):
+                return None
+
         # Neuen Auftrag erstellen
         order = Order(
             id=generate_order_id(),
@@ -94,7 +113,7 @@ def new():
             internal_notes=request.form.get('notes', ''),
             customer_notes=request.form.get('customer_notes', ''),
             total_price=float(request.form.get('price', 0) or 0),
-            due_date=request.form.get('pickup_date') or None,
+            due_date=parse_datetime(request.form.get('pickup_date')),
             rush_order=request.form.get('rush_order', False) == 'on',
             created_by=current_user.username
         )
@@ -119,15 +138,9 @@ def new():
         order.design_status = design_status
         
         if design_status == 'needs_order':
-            order.design_supplier_id = request.form.get('design_supplier_id')
+            order.design_supplier_id = request.form.get('design_supplier_id') or None
             order.design_order_notes = request.form.get('design_order_notes')
-            
-            expected_date_str = request.form.get('design_expected_date')
-            if expected_date_str:
-                try:
-                    order.design_expected_date = datetime.strptime(expected_date_str, '%Y-%m-%d').date()
-                except ValueError:
-                    pass
+            order.design_expected_date = parse_date(request.form.get('design_expected_date'))
         
         elif design_status == 'customer_provided':
             # Wenn Kunde Design bereitstellt, aber keine Datei hochgeladen wurde
@@ -135,19 +148,67 @@ def new():
                 order.design_status = 'none'  # Zurücksetzen auf "none" wenn keine Datei
         
         # Design-Datei hochladen (wenn vorhanden)
+        design_file_processed = False
+
         if 'design_file' in request.files:
             file = request.files['design_file']
             if file and file.filename:
                 # Sichere Dateiname generieren
-                filename = f"{order.id}_{file.filename}"
-                upload_path = os.path.join('uploads', 'designs', filename)
-                os.makedirs(os.path.dirname(upload_path), exist_ok=True)
+                filename = f"{order.id}_{secure_filename(file.filename)}"
+                upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'designs')
+                os.makedirs(upload_dir, exist_ok=True)
+                upload_path = os.path.join(upload_dir, filename)
                 file.save(upload_path)
                 order.design_file_path = upload_path
-                
+                order.design_file = f"uploads/designs/{filename}"
+                design_file_processed = True
+
                 # Status auf "customer_provided" setzen wenn Datei hochgeladen
                 if order.design_status == 'none':
                     order.design_status = 'customer_provided'
+
+        # NEU: Wenn ein Dateipfad über den File-Browser ausgewählt wurde
+        design_file_path_input = request.form.get('design_file_path', '').strip()
+        if design_file_path_input and not design_file_processed:
+            # Prüfe ob die Datei existiert
+            if os.path.exists(design_file_path_input):
+                # Kopiere die Datei in den Upload-Ordner
+                original_filename = os.path.basename(design_file_path_input)
+                filename = f"{order.id}_{secure_filename(original_filename)}"
+                upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'designs')
+                os.makedirs(upload_dir, exist_ok=True)
+                upload_path = os.path.join(upload_dir, filename)
+
+                # Datei kopieren
+                import shutil
+                shutil.copy2(design_file_path_input, upload_path)
+
+                order.design_file_path = upload_path
+                order.design_file = f"uploads/designs/{filename}"
+                design_file_processed = True
+
+                # Status auf "customer_provided" setzen
+                if order.design_status == 'none':
+                    order.design_status = 'customer_provided'
+
+        # NEU: DST-Datei analysieren wenn vorhanden
+        if design_file_processed and order.design_file_path:
+            file_ext = os.path.splitext(order.design_file_path)[1].lower()
+            if file_ext in ['.dst', '.pes', '.jef', '.exp']:
+                try:
+                    analysis = analyze_dst_file_robust(order.design_file_path)
+                    if analysis.get('success'):
+                        # Nur überschreiben wenn nicht manuell eingegeben
+                        if not order.stitch_count or order.stitch_count == 0:
+                            order.stitch_count = analysis.get('stitch_count', 0)
+                        if not order.design_width_mm or order.design_width_mm == 0:
+                            order.design_width_mm = analysis.get('width_mm', 0)
+                        if not order.design_height_mm or order.design_height_mm == 0:
+                            order.design_height_mm = analysis.get('height_mm', 0)
+                        # Speichere komplette Analyse als JSON
+                        order.file_analysis = json.dumps(analysis)
+                except Exception as e:
+                    current_app.logger.error(f"Fehler bei DST-Analyse: {e}")
         
         # In Datenbank speichern
         db.session.add(order)
@@ -182,8 +243,9 @@ def new():
         log_activity('order_created', 
                     f'Auftrag erstellt: {order.id} für {order.customer.display_name if order.customer else "Unbekannt"}')
         
-        flash(f'Auftrag {order.id} wurde erstellt!', 'success')
-        return redirect(url_for('orders.show', order_id=order.id))
+        flash(f'Auftrag {order.id} wurde erstellt! Sie können jetzt mehrere Design-Positionen hinzufügen.', 'success')
+        # Zur Edit-Seite weiterleiten, damit Multi-Designs hinzugefügt werden können
+        return redirect(url_for('orders.edit', order_id=order.id))
     
     # Kunden und Artikel für Formular laden
     customers_list = Customer.query.order_by(Customer.company_name, Customer.last_name).all()
@@ -238,14 +300,19 @@ def show(order_id):
             items_ordered += 1
         elif item.supplier_order_status == 'delivered':
             items_delivered += 1
-    
+
+    # Maschinen für Produktionsplanung laden
+    from src.models.models import Machine
+    machines = Machine.query.filter_by(status='active').order_by(Machine.name).all()
+
     return render_template('orders/show.html',
                          order=order,
                          suppliers=suppliers,
                          status_history=status_history,
                          items_to_order=items_to_order,
                          items_ordered=items_ordered,
-                         items_delivered=items_delivered)
+                         items_delivered=items_delivered,
+                         machines=machines)
 
 
 @order_bp.route('/<order_id>/photos')
@@ -260,8 +327,18 @@ def photos(order_id):
 def edit(order_id):
     """Auftrag bearbeiten"""
     order = Order.query.get_or_404(order_id)
-    
+
     if request.method == 'POST':
+        # Hilfsfunktion zum Parsen von Datumsfeldern
+        def parse_datetime(date_str):
+            """Parst Datumsstring zu datetime-Objekt oder None (für DateTime-Spalten)"""
+            if not date_str or date_str.strip() == '':
+                return None
+            try:
+                return datetime.strptime(date_str.strip(), '%Y-%m-%d')
+            except (ValueError, AttributeError):
+                return None
+
         # Auftrag aktualisieren
         order.customer_id = request.form.get('customer_id')
         order.order_type = request.form.get('order_type', 'embroidery')
@@ -269,7 +346,7 @@ def edit(order_id):
         order.internal_notes = request.form.get('notes', '')
         order.customer_notes = request.form.get('customer_notes', '')
         order.total_price = float(request.form.get('price', 0) or 0)
-        order.due_date = request.form.get('pickup_date') or None
+        order.due_date = parse_datetime(request.form.get('pickup_date'))
         order.rush_order = request.form.get('rush_order', False) == 'on'
         order.updated_at = datetime.utcnow()
         order.updated_by = current_user.username
@@ -302,20 +379,25 @@ def edit(order_id):
     # Kunden und Artikel für Formular laden
     customers_list = Customer.query.order_by(Customer.company_name, Customer.last_name).all()
     articles_list = Article.query.filter_by(active=True).order_by(Article.name).all()
-    
+
+    # Maschinen für Produktionsplanung laden
+    from src.models.models import Machine
+    machines = Machine.query.filter_by(status='active').order_by(Machine.name).all()
+
     # In Dictionary umwandeln für Template-Kompatibilität
     customers = {}
     for customer in customers_list:
         customers[customer.id] = customer
-    
+
     articles = {}
     for article in articles_list:
         articles[article.id] = article
-    
+
     return render_template('orders/edit.html',
                          order=order,
                          customers=customers,
-                         articles=articles)
+                         articles=articles,
+                         machines=machines)
 
 @order_bp.route('/<order_id>/status', methods=['POST'])
 @login_required
@@ -727,6 +809,26 @@ def mark_item_for_order(item_id):
     return jsonify({'success': True})
 
 
+@order_bp.route('/<order_id>/design-ordered', methods=['POST'])
+@login_required
+def mark_design_ordered(order_id):
+    """Markiere Design als bestellt"""
+    order = Order.query.get_or_404(order_id)
+
+    # Design-Status aktualisieren
+    if order.design_status == 'needs_order':
+        order.design_status = 'ordered'
+        order.design_order_date = datetime.now()
+        db.session.commit()
+
+        log_activity('design_marked_ordered',
+                    f'Design für Auftrag {order_id} als bestellt markiert')
+
+        return jsonify({'success': True})
+
+    return jsonify({'success': False, 'error': 'Design ist nicht im Status "needs_order"'}), 400
+
+
 @order_bp.route('/create-quick', methods=['POST'])
 @login_required
 def create_quick_order():
@@ -937,17 +1039,21 @@ def create_quick():
 def print_order_sheet(order_id):
     """Vollständiges A4 Auftragsblatt drucken"""
     order = Order.query.get_or_404(order_id)
-    
+
     # Füge aktuelles Datum für das Template hinzu
     from datetime import datetime
     now = datetime.now()
-    
+
+    # Firmendaten laden
+    company = CompanySettings.query.first()
+
     # Aktivität protokollieren
-    log_activity('order_sheet_printed', 
+    log_activity('order_sheet_printed',
                 f'Auftragsblatt gedruckt für Bestellung: {order.id}')
-    
-    return render_template('orders/order_sheet.html', 
+
+    return render_template('orders/order_sheet.html',
                          order=order,
+                         company=company,
                          now=now)
 
 @order_bp.route('/<string:order_id>/print/production_labels')
@@ -1071,5 +1177,225 @@ def upload_design(order_id):
                     db.session.commit()
             except:
                 pass
-    
+
     return redirect(url_for('orders.show', order_id=order_id))
+
+
+# ==========================================
+# WORKFLOW API ENDPUNKTE
+# ==========================================
+
+@order_bp.route('/<order_id>/confirm-pickup', methods=['POST'])
+@login_required
+def confirm_pickup(order_id):
+    """Bestätigt Abholung durch Kunden"""
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'})
+
+    try:
+        data = request.get_json()
+
+        order.pickup_signature_name = data.get('pickup_name')
+        order.pickup_signature = data.get('signature')
+        order.pickup_confirmed_at = datetime.utcnow()
+        order.workflow_status = 'completed'
+
+        # Zahlung verarbeiten
+        payment_method = data.get('payment_method')
+        if payment_method:
+            order.record_final_payment(method=payment_method)
+
+        db.session.commit()
+
+        log_activity('pickup_confirmed',
+                    f'Abholung bestätigt für Auftrag {order.order_number} durch {order.pickup_signature_name}')
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_bp.route('/<order_id>/confirm-shipping', methods=['POST'])
+@login_required
+def confirm_shipping(order_id):
+    """Markiert Auftrag als versendet"""
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'})
+
+    try:
+        data = request.get_json()
+
+        # Shipment erstellen falls Model existiert
+        order.workflow_status = 'shipped'
+        order.pickup_confirmed_at = datetime.utcnow()  # Wiederverwendung für Versanddatum
+
+        # Tracking-Info in Notizen speichern
+        tracking_info = f"Versand: {data.get('carrier', '-')}"
+        if data.get('tracking_numbers'):
+            tracking_info += f"\nTracking: {data.get('tracking_numbers')}"
+        if data.get('notes'):
+            tracking_info += f"\nNotizen: {data.get('notes')}"
+
+        if order.notes:
+            order.notes += f"\n\n--- Versandinfo ---\n{tracking_info}"
+        else:
+            order.notes = f"--- Versandinfo ---\n{tracking_info}"
+
+        db.session.commit()
+
+        log_activity('shipping_confirmed',
+                    f'Versand bestätigt für Auftrag {order.order_number}')
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_bp.route('/<order_id>/archive', methods=['POST'])
+@login_required
+def archive_order(order_id):
+    """Archiviert den Auftrag"""
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'})
+
+    try:
+        can_archive, message = order.can_archive()
+        if not can_archive:
+            return jsonify({'success': False, 'error': message})
+
+        data = request.get_json()
+        reason = data.get('reason', 'completed')
+
+        order.archive(user=current_user.username, reason=reason)
+        db.session.commit()
+
+        log_activity('order_archived',
+                    f'Auftrag {order.order_number} archiviert: {reason}')
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_bp.route('/<order_id>/unarchive', methods=['POST'])
+@login_required
+def unarchive_order(order_id):
+    """Stellt Auftrag aus Archiv wieder her"""
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'})
+
+    try:
+        order.unarchive()
+        db.session.commit()
+
+        log_activity('order_unarchived',
+                    f'Auftrag {order.order_number} aus Archiv wiederhergestellt')
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_bp.route('/<order_id>/mark-paid', methods=['POST'])
+@login_required
+def mark_paid(order_id):
+    """Markiert Auftrag als bezahlt"""
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'})
+
+    try:
+        order.record_final_payment(method='manual')
+        db.session.commit()
+
+        log_activity('payment_confirmed',
+                    f'Zahlung bestätigt für Auftrag {order.order_number}')
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_bp.route('/<order_id>/start-production', methods=['POST'])
+@login_required
+def start_production(order_id):
+    """Startet die Produktion"""
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'})
+
+    try:
+        order.workflow_status = 'in_production'
+        order.production_start = datetime.utcnow()
+        db.session.commit()
+
+        log_activity('production_started',
+                    f'Produktion gestartet für Auftrag {order.order_number}')
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_bp.route('/<order_id>/save-packing', methods=['POST'])
+@login_required
+def save_packing(order_id):
+    """Speichert Verpackungs-Status"""
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'})
+
+    try:
+        data = request.get_json()
+
+        # Delivery-Type aktualisieren
+        if data.get('delivery_type'):
+            order.delivery_type = data.get('delivery_type')
+
+        # TODO: PackingList-Einträge erstellen/aktualisieren
+
+        db.session.commit()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_bp.route('/<order_id>/complete-packing', methods=['POST'])
+@login_required
+def complete_packing(order_id):
+    """Schließt Verpackung ab"""
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'})
+
+    try:
+        order.workflow_status = 'ready_to_ship'
+        db.session.commit()
+
+        log_activity('packing_completed',
+                    f'Verpackung abgeschlossen für Auftrag {order.order_number}')
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})

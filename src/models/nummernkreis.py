@@ -37,6 +37,10 @@ class DocumentType:
     RECHNUNG = 'rechnung'          # Rechnung
     GUTSCHRIFT = 'gutschrift'      # Gutschrift
     STORNORECHNUNG = 'stornorechnung'  # Stornorechnung
+    
+    # Einkauf-Modul (NEU)
+    PURCHASE_ORDER = 'purchase_order'  # Einkaufsbestellung (Artikel bei Lieferanten)
+    DESIGN_ORDER = 'design_order'      # Design-Bestellung (Puncher/Digitizer)
 
 
 class NumberSequenceSettings(db.Model):
@@ -121,6 +125,19 @@ class NumberSequenceSettings(db.Model):
                     'use_year': True,
                     'use_month': True,
                     'format_pattern': '{prefix}-{year}{month:02d}-{number:04d}'
+                },
+                # Einkauf-Modul
+                DocumentType.PURCHASE_ORDER: {
+                    'prefix': 'PO',
+                    'use_year': True,
+                    'use_month': False,
+                    'format_pattern': '{prefix}-{year}-{number:04d}'
+                },
+                DocumentType.DESIGN_ORDER: {
+                    'prefix': 'DO',
+                    'use_year': True,
+                    'use_month': False,
+                    'format_pattern': '{prefix}-{year}-{number:04d}'
                 }
             }
 

@@ -235,6 +235,72 @@ function removePosition(posId) {
     updateSummen();
 }
 
+// Artikel suchen
+function searchArticle(posId, query) {
+    if (query.length < 2) {
+        hideArticleDropdown(posId);
+        return;
+    }
+
+    fetch(`/articles/api/search?q=${encodeURIComponent(query)}`)
+        .then(res => res.json())
+        .then(data => {
+            showArticleDropdown(posId, data.articles || []);
+        })
+        .catch(error => {
+            console.error('Fehler bei Artikelsuche:', error);
+        });
+}
+
+// Artikel-Dropdown anzeigen
+function showArticleDropdown(posId, articles) {
+    let dropdown = document.getElementById(`dropdown_${posId}`);
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.id = `dropdown_${posId}`;
+        dropdown.className = 'article-dropdown';
+        dropdown.style.cssText = 'position:absolute;z-index:1000;background:white;border:1px solid #ccc;max-height:200px;overflow-y:auto;width:100%;box-shadow:0 4px 6px rgba(0,0,0,0.1);';
+        const input = document.getElementById(`artikel_${posId}`);
+        input.parentElement.style.position = 'relative';
+        input.parentElement.appendChild(dropdown);
+    }
+
+    if (articles.length === 0) {
+        dropdown.innerHTML = '<div class="p-2 text-muted">Keine Artikel gefunden</div>';
+    } else {
+        dropdown.innerHTML = articles.slice(0, 10).map(a => `
+            <div class="p-2 border-bottom article-option" style="cursor:pointer;"
+                 onclick="selectArticle('${posId}', ${JSON.stringify(a).replace(/"/g, '&quot;')})">
+                <strong>${a.name}</strong>
+                <small class="text-muted d-block">${a.article_number || ''} - ${(a.price || 0).toFixed(2)} €</small>
+            </div>
+        `).join('');
+    }
+    dropdown.style.display = 'block';
+}
+
+// Artikel-Dropdown verstecken
+function hideArticleDropdown(posId) {
+    const dropdown = document.getElementById(`dropdown_${posId}`);
+    if (dropdown) {
+        dropdown.style.display = 'none';
+    }
+}
+
+// Artikel auswählen
+function selectArticle(posId, article) {
+    const pos = positionen.find(p => p.id === posId);
+    if (pos) {
+        pos.artikel_id = article.id;
+        pos.artikel_name = article.name;
+        pos.einzelpreis = article.price || 0;
+        pos.beschreibung = article.description || '';
+        renderPositionen();
+        updateSummen();
+    }
+    hideArticleDropdown(posId);
+}
+
 // Positionen rendern
 function renderPositionen() {
     const tbody = document.getElementById('positionen-body');
@@ -243,11 +309,13 @@ function renderPositionen() {
     positionen.forEach((pos, index) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>
-                <input type="text" class="form-control form-control-sm"
+            <td style="position:relative;">
+                <input type="text" class="form-control form-control-sm" id="artikel_${pos.id}"
                        value="${pos.artikel_name}"
+                       oninput="searchArticle('${pos.id}', this.value)"
+                       onblur="setTimeout(() => hideArticleDropdown('${pos.id}'), 200)"
                        onchange="updatePositionField('${pos.id}', 'artikel_name', this.value)"
-                       placeholder="z.B. T-Shirt bedruckt" required>
+                       placeholder="Artikel suchen..." autocomplete="off" required>
             </td>
             <td>
                 <input type="text" class="form-control form-control-sm"
@@ -258,7 +326,7 @@ function renderPositionen() {
             <td>
                 <input type="number" class="form-control form-control-sm"
                        value="${pos.menge}" min="0.01" step="0.01"
-                       onchange="updatePositionField('${pos.id}', 'menge', parseFloat(this.value))"
+                       onchange="updatePositionField('${pos.id}', 'menge', parseFloat(this.value)); updateSummen();"
                        required>
             </td>
             <td>
@@ -269,12 +337,12 @@ function renderPositionen() {
             <td>
                 <input type="number" class="form-control form-control-sm"
                        value="${pos.einzelpreis}" min="0" step="0.01"
-                       onchange="updatePositionField('${pos.id}', 'einzelpreis', parseFloat(this.value))"
+                       onchange="updatePositionField('${pos.id}', 'einzelpreis', parseFloat(this.value)); updateSummen();"
                        required>
             </td>
             <td>
                 <select class="form-select form-select-sm"
-                        onchange="updatePositionField('${pos.id}', 'mwst_satz', parseFloat(this.value))">
+                        onchange="updatePositionField('${pos.id}', 'mwst_satz', parseFloat(this.value)); updateSummen();">
                     <option value="19" ${pos.mwst_satz == 19 ? 'selected' : ''}>19%</option>
                     <option value="7" ${pos.mwst_satz == 7 ? 'selected' : ''}>7%</option>
                     <option value="0" ${pos.mwst_satz == 0 ? 'selected' : ''}>0%</option>

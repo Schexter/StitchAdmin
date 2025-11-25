@@ -5,7 +5,8 @@ Supplier Controller - Datenbankbasierte Lieferanten-Verwaltung
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime, date
-from src.models.models import db, Supplier, Article, SupplierOrder, OrderItem, Order, ActivityLog
+from src.models.models import db, Supplier, Article, SupplierOrder, OrderItem, Order, ActivityLog, SupplierRating
+from src.models.supplier_contact import SupplierContact
 from src.utils.activity_logger import log_activity
 from sqlalchemy import or_
 import json
@@ -140,25 +141,52 @@ def new():
 def show(supplier_id):
     """Lieferanten-Details anzeigen"""
     supplier = Supplier.query.get_or_404(supplier_id)
-    
+
     # Lade zugehörige Artikel
     supplier_articles = Article.query.filter_by(supplier=supplier.name).all()
-    
+
     # Lade letzte Bestellungen
     recent_orders = SupplierOrder.query.filter_by(supplier_id=supplier_id)\
                                        .order_by(SupplierOrder.created_at.desc())\
-                                       .limit(5).all()
-    
+                                       .limit(10).all()
+
+    # Lade alle Bestellungen für Statistik
+    all_orders = SupplierOrder.query.filter_by(supplier_id=supplier_id).all()
+
     # Berechne Gesamtvolumen der Bestellungen
-    total_amount = 0
-    if recent_orders:
-        total_amount = sum(order.total_amount or 0 for order in recent_orders)
-    
-    return render_template('suppliers/show.html', 
-                         supplier=supplier, 
+    total_amount = sum(order.total_amount or 0 for order in all_orders)
+    total_orders = len(all_orders)
+
+    # Lade Ansprechpartner
+    contacts = SupplierContact.query.filter_by(supplier_id=supplier_id, active=True)\
+                                    .order_by(SupplierContact.is_primary_contact.desc()).all()
+
+    # Lade Bewertungen
+    ratings = SupplierRating.query.filter_by(supplier_id=supplier_id)\
+                                  .order_by(SupplierRating.rated_at.desc()).all()
+
+    # Berechne Umsatz nach Jahren
+    yearly_stats = {}
+    for order in all_orders:
+        if order.order_date:
+            year = order.order_date.year
+            if year not in yearly_stats:
+                yearly_stats[year] = {'count': 0, 'amount': 0}
+            yearly_stats[year]['count'] += 1
+            yearly_stats[year]['amount'] += order.total_amount or 0
+
+    # Sortiere Jahre absteigend
+    yearly_stats = dict(sorted(yearly_stats.items(), reverse=True))
+
+    return render_template('suppliers/show.html',
+                         supplier=supplier,
                          supplier_articles=supplier_articles,
                          recent_orders=recent_orders,
-                         total_amount=total_amount)
+                         total_amount=total_amount,
+                         total_orders=total_orders,
+                         contacts=contacts,
+                         ratings=ratings,
+                         yearly_stats=yearly_stats)
 
 @supplier_bp.route('/<supplier_id>/edit', methods=['GET', 'POST'])
 @login_required
@@ -624,11 +652,14 @@ def pending_orders():
                          total_value=total_pending_value,
                          overdue_orders=overdue_orders)
 
+@supplier_bp.route('/order-queue')
 @supplier_bp.route('/order-suggestions')
 @login_required
 def order_suggestions():
     """Zeige Bestellvorschläge basierend auf Aufträgen ohne Lagerbestand"""
-    # Hole alle OrderItems die noch nicht bestellt wurden und wo der Artikel nicht auf Lager ist
+    # Hole alle OrderItems die:
+    # 1. Explizit als 'to_order' markiert wurden (vom Benutzer im Auftrag geklickt)
+    # 2. ODER: Status 'none' haben UND nicht genug Bestand vorhanden ist
     suggestions = db.session.query(
         OrderItem,
         Article,
@@ -639,34 +670,53 @@ def order_suggestions():
     ).join(
         Order, OrderItem.order_id == Order.id
     ).outerjoin(
-        Supplier, Article.supplier == Supplier.name  # Supplier ist als Name gespeichert, nicht als ID
+        Supplier, db.or_(
+            db.func.lower(Article.supplier) == db.func.lower(Supplier.name),  # Exakter Match
+            db.func.lower(Supplier.name).contains(db.func.lower(Article.supplier)),  # Supplier enthält Artikel-Lieferant
+            db.func.lower(Article.supplier).contains(db.func.lower(Supplier.name))   # Artikel-Lieferant enthält Supplier
+        )
     ).filter(
-        OrderItem.supplier_order_status.in_(['none', 'to_order']),
+        Order.status.notin_(['cancelled', 'delivered', 'completed']),
         db.or_(
-            Article.stock == None,
-            Article.stock < OrderItem.quantity
-        ),
-        Order.status.notin_(['cancelled', 'delivered'])
+            # Explizit zur Bestellung markiert - IMMER anzeigen
+            OrderItem.supplier_order_status == 'to_order',
+            # Oder: nicht markiert aber zu wenig Bestand
+            db.and_(
+                OrderItem.supplier_order_status == 'none',
+                db.or_(
+                    Article.stock == None,
+                    Article.stock < OrderItem.quantity
+                )
+            )
+        )
     ).all()
     
     # Gruppiere nach Lieferant
     supplier_suggestions = {}
     for item, article, order, supplier in suggestions:
-        supplier_id = article.supplier or 'no_supplier'
-        supplier_name = supplier.name if supplier else 'Kein Lieferant'
-        
+        # Nutze Supplier ID wenn verfügbar, sonst Artikel-Supplier-Name
+        if supplier:
+            supplier_id = supplier.id
+            supplier_name = supplier.name
+        elif article.supplier:
+            supplier_id = article.supplier  # Name als Key wenn kein Match
+            supplier_name = article.supplier
+        else:
+            supplier_id = 'no_supplier'
+            supplier_name = 'Kein Lieferant'
+
         if supplier_id not in supplier_suggestions:
             supplier_suggestions[supplier_id] = {
                 'supplier': supplier,
                 'supplier_name': supplier_name,
-                'items': []
+                'order_items': []
             }
-        
+
         # Berechne benötigte Menge
         current_stock = article.stock or 0
         needed_quantity = max(0, item.quantity - current_stock)
-        
-        supplier_suggestions[supplier_id]['items'].append({
+
+        supplier_suggestions[supplier_id]['order_items'].append({
             'order_item': item,
             'article': article,
             'order': order,
@@ -674,11 +724,140 @@ def order_suggestions():
             'current_stock': current_stock
         })
     
-    return render_template('suppliers/order_suggestions.html', 
-                         supplier_suggestions=supplier_suggestions)
+    # Hole auch alle offenen/Entwurf-Bestellungen zum Anzeigen
+    pending_orders = SupplierOrder.query.filter(
+        SupplierOrder.status.in_(['draft', 'ordered'])
+    ).order_by(SupplierOrder.created_at.desc()).all()
+
+    return render_template('suppliers/order_suggestions.html',
+                         supplier_suggestions=supplier_suggestions,
+                         pending_orders=pending_orders)
+
+@supplier_bp.route('/<supplier_id>/contact/add', methods=['POST'])
+@login_required
+def add_contact(supplier_id):
+    """Ansprechpartner hinzufügen"""
+    supplier = Supplier.query.get_or_404(supplier_id)
+
+    try:
+        # Wenn als Hauptkontakt markiert, setze alle anderen auf nicht-primär
+        is_primary = request.form.get('is_primary') == 'on'
+        if is_primary:
+            SupplierContact.query.filter_by(supplier_id=supplier_id, is_primary_contact=True)\
+                                 .update({'is_primary_contact': False})
+
+        contact = SupplierContact(
+            supplier_id=supplier_id,
+            salutation=request.form.get('salutation', ''),
+            first_name=request.form.get('first_name', ''),
+            last_name=request.form.get('last_name'),
+            position=request.form.get('position', ''),
+            department=request.form.get('department', ''),
+            email=request.form.get('email', ''),
+            phone=request.form.get('phone', ''),
+            mobile=request.form.get('mobile', ''),
+            is_primary_contact=is_primary,
+            created_by=current_user.username
+        )
+
+        db.session.add(contact)
+        db.session.commit()
+
+        log_activity(current_user.username, 'supplier_contact_added',
+                    f'Ansprechpartner hinzugefügt: {contact.first_name} {contact.last_name} bei {supplier.name}')
+
+        flash(f'Ansprechpartner {contact.first_name} {contact.last_name} wurde hinzugefügt!', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Fehler beim Hinzufügen des Ansprechpartners: {str(e)}', 'danger')
+
+    return redirect(url_for('suppliers.show', supplier_id=supplier_id))
+
+
+@supplier_bp.route('/<supplier_id>/contact/<int:contact_id>/delete', methods=['POST'])
+@login_required
+def delete_contact(supplier_id, contact_id):
+    """Ansprechpartner löschen"""
+    contact = SupplierContact.query.get_or_404(contact_id)
+
+    if contact.supplier_id != supplier_id:
+        return jsonify({'success': False, 'error': 'Ungültiger Ansprechpartner'}), 404
+
+    try:
+        name = f'{contact.first_name} {contact.last_name}'
+        contact.active = False  # Soft delete
+        db.session.commit()
+
+        log_activity(current_user.username, 'supplier_contact_deleted',
+                    f'Ansprechpartner gelöscht: {name}')
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@supplier_bp.route('/<supplier_id>/rating/add', methods=['POST'])
+@login_required
+def add_rating(supplier_id):
+    """Bewertung hinzufügen"""
+    supplier = Supplier.query.get_or_404(supplier_id)
+
+    try:
+        quality = float(request.form.get('quality', 3))
+        delivery_speed = float(request.form.get('delivery_speed', 3))
+        price_performance = float(request.form.get('price_performance', 3))
+        communication = float(request.form.get('communication', 3))
+        packaging = float(request.form.get('packaging', 3))
+        reliability = float(request.form.get('reliability', 3))
+
+        # Gesamtbewertung berechnen (Durchschnitt der Hauptkriterien)
+        overall_rating = (quality + delivery_speed + price_performance + communication) / 4
+
+        rating = SupplierRating(
+            supplier_id=supplier_id,
+            quality=quality,
+            delivery_speed=delivery_speed,
+            price_performance=price_performance,
+            communication=communication,
+            packaging=packaging,
+            reliability=reliability,
+            overall_rating=overall_rating,
+            comment=request.form.get('comment', ''),
+            rated_by=current_user.username,
+            rated_at=datetime.utcnow()
+        )
+
+        db.session.add(rating)
+
+        # Aktualisiere Durchschnittsbewertungen im Supplier
+        all_ratings = SupplierRating.query.filter_by(supplier_id=supplier_id).all()
+        all_ratings.append(rating)  # Include new rating
+
+        supplier.rating_quality = sum(r.quality for r in all_ratings) / len(all_ratings)
+        supplier.rating_delivery = sum(r.delivery_speed for r in all_ratings) / len(all_ratings)
+        supplier.rating_price = sum(r.price_performance for r in all_ratings) / len(all_ratings)
+        supplier.rating_communication = sum(r.communication for r in all_ratings) / len(all_ratings)
+        supplier.rating_overall = sum(r.overall_rating for r in all_ratings) / len(all_ratings)
+
+        db.session.commit()
+
+        log_activity(current_user.username, 'supplier_rating_added',
+                    f'Bewertung hinzugefügt für {supplier.name}: {overall_rating:.1f}')
+
+        flash(f'Bewertung wurde gespeichert!', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Fehler beim Speichern der Bewertung: {str(e)}', 'danger')
+
+    return redirect(url_for('suppliers.show', supplier_id=supplier_id))
+
 
 @supplier_bp.route('/create-order-from-suggestions', methods=['POST'])
-@login_required  
+@login_required
 def create_order_from_suggestions():
     """Erstelle Lieferantenbestellung aus Vorschlägen"""
     supplier_id = request.form.get('supplier_id')
@@ -759,9 +938,131 @@ def create_order_from_suggestions():
         db.session.commit()
         
         flash(f'Bestellung {order_id} wurde erfolgreich erstellt!', 'success')
-        return redirect(url_for('suppliers.show', supplier_id=supplier_id))
-        
+        # Weiterleitung zur Bestelldetails mit Druckoption
+        return redirect(url_for('suppliers.show_order', supplier_id=supplier_id, order_id=order_id))
+
     except Exception as e:
         db.session.rollback()
         flash(f'Fehler beim Erstellen der Bestellung: {str(e)}', 'danger')
         return redirect(url_for('suppliers.order_suggestions'))
+
+
+@supplier_bp.route('/<supplier_id>/orders/<order_id>/print')
+@login_required
+def print_supplier_order(supplier_id, order_id):
+    """Drucke Lieferantenbestellung als Bestellformular"""
+    from src.models import CompanySettings
+
+    supplier = Supplier.query.get_or_404(supplier_id)
+    supplier_order = SupplierOrder.query.get_or_404(order_id)
+    company = CompanySettings.query.first()
+
+    # Items aus JSON laden
+    items = []
+    if supplier_order.items:
+        try:
+            items = json.loads(supplier_order.items)
+        except:
+            items = []
+
+    return render_template('suppliers/print_order.html',
+                         supplier=supplier,
+                         order=supplier_order,
+                         items=items,
+                         company=company,
+                         now=datetime.now())
+
+
+@supplier_bp.route('/<supplier_id>/orders/<order_id>/mark-ordered', methods=['POST'])
+@login_required
+def mark_order_as_ordered(supplier_id, order_id):
+    """Markiere Lieferantenbestellung als bestellt"""
+    supplier_order = SupplierOrder.query.get_or_404(order_id)
+
+    if supplier_order.status == 'draft':
+        supplier_order.status = 'ordered'
+        supplier_order.order_date = datetime.now().date()
+
+        # Aktualisiere verknüpfte OrderItems
+        OrderItem.query.filter_by(supplier_order_id=order_id).update({
+            'supplier_order_status': 'ordered',
+            'supplier_order_date': datetime.now().date()
+        })
+
+        db.session.commit()
+
+        log_activity('supplier_order_marked_ordered',
+                    f'Lieferantenbestellung {order_id} als bestellt markiert')
+
+        flash(f'Bestellung {order_id} wurde als bestellt markiert!', 'success')
+
+    return redirect(url_for('suppliers.show_order', supplier_id=supplier_id, order_id=order_id))
+
+
+@supplier_bp.route('/<supplier_id>/orders/<order_id>/receive', methods=['GET', 'POST'])
+@login_required
+def receive_order(supplier_id, order_id):
+    """Wareneingang für Lieferantenbestellung"""
+    supplier = Supplier.query.get_or_404(supplier_id)
+    supplier_order = SupplierOrder.query.get_or_404(order_id)
+
+    # Items aus JSON laden
+    items = []
+    if supplier_order.items:
+        try:
+            items = json.loads(supplier_order.items)
+        except:
+            items = []
+
+    if request.method == 'POST':
+        received_items = request.form.getlist('received_item')
+        received_quantities = {}
+
+        for item_id in received_items:
+            qty = int(request.form.get(f'received_qty_{item_id}', 0))
+            if qty > 0:
+                received_quantities[item_id] = qty
+
+        # Aktualisiere Lagerbestand
+        for item in items:
+            article_nr = item.get('article_number')
+            if article_nr in received_quantities:
+                received_qty = received_quantities[article_nr]
+                article = Article.query.filter_by(article_number=article_nr).first()
+                if article:
+                    article.stock = (article.stock or 0) + received_qty
+                    item['received_quantity'] = received_qty
+
+        # Prüfe ob alles geliefert wurde
+        all_received = all(
+            item.get('received_quantity', 0) >= item.get('quantity', 0)
+            for item in items
+        )
+
+        # Aktualisiere Bestellung
+        supplier_order.items = json.dumps(items)
+        supplier_order.delivery_date = datetime.now().date()
+
+        if all_received:
+            supplier_order.status = 'delivered'
+            # Aktualisiere verknüpfte OrderItems
+            OrderItem.query.filter_by(supplier_order_id=order_id).update({
+                'supplier_order_status': 'delivered',
+                'supplier_delivered_date': datetime.now().date()
+            })
+            flash(f'Lieferung für Bestellung {order_id} wurde vollständig eingebucht!', 'success')
+        else:
+            supplier_order.status = 'partial'
+            flash(f'Teillieferung für Bestellung {order_id} wurde eingebucht.', 'info')
+
+        db.session.commit()
+
+        log_activity('supplier_order_received',
+                    f'Wareneingang für Bestellung {order_id}')
+
+        return redirect(url_for('suppliers.show_order', supplier_id=supplier_id, order_id=order_id))
+
+    return render_template('suppliers/receive_order.html',
+                         supplier=supplier,
+                         order=supplier_order,
+                         items=items)

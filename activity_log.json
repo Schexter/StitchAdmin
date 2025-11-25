@@ -14,5 +14,13 @@
     "action": "shelly_scan",
     "details": "0 Shelly-Ger\u00e4te gefunden",
     "ip_address": "N/A"
+  },
+  {
+    "id": 3,
+    "timestamp": "2025-12-01T00:14:49.546124",
+    "username": "Hans",
+    "action": "supplier_created",
+    "details": "Lieferant erstellt: LF001 - L-shop",
+    "ip_address": "N/A"
   }
 ]

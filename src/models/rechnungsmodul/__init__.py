@@ -11,7 +11,7 @@ Dieses Modul importiert alle Rechnungsmodul-Models und stellt sie zur Verfügung
 from .models import (
     KassenBeleg, BelegPosition, KassenTransaktion, MwStSatz, TSEKonfiguration,
     Rechnung, RechnungsPosition, RechnungsZahlung, TagesAbschluss, ZugpferdKonfiguration,
-    BelegTyp, ZahlungsArt, RechnungsStatus, TSEStatus, ZugpferdProfil
+    BelegTyp, ZahlungsArt, RechnungsStatus, TSEStatus, ZugpferdProfil, RechnungsRichtung
 )
 
 models_available = True
@@ -20,6 +20,6 @@ models_available = True
 __all__ = [
     'KassenBeleg', 'BelegPosition', 'KassenTransaktion', 'MwStSatz', 'TSEKonfiguration',
     'Rechnung', 'RechnungsPosition', 'RechnungsZahlung', 'TagesAbschluss', 'ZugpferdKonfiguration',
-    'BelegTyp', 'ZahlungsArt', 'RechnungsStatus', 'TSEStatus', 'ZugpferdProfil',
+    'BelegTyp', 'ZahlungsArt', 'RechnungsStatus', 'TSEStatus', 'ZugpferdProfil', 'RechnungsRichtung',
     'models_available'
 ]
