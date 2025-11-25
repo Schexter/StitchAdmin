@@ -9,9 +9,8 @@ Erstellt von: Hans Hahn - Alle Rechte vorbehalten
 
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
-from src.models import db, Order, PackingList
+from src.models import db, Order, PackingList, ActivityLog
 from src.services.photo_service import PhotoService, ALLOWED_EXTENSIONS, MAX_FILE_SIZE
-from src.models.activity_log import ActivityLog
 import logging
 
 logger = logging.getLogger(__name__)
