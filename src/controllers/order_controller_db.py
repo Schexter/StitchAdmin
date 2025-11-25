@@ -248,6 +248,14 @@ def show(order_id):
                          items_ordered=items_ordered,
                          items_delivered=items_delivered)
 
+
+@order_bp.route('/<order_id>/photos')
+@login_required
+def photos(order_id):
+    """Foto-Seite für Auftrag (Mobile-optimiert)"""
+    order = Order.query.get_or_404(order_id)
+    return render_template('orders/photos.html', order=order)
+
 @order_bp.route('/<order_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit(order_id):

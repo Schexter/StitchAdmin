@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}Fotos - Auftrag {{ order.order_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('orders.index') }}">Aufträge</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('orders.show', order_id=order.id) }}">{{ order.order_number }}</a></li>
+            <li class="breadcrumb-item active">Fotos</li>
+        </ol>
+    </nav>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1>📸 Fotos - Auftrag {{ order.order_number }}</h1>
+            <p class="text-muted">Dokumentieren Sie Farben, Positionen und Qualität direkt mit der Smartphone-Kamera</p>
+        </div>
+    </div>
+
+    <!-- Kamera-Upload Bereich -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-camera"></i> Foto aufnehmen oder hochladen</h5>
+                </div>
+                <div class="card-body">
+                    <div id="camera-container"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar mit Infos -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Auftrags-Info</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Auftrag:</strong> {{ order.order_number }}</p>
+                    <p><strong>Kunde:</strong>
+                        {% if order.customer %}
+                            {{ order.customer.company_name or (order.customer.first_name + ' ' + order.customer.last_name) }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </p>
+                    <p><strong>Status:</strong>
+                        <span class="badge bg-info">{{ order.status }}</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">💡 Foto-Typen</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li><strong>Farben:</strong> Garne, Textilfarben</li>
+                        <li><strong>Position:</strong> Stickposition, Platzierung</li>
+                        <li><strong>Sample:</strong> Musterstück, Probestickerei</li>
+                        <li><strong>QC:</strong> Qualitätskontrolle</li>
+                        <li><strong>Sonstiges:</strong> Andere Dokumentation</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Mobile-optimierte Styles */
+    .camera-upload-container {
+        max-width: 100%;
+    }
+
+    #camera-video {
+        width: 100%;
+        max-width: 640px;
+        border-radius: 8px;
+        background: #000;
+    }
+
+    .camera-controls {
+        margin-top: 15px;
+        text-align: center;
+    }
+
+    .camera-controls .btn {
+        margin: 5px;
+        min-width: 120px;
+    }
+
+    .upload-options .btn {
+        padding: 15px;
+        font-size: 1.1rem;
+    }
+
+    .photo-preview-area img {
+        border-radius: 8px;
+        border: 2px solid #ddd;
+    }
+
+    .uploaded-photos .card {
+        height: 100%;
+    }
+
+    .uploaded-photos .card-img-top {
+        height: 150px;
+        object-fit: cover;
+    }
+
+    /* Touch-freundliche Buttons auf Mobile */
+    @media (max-width: 768px) {
+        .camera-controls .btn,
+        .upload-options .btn {
+            padding: 20px;
+            font-size: 1.2rem;
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        #camera-video {
+            max-height: 400px;
+        }
+    }
+</style>
+
+<script src="{{ url_for('static', filename='js/camera-upload.js') }}"></script>
+<script>
+    // Kamera-Upload initialisieren
+    document.addEventListener('DOMContentLoaded', function() {
+        const cameraUpload = new CameraUpload({
+            targetElement: '#camera-container',
+            uploadUrl: '/api/photos/upload/order/{{ order.id }}',
+            photoType: 'other',
+            onSuccess: function(result) {
+                console.log('Upload erfolgreich!', result);
+
+                // Success-Nachricht anzeigen
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
+                alertDiv.innerHTML = `
+                    <strong>Erfolgreich!</strong> Foto wurde hochgeladen.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('#camera-container').prepend(alertDiv);
+
+                // Nach 3 Sekunden ausblenden
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 3000);
+            },
+            onError: function(error) {
+                console.error('Upload-Fehler:', error);
+
+                // Fehler-Nachricht anzeigen
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+                alertDiv.innerHTML = `
+                    <strong>Fehler!</strong> ${error.message || 'Upload fehlgeschlagen'}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('#camera-container').prepend(alertDiv);
+            }
+        });
+
+        // Vorhandene Fotos laden
+        loadExistingPhotos();
+    });
+
+    function loadExistingPhotos() {
+        // Hole Fotos vom Server (wenn Order.photos implementiert)
+        // TODO: API-Endpunkt für Fotos-Liste erstellen
+    }
+
+    function deletePhoto(photoPath) {
+        if (confirm('Foto wirklich löschen?')) {
+            fetch(`/api/photos/delete/order/{{ order.id }}/${encodeURIComponent(photoPath)}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    location.reload();
+                } else {
+                    alert('Fehler beim Löschen: ' + result.error);
+                }
+            })
+            .catch(error => {
+                console.error('Fehler:', error);
+                alert('Fehler beim Löschen');
+            });
+        }
+    }
+</script>
+{% endblock %}
