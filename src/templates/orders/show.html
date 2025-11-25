@@ -39,6 +39,21 @@
                     <div class="col-md-9">{{ order.id }}</div>
                 </div>
                 <div class="row mb-2">
+                    <div class="col-md-3"><strong>Kunde:</strong></div>
+                    <div class="col-md-9">
+                        {% if order.customer %}
+                            <a href="{{ url_for('customers.show', customer_id=order.customer.id) }}">
+                                {{ order.customer.display_name }}
+                            </a>
+                            {% if order.customer.customer_number %}
+                                <small class="text-muted">({{ order.customer.customer_number }})</small>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">Kein Kunde zugeordnet</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="row mb-2">
                     <div class="col-md-3"><strong>Status:</strong></div>
                     <div class="col-md-9">
                         {% if order.status == 'pending' %}
@@ -104,34 +119,26 @@
                         {% endif %}
                     </div>
                 </div>
-                {% if order.textile_items %}
-                <!-- Neue Textil-Items Struktur -->
+                {% if order.items.count() > 0 %}
+                <!-- Textil-Items Struktur -->
                 <div class="row mb-3">
                     <div class="col-md-3"><strong>Textilien:</strong></div>
                     <div class="col-md-9">
-                        {% for item in order.textile_items %}
+                        {% for item in order.items %}
                         <div class="border p-2 mb-2">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <strong>{{ item.article_name }}</strong>
-                                    {% if item.article_sku %}<br><small class="text-muted">SKU: {{ item.article_sku }}</small>{% endif %}
-                                    {% if item.article_material %}<br><small class="text-info">{{ item.article_material }}</small>{% endif %}
-                                    <br><span class="text-muted">{{ item.quantity }} Stück à {{ "%.2f"|format(item.price) }} €</span>
+                                    <strong>{{ item.article.name if item.article else 'Unbekannter Artikel' }}</strong>
+                                    {% if item.article and item.article.article_number %}<br><small class="text-muted">Art.Nr.: {{ item.article.article_number }}</small>{% endif %}
+                                    {% if item.article and item.article.material %}<br><small class="text-info">{{ item.article.material }}</small>{% endif %}
+                                    <br><span class="text-muted">{{ item.quantity }} Stück à {{ "%.2f"|format(item.unit_price) }} €</span>
                                 </div>
                                 <div class="col-md-6">
-                                    {% if item.size %}
-                                        <small><strong>Größe:</strong> {{ item.size }}
-                                        {% if item.original_article_size and item.size != item.original_article_size %}
-                                            <span class="text-muted">(Artikel: {{ item.original_article_size }})</span>
-                                        {% endif %}
-                                        </small><br>
+                                    {% if item.textile_size %}
+                                        <small><strong>Größe:</strong> {{ item.textile_size }}</small><br>
                                     {% endif %}
-                                    {% if item.color_note %}
-                                        <small><strong>Farbe:</strong> {{ item.color_note }}
-                                        {% if item.original_article_color and item.original_article_color not in item.color_note %}
-                                            <span class="text-muted">(Artikel: {{ item.original_article_color }})</span>
-                                        {% endif %}
-                                        </small>
+                                    {% if item.textile_color %}
+                                        <small><strong>Farbe:</strong> {{ item.textile_color }}</small>
                                     {% endif %}
                                 </div>
                             </div>
@@ -358,7 +365,7 @@
                     {% endif %}
                     
                     {% if order.status == 'ready' %}
-                    <a href="{{ url_for('shipping.prepare_shipment', order_id=order.id) }}" class="btn btn-primary w-100">
+                    <a href="{{ url_for('shipping.new', order_id=order.id) }}" class="btn btn-primary w-100">
                         <i class="bi bi-truck"></i> Versand vorbereiten
                     </a>
                     {% endif %}
@@ -397,6 +404,11 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
+                    <!-- Foto-Dokumentation -->
+                    <a href="{{ url_for('orders.photos', order_id=order.id) }}" class="btn btn-primary">
+                        <i class="bi bi-camera"></i> Fotos / QM-Dokumentation
+                    </a>
+
                     {% if order.status in ['ready', 'ready_for_pickup', 'completed'] %}
                     <button class="btn btn-success" onclick="auftragZurKasseUebernehmen('{{ order.id }}')">
                         <i class="bi bi-cash-coin"></i> Zur Kasse / Rechnung erstellen

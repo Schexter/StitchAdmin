@@ -1,181 +1,367 @@
 # StitchAdmin 2.0 - Quick Start Guide
 
-**Erstellt von Hans Hahn - Alle Rechte vorbehalten**
+**Von 0 auf produktiv in 10 Minuten! ⚡**
+
+Erstellt von: **Hans Hahn** - Alle Rechte vorbehalten
 
 ---
 
-## ✅ Migration erfolgreich abgeschlossen!
+## 🎯 Was du bekommst
 
-Alle Dateien wurden erfolgreich von `StitchAdmin` nach `StitchAdmin2.0` migriert.
+- ✅ Vollständiges ERP-System für Stickerei-Betriebe
+- ✅ Mobile Zugriff vom Smartphone
+- ✅ Foto-Dokumentation mit Kamera
+- ✅ OCR-Texterkennung für Rechnungen & Briefe
+- ✅ Automatische Workflows
 
 ---
 
-## 🚀 Schnellstart (5 Schritte)
+## 📦 Installation
 
-### Schritt 1: Virtual Environment erstellen
+### Linux/Ubuntu/Debian
+
 ```bash
-cd C:\SoftwareEntwicklung\StitchAdmin2.0
-python -m venv .venv
+# 1. Terminal öffnen
+cd /pfad/zu/StitchAdmin2.0
+
+# 2. Automatische Installation
+sudo bash scripts/install_dependencies.sh
+
+# 3. Server starten
+python3 app.py
+
+# 4. Browser öffnen
+# http://localhost:5000
 ```
 
-### Schritt 2: Virtual Environment aktivieren
-```bash
-.venv\Scripts\activate
-```
+### Windows
 
-### Schritt 3: Requirements installieren
-```bash
-pip install -r requirements.txt
-```
+```cmd
+REM 1. CMD öffnen (als Administrator)
+cd C:\pfad\zu\StitchAdmin2.0
 
-### Schritt 4: Anwendung starten
-```bash
+REM 2. Tesseract OCR installieren
+REM https://github.com/UB-Mannheim/tesseract/wiki
+REM -> tesseract-ocr-w64-setup-5.x.x.exe herunterladen
+REM -> Installieren mit "Deutsche Sprache" auswählen!
+
+REM 3. Dependencies installieren
+scripts\install_dependencies.bat
+
+REM 4. Server starten
 python app.py
+
+REM 5. Browser öffnen
+REM http://localhost:5000
 ```
 
-### Schritt 5: Im Browser öffnen
-```
-http://localhost:5000
-```
+---
 
-**Login-Daten:**
+## 🚀 Erste Schritte
+
+### 1. Einloggen
+
+**Standard-Zugangsdaten:**
 - Benutzername: `admin`
 - Passwort: `admin`
 
----
+⚠️ **WICHTIG:** Passwort nach dem ersten Login ändern!
 
-## 📋 Was wurde migriert?
-
-✅ **Models** - Alle Datenmodelle  
-✅ **Controllers** - Alle Controller inkl. Rechnungsmodul  
-✅ **Services** - Business-Services  
-✅ **Utils** - Hilfsfunktionen  
-✅ **Templates** - Alle HTML-Templates  
-✅ **Static Files** - CSS, JS, Images  
-✅ **Datenbank** - SQLite DB + Backup  
-✅ **Uploads** - Design-Dateien, Dokumente, Bilder  
-
----
-
-## 📁 Neue Struktur
+### 2. Grundeinstellungen konfigurieren
 
 ```
-StitchAdmin2.0/
-├── app.py                    # Haupt-Anwendung
-├── requirements.txt
-├── .env
-│
-├── src/
-│   ├── controllers/          # Geschäftslogik
-│   ├── models/              # Datenmodelle
-│   ├── services/            # Business-Services
-│   ├── utils/               # Hilfsfunktionen
-│   ├── templates/           # HTML-Templates
-│   └── static/              # CSS, JS, Images
-│
-├── instance/
-│   ├── stitchadmin.db       # Datenbank
-│   └── uploads/             # Upload-Dateien
-│
-├── backups/                 # DB-Backups
-├── config/                  # Konfiguration
-├── docs/                    # Dokumentation
-├── logs/                    # Logs
-├── scripts/                 # Hilfsskripte
-└── tests/                   # Tests (leer)
+Menü → Einstellungen → Firma
+```
+
+**Pflichtfelder:**
+- Firmenname
+- Adresse
+- Steuernummer
+- Logo hochladen (optional)
+
+### 3. Ersten Kunden anlegen
+
+```
+Menü → Kunden → Neu
+```
+
+**Mindestangaben:**
+- Vorname & Nachname (oder Firma)
+- Email oder Telefon
+- Adresse
+
+### 4. Ersten Auftrag erstellen
+
+```
+Menü → Aufträge → Neu
+```
+
+**Workflow:**
+1. Kunde auswählen
+2. Artikel hinzufügen
+3. Liefertermin festlegen
+4. Speichern
+
+---
+
+## 📱 Mobile Features nutzen
+
+### IP-Adresse herausfinden
+
+**Linux/macOS:**
+```bash
+hostname -I | awk '{print $1}'
+# Beispiel-Ausgabe: 192.168.1.100
+```
+
+**Windows:**
+```cmd
+ipconfig | findstr IPv4
+# Beispiel-Ausgabe: IPv4-Adresse . . . . . . . . . . : 192.168.1.100
+```
+
+### Vom Smartphone zugreifen
+
+1. **Smartphone und PC im gleichen WLAN**
+2. **Browser auf Smartphone öffnen**
+3. **Eingeben:** `http://192.168.1.100:5000`
+   (Ersetze die IP mit deiner tatsächlichen IP!)
+
+### Fotos mit Smartphone aufnehmen
+
+**Für Aufträge (Farben, Samples, QC):**
+```
+Im Browser: /orders/<AUFTRAG_ID>/photos
+```
+
+**Für Posteingang (mit OCR):**
+```
+Im Browser: /documents/post/<POST_ID>/scan
 ```
 
 ---
 
-## ⚠️ Bekannte Punkte
+## 🎨 Workflow-Beispiel: Stickauftrag
 
-### Import-Anpassungen erforderlich
-Die Controller müssen ihre Imports eventuell anpassen:
+### Start bis Versand in 6 Schritten
 
-**Alt (in den Controller-Dateien):**
-```python
-from models.models import Customer
-from utils.logger import log_activity
+**1. Auftrag erstellen**
+```
+Aufträge → Neu → Kunde wählen → Artikel hinzufügen
 ```
 
-**Neu (sollte sein):**
-```python
-from src.models.models import Customer
-from src.utils.logger import log_activity
+**2. Design hochladen**
+```
+Auftrag öffnen → Design-Tab → DST-Datei hochladen
+→ Stichzahl wird automatisch erkannt!
 ```
 
-Die `app.py` importiert jetzt mit `src.` Präfix, aber die Controller-Dateien selbst könnten noch alte Imports haben.
+**3. Produktion starten**
+```
+Auftrag öffnen → Produktion → Maschine zuweisen → Starten
+```
 
-### Erste Schritte nach dem Start:
+**4. Produktion abschließen + QC**
+```
+Produktion abschließen → Packliste wird automatisch erstellt
+→ Mit Smartphone: QC-Fotos aufnehmen
+→ QC bestätigen
+```
 
-1. **Prüfen, welche Module geladen wurden**  
-   Beim Start zeigt die Konsole an, welche Blueprints erfolgreich registriert wurden.
+**5. Verpacken**
+```
+Packliste → Als verpackt markieren
+→ Lieferschein wird automatisch erstellt
+→ Mit Smartphone: Versandlabel scannen
+→ Tracking-Nummer wird automatisch erkannt!
+```
 
-2. **Dashboard testen**  
-   Nach Login sollte das Dashboard mit Statistiken angezeigt werden.
+**6. Rechnung erstellen**
+```
+Auftrag → Rechnung erstellen → PDF generieren → Email senden
+```
 
-3. **Module einzeln testen**  
-   - Kunden → Funktioniert?
-   - Artikel → Funktioniert?
-   - Aufträge → Funktioniert?
-   - etc.
-
----
-
-## 🔧 Fehlerbehebung
-
-### Fehler: "Module not found"
-**Lösung:** Imports in den Controller-Dateien anpassen (siehe oben)
-
-### Fehler: "Database locked"
-**Lösung:** SQLite-DB im alten Verzeichnis könnte noch geöffnet sein. Schließen Sie alle Instanzen der alten Anwendung.
-
-### Fehler: "Template not found"
-**Lösung:** Template-Pfade prüfen - sollten relativ zu `src/templates/` sein
-
-### Blueprints laden nicht
-**Lösung:** 
-1. Debug-Modus aktivieren (bereits aktiv)
-2. Traceback in der Konsole ansehen
-3. Imports im jeweiligen Controller prüfen
+**Fertig! 🎉**
 
 ---
 
-## 📚 Dokumentation
+## 🔍 OCR-Features testen
 
-Weitere Informationen in:
-- `docs/MIGRATION_COMPLETE.md` - Vollständiger Migrations-Bericht
-- `docs/MIGRATION_GUIDE.md` - Migrations-Anleitung
-- `docs/README_OLD.md` - Alte README als Referenz
-- `app_old_reference.py` - Alte app.py als Vergleich
+### Rechnung scannen
+
+1. **PostEntry erstellen:**
+   ```
+   Dokumente → Postbuch → Neu → Typ: "Eingehend"
+   ```
+
+2. **Mit Smartphone öffnen:**
+   ```
+   /documents/post/<ID>/scan
+   ```
+
+3. **Rechnung fotografieren:**
+   - Kamera-Button drücken
+   - Rechnung fotografieren
+   - Upload bestätigen
+
+4. **Automatisch erkannt:**
+   - ✅ Rechnungsbetrag
+   - ✅ Rechnungsnummer
+   - ✅ Rechnungsdatum
+   - ✅ Volltext für Suche
+
+### Paket-Tracking scannen
+
+1. **PostEntry für Versand erstellen**
+
+2. **DHL-Label fotografieren:**
+   - Tracking-Nummer wird automatisch erkannt
+   - Versandkosten werden extrahiert
+   - Felder werden automatisch ausgefüllt
 
 ---
 
-## 🔒 Backup-Hinweis
+## ⚙️ Wichtige Einstellungen
 
-⚠️ **Wichtig:** Das alte Verzeichnis `C:\SoftwareEntwicklung\StitchAdmin` wurde **nicht gelöscht**.
+### Workflows automatisieren
 
-Es dient als Backup und Referenz. Bitte erst löschen, wenn die Migration vollständig getestet wurde!
+```
+Einstellungen → Workflows
+```
+
+**Empfohlene Einstellungen:**
+- ✅ Packliste nach Produktion automatisch erstellen
+- ✅ Lieferschein nach Verpackung automatisch erstellen
+- ✅ Tracking-Email automatisch senden
+- ✅ OCR bei Upload aktivieren
+
+### Firmen-Branding
+
+```
+Einstellungen → Branding
+```
+
+**Anpassen:**
+- Logo hochladen
+- Farben anpassen
+- Email-Signatur
+- PDF-Layout
 
 ---
 
-## 📞 Support
+## 🆘 Häufige Probleme
 
-Bei Problemen:
-1. Konsolen-Output prüfen
-2. Debug-Modus ist aktiv - Fehler werden detailliert angezeigt
-3. Alte Dateien im Original-Verzeichnis als Referenz nutzen
+### Server nicht erreichbar
+
+**Problem:** `Connection refused` vom Smartphone
+
+**Lösung:**
+```bash
+# 1. Firewall-Port öffnen (Linux)
+sudo ufw allow 5000
+
+# 2. Windows: Firewall-Regel hinzufügen
+# Systemsteuerung → Firewall → Neue Regel → Port 5000 zulassen
+```
+
+### OCR erkennt nichts
+
+**Problem:** Leerer Text nach Scan
+
+**Lösung:**
+- ✅ Bessere Beleuchtung beim Fotografieren
+- ✅ Dokument glatt legen (keine Falten)
+- ✅ Kamera stabilisieren (nicht verwackeln)
+- ✅ Höhere Auflösung verwenden
+- ✅ Tesseract korrekt installiert? `tesseract --version`
+
+### Fotos werden nicht hochgeladen
+
+**Problem:** Upload schlägt fehl
+
+**Lösung:**
+```bash
+# Upload-Ordner erstellen
+mkdir -p instance/uploads/photos
+mkdir -p instance/uploads/thumbnails
+chmod -R 755 instance/uploads
+```
+
+### Python-Fehler beim Start
+
+**Problem:** `ModuleNotFoundError`
+
+**Lösung:**
+```bash
+# Dependencies neu installieren
+pip install -r requirements.txt
+
+# Oder Installations-Skript verwenden
+sudo bash scripts/install_dependencies.sh
+```
 
 ---
 
-## ✨ Viel Erfolg!
+## 📚 Nächste Schritte
 
-Die Migration ist abgeschlossen. Alle Komponenten sind an ihrem Platz.  
-Jetzt kann die Entwicklung in der neuen, sauberen Struktur weitergehen!
+**Nach dem Quick Start:**
 
-**Nächster Schritt:** Virtual Environment einrichten und die Anwendung starten! 🚀
+1. **Dokumentation lesen:**
+   - [INSTALLATION.md](INSTALLATION.md) - Detaillierte Installation
+   - [MOBILE_WORKFLOW_FEATURES.md](docs/MOBILE_WORKFLOW_FEATURES.md) - Mobile Features
+   - [POSTENTRY_OCR_FEATURES.md](docs/POSTENTRY_OCR_FEATURES.md) - OCR-Features
+
+2. **Daten importieren:**
+   - Kunden aus Excel importieren
+   - Artikel aus L-Shop importieren
+   - Garnfarben hochladen
+
+3. **Team einrichten:**
+   - Benutzer anlegen
+   - Rollen vergeben
+   - Rechte anpassen
+
+4. **Backup einrichten:**
+   ```bash
+   # Automatisches Backup einrichten
+   cp scripts/backup.sh /etc/cron.daily/
+   ```
+
+5. **Produktion vorbereiten:**
+   - Für SSL/TLS konfigurieren
+   - Reverse Proxy einrichten (Nginx)
+   - Systemd Service erstellen
 
 ---
 
-**Erstellt von Hans Hahn - Alle Rechte vorbehalten**  
-**Datum:** 05.11.2025
+## 💡 Tipps & Tricks
+
+### Tastatur-Shortcuts
+
+- `Strg + S` - Speichern (in Formularen)
+- `Strg + N` - Neu (auf Listen-Seiten)
+- `Strg + F` - Suche
+
+### Mobile-Optimierung
+
+- **Kamera-Qualität:** Für OCR reichen 5MP
+- **Beleuchtung:** Tageslicht oder LED (kein Blitz)
+- **Hintergrund:** Dunkler Untergrund für bessere Kontraste
+
+### Performance
+
+- **Datenbank:** Für >1000 Aufträge PostgreSQL verwenden
+- **Uploads:** Alte Fotos regelmäßig archivieren
+- **Cache:** Browser-Cache leeren bei Problemen
+
+---
+
+## 🎉 Geschafft!
+
+Du bist jetzt bereit, StitchAdmin 2.0 produktiv zu nutzen!
+
+**Viel Erfolg mit deinem Stickerei-Betrieb! 🧵✨**
+
+---
+
+**Erstellt von Hans Hahn - Alle Rechte vorbehalten**

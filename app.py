@@ -9,7 +9,7 @@ Hauptanwendung mit Flask Application Factory Pattern
 import os
 import sys
 from datetime import timedelta
-from flask import Flask, render_template, redirect, url_for, flash, request
+from flask import Flask, render_template, redirect, url_for, flash, request, send_from_directory
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
 # UTF-8 Encoding für Windows
@@ -297,9 +297,17 @@ def create_app():
         except (ImportError, Exception):
             pass
 
-        return render_template('dashboard_personalized.html', 
-                             user_modules=user_modules, 
+        return render_template('dashboard_personalized.html',
+                             user_modules=user_modules,
                              stats=stats)
+
+    @app.route('/uploads/<path:filename>')
+    def uploaded_file(filename):
+        """
+        Stellt Upload-Dateien bereit (Fotos, Thumbnails, etc.)
+        """
+        upload_folder = app.config.get('UPLOAD_FOLDER', 'instance/uploads')
+        return send_from_directory(upload_folder, filename)
 
     @app.template_filter('format_date')
     def format_date_filter(date_obj, format_string='%d.%m.%Y'):
@@ -369,6 +377,14 @@ def create_app():
             return f"{float(value):.1f}%"
         except (TypeError, ValueError):
             return "0%"
+
+    @app.template_filter('is_design_link')
+    def is_design_link_filter(value):
+        """Prüft ob der Wert ein Link (URL) ist"""
+        if not value:
+            return False
+        value_str = str(value)
+        return value_str.startswith('http://') or value_str.startswith('https://') or value_str.startswith('link:')
 
     # ==========================================
     # CONTEXT PROCESSORS

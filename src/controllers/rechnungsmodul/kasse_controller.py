@@ -369,6 +369,45 @@ def artikel_suchen():
         logger.error(f"Fehler bei Artikel-Suche: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
+@kasse_bp.route('/auftraege/suchen')
+def auftraege_suchen():
+    """Auftrags-Suche für Kassenverkauf"""
+    from src.models.models import Order
+
+    query = request.args.get('q', '').strip()
+
+    try:
+        # Basis-Query: Nur abrechenbare Aufträge
+        query_filter = Order.query.filter(
+            Order.status.in_(['accepted', 'in_progress', 'ready', 'completed'])
+        )
+
+        # Wenn Suche angegeben, filtere nach Auftragsnummer
+        if query:
+            query_filter = query_filter.filter(
+                db.or_(
+                    Order.order_number.ilike(f'%{query}%'),
+                    Order.id.ilike(f'%{query}%')
+                )
+            )
+
+        # Limitiere auf 50 Aufträge, sortiere nach neuesten
+        auftraege = query_filter.order_by(Order.created_at.desc()).limit(50).all()
+
+        result = [{
+            'id': order.id,
+            'order_number': order.order_number,
+            'beschreibung': order.description or 'Keine Beschreibung',
+            'preis': float(order.total_price) if order.total_price else 0.0,
+            'kunde': order.customer.display_name if order.customer else 'Kein Kunde',
+            'status': order.status
+        } for order in auftraege]
+
+        return jsonify({'success': True, 'auftraege': result})
+    except Exception as e:
+        logger.error(f"Fehler bei Auftrags-Suche: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
 @kasse_bp.route('/kunden/suchen')
 def kunden_suchen():
     """Kunden-Suche für Kassenverkauf"""

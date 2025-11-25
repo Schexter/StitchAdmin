@@ -56,13 +56,14 @@ class CameraUpload {
                 <div class="upload-options" id="upload-options">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <button type="button" class="btn btn-primary btn-block btn-lg" id="start-camera-btn">
-                                <i class="fas fa-camera"></i> Kamera öffnen
-                            </button>
+                            <label for="camera-upload" class="btn btn-primary btn-block btn-lg mb-0">
+                                <i class="fas fa-camera"></i> Foto aufnehmen
+                            </label>
+                            <input type="file" id="camera-upload" accept="image/*" capture="environment" style="display: none;">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="file-upload" class="btn btn-secondary btn-block btn-lg mb-0">
-                                <i class="fas fa-upload"></i> Datei wählen
+                                <i class="fas fa-upload"></i> Aus Galerie
                             </label>
                             <input type="file" id="file-upload" accept="image/*" style="display: none;">
                         </div>
@@ -102,28 +103,28 @@ class CameraUpload {
     }
 
     attachEventListeners() {
-        // Start camera
-        const startCameraBtn = document.getElementById('start-camera-btn');
-        if (startCameraBtn) {
-            startCameraBtn.addEventListener('click', () => this.startCamera());
+        // Camera upload (native)
+        const cameraUpload = document.getElementById('camera-upload');
+        if (cameraUpload) {
+            cameraUpload.addEventListener('change', (e) => this.handleFileUpload(e));
         }
 
-        // Stop camera
+        // File upload (gallery)
+        const fileUpload = document.getElementById('file-upload');
+        if (fileUpload) {
+            fileUpload.addEventListener('change', (e) => this.handleFileUpload(e));
+        }
+
+        // Stop camera (für alte Browser-Kompatibilität)
         const stopCameraBtn = document.getElementById('stop-camera-btn');
         if (stopCameraBtn) {
             stopCameraBtn.addEventListener('click', () => this.stopCamera());
         }
 
-        // Capture photo
+        // Capture photo (für alte Browser-Kompatibilität)
         const captureBtn = document.getElementById('capture-btn');
         if (captureBtn) {
             captureBtn.addEventListener('click', () => this.capturePhoto());
-        }
-
-        // File upload
-        const fileUpload = document.getElementById('file-upload');
-        if (fileUpload) {
-            fileUpload.addEventListener('change', (e) => this.handleFileUpload(e));
         }
 
         // Confirm upload
@@ -141,6 +142,16 @@ class CameraUpload {
 
     async startCamera() {
         try {
+            // Prüfe ob getUserMedia verfügbar ist
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('UNSUPPORTED');
+            }
+
+            // Prüfe ob wir in einem sicheren Kontext sind (HTTPS oder localhost)
+            if (location.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+                throw new Error('INSECURE_CONTEXT');
+            }
+
             // Request camera access
             this.stream = await navigator.mediaDevices.getUserMedia({
                 video: {
@@ -159,7 +170,26 @@ class CameraUpload {
 
         } catch (error) {
             console.error('Camera access error:', error);
-            alert('Kamera-Zugriff fehlgeschlagen. Bitte prüfen Sie die Berechtigungen.');
+
+            let errorMessage = 'Kamera-Zugriff fehlgeschlagen.';
+
+            if (error.message === 'INSECURE_CONTEXT') {
+                errorMessage = '⚠️ HTTPS erforderlich!\n\n' +
+                    'Kamera-Zugriff ist nur über HTTPS oder localhost möglich.\n\n' +
+                    'Aktuell: ' + location.protocol + '//' + location.host + '\n\n' +
+                    'Bitte verwenden Sie HTTPS oder nutzen Sie die Datei-Upload Option.';
+            } else if (error.message === 'UNSUPPORTED') {
+                errorMessage = 'Ihr Browser unterstützt keinen Kamera-Zugriff.\n\n' +
+                    'Bitte nutzen Sie die Datei-Upload Option.';
+            } else if (error.name === 'NotAllowedError') {
+                errorMessage = 'Kamera-Berechtigung wurde verweigert.\n\n' +
+                    'Bitte erlauben Sie den Kamera-Zugriff in den Browser-Einstellungen.';
+            } else if (error.name === 'NotFoundError') {
+                errorMessage = 'Keine Kamera gefunden.\n\n' +
+                    'Bitte nutzen Sie die Datei-Upload Option.';
+            }
+
+            alert(errorMessage);
         }
     }
 
@@ -237,8 +267,11 @@ class CameraUpload {
         document.getElementById('photo-preview-area').style.display = 'none';
         document.getElementById('upload-options').style.display = 'block';
 
-        // Clear file input
-        document.getElementById('file-upload').value = '';
+        // Clear both file inputs
+        const fileUpload = document.getElementById('file-upload');
+        const cameraUpload = document.getElementById('camera-upload');
+        if (fileUpload) fileUpload.value = '';
+        if (cameraUpload) cameraUpload.value = '';
     }
 
     async uploadPhoto() {
@@ -327,7 +360,11 @@ class CameraUpload {
 
         // Clear inputs
         document.getElementById('photo-description').value = '';
-        document.getElementById('file-upload').value = '';
+
+        const fileUpload = document.getElementById('file-upload');
+        const cameraUpload = document.getElementById('camera-upload');
+        if (fileUpload) fileUpload.value = '';
+        if (cameraUpload) cameraUpload.value = '';
 
         // Reset progress bar
         const progressBar = document.querySelector('.progress-bar');

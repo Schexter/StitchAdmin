@@ -512,6 +512,15 @@ def post_view(id):
     return render_template('documents/post_view.html', entry=entry)
 
 
+@documents_bp.route('/post/<int:id>/scan')
+@login_required
+def post_scan(id):
+    """Dokument scannen/fotografieren für Post-Eintrag"""
+
+    post_entry = PostEntry.query.get_or_404(id)
+    return render_template('documents/post_scan.html', post_entry=post_entry)
+
+
 @documents_bp.route('/post/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def post_edit(id):

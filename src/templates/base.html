@@ -68,6 +68,15 @@
                             <li><a class="dropdown-item" href="{{ url_for('shelly.index') }}"><i class="bi bi-plug"></i> Shelly-Geräte</a></li>
                         </ul>
                     </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Buchhaltung</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('rechnung.rechnungs_index') }}"><i class="bi bi-file-text"></i> Rechnungen</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('rechnung.neue_rechnung') }}"><i class="bi bi-plus-circle"></i> Neue Rechnung</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('kasse.verkauf_interface') }}"><i class="bi bi-cash-register"></i> Kasse</a></li>
+                        </ul>
+                    </li>
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav ms-auto">

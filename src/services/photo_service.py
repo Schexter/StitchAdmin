@@ -90,17 +90,17 @@ class PhotoService:
         relative_photo_path = os.path.relpath(photo_path, self.upload_base_dir)
         relative_thumbnail_path = os.path.relpath(thumbnail_path, self.upload_base_dir) if thumbnail_path else None
 
-        # Foto-Info zurückgeben
+        # Foto-Info zurückgeben (nur JSON-serialisierbare Daten!)
         return {
-            'path': relative_photo_path,
-            'thumbnail_path': relative_thumbnail_path,
-            'type': photo_type,
-            'description': description,
-            'filename': file_storage.filename,
+            'path': str(relative_photo_path),
+            'thumbnail_path': str(relative_thumbnail_path) if relative_thumbnail_path else None,
+            'type': str(photo_type),
+            'description': str(description),
+            'filename': str(file_storage.filename),
             'timestamp': datetime.now().isoformat(),
-            'entity_type': entity_type,
-            'entity_id': entity_id,
-            'size': os.path.getsize(photo_path)
+            'entity_type': str(entity_type),
+            'entity_id': str(entity_id) if entity_id else None,
+            'size': int(os.path.getsize(photo_path))
         }
 
     def save_base64_photo(self, base64_data, photo_type='other', description='', entity_type='order', entity_id=None):
@@ -181,17 +181,17 @@ class PhotoService:
         relative_photo_path = os.path.relpath(photo_path, self.upload_base_dir)
         relative_thumbnail_path = os.path.relpath(thumbnail_path, self.upload_base_dir) if thumbnail_path else None
 
-        # Foto-Info zurückgeben
+        # Foto-Info zurückgeben (nur JSON-serialisierbare Daten!)
         return {
-            'path': relative_photo_path,
-            'thumbnail_path': relative_thumbnail_path,
-            'type': photo_type,
-            'description': description,
-            'filename': unique_filename,
+            'path': str(relative_photo_path),
+            'thumbnail_path': str(relative_thumbnail_path) if relative_thumbnail_path else None,
+            'type': str(photo_type),
+            'description': str(description),
+            'filename': str(unique_filename),
             'timestamp': datetime.now().isoformat(),
-            'entity_type': entity_type,
-            'entity_id': entity_id,
-            'size': os.path.getsize(photo_path)
+            'entity_type': str(entity_type),
+            'entity_id': str(entity_id) if entity_id else None,
+            'size': int(os.path.getsize(photo_path))
         }
 
     def _create_thumbnail(self, source_path, thumbnail_path):

@@ -16,12 +16,26 @@
                 <div class="card-body">
                     <div class="row mb-3">
                         <div class="col-md-8">
-                            <input type="text" class="form-control form-control-lg" id="articleSearch" 
-                                   placeholder="Artikelsuche (Name, Nr., Barcode)..." autofocus>
+                            <div class="input-group">
+                                <input type="text" class="form-control form-control-lg" id="articleSearch"
+                                       placeholder="Artikel- oder Auftragssuche..." autofocus>
+                                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <span id="searchTypeLabel">Artikel</span>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li><a class="dropdown-item" href="#" onclick="setSearchType('artikel')">
+                                        <i class="bi bi-box"></i> Artikel</a></li>
+                                    <li><a class="dropdown-item" href="#" onclick="setSearchType('auftrag')">
+                                        <i class="bi bi-receipt"></i> Auftrag</a></li>
+                                </ul>
+                            </div>
+                            <div id="searchResults" class="list-group mt-1" style="display: none; max-height: 300px; overflow-y: auto; position: absolute; z-index: 1000; width: 100%;">
+                                <!-- Suchergebnisse werden hier dynamisch eingefügt -->
+                            </div>
                         </div>
                         <div class="col-md-4">
-                            <button class="btn btn-info btn-lg w-100" onclick="showArticleList()">
-                                <i class="bi bi-list"></i> Artikel-Liste
+                            <button class="btn btn-info btn-lg w-100" id="listButton" onclick="showList()">
+                                <i class="bi bi-list"></i> <span id="listButtonLabel">Artikel-Liste</span>
                             </button>
                         </div>
                     </div>
@@ -112,6 +126,29 @@
 </div>
 
 <!-- Modals -->
+<!-- Auftrags-Such-Modal -->
+<div class="modal fade" id="orderSearchModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-receipt"></i> Auftrags-Suche</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control form-control-lg" id="orderSearchInput"
+                           placeholder="Auftragsnummer suchen..." autocomplete="off">
+                </div>
+                <div id="orderSearchResults" class="list-group" style="max-height: 400px; overflow-y: auto;">
+                    <div class="list-group-item text-center text-muted">
+                        Geben Sie eine Auftragsnummer ein...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Bar-Zahlung Modal (unverändert) -->
 <div class="modal fade" id="cashModal" tabindex="-1">
     {# ... Inhalt unverändert ... #}
@@ -149,21 +186,172 @@ let articles = [];
 let sumupWaitingModal = null;
 let sumupCheckoutId = null;
 let sumupPollingInterval = null;
+let searchType = 'artikel'; // 'artikel' oder 'auftrag'
+let searchTimeout = null;
 
 // Initialisierung
 document.addEventListener('DOMContentLoaded', function() {
     sumupWaitingModal = new bootstrap.Modal(document.getElementById('sumupWaitingModal'));
-    
+
     // Lade initialen Warenkorb und aktualisiere die Anzeige
     fetchWarenkorb();
-    
+
+    // Enter-Suche
     document.getElementById('articleSearch').addEventListener('keypress', function(e) {
         if (e.key === 'Enter' && this.value.trim() !== '') {
-            searchAndAddToCart(this.value.trim());
-            this.value = '';
+            performSearch(this.value.trim());
+        }
+    });
+
+    // Live-Suche während Eingabe
+    document.getElementById('articleSearch').addEventListener('input', function(e) {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+
+        if (query.length >= 2) {
+            searchTimeout = setTimeout(() => {
+                showSearchResults(query);
+            }, 300);
+        } else {
+            hideSearchResults();
+        }
+    });
+
+    // Klick außerhalb schließt Suchergebnisse
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('#articleSearch') && !e.target.closest('#searchResults')) {
+            hideSearchResults();
         }
     });
 });
+
+// Suchtyp umschalten
+function setSearchType(type) {
+    searchType = type;
+    document.getElementById('searchTypeLabel').textContent = type === 'artikel' ? 'Artikel' : 'Auftrag';
+    document.getElementById('listButtonLabel').textContent = type === 'artikel' ? 'Artikel-Liste' : 'Auftrags-Liste';
+    document.getElementById('articleSearch').placeholder =
+        type === 'artikel' ? 'Artikelsuche (Name, Nr., Barcode)...' : 'Auftragssuche (Auftragsnummer)...';
+    document.getElementById('articleSearch').focus();
+    hideSearchResults();
+}
+
+// Zeigt Suchergebnisse an
+function showSearchResults(query) {
+    const url = searchType === 'artikel'
+        ? `{{ url_for('kasse.artikel_suchen') }}?q=${encodeURIComponent(query)}`
+        : `{{ url_for('kasse.auftraege_suchen') }}?q=${encodeURIComponent(query)}`;
+
+    fetch(url)
+    .then(res => res.json())
+    .then(data => {
+        const resultsDiv = document.getElementById('searchResults');
+        resultsDiv.innerHTML = '';
+
+        if (searchType === 'artikel' && data.success && data.artikel && data.artikel.length > 0) {
+            data.artikel.forEach(artikel => {
+                const item = document.createElement('a');
+                item.href = '#';
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <strong>${artikel.name}</strong><br>
+                            <small class="text-muted">Art.Nr.: ${artikel.article_number || '-'}</small>
+                        </div>
+                        <div class="text-end">
+                            <strong>${artikel.preis.toFixed(2)} €</strong>
+                        </div>
+                    </div>
+                `;
+                item.onclick = (e) => {
+                    e.preventDefault();
+                    addArtikelToCart(artikel);
+                    hideSearchResults();
+                };
+                resultsDiv.appendChild(item);
+            });
+            resultsDiv.style.display = 'block';
+        } else if (searchType === 'auftrag' && data.success && data.auftraege && data.auftraege.length > 0) {
+            data.auftraege.forEach(auftrag => {
+                const item = document.createElement('a');
+                item.href = '#';
+                item.className = 'list-group-item list-group-item-action';
+                item.innerHTML = `
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <strong>${auftrag.order_number}</strong><br>
+                            <small class="text-muted">${auftrag.kunde} - ${auftrag.beschreibung}</small>
+                        </div>
+                        <div class="text-end">
+                            <strong>${auftrag.preis.toFixed(2)} €</strong><br>
+                            <span class="badge bg-info">${auftrag.status}</span>
+                        </div>
+                    </div>
+                `;
+                item.onclick = (e) => {
+                    e.preventDefault();
+                    addAuftragToCart(auftrag);
+                    hideSearchResults();
+                };
+                resultsDiv.appendChild(item);
+            });
+            resultsDiv.style.display = 'block';
+        } else {
+            resultsDiv.innerHTML = '<div class="list-group-item">Keine Ergebnisse gefunden</div>';
+            resultsDiv.style.display = 'block';
+        }
+    });
+}
+
+function hideSearchResults() {
+    document.getElementById('searchResults').style.display = 'none';
+}
+
+// Führt Suche durch und fügt erstes Ergebnis hinzu (Enter)
+function performSearch(query) {
+    const url = searchType === 'artikel'
+        ? `{{ url_for('kasse.artikel_suchen') }}?q=${encodeURIComponent(query)}`
+        : `{{ url_for('kasse.auftraege_suchen') }}?q=${encodeURIComponent(query)}`;
+
+    fetch(url)
+    .then(res => res.json())
+    .then(data => {
+        if (searchType === 'artikel' && data.success && data.artikel && data.artikel.length > 0) {
+            addArtikelToCart(data.artikel[0]);
+            document.getElementById('articleSearch').value = '';
+        } else if (searchType === 'auftrag' && data.success && data.auftraege && data.auftraege.length > 0) {
+            addAuftragToCart(data.auftraege[0]);
+            document.getElementById('articleSearch').value = '';
+        } else {
+            alert('Nichts gefunden.');
+        }
+        hideSearchResults();
+    });
+}
+
+// Fügt Artikel zum Warenkorb hinzu
+function addArtikelToCart(artikel) {
+    const articleData = {
+        artikel_id: artikel.id,
+        name: artikel.name,
+        preis: artikel.preis,
+        menge: 1
+    };
+    updateWarenkorb("{{ url_for('kasse.warenkorb_hinzufuegen') }}", articleData);
+}
+
+// Fügt Auftrag zum Warenkorb hinzu
+function addAuftragToCart(auftrag) {
+    const auftragData = {
+        artikel_id: null, // Kein Artikel, sondern Auftrag
+        name: `Auftrag ${auftrag.order_number}${auftrag.beschreibung ? ' - ' + auftrag.beschreibung : ''}`,
+        preis: auftrag.preis,
+        menge: 1,
+        auftrag_id: auftrag.id // Zusätzliche Info für Backend
+    };
+    updateWarenkorb("{{ url_for('kasse.warenkorb_hinzufuegen') }}", auftragData);
+}
 
 // --- NEUE, REFAKTORIERTE FUNKTIONEN ---
 
@@ -533,8 +721,17 @@ function showCustomerList() {
 }
 
 // ==========================================
-// ARTIKEL-SUCHE MODAL
+// ARTIKEL-SUCHE & AUFTRAGS-SUCHE MODALS
 // ==========================================
+
+// Generische Funktion zum Öffnen der Liste
+function showList() {
+    if (searchType === 'artikel') {
+        showArticleList();
+    } else {
+        showOrderList();
+    }
+}
 
 function showArticleList() {
     // Öffne das Artikel-Such-Modal
@@ -545,6 +742,127 @@ function showArticleList() {
     setTimeout(() => {
         document.getElementById('articleSearchInput').focus();
     }, 500);
+}
+
+function showOrderList() {
+    // Öffne das Auftrags-Such-Modal
+    const modal = new bootstrap.Modal(document.getElementById('orderSearchModal'));
+    modal.show();
+
+    // Lade alle Aufträge
+    loadAllOrders();
+
+    // Fokus auf Suchfeld
+    setTimeout(() => {
+        document.getElementById('orderSearchInput').focus();
+    }, 500);
+}
+
+// Event-Listener für Auftrags-Suche im Modal
+document.addEventListener('DOMContentLoaded', function() {
+    const orderSearchInput = document.getElementById('orderSearchInput');
+    if (orderSearchInput) {
+        let orderSearchTimeout = null;
+
+        orderSearchInput.addEventListener('input', function(e) {
+            clearTimeout(orderSearchTimeout);
+            const query = this.value.trim();
+
+            if (query.length >= 1) {
+                orderSearchTimeout = setTimeout(() => {
+                    searchOrdersInModal(query);
+                }, 300);
+            } else {
+                loadAllOrders();
+            }
+        });
+    }
+});
+
+// Lade alle Aufträge (oder die letzten 50)
+function loadAllOrders() {
+    fetch(`{{ url_for('kasse.auftraege_suchen') }}?q=`)
+    .then(res => res.json())
+    .then(data => {
+        displayOrderSearchResults(data);
+    })
+    .catch(error => {
+        console.error('Fehler beim Laden der Aufträge:', error);
+    });
+}
+
+// Suche Aufträge im Modal
+function searchOrdersInModal(query) {
+    fetch(`{{ url_for('kasse.auftraege_suchen') }}?q=${encodeURIComponent(query)}`)
+    .then(res => res.json())
+    .then(data => {
+        displayOrderSearchResults(data);
+    })
+    .catch(error => {
+        console.error('Fehler bei der Auftragssuche:', error);
+    });
+}
+
+// Zeige Auftrags-Suchergebnisse im Modal an
+function displayOrderSearchResults(data) {
+    const resultsDiv = document.getElementById('orderSearchResults');
+    resultsDiv.innerHTML = '';
+
+    if (data.success && data.auftraege && data.auftraege.length > 0) {
+        data.auftraege.forEach(auftrag => {
+            const item = document.createElement('a');
+            item.href = '#';
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1"><strong>${auftrag.order_number}</strong></h6>
+                        <p class="mb-1 text-muted">${auftrag.beschreibung}</p>
+                        <small class="text-muted">
+                            <i class="bi bi-person"></i> ${auftrag.kunde}
+                            &nbsp;&nbsp;
+                            <span class="badge bg-${getStatusBadgeClass(auftrag.status)}">${getStatusLabel(auftrag.status)}</span>
+                        </small>
+                    </div>
+                    <div class="text-end">
+                        <h5 class="mb-0">${auftrag.preis.toFixed(2)} €</h5>
+                    </div>
+                </div>
+            `;
+            item.onclick = (e) => {
+                e.preventDefault();
+                addAuftragToCart(auftrag);
+                // Schließe Modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('orderSearchModal'));
+                if (modal) modal.hide();
+            };
+            resultsDiv.appendChild(item);
+        });
+    } else {
+        resultsDiv.innerHTML = '<div class="list-group-item text-center text-muted">Keine Aufträge gefunden</div>';
+    }
+}
+
+// Hilfsfunktion für Status-Badge-Farbe
+function getStatusBadgeClass(status) {
+    const statusMap = {
+        'accepted': 'primary',
+        'in_progress': 'warning',
+        'ready': 'success',
+        'completed': 'secondary'
+    };
+    return statusMap[status] || 'secondary';
+}
+
+// Hilfsfunktion für Status-Label
+function getStatusLabel(status) {
+    const statusMap = {
+        'accepted': 'Angenommen',
+        'in_progress': 'In Bearbeitung',
+        'ready': 'Fertig',
+        'completed': 'Abgeschlossen'
+    };
+    return statusMap[status] || status;
 }
 
 // Override der selectArticle Funktion für die Kasse

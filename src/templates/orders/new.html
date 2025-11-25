@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <div class="col-md-4">
                                             <div class="mb-3">
                                                 <label class="form-label">Größe</label>
-                                                <select class="form-control" name="textile_size[]" title="Wird automatisch aus Artikel übernommen">
+                                                <select class="form-control" name="size[]" title="Wird automatisch aus Artikel übernommen">
                                                     <option value="">Wählen...</option>
                                                     <option value="XS">XS</option>
                                                     <option value="S">S</option>
@@ -191,8 +191,8 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <div class="col-md-4">
                                             <div class="mb-3">
                                                 <label class="form-label">Farbe/Material</label>
-                                                <input type="text" class="form-control" name="textile_color_note[]" 
-                                                       placeholder="Automatisch aus Artikel" 
+                                                <input type="text" class="form-control" name="color[]"
+                                                       placeholder="Automatisch aus Artikel"
                                                        title="Wird automatisch aus Artikel übernommen, kann ergänzt werden">
                                             </div>
                                         </div>
@@ -812,9 +812,9 @@ function updateTextileInfo(selectElement) {
         textileItem.querySelector('.price-display').value = price.toFixed(2) + ' €';
         
         // Farbe und Größe automatisch setzen, falls im Artikel vorhanden
-        const sizeSelect = textileItem.querySelector('select[name="textile_size[]"]');
-        const colorInput = textileItem.querySelector('input[name="textile_color_note[]"]');
-        
+        const sizeSelect = textileItem.querySelector('select[name="size[]"]');
+        const colorInput = textileItem.querySelector('input[name="color[]"]');
+
         // Größe setzen, falls sie in den Optionen vorhanden ist
         if (size && sizeSelect) {
             for (let i = 0; i < sizeSelect.options.length; i++) {
@@ -824,20 +824,20 @@ function updateTextileInfo(selectElement) {
                 }
             }
         }
-        
+
         // Farbe setzen, falls vorhanden
         if (color && colorInput) {
             colorInput.value = color;
         }
-        
+
         calculatePrice();
     } else {
         textileItem.querySelector('.textile-info').value = '';
         textileItem.querySelector('.price-display').value = '';
-        
+
         // Felder zurücksetzen
-        const sizeSelect = textileItem.querySelector('select[name="textile_size[]"]');
-        const colorInput = textileItem.querySelector('input[name="textile_color_note[]"]');
+        const sizeSelect = textileItem.querySelector('select[name="size[]"]');
+        const colorInput = textileItem.querySelector('input[name="color[]"]');
         
         if (sizeSelect) sizeSelect.selectedIndex = 0;
         if (colorInput) colorInput.value = '';
@@ -856,8 +856,8 @@ function addTextileItem() {
     newItem.querySelector('.quantity-input').value = 1;
     newItem.querySelector('.textile-info').value = '';
     newItem.querySelector('.price-display').value = '';
-    newItem.querySelector('select[name="textile_size[]"]').selectedIndex = 0;
-    newItem.querySelector('input[name="textile_color_note[]"]').value = '';
+    newItem.querySelector('select[name="size[]"]').selectedIndex = 0;
+    newItem.querySelector('input[name="color[]"]').value = '';
     
     // Event-Handler für das neue Item aktualisieren
     const articleSelect = newItem.querySelector('.article-select');

@@ -637,7 +637,15 @@ def api_colors():
             'stock_quantity': thread.stock.quantity if thread.stock else 0
         })
 
-    return jsonify(results)
+    # Hersteller extrahieren
+    manufacturers = list(set([t.manufacturer for t in threads if t.manufacturer]))
+
+    return jsonify({
+        'success': True,
+        'colors': results,
+        'manufacturers': manufacturers,
+        'total': len(results)
+    })
 
 @thread_bp.route('/usage')
 @login_required

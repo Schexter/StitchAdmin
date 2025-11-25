@@ -201,7 +201,7 @@ function loadAvailableThreads() {
             });
     } else {
         // Für Stickerei: Lade Garnfarben
-        fetch('/threads/api/colors')
+        fetch('/thread/api/colors')
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);

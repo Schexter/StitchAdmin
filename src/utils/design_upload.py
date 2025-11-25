@@ -78,30 +78,37 @@ def analyze_print_file(filepath):
         
         if ext in ['png', 'jpg', 'jpeg']:
             img = Image.open(filepath)
-            
-            # DPI
+
+            # DPI - Sicherstellen dass es JSON-serialisierbar ist
             dpi = img.info.get('dpi', (72, 72))
             if isinstance(dpi, tuple):
                 dpi_x, dpi_y = dpi
             else:
                 dpi_x = dpi_y = dpi
-            
+
+            # Konvertiere zu float (falls IFDRational oder andere Objekte)
+            try:
+                dpi_x = float(dpi_x)
+                dpi_y = float(dpi_y)
+            except (TypeError, ValueError):
+                dpi_x = dpi_y = 72.0
+
             # Dimensionen
             width_mm = (img.width / dpi_x) * 25.4
             height_mm = (img.height / dpi_y) * 25.4
-            
+
             return {
                 'success': True,
-                'width_px': img.width,
-                'height_px': img.height,
-                'width_mm': round(width_mm, 2),
-                'height_mm': round(height_mm, 2),
-                'width_cm': round(width_mm / 10, 2),
-                'height_cm': round(height_mm / 10, 2),
-                'dpi_x': dpi_x,
-                'dpi_y': dpi_y,
-                'mode': img.mode,
-                'format': img.format
+                'width_px': int(img.width),
+                'height_px': int(img.height),
+                'width_mm': round(float(width_mm), 2),
+                'height_mm': round(float(height_mm), 2),
+                'width_cm': round(float(width_mm / 10), 2),
+                'height_cm': round(float(height_mm / 10), 2),
+                'dpi_x': float(dpi_x),
+                'dpi_y': float(dpi_y),
+                'mode': str(img.mode),
+                'format': str(img.format) if img.format else 'unknown'
             }
         else:
             return {

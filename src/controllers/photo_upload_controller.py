@@ -10,8 +10,11 @@ Erstellt von: Hans Hahn - Alle Rechte vorbehalten
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_required, current_user
 from src.models import db, Order, PackingList, ActivityLog
+from src.models.document import PostEntry
 from src.services.photo_service import PhotoService, ALLOWED_EXTENSIONS, MAX_FILE_SIZE
+from src.services.ocr_service import OCRService, OCR_AVAILABLE
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +243,199 @@ def delete_order_photo(order_id, photo_path):
         return jsonify({'error': 'Interner Server-Fehler'}), 500
 
 
+@photo_upload_bp.route('/upload/post-entry/<int:post_entry_id>', methods=['POST'])
+@login_required
+def upload_post_entry_photo(post_entry_id):
+    """
+    Upload Foto für PostEntry mit optionaler OCR-Verarbeitung
+    Unterstützt:
+    - Datei-Upload (multipart/form-data)
+    - Base64-Upload (JSON) für Kamera
+    - Automatische OCR-Verarbeitung
+    """
+    post_entry = PostEntry.query.get_or_404(post_entry_id)
+
+    photo_service = PhotoService()
+    ocr_enabled = request.form.get('ocr_enabled', 'true').lower() == 'true' if not request.is_json else request.get_json().get('ocr_enabled', True)
+
+    try:
+        # Check if it's a base64 upload (from camera)
+        if request.is_json:
+            data = request.get_json()
+            base64_data = data.get('photo')
+            photo_type = data.get('type', 'other')
+            description = data.get('description', '')
+
+            if not base64_data:
+                return jsonify({'error': 'Kein Foto-Daten vorhanden'}), 400
+
+            # Base64-Foto speichern
+            photo_info = photo_service.save_base64_photo(
+                base64_data=base64_data,
+                photo_type=photo_type,
+                description=description,
+                entity_type='post_entry',
+                entity_id=post_entry_id
+            )
+
+        # File upload (traditional)
+        else:
+            if 'photo' not in request.files:
+                return jsonify({'error': 'Keine Datei hochgeladen'}), 400
+
+            file = request.files['photo']
+
+            if file.filename == '':
+                return jsonify({'error': 'Keine Datei ausgewählt'}), 400
+
+            if not photo_service.allowed_file(file.filename):
+                return jsonify({'error': f'Dateiformat nicht erlaubt. Erlaubt: {", ".join(ALLOWED_EXTENSIONS)}'}), 400
+
+            # Foto-Typ und Beschreibung aus Form
+            photo_type = request.form.get('type', 'other')
+            description = request.form.get('description', '')
+
+            # Foto speichern
+            photo_info = photo_service.save_photo(
+                file_storage=file,
+                photo_type=photo_type,
+                description=description,
+                entity_type='post_entry',
+                entity_id=post_entry_id
+            )
+
+        # Foto zum PostEntry hinzufügen
+        post_entry.add_photo(
+            photo_path=photo_info['path'],
+            photo_type=photo_info['type'],
+            description=photo_info['description']
+        )
+
+        # OCR-Verarbeitung (wenn aktiviert und verfügbar)
+        ocr_result = None
+        if ocr_enabled and OCR_AVAILABLE:
+            try:
+                # Vollständiger Pfad zum Foto
+                upload_folder = current_app.config.get('UPLOAD_FOLDER', 'instance/uploads')
+                photo_full_path = os.path.join(upload_folder, photo_info['path'])
+
+                # OCR durchführen
+                ocr_service = OCRService()
+                ocr_result = ocr_service.process_document(photo_full_path, lang='deu')
+
+                # OCR-Text speichern
+                post_entry.set_ocr_text(ocr_result['text'])
+
+                # Extrahierte Daten speichern
+                if ocr_result['extracted_data']:
+                    post_entry.update_extracted_data(ocr_result['extracted_data'])
+
+                    # Auto-Fill: Tracking-Nummer
+                    if 'primary_tracking' in ocr_result['extracted_data'] and not post_entry.tracking_number:
+                        post_entry.tracking_number = ocr_result['extracted_data']['primary_tracking']
+
+                    # Auto-Fill: Betrag
+                    if 'primary_amount' in ocr_result['extracted_data'] and not post_entry.shipping_cost:
+                        post_entry.shipping_cost = ocr_result['extracted_data']['primary_amount']
+
+                logger.info(f"OCR erfolgreich für PostEntry {post_entry_id}")
+
+            except Exception as ocr_error:
+                logger.warning(f"OCR-Fehler für PostEntry {post_entry_id}: {ocr_error}")
+                # OCR-Fehler nicht fatal - Foto wird trotzdem gespeichert
+
+        db.session.commit()
+
+        # Aktivität loggen
+        log_activity(
+            'post_entry_photo_upload',
+            f"Foto zu PostEntry {post_entry.entry_number} hochgeladen (Typ: {photo_type})"
+        )
+
+        # URLs für Response
+        photo_info['url'] = photo_service.get_photo_url(photo_info['path'])
+        photo_info['thumbnail_url'] = photo_service.get_thumbnail_url(photo_info.get('thumbnail_path'))
+
+        response = {
+            'success': True,
+            'message': 'Foto erfolgreich hochgeladen',
+            'photo': photo_info
+        }
+
+        # OCR-Ergebnis hinzufügen
+        if ocr_result:
+            response['ocr'] = {
+                'text': ocr_result['text'][:500] + '...' if len(ocr_result['text']) > 500 else ocr_result['text'],  # Gekürzt für Response
+                'extracted_data': ocr_result['extracted_data']
+            }
+
+        return jsonify(response), 200
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Fehler beim PostEntry-Foto-Upload: {e}", exc_info=True)
+        return jsonify({'error': 'Interner Server-Fehler'}), 500
+
+
+@photo_upload_bp.route('/delete/post-entry/<int:post_entry_id>/<path:photo_path>', methods=['DELETE'])
+@login_required
+def delete_post_entry_photo(post_entry_id, photo_path):
+    """
+    Löscht Foto von einem PostEntry
+    """
+    post_entry = PostEntry.query.get_or_404(post_entry_id)
+
+    photo_service = PhotoService()
+
+    try:
+        # Foto aus PostEntry entfernen
+        post_entry.remove_photo(photo_path)
+
+        # Foto-Datei löschen
+        photo_service.delete_photo(photo_path)
+
+        db.session.commit()
+
+        # Aktivität loggen
+        log_activity(
+            'post_entry_photo_delete',
+            f"Foto von PostEntry {post_entry.entry_number} gelöscht"
+        )
+
+        return jsonify({
+            'success': True,
+            'message': 'Foto erfolgreich gelöscht'
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Fehler beim PostEntry-Foto-Löschen: {e}", exc_info=True)
+        return jsonify({'error': 'Interner Server-Fehler'}), 500
+
+
+@photo_upload_bp.route('/post-entry/<int:post_entry_id>/photos', methods=['GET'])
+@login_required
+def get_post_entry_photos(post_entry_id):
+    """
+    Gibt alle Fotos eines PostEntry zurück
+    """
+    post_entry = PostEntry.query.get_or_404(post_entry_id)
+    photo_service = PhotoService()
+
+    photos = post_entry.get_photos()
+
+    # URLs hinzufügen
+    for photo in photos:
+        photo['url'] = photo_service.get_photo_url(photo['path'])
+
+    return jsonify({
+        'success': True,
+        'photos': photos,
+        'ocr_text': post_entry.ocr_text,
+        'extracted_data': post_entry.get_extracted_data()
+    }), 200
+
+
 @photo_upload_bp.route('/info', methods=['GET'])
 @login_required
 def upload_info():
@@ -255,8 +451,12 @@ def upload_info():
             {'value': 'position', 'label': 'Position'},
             {'value': 'sample', 'label': 'Musterstück'},
             {'value': 'qc', 'label': 'Qualitätskontrolle'},
-            {'value': 'other', 'label': 'Sonstiges'}
-        ]
+            {'value': 'other', 'label': 'Sonstiges'},
+            {'value': 'invoice', 'label': 'Rechnung'},
+            {'value': 'letter', 'label': 'Brief'},
+            {'value': 'package', 'label': 'Paket/Lieferschein'}
+        ],
+        'ocr_available': OCR_AVAILABLE
     })
 
 

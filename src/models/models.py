@@ -408,13 +408,16 @@ class Order(db.Model):
 
     def can_start_production(self):
         """Prüft ob Auftrag produktionsbereit ist"""
-        # Design-Check
-        if self.design_status not in ['customer_provided', 'ready']:
-            return False, "Design nicht verfügbar"
-        
+        # Design-Check: Nur blockieren wenn explizit auf Design gewartet wird
+        if self.design_status in ['needs_order', 'ordered']:
+            return False, "Design noch nicht verfügbar (wird bestellt/geliefert)"
+
+        # 'none', 'customer_provided', 'ready' sind alle OK für Produktion
+        # 'none' bedeutet: Design ist woanders gespeichert oder nicht im ERP verwaltet
+
         # Weitere Validierungen können hier hinzugefügt werden
         # z.B. Materialverfügbarkeit, Maschinenkapazität, etc.
-        
+
         return True, "OK"
     
     def get_design_status_display(self):

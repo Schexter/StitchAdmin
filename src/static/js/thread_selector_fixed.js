@@ -148,7 +148,7 @@ function getPrintColorSection() {
 
 function loadAvailableThreads() {
     const isPrinting = orderType === 'printing' || orderType === 'dtf';
-    const url = isPrinting ? '/threads/api/print-colors' : '/threads/api/colors';
+    const url = isPrinting ? '/thread/api/print-colors' : '/thread/api/colors';
     
     fetch(url)
         .then(response => {

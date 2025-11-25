@@ -132,6 +132,24 @@ Das Projekt befindet sich in der **schrittweisen Implementierung und Testphase**
 - Offene Posten
 - Lagerbestand-Warnungen
 
+### 📱 Mobile Webapp & OCR Features ⭐ NEU!
+- **Smartphone-Zugriff** - Nutzung im lokalen Netzwerk (Intranet)
+- **Kamera-Integration** - Foto-Aufnahme für QM-Dokumentation
+- **QM-Fotos** - Dokumentation von Farben, Positionen, Samples, Qualitätskontrolle
+- **OCR-Texterkennung** - Tesseract-Integration für automatische Texterkennung
+- **Smart-Extraction** - Automatische Erkennung von:
+  - 💰 Geldbeträgen (€123,45)
+  - 📅 Datumsangaben (25.11.2025, flexible Formate)
+  - 📦 Tracking-Nummern (DHL, DPD, UPS, Hermes, GLS, FedEx)
+  - 📄 Referenznummern (Rechnungs-Nr., Kunden-Nr., Auftrags-Nr.)
+- **Auto-Fill** - Automatisches Ausfüllen von Feldern nach OCR-Erkennung
+- **Workflow-Integration** - Produktion → Packliste → Lieferschein automatisch
+- **PDF-Generierung** - Professionelle Dokumente mit Logo & QR-Code
+
+**Dokumentation:**
+- [Mobile Workflow Features](docs/MOBILE_WORKFLOW_FEATURES.md)
+- [PostEntry OCR Features](docs/POSTENTRY_OCR_FEATURES.md)
+
 ---
 
 ## 🛠️ Technologie-Stack
@@ -155,6 +173,9 @@ Das Projekt befindet sich in der **schrittweisen Implementierung und Testphase**
 - **openpyxl 3.1.2** - L-Shop Excel-Import
 - **pandas ≥2.2.0** - Datenverarbeitung
 - **PyPDF2 / pdfplumber** - PDF-Analyse (Garnkarten, Rechnungen)
+- **reportlab ≥4.0.0** - PDF-Generierung (Packlisten, Lieferscheine)
+- **pytesseract ≥0.3.10** - OCR-Texterkennung ⭐ NEU!
+- **qrcode[pil] ≥7.4.2** - QR-Code Generierung
 
 ### Development Tools
 - **Python 3.11+** (getestet mit 3.11, 3.12, 3.13)
@@ -172,8 +193,28 @@ Das Projekt befindet sich in der **schrittweisen Implementierung und Testphase**
 - **Python:** Version 3.11 oder höher
 - **RAM:** Mindestens 4GB (8GB empfohlen)
 - **Speicher:** 500MB für Anwendung + Speicher für Uploads
+- **Tesseract OCR:** 4.0+ (für OCR-Features) ⭐ NEU!
 
-### Schritt-für-Schritt Installation
+### ⚡ Schnellinstallation (Empfohlen)
+
+**Linux/macOS:**
+```bash
+cd StitchAdmin2.0
+sudo bash scripts/install_dependencies.sh
+python3 app.py
+```
+
+**Windows:**
+```cmd
+cd StitchAdmin2.0
+REM Tesseract OCR installieren: https://github.com/UB-Mannheim/tesseract/wiki
+scripts\install_dependencies.bat
+python app.py
+```
+
+**Detaillierte Anleitung:** Siehe [INSTALLATION.md](INSTALLATION.md)
+
+### Schritt-für-Schritt Installation (Manuell)
 
 #### 1. Repository klonen oder herunterladen
 

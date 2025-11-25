@@ -338,10 +338,15 @@ class PostEntry(db.Model):
     delivery_note_id = db.Column(db.Integer, db.ForeignKey('delivery_notes.id'), nullable=True)
     is_auto_created = db.Column(db.Boolean, default=False)  # Automatisch aus Workflow erstellt
 
+    # Foto-Dokumentation & OCR
+    photos = db.Column(db.Text)  # JSON Array: [{"path": "...", "type": "invoice|letter|package|other", "description": "...", "timestamp": "..."}]
+    ocr_text = db.Column(db.Text)  # Volltext aus OCR (für Briefe)
+    extracted_data = db.Column(db.Text)  # JSON: {"amount": 123.45, "date": "2025-11-25", "tracking": "...", "reference": "..."}
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # Relationships
     customer = db.relationship('Customer', backref='post_entries', foreign_keys=[customer_id])
     order = db.relationship('Order', backref='post_entries', foreign_keys=[order_id])
@@ -379,6 +384,53 @@ class PostEntry(db.Model):
         if self.reminder_date:
             return date.today() >= self.reminder_date
         return False
+
+    # Foto-Management
+    def get_photos(self):
+        """Gibt alle Fotos als Liste zurück"""
+        if not self.photos:
+            return []
+        try:
+            return json.loads(self.photos)
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    def add_photo(self, photo_path, photo_type='other', description=''):
+        """Fügt ein Foto hinzu"""
+        photos = self.get_photos()
+        photos.append({
+            'path': photo_path,
+            'type': photo_type,
+            'description': description,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        self.photos = json.dumps(photos)
+
+    def remove_photo(self, photo_path):
+        """Entfernt ein Foto"""
+        photos = self.get_photos()
+        photos = [p for p in photos if p.get('path') != photo_path]
+        self.photos = json.dumps(photos) if photos else None
+
+    # OCR & Smart Extraction
+    def get_extracted_data(self):
+        """Gibt extrahierte Daten als Dict zurück"""
+        if not self.extracted_data:
+            return {}
+        try:
+            return json.loads(self.extracted_data)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def update_extracted_data(self, data_dict):
+        """Aktualisiert extrahierte Daten"""
+        current_data = self.get_extracted_data()
+        current_data.update(data_dict)
+        self.extracted_data = json.dumps(current_data)
+
+    def set_ocr_text(self, text):
+        """Setzt den OCR-erkannten Text"""
+        self.ocr_text = text
 
 
 class EmailAccount(db.Model):
