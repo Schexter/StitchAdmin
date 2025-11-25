@@ -37,6 +37,7 @@ class ZahlungsArt(Enum):
     """Zahlungsarten"""
     BAR = "BAR"
     EC_KARTE = "EC_KARTE"
+    SUMUP = "SUMUP"
     KREDITKARTE = "KREDITKARTE"
     RECHNUNG = "RECHNUNG"
     UEBERWEISUNG = "UEBERWEISUNG"
@@ -212,21 +213,36 @@ class BelegPosition(db.Model):
     
     def calculate_amounts(self):
         """Berechnet alle Beträge basierend auf Grunddaten"""
+        # Wenn Beträge bereits gesetzt sind, nicht neu berechnen
+        if self.netto_betrag is not None and self.brutto_betrag is not None:
+            return
+
+        # Sichere Defaults
+        if self.menge is None:
+            self.menge = 1
+        if self.einzelpreis_netto is None:
+            self.einzelpreis_netto = 0
+        if self.mwst_satz is None:
+            self.mwst_satz = 19
+        if self.rabatt_prozent is None:
+            self.rabatt_prozent = 0
+
         # Netto-Gesamtbetrag
         netto_gesamt = self.menge * self.einzelpreis_netto
-        
+
         # Rabatt abziehen
         self.rabatt_betrag = netto_gesamt * (self.rabatt_prozent / 100)
         self.netto_betrag = netto_gesamt - self.rabatt_betrag
-        
+
         # MwSt berechnen
         self.mwst_betrag = self.netto_betrag * (self.mwst_satz / 100)
-        
+
         # Brutto-Betrag
         self.brutto_betrag = self.netto_betrag + self.mwst_betrag
-        
-        # Einzelpreis brutto berechnen
-        self.einzelpreis_brutto = self.einzelpreis_netto * (1 + self.mwst_satz / 100)
+
+        # Einzelpreis brutto berechnen (falls noch nicht gesetzt)
+        if self.einzelpreis_brutto is None:
+            self.einzelpreis_brutto = self.einzelpreis_netto * (1 + self.mwst_satz / 100)
     
     def __repr__(self):
         return f'<BelegPosition {self.position}: {self.artikel_name}>'

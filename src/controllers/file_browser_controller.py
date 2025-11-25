@@ -4,21 +4,12 @@ Design File Browser - Datei-Browser für Design-Auswahl
 
 import os
 from flask import Blueprint, render_template, request, jsonify
+from flask_login import login_required
 from functools import wraps
 import mimetypes
 
 # Blueprint für Datei-Browser
 file_browser_bp = Blueprint('file_browser', __name__, url_prefix='/file_browser')
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        from flask import session, redirect, url_for, flash
-        if 'username' not in session:
-            flash('Bitte melden Sie sich an.', 'info')
-            return redirect(url_for('auth.login'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 def is_design_file(filename):
     """Prüft ob die Datei ein Design-File ist"""

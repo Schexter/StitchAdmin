@@ -1,32 +1,36 @@
 from flask import Blueprint, jsonify, request, send_from_directory
 from flask_login import login_required
 from src.models.models import Article, Supplier, db
-from flask_swagger_ui import get_swaggerui_blueprint
 import json
 import os
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
-# ==================== SWAGGER UI KONFIGURATION ====================
-SWAGGER_URL = '/api/docs'  # URL für Swagger UI
-API_URL = '/openapi.yaml'  # URL zur OpenAPI-Spezifikation
+# ==================== SWAGGER UI KONFIGURATION (OPTIONAL) ====================
+try:
+    from flask_swagger_ui import get_swaggerui_blueprint
 
-# Erstelle Swagger UI Blueprint
-swaggerui_blueprint = get_swaggerui_blueprint(
-    SWAGGER_URL,
-    API_URL,
-    config={
-        'app_name': "StitchAdmin 2.0 API",
-        'docExpansion': 'list',
-        'defaultModelsExpandDepth': 3,
-        'displayRequestDuration': True,
-        'filter': True,
-        'tryItOutEnabled': True
-    }
-)
+    SWAGGER_URL = '/api/docs'  # URL für Swagger UI
+    API_URL = '/openapi.yaml'  # URL zur OpenAPI-Spezifikation
 
-# Registriere Swagger UI Blueprint (wird in app.py eingebunden)
-# HINWEIS: Dies muss in app.py mit app.register_blueprint(swaggerui_blueprint) registriert werden
+    # Erstelle Swagger UI Blueprint
+    swaggerui_blueprint = get_swaggerui_blueprint(
+        SWAGGER_URL,
+        API_URL,
+        config={
+            'app_name': "StitchAdmin 2.0 API",
+            'docExpansion': 'list',
+            'defaultModelsExpandDepth': 3,
+            'displayRequestDuration': True,
+            'filter': True,
+            'tryItOutEnabled': True
+        }
+    )
+    # Registriere Swagger UI Blueprint (wird in app.py eingebunden)
+    # HINWEIS: Dies muss in app.py mit app.register_blueprint(swaggerui_blueprint) registriert werden
+except ImportError:
+    swaggerui_blueprint = None
+    print("[INFO] flask_swagger_ui nicht installiert - Swagger UI nicht verfuegbar")
 
 @api_bp.route('/articles')
 @login_required

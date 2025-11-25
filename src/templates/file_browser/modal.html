@@ -531,7 +531,22 @@ class FileBrowser {
 }
 
 // Global instance
-let fileBrowser = new FileBrowser();
+let fileBrowser;
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    fileBrowser = new FileBrowser();
+    console.log('FileBrowser initialized');
+});
+
+// Fallback: Initialize immediately if DOM already loaded
+if (document.readyState === 'loading') {
+    // DOM still loading, wait for DOMContentLoaded
+} else {
+    // DOM already loaded
+    fileBrowser = new FileBrowser();
+    console.log('FileBrowser initialized (immediate)');
+}
 </script>
 
 <!-- Erstellt von Hans Hahn - Alle Rechte vorbehalten -->

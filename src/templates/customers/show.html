@@ -27,6 +27,9 @@
                 {{ customer.display_name or (customer.first_name ~ ' ' ~ customer.last_name) or customer.company_name }}
             </h1>
             <div>
+                <a href="{{ url_for('orders.new', customer_id=customer.id) }}" class="btn btn-success">
+                    <i class="bi bi-plus-circle"></i> Neuer Auftrag
+                </a>
                 <a href="{{ url_for('customers.edit', customer_id=customer.id) }}" class="btn btn-primary">
                     <i class="bi bi-pencil"></i> Bearbeiten
                 </a>

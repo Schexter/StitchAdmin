@@ -204,7 +204,8 @@ def neue_rechnung():
             naechste_nummer=naechste_nummer,
             zugpferd_profile=zugpferd_profile,
             mwst_saetze=mwst_saetze,
-            page_title="Neue Rechnung erstellen"
+            page_title="Neue Rechnung erstellen",
+            today=date.today().isoformat()
         )
         
     except Exception as e:

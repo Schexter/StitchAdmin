@@ -323,10 +323,10 @@ def company_settings():
 @login_required
 def users():
     """Benutzerverwaltung"""
-    return redirect(url_for('user.index'))
+    return redirect(url_for('users.index'))
 
 @settings_bp.route('/users/new', methods=['GET', 'POST'])
 @login_required
 def new_user():
     """Neuer Benutzer"""
-    return redirect(url_for('user.new'))
+    return redirect(url_for('users.new'))

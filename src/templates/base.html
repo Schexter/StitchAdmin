@@ -75,6 +75,8 @@
                             <li><a class="dropdown-item" href="{{ url_for('rechnung.neue_rechnung') }}"><i class="bi bi-plus-circle"></i> Neue Rechnung</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('kasse.verkauf_interface') }}"><i class="bi bi-cash-register"></i> Kasse</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('buchungen.index') }}"><i class="bi bi-journal-text"></i> Buchungsjournal</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('buchungen.konten') }}"><i class="bi bi-list-ul"></i> Kontenübersicht</a></li>
                         </ul>
                     </li>
                     {% endif %}

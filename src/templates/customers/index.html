@@ -103,11 +103,15 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{{ url_for('customers.show', customer_id=customer_id) }}" 
+                            <a href="{{ url_for('orders.new', customer_id=customer_id) }}"
+                               class="btn btn-sm btn-success" title="Auftrag erstellen">
+                                <i class="bi bi-plus-circle"></i>
+                            </a>
+                            <a href="{{ url_for('customers.show', customer_id=customer_id) }}"
                                class="btn btn-sm btn-info" title="Details">
                                 <i class="bi bi-eye"></i>
                             </a>
-                            <a href="{{ url_for('customers.edit', customer_id=customer_id) }}" 
+                            <a href="{{ url_for('customers.edit', customer_id=customer_id) }}"
                                class="btn btn-sm btn-primary" title="Bearbeiten">
                                 <i class="bi bi-pencil"></i>
                             </a>

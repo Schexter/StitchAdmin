@@ -213,3 +213,46 @@ def delete(customer_id):
     
     flash(f'Kunde {customer_name} wurde gelöscht!', 'success')
     return redirect(url_for('customers.index'))
+
+# ==========================================
+# API ENDPOINTS
+# ==========================================
+
+@customer_bp.route('/api/customers', methods=['GET'])
+@login_required
+def api_customers():
+    """API Endpoint: Liste aller Kunden als JSON"""
+    from flask import jsonify
+
+    try:
+        # Alle Kunden laden, sortiert nach Name
+        customers = Customer.query.order_by(Customer.company_name, Customer.first_name).all()
+
+        # Konvertiere zu JSON-Format
+        customers_data = [{
+            'id': c.id,
+            'display_name': c.display_name,
+            'company_name': c.company_name or '',
+            'first_name': c.first_name or '',
+            'last_name': c.last_name or '',
+            'customer_number': c.customer_number or '',
+            'email': c.email or '',
+            'phone': c.phone or '',
+            'street': c.street or '',
+            'house_number': c.house_number or '',
+            'postal_code': c.postal_code or '',
+            'city': c.city or '',
+            'vat_id': c.vat_id or '',
+            'tax_id': c.tax_id or ''
+        } for c in customers]
+
+        return jsonify({
+            'success': True,
+            'customers': customers_data
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500

@@ -70,7 +70,12 @@ def new():
         if User.query.filter_by(username=username).first():
             flash('Benutzername bereits vergeben!', 'danger')
             return render_template('users/new.html')
-        
+
+        # Prüfen ob E-Mail bereits existiert
+        if User.query.filter_by(email=email).first():
+            flash('E-Mail-Adresse wird bereits verwendet!', 'danger')
+            return render_template('users/new.html')
+
         # Neuen Benutzer erstellen
         user = User(
             username=username,
@@ -79,7 +84,7 @@ def new():
             is_active=True
         )
         user.set_password(password)
-        
+
         db.session.add(user)
         db.session.commit()
         
@@ -104,19 +109,26 @@ def edit(user_id):
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
-        # Email aktualisieren
-        user.email = request.form.get('email')
-        
+        # Email aktualisieren (aber prüfen ob bereits verwendet)
+        new_email = request.form.get('email')
+        if new_email != user.email:
+            # E-Mail hat sich geändert - prüfe ob bereits verwendet
+            existing_user = User.query.filter_by(email=new_email).first()
+            if existing_user:
+                flash('E-Mail-Adresse wird bereits verwendet!', 'danger')
+                return render_template('users/edit.html', user=user)
+        user.email = new_email
+
         # Passwort nur ändern wenn ausgefüllt
         new_password = request.form.get('new_password')
         if new_password:
             user.set_password(new_password)
-        
+
         # Admin-Status nur von Admins änderbar
         if current_user.is_admin:
             user.is_admin = request.form.get('is_admin', False) == 'on'
             user.is_active = request.form.get('is_active', False) == 'on'
-        
+
         db.session.commit()
         
         # Aktivität protokollieren

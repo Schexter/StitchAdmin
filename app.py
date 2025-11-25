@@ -174,10 +174,13 @@ def create_app():
     try:
         from src.controllers.rechnungsmodul.kasse_controller import kasse_bp
         from src.controllers.rechnungsmodul.rechnung_controller import rechnung_bp
+        from src.controllers.buchungen_controller import buchungen_bp
         app.register_blueprint(kasse_bp)
         app.register_blueprint(rechnung_bp)
+        app.register_blueprint(buchungen_bp)
         blueprints_registered.append('Kasse')
         blueprints_registered.append('Rechnungen')
+        blueprints_registered.append('Buchungsjournal')
         print("[OK] Rechnungsmodul Blueprints registriert")
     except ImportError as e:
         print(f"[WARNUNG] Rechnungsmodul nicht verfuegbar: {e}")
@@ -385,6 +388,20 @@ def create_app():
             return False
         value_str = str(value)
         return value_str.startswith('http://') or value_str.startswith('https://') or value_str.startswith('link:')
+
+    @app.template_filter('show_graphics_manager')
+    def show_graphics_manager_filter(order_id):
+        """Prüft ob der Grafikmanager-Button angezeigt werden soll (nur wenn kein Design vorhanden)"""
+        try:
+            from src.models.models import Order
+            order = Order.query.get(order_id)
+            if not order:
+                return False
+            # Zeige Grafikmanager nur wenn KEIN Design vorhanden ist
+            return not (order.design_file_path or order.design_file)
+        except Exception as e:
+            # Bei Fehler: Grafikmanager NICHT anzeigen
+            return False
 
     # ==========================================
     # CONTEXT PROCESSORS

@@ -6,5 +6,13 @@
     "action": "shelly_scan",
     "details": "0 Shelly-Ger\u00e4te gefunden",
     "ip_address": "N/A"
+  },
+  {
+    "id": 2,
+    "timestamp": "2025-11-25T19:45:28.135713",
+    "username": "Hans",
+    "action": "shelly_scan",
+    "details": "0 Shelly-Ger\u00e4te gefunden",
+    "ip_address": "N/A"
   }
 ]

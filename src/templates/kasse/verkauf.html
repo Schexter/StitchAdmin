@@ -149,9 +149,146 @@
     </div>
 </div>
 
-<!-- Bar-Zahlung Modal (unverändert) -->
+<!-- Bar-Zahlung Modal -->
 <div class="modal fade" id="cashModal" tabindex="-1">
-    {# ... Inhalt unverändert ... #}
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-cash"></i> Barzahlung</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Gesamtbetrag</h5>
+                        <h2 id="cash-total" class="text-success">0,00 €</h2>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="cash-given" class="form-label">Gegeben:</label>
+                        <input type="number" class="form-control form-control-lg" id="cash-given"
+                               placeholder="0.00" step="0.01" min="0" autofocus>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <h4>Rückgeld: <span id="cash-change" class="text-primary">0,00 €</span></h4>
+                    </div>
+                </div>
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <h6>Schnellauswahl:</h6>
+                        <div class="d-grid gap-2 d-md-flex">
+                            <button class="btn btn-outline-primary" onclick="setCashGiven('5')">5 €</button>
+                            <button class="btn btn-outline-primary" onclick="setCashGiven('10')">10 €</button>
+                            <button class="btn btn-outline-primary" onclick="setCashGiven('20')">20 €</button>
+                            <button class="btn btn-outline-primary" onclick="setCashGiven('50')">50 €</button>
+                            <button class="btn btn-outline-primary" onclick="setCashGiven('100')">100 €</button>
+                            <button class="btn btn-outline-success" onclick="setCashGiven('exact')">Passend</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success btn-lg" id="complete-cash-btn" onclick="completeCashPayment()">
+                    <i class="bi bi-check-circle"></i> Zahlung abschließen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rechnung-Modal -->
+<div class="modal fade" id="invoiceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-file-text"></i> Auf Rechnung</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Der Betrag von <strong id="invoice-total">0,00 €</strong> wird auf Rechnung gebucht.
+                </div>
+                <p>Möchten Sie fortfahren?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="completeInvoicePayment()">
+                    <i class="bi bi-check-circle"></i> Bestätigen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manuelles Zahlungs-Modal (Bar/EC über SumUp TSE) -->
+<div class="modal fade" id="manualPaymentModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-credit-card"></i>
+                    Zahlung über SumUp Terminal
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <h5><i class="bi bi-info-circle"></i> Bitte am SumUp Terminal eingeben:</h5>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card border-primary">
+                            <div class="card-body text-center">
+                                <h6 class="text-muted">Belegnummer</h6>
+                                <h2 class="text-primary" id="manual-beleg-nummer">-</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-success">
+                            <div class="card-body text-center">
+                                <h6 class="text-muted">Betrag</h6>
+                                <h2 class="text-success" id="manual-betrag">0,00 €</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning">
+                    <ol class="mb-0">
+                        <li>Geben Sie den <strong>Betrag</strong> im SumUp Terminal ein</li>
+                        <li>Verwenden Sie die <strong>Belegnummer</strong> als Referenz</li>
+                        <li>Führen Sie die Zahlung am Terminal durch</li>
+                        <li>Bestätigen Sie unten nach erfolgreicher Zahlung</li>
+                    </ol>
+                </div>
+
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="payment-confirmed-check">
+                    <label class="form-check-label" for="payment-confirmed-check">
+                        <strong>Zahlung wurde am Terminal erfolgreich durchgeführt</strong>
+                    </label>
+                </div>
+
+                <input type="hidden" id="manual-payment-type" value="">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x"></i> Abbrechen
+                </button>
+                <button type="button" class="btn btn-success btn-lg" id="confirm-manual-payment-btn"
+                        onclick="confirmManualPayment()" disabled>
+                    <i class="bi bi-check-circle"></i> Verkauf abschließen
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- NEU: SumUp "Warten" Modal -->
@@ -453,11 +590,10 @@ function startPayment(method) {
 
     switch(method) {
         case 'BAR':
-            // Barzahlung-Modal öffnen (Logik bleibt ähnlich)
-            openCashModal();
-            break;
+        case 'EC':
         case 'SUMUP':
-            startSumUpPayment();
+            // Manuelles Zahlungs-Modal (über SumUp TSE)
+            openManualPaymentModal(method);
             break;
         case 'RECHNUNG':
             // Auf Rechnung (Logik bleibt ähnlich)
@@ -466,21 +602,213 @@ function startPayment(method) {
     }
 }
 
+// Globale Variablen für Modals
+let cashModal = null;
+let invoiceModal = null;
+let manualPaymentModal = null;
+
+// Initialisiere Modals
+document.addEventListener('DOMContentLoaded', function() {
+    cashModal = new bootstrap.Modal(document.getElementById('cashModal'));
+    invoiceModal = new bootstrap.Modal(document.getElementById('invoiceModal'));
+    manualPaymentModal = new bootstrap.Modal(document.getElementById('manualPaymentModal'));
+
+    // Event-Listener für Rückgeld-Berechnung
+    document.getElementById('cash-given').addEventListener('input', calculateChange);
+
+    // Event-Listener für Zahlungs-Bestätigung Checkbox
+    document.getElementById('payment-confirmed-check').addEventListener('change', function() {
+        document.getElementById('confirm-manual-payment-btn').disabled = !this.checked;
+    });
+});
+
+// Manuelles Zahlungs-Modal öffnen (Bar/EC)
+function openManualPaymentModal(paymentType) {
+    const total = cart.reduce((sum, item) => sum + (item.brutto_betrag || 0), 0);
+
+    // Generiere Belegnummer
+    const now = new Date();
+    const belegnummer = `B-${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
+
+    // Setze Werte im Modal
+    document.getElementById('manual-beleg-nummer').textContent = belegnummer;
+    document.getElementById('manual-betrag').textContent = formatCurrency(total);
+    document.getElementById('manual-payment-type').value = paymentType;
+    document.getElementById('payment-confirmed-check').checked = false;
+    document.getElementById('confirm-manual-payment-btn').disabled = true;
+
+    // Öffne Modal
+    manualPaymentModal.show();
+}
+
+// Verkauf nach manueller Bestätigung abschließen
+function confirmManualPayment() {
+    const paymentType = document.getElementById('manual-payment-type').value;
+    const confirmed = document.getElementById('payment-confirmed-check').checked;
+
+    if (!confirmed) {
+        alert('Bitte bestätigen Sie die Zahlung!');
+        return;
+    }
+
+    // Verkauf abschließen
+    fetch('/kasse/verkauf/abschliessen', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            zahlungsart: paymentType
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            manualPaymentModal.hide();
+            alert(`Verkauf erfolgreich! Beleg-Nr.: ${data.beleg_nummer}`);
+            // Seite neu laden (Warenkorb ist bereits serverseitig geleert)
+            window.location.reload();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Fehler beim Abschließen:', error);
+        alert('Ein Fehler ist aufgetreten!');
+    });
+}
+
+// Warenkorb leeren und UI aktualisieren
+function clearCart() {
+    fetch('/kasse/warenkorb/leeren', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Seite neu laden
+            window.location.reload();
+        }
+    });
+}
+
 function openCashModal() {
-    // Logik zum Öffnen und Befüllen des Bar-Modals
-    // ...
+    // Berechne Gesamtsumme aus Warenkorb
+    const total = cart.reduce((sum, item) => sum + (item.brutto_betrag || 0), 0);
+
+    // Setze Werte im Modal
+    document.getElementById('cash-total').textContent = formatCurrency(total);
+    document.getElementById('cash-given').value = '';
+    document.getElementById('cash-change').textContent = formatCurrency(0);
+
+    // Öffne Modal
+    cashModal.show();
+
+    // Fokus auf Eingabefeld
+    setTimeout(() => {
+        document.getElementById('cash-given').focus();
+    }, 500);
+}
+
+function setCashGiven(amount) {
+    const total = cart.reduce((sum, item) => sum + (item.brutto_betrag || 0), 0);
+
+    if (amount === 'exact') {
+        document.getElementById('cash-given').value = total.toFixed(2);
+    } else {
+        document.getElementById('cash-given').value = amount;
+    }
+
+    calculateChange();
+}
+
+function calculateChange() {
+    const total = cart.reduce((sum, item) => sum + (item.brutto_betrag || 0), 0);
+    const given = parseFloat(document.getElementById('cash-given').value) || 0;
+    const change = Math.max(0, given - total);
+
+    document.getElementById('cash-change').textContent = formatCurrency(change);
+
+    // Aktiviere/Deaktiviere Button
+    const btn = document.getElementById('complete-cash-btn');
+    if (given >= total) {
+        btn.disabled = false;
+    } else {
+        btn.disabled = true;
+    }
 }
 
 function completeCashPayment() {
+    const total = cart.reduce((sum, item) => sum + (item.brutto_betrag || 0), 0);
+    const given = parseFloat(document.getElementById('cash-given').value) || 0;
+    const change = Math.max(0, given - total);
+
+    if (given < total) {
+        alert('Der gegebene Betrag ist zu niedrig!');
+        return;
+    }
+
     // Schließt Bar-Verkauf ab
-    const data = { zahlungsart: 'BAR', /* ... weitere Daten ... */ };
+    const data = {
+        zahlungsart: 'BAR',
+        gegeben: given,
+        rueckgeld: change
+    };
+
+    // Deaktiviere Button während Verarbeitung
+    document.getElementById('complete-cash-btn').disabled = true;
+
     fetch("{{ url_for('kasse.verkauf_abschliessen') }}", {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(data)
     })
     .then(res => res.json())
-    .then(handleSaleCompletion);
+    .then(result => {
+        cashModal.hide();
+        handleSaleCompletion(result);
+    })
+    .catch(error => {
+        console.error('Fehler:', error);
+        alert('Fehler beim Abschluss der Zahlung: ' + error);
+        document.getElementById('complete-cash-btn').disabled = false;
+    });
+}
+
+function paymentInvoice() {
+    // Berechne Gesamtsumme aus Warenkorb
+    const total = cart.reduce((sum, item) => sum + (item.brutto_betrag || 0), 0);
+
+    // Setze Werte im Modal
+    document.getElementById('invoice-total').textContent = formatCurrency(total);
+
+    // Öffne Modal
+    invoiceModal.show();
+}
+
+function completeInvoicePayment() {
+    // Schließt Rechnung-Verkauf ab
+    const data = {
+        zahlungsart: 'RECHNUNG'
+    };
+
+    fetch("{{ url_for('kasse.verkauf_abschliessen') }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(result => {
+        invoiceModal.hide();
+        handleSaleCompletion(result);
+    })
+    .catch(error => {
+        console.error('Fehler:', error);
+        alert('Fehler beim Abschluss der Zahlung: ' + error);
+    });
 }
 
 function startSumUpPayment() {

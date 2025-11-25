@@ -7,23 +7,350 @@
     <div class="row">
         <div class="col-12">
             <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">📝 {{ page_title }}</h3>
+                <div class="card-header bg-primary text-white">
+                    <h3><i class="bi bi-file-text"></i> {{ page_title }}</h3>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-warning">
-                        <h4>⚠️ Rechnungsformular in Entwicklung</h4>
-                        <p>Das Rechnungsformular wird noch implementiert.</p>
-                        <p>Geplante Rechnungsnummer: <strong>{{ naechste_nummer }}</strong></p>
-                        <p>Features: ZUGPFERD-Profile, Artikel-Integration, PDF/A-3-Export</p>
-                    </div>
-                    
-                    <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-secondary">
-                        ← Zurück zur Rechnungsübersicht
-                    </a>
+                    <form method="POST" action="{{ url_for('rechnung.rechnung_erstellen') }}" id="rechnungsform">
+                        <div class="row">
+                            <!-- Linke Spalte: Kundendaten -->
+                            <div class="col-md-6">
+                                <h5 class="mb-3"><i class="bi bi-person"></i> Kundendaten</h5>
+
+                                <div class="mb-3">
+                                    <label for="kunde_id" class="form-label">Kunde *</label>
+                                    <select class="form-select" id="kunde_id" name="kunde_id" required>
+                                        <option value="">Bitte wählen...</option>
+                                    </select>
+                                    <div class="form-text">Kunde aus der Datenbank auswählen</div>
+                                </div>
+                            </div>
+
+                            <!-- Rechte Spalte: Rechnungsdaten -->
+                            <div class="col-md-6">
+                                <h5 class="mb-3"><i class="bi bi-calendar"></i> Rechnungsdaten</h5>
+
+                                <div class="mb-3">
+                                    <label class="form-label">Rechnungsnummer</label>
+                                    <input type="text" class="form-control" value="{{ naechste_nummer }}" disabled>
+                                    <div class="form-text">Wird automatisch vergeben</div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="rechnungsdatum" class="form-label">Rechnungsdatum *</label>
+                                    <input type="date" class="form-control" id="rechnungsdatum" name="rechnungsdatum"
+                                           value="{{ today }}" required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="leistungsdatum" class="form-label">Leistungsdatum *</label>
+                                    <input type="date" class="form-control" id="leistungsdatum" name="leistungsdatum"
+                                           value="{{ today }}" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Rechnungspositionen -->
+                        <div class="row">
+                            <div class="col-12">
+                                <h5 class="mb-3"><i class="bi bi-list"></i> Rechnungspositionen</h5>
+
+                                <div class="table-responsive">
+                                    <table class="table table-bordered" id="positionen-table">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th style="width: 30%">Artikel / Beschreibung *</th>
+                                                <th style="width: 20%">Beschreibung (Detail)</th>
+                                                <th style="width: 10%">Menge *</th>
+                                                <th style="width: 10%">Einheit</th>
+                                                <th style="width: 12%">Einzelpreis * (€)</th>
+                                                <th style="width: 10%">MwSt %</th>
+                                                <th style="width: 8%">Gesamt (€)</th>
+                                                <th style="width: 50px"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="positionen-body">
+                                            <!-- Positionen werden hier dynamisch eingefügt -->
+                                        </tbody>
+                                        <tfoot>
+                                            <tr>
+                                                <td colspan="8">
+                                                    <button type="button" class="btn btn-sm btn-success" onclick="addPosition()">
+                                                        <i class="bi bi-plus-circle"></i> Position hinzufügen
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+
+                                <!-- Summen -->
+                                <div class="row">
+                                    <div class="col-md-8"></div>
+                                    <div class="col-md-4">
+                                        <table class="table table-sm">
+                                            <tr>
+                                                <td class="text-end"><strong>Netto:</strong></td>
+                                                <td class="text-end" id="summe-netto">0,00 €</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="text-end">MwSt:</td>
+                                                <td class="text-end" id="summe-mwst">0,00 €</td>
+                                            </tr>
+                                            <tr class="table-primary">
+                                                <td class="text-end"><strong>Brutto:</strong></td>
+                                                <td class="text-end"><strong id="summe-brutto">0,00 €</strong></td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Weitere Optionen -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="zahlungsbedingungen" class="form-label">Zahlungsbedingungen</label>
+                                    <input type="text" class="form-control" id="zahlungsbedingungen"
+                                           name="zahlungsbedingungen" value="Zahlbar innerhalb 14 Tagen">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="zugpferd_profil" class="form-label">ZUGPFERD-Profil</label>
+                                    <select class="form-select" id="zugpferd_profil" name="zugpferd_profil">
+                                        {% for profil in zugpferd_profile %}
+                                        <option value="{{ profil.value }}" {% if profil.value == 'BASIC' %}selected{% endif %}>
+                                            {{ profil.label }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="form-text">Elektronisches Rechnungsformat für Deutschland</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="bemerkungen" class="form-label">Bemerkungen</label>
+                                    <textarea class="form-control" id="bemerkungen" name="bemerkungen"
+                                              rows="5" placeholder="Optional: Bemerkungen zur Rechnung..."></textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Hidden field für Positionen (als JSON) -->
+                        <input type="hidden" id="positionen-json" name="positionen">
+
+                        <hr>
+
+                        <!-- Aktionen -->
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-circle"></i> Rechnung erstellen
+                            </button>
+                            <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-secondary btn-lg">
+                                <i class="bi bi-x-circle"></i> Abbrechen
+                            </a>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Globale Variablen
+let positionen = [];
+let positionCounter = 0;
+let kunden = [];
+
+// Initialisierung
+document.addEventListener('DOMContentLoaded', function() {
+    // Lade Kunden
+    loadCustomers();
+
+    // Setze heutiges Datum
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('rechnungsdatum').value = today;
+    document.getElementById('leistungsdatum').value = today;
+
+    // Füge erste Position hinzu
+    addPosition();
+});
+
+// Kunden laden
+function loadCustomers() {
+    fetch('/customers/api/customers')
+        .then(res => res.json())
+        .then(data => {
+            const select = document.getElementById('kunde_id');
+            select.innerHTML = '<option value="">Bitte wählen...</option>';
+
+            if (data.customers) {
+                kunden = data.customers;
+                data.customers.forEach(customer => {
+                    const option = document.createElement('option');
+                    option.value = customer.id;
+                    option.textContent = `${customer.display_name}${customer.customer_number ? ' (' + customer.customer_number + ')' : ''}`;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Fehler beim Laden der Kunden:', error);
+            alert('Fehler beim Laden der Kundenliste');
+        });
+}
+
+// Position hinzufügen
+function addPosition() {
+    positionCounter++;
+    const posId = `pos_${positionCounter}`;
+
+    const position = {
+        id: posId,
+        artikel_name: '',
+        beschreibung: '',
+        menge: 1,
+        einheit: 'Stück',
+        einzelpreis: 0,
+        mwst_satz: 19,
+        rabatt_prozent: 0
+    };
+
+    positionen.push(position);
+    renderPositionen();
+    updateSummen();
+}
+
+// Position entfernen
+function removePosition(posId) {
+    positionen = positionen.filter(p => p.id !== posId);
+    renderPositionen();
+    updateSummen();
+}
+
+// Positionen rendern
+function renderPositionen() {
+    const tbody = document.getElementById('positionen-body');
+    tbody.innerHTML = '';
+
+    positionen.forEach((pos, index) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                       value="${pos.artikel_name}"
+                       onchange="updatePositionField('${pos.id}', 'artikel_name', this.value)"
+                       placeholder="z.B. T-Shirt bedruckt" required>
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                       value="${pos.beschreibung}"
+                       onchange="updatePositionField('${pos.id}', 'beschreibung', this.value)"
+                       placeholder="Optional">
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm"
+                       value="${pos.menge}" min="0.01" step="0.01"
+                       onchange="updatePositionField('${pos.id}', 'menge', parseFloat(this.value))"
+                       required>
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                       value="${pos.einheit}"
+                       onchange="updatePositionField('${pos.id}', 'einheit', this.value)">
+            </td>
+            <td>
+                <input type="number" class="form-control form-control-sm"
+                       value="${pos.einzelpreis}" min="0" step="0.01"
+                       onchange="updatePositionField('${pos.id}', 'einzelpreis', parseFloat(this.value))"
+                       required>
+            </td>
+            <td>
+                <select class="form-select form-select-sm"
+                        onchange="updatePositionField('${pos.id}', 'mwst_satz', parseFloat(this.value))">
+                    <option value="19" ${pos.mwst_satz == 19 ? 'selected' : ''}>19%</option>
+                    <option value="7" ${pos.mwst_satz == 7 ? 'selected' : ''}>7%</option>
+                    <option value="0" ${pos.mwst_satz == 0 ? 'selected' : ''}>0%</option>
+                </select>
+            </td>
+            <td class="text-end">
+                <strong>${calculatePositionTotal(pos).toFixed(2)}</strong>
+            </td>
+            <td>
+                <button type="button" class="btn btn-sm btn-danger"
+                        onclick="removePosition('${pos.id}')"
+                        ${positionen.length === 1 ? 'disabled' : ''}>
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// Position-Feld aktualisieren
+function updatePositionField(posId, field, value) {
+    const pos = positionen.find(p => p.id === posId);
+    if (pos) {
+        pos[field] = value;
+        renderPositionen();
+        updateSummen();
+    }
+}
+
+// Positions-Gesamt berechnen
+function calculatePositionTotal(pos) {
+    const netto = pos.menge * pos.einzelpreis;
+    const mwst = netto * (pos.mwst_satz / 100);
+    return netto + mwst;
+}
+
+// Summen aktualisieren
+function updateSummen() {
+    let netto = 0;
+    let mwst = 0;
+
+    positionen.forEach(pos => {
+        const posNetto = pos.menge * pos.einzelpreis;
+        const posMwst = posNetto * (pos.mwst_satz / 100);
+        netto += posNetto;
+        mwst += posMwst;
+    });
+
+    const brutto = netto + mwst;
+
+    document.getElementById('summe-netto').textContent = netto.toFixed(2) + ' €';
+    document.getElementById('summe-mwst').textContent = mwst.toFixed(2) + ' €';
+    document.getElementById('summe-brutto').textContent = brutto.toFixed(2) + ' €';
+}
+
+// Form-Submit
+document.getElementById('rechnungsform').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // Validierung
+    if (positionen.length === 0) {
+        alert('Bitte fügen Sie mindestens eine Position hinzu.');
+        return;
+    }
+
+    if (!document.getElementById('kunde_id').value) {
+        alert('Bitte wählen Sie einen Kunden aus.');
+        return;
+    }
+
+    // Konvertiere Positionen zu JSON und setze Hidden Field
+    document.getElementById('positionen-json').value = JSON.stringify(positionen);
+
+    // Submit
+    this.submit();
+});
+</script>
 {% endblock %}

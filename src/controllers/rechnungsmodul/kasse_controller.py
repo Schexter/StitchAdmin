@@ -17,6 +17,7 @@ from src.models.rechnungsmodul import (
     BelegTyp, ZahlungsArt, models_available
 )
 from src.utils.sumup_service import sumup_service
+from src.services.buchungs_service import BuchungsService
 
 import logging
 logger = logging.getLogger(__name__)
@@ -24,6 +25,18 @@ logger = logging.getLogger(__name__)
 kasse_bp = Blueprint('kasse', __name__, url_prefix='/kasse')
 
 # ... (TSE-Service, Utility-Klassen und Warenkorb-Funktionen bleiben unverändert) ...
+
+def _map_zahlungsart_to_enum(zahlungsart_str):
+    """Mapped Zahlungsart-String auf Enum"""
+    mapping = {
+        'BAR': ZahlungsArt.BAR,
+        'EC': ZahlungsArt.EC_KARTE,
+        'SUMUP': ZahlungsArt.SUMUP,
+        'KARTE': ZahlungsArt.EC_KARTE,
+        'RECHNUNG': ZahlungsArt.RECHNUNG,
+        'UEBERWEISUNG': ZahlungsArt.UEBERWEISUNG
+    }
+    return mapping.get(zahlungsart_str, ZahlungsArt.BAR)
 
 def _finalize_sale(warenkorb, zahlungsart, gegeben=None, rueckgeld=None, transaction_info=None):
     """
@@ -39,13 +52,14 @@ def _finalize_sale(warenkorb, zahlungsart, gegeben=None, rueckgeld=None, transac
 
         # Erstelle Kassenbeleg
         beleg = KassenBeleg(
-            beleg_nummer=f"B-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            datum=datetime.now(),
+            belegnummer=f"B-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             kunde_id=session.get('customer_id'),
-            summe_netto=warenkorb_summen['netto_gesamt'],
-            summe_brutto=warenkorb_summen['brutto_gesamt'],
-            mwst_betrag=warenkorb_summen['mwst_gesamt'],
-            zahlungsart=zahlungsart,
+            netto_gesamt=warenkorb_summen['netto_gesamt'],
+            brutto_gesamt=warenkorb_summen['brutto_gesamt'],
+            mwst_gesamt=warenkorb_summen['mwst_gesamt'],
+            zahlungsart=_map_zahlungsart_to_enum(zahlungsart),
+            gegeben=gegeben,
+            rueckgeld=rueckgeld,
             storniert=False
         )
 
@@ -53,13 +67,15 @@ def _finalize_sale(warenkorb, zahlungsart, gegeben=None, rueckgeld=None, transac
         db.session.flush()  # Beleg-ID generieren
 
         # Erstelle Belegpositionen
-        for item in warenkorb:
+        for idx, item in enumerate(warenkorb, 1):
             position = BelegPosition(
                 beleg_id=beleg.id,
+                position=idx,
                 artikel_id=item.get('artikel_id'),
-                bezeichnung=item.get('name'),
+                artikel_name=item.get('name'),
                 menge=item.get('menge', 1),
-                einzelpreis=item.get('preis', 0),
+                einzelpreis_netto=item.get('preis', 0),
+                einzelpreis_brutto=item.get('preis', 0) * (1 + item.get('mwst_satz', 19) / 100),
                 netto_betrag=item.get('netto_betrag', 0),
                 mwst_betrag=item.get('mwst_betrag', 0),
                 brutto_betrag=item.get('brutto_betrag', 0),
@@ -67,31 +83,35 @@ def _finalize_sale(warenkorb, zahlungsart, gegeben=None, rueckgeld=None, transac
             )
             db.session.add(position)
 
-        # Erstelle Transaktion
-        transaktion = KassenTransaktion(
-            beleg_id=beleg.id,
-            zahlungsart=ZahlungsArt[zahlungsart] if hasattr(ZahlungsArt, zahlungsart) else ZahlungsArt.BAR,
-            betrag=warenkorb_summen['brutto_gesamt'],
-            gegeben=gegeben,
-            rueckgeld=rueckgeld,
-            transaktions_info=transaction_info
-        )
-        db.session.add(transaktion)
+        # TSE-Transaktion optional (nur wenn TSE konfiguriert ist)
+        # Da wir manuell über SumUp TSE arbeiten, überspringen wir das hier
+        # TODO: TSE-Integration wenn echtes TSE-Gerät vorhanden
 
         # Speichern
         db.session.commit()
+
+        # Automatische Buchung nach SKR03
+        try:
+            buchung_erfolg = BuchungsService.buche_kassenverkauf(beleg, zahlungsart)
+            if buchung_erfolg:
+                logger.info(f"Buchung für Beleg {beleg.belegnummer} erfolgreich erstellt")
+            else:
+                logger.warning(f"Buchung für Beleg {beleg.belegnummer} konnte nicht erstellt werden")
+        except Exception as buchungs_fehler:
+            logger.error(f"Fehler bei automatischer Buchung: {buchungs_fehler}")
+            # Verkauf ist trotzdem erfolgreich, nur Buchung fehlgeschlagen
 
         # Warenkorb leeren
         session['warenkorb'] = []
         session.modified = True
 
-        logger.info(f"Verkauf erfolgreich abgeschlossen: Beleg {beleg.beleg_nummer}")
+        logger.info(f"Verkauf erfolgreich abgeschlossen: Beleg {beleg.belegnummer}")
 
         return {
             'success': True,
             'beleg_id': beleg.id,
-            'beleg_nummer': beleg.beleg_nummer,
-            'message': f'Verkauf erfolgreich! Beleg-Nr.: {beleg.beleg_nummer}'
+            'beleg_nummer': beleg.belegnummer,
+            'message': f'Verkauf erfolgreich! Beleg-Nr.: {beleg.belegnummer}'
         }
 
     except SQLAlchemyError as e:
@@ -108,20 +128,23 @@ def _finalize_sale(warenkorb, zahlungsart, gegeben=None, rueckgeld=None, transac
 @kasse_bp.route('/verkauf/abschliessen', methods=['POST'])
 def verkauf_abschliessen():
     """
-    Schließt einen Bar-Verkauf direkt ab.
+    Schließt einen Verkauf ab (Bar/EC über SumUp TSE).
     """
     data = request.get_json()
-    if data.get('zahlungsart') != 'BAR':
-        return jsonify({'success': False, 'error': 'Diese Route ist nur für Barzahlungen.'}), 400
+    zahlungsart = data.get('zahlungsart', 'BAR')
+
+    # Akzeptiere BAR, EC und SUMUP (alle über SumUp TSE)
+    if zahlungsart not in ['BAR', 'EC', 'SUMUP']:
+        return jsonify({'success': False, 'error': 'Ungültige Zahlungsart.'}), 400
 
     warenkorb = get_warenkorb()
     result = _finalize_sale(
         warenkorb,
-        zahlungsart='BAR',
-        gegeben=data.get('erhaltener_betrag'),
-        rueckgeld=data.get('rueckgeld')
+        zahlungsart=zahlungsart,
+        gegeben=None,  # Keine Rückgeld-Berechnung bei manueller Zahlung
+        rueckgeld=None
     )
-    
+
     if result.get('success'):
         return jsonify(result)
     else:
@@ -536,12 +559,39 @@ def auftrag_uebernehmen(order_id):
 
 @kasse_bp.route('/warenkorb/hinzufuegen', methods=['POST'])
 def warenkorb_hinzufuegen():
-    """Artikel zum Warenkorb hinzufügen"""
+    """Artikel oder Auftrag zum Warenkorb hinzufügen"""
     data = request.get_json() or {}
     warenkorb = get_warenkorb()
 
     artikel_id = data.get('artikel_id')
-    if artikel_id:
+    auftrag_id = data.get('auftrag_id')
+
+    # Fall 1: Auftrag hinzufügen
+    if auftrag_id:
+        from src.models.models import Order
+
+        # Prüfe, ob Auftrag schon im Warenkorb ist
+        existing = next((item for item in warenkorb if item.get('auftrag_id') == auftrag_id), None)
+
+        if existing:
+            # Erhöhe Menge (normalerweise 1 für Aufträge)
+            existing['menge'] = existing.get('menge', 1) + 1
+        else:
+            # Füge neuen Auftrag hinzu
+            auftrag = Order.query.get(auftrag_id)
+            if auftrag:
+                warenkorb.append({
+                    'warenkorb_id': str(uuid.uuid4()),
+                    'artikel_id': None,  # Kein Artikel
+                    'auftrag_id': auftrag.id,
+                    'name': data.get('name', f'Auftrag {auftrag.order_number}'),
+                    'preis': float(data.get('preis', auftrag.total_price or 0)),
+                    'menge': data.get('menge', 1),
+                    'mwst_satz': 19
+                })
+
+    # Fall 2: Artikel hinzufügen
+    elif artikel_id:
         # Prüfe, ob Artikel schon im Warenkorb ist
         existing = next((item for item in warenkorb if item.get('artikel_id') == artikel_id), None)
 
@@ -555,6 +605,7 @@ def warenkorb_hinzufuegen():
                 warenkorb.append({
                     'warenkorb_id': str(uuid.uuid4()),
                     'artikel_id': artikel.id,
+                    'auftrag_id': None,
                     'name': artikel.name,
                     'preis': float(artikel.price) if artikel.price else 0.0,
                     'menge': data.get('menge', 1),

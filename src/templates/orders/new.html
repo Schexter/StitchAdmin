@@ -11,23 +11,31 @@
 <script>
 // Zusätzliche Workflow-Funktionen
 function validateDesignWorkflow() {
+    console.log('Validiere Design-Workflow...');
+
     const designStatus = document.getElementById('design_status').value;
-    
+    console.log('Design-Status:', designStatus);
+
+    // Design-Status ist jetzt optional
     if (!designStatus) {
-        alert('Bitte wählen Sie einen Design-Status aus.');
-        return false;
+        console.log('Kein Design-Status gesetzt - überspringe Validierung');
+        return true;
     }
-    
+
     if (designStatus === 'logo_available') {
         const filePath = document.getElementById('design_file_path').value;
         const fileUpload = document.getElementById('design_file_upload').files.length;
-        
+        console.log('FilePath:', filePath, 'FileUpload:', fileUpload);
+
         if (!filePath && fileUpload === 0) {
-            alert('Bitte wählen Sie eine Design-Datei aus oder laden Sie eine hoch.');
+            alert('Sie haben "Logo vorhanden" ausgewählt, aber keine Datei angegeben.\n\nBitte wählen Sie eine Design-Datei aus oder laden Sie eine hoch.');
+            // Scroll zur Design-Sektion
+            document.getElementById('logo-available-section').scrollIntoView({ behavior: 'smooth', block: 'center' });
             return false;
         }
     }
-    
+
+    console.log('Design-Workflow Validierung erfolgreich');
     return true;
 }
 
@@ -78,7 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <select class="form-control" id="customer_id" name="customer_id" required>
                                     <option value="">Kunde wählen...</option>
                                     {% for customer_id, customer in customers.items() %}
-                                    <option value="{{ customer_id }}">
+                                    <option value="{{ customer_id }}" {% if selected_customer_id and selected_customer_id == customer_id %}selected{% endif %}>
                                         {% if customer.customer_type == 'business' %}
                                             {{ customer.company_name or customer.display_name }}
                                             {% if customer.contact_person %} ({{ customer.contact_person }}){% endif %}
@@ -88,6 +96,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </option>
                                     {% endfor %}
                                 </select>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle"></i>
+                                    Kein Kunde in der Liste?
+                                    <a href="{{ url_for('customers.new') }}" target="_blank">Neuen Kunden anlegen</a>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -230,14 +243,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                 </div>
                                 <div class="card-body">
                                     <div class="mb-3">
-                                        <label class="form-label">Design-Status *</label>
-                                        <select class="form-control" id="design_status" name="design_status" required onchange="toggleDesignWorkflow()">
-                                            <option value="">Wählen Sie...</option>
+                                        <label class="form-label">Design-Status</label>
+                                        <select class="form-control" id="design_status" name="design_status" onchange="toggleDesignWorkflow()">
+                                            <option value="">Wählen Sie... (optional)</option>
                                             <option value="logo_available">Logo vorhanden</option>
                                             <option value="logo_needs_creation">Logo muss erstellt werden</option>
                                             <option value="logo_needs_adaptation">Logo muss angepasst werden</option>
                                         </select>
-                                        <small class="text-muted">Bestimmt den Workflow für die Design-Verarbeitung</small>
+                                        <small class="text-muted">Optional: Bestimmt den Workflow für die Design-Verarbeitung</small>
                                     </div>
                                     
                                     <!-- Logo vorhanden - Pfad oder Upload -->
@@ -744,17 +757,82 @@ function updateStatusDisplay(text) {
 
 // Datei-Dialog-Funktionen
 function selectDesignFile() {
+    console.log('selectDesignFile() aufgerufen');
+
+    // Prüfe ob FileBrowser verfügbar ist
+    if (typeof fileBrowser === 'undefined' || !fileBrowser) {
+        console.error('FileBrowser object not found');
+        console.log('Versuche FileBrowser zu initialisieren...');
+
+        // Versuche FileBrowser zu initialisieren
+        if (typeof FileBrowser !== 'undefined') {
+            fileBrowser = new FileBrowser();
+            console.log('FileBrowser erfolgreich initialisiert');
+        } else {
+            alert('File Browser nicht verfügbar. Die Datei-Browser-Komponente wurde nicht geladen.\n\nBitte verwenden Sie stattdessen die "Hochladen"-Option.');
+            return;
+        }
+    }
+
+    console.log('Öffne FileBrowser Modal...');
+
+    // Setze Design-Status auf "logo_available"
+    const designStatusSelect = document.getElementById('design_status');
+    if (designStatusSelect && !designStatusSelect.value) {
+        designStatusSelect.value = 'logo_available';
+        toggleDesignWorkflow();
+    }
+
     // Öffne File-Browser Modal
-    fileBrowser.openModal(function(selectedFile) {
-        document.getElementById('design_file_path').value = selectedFile.path;
-        markDesignAsReady();
-        
-        // Versuche Datei-Analyse
-        analyzeSelectedFile(selectedFile.path);
-    });
+    try {
+        fileBrowser.openModal(function(selectedFile) {
+            console.log('Datei ausgewählt:', selectedFile);
+            document.getElementById('design_file_path').value = selectedFile.path;
+            markDesignAsReady();
+
+            // Versuche Datei-Analyse
+            analyzeSelectedFile(selectedFile.path);
+        });
+    } catch (error) {
+        console.error('Fehler beim Öffnen des FileBrowsers:', error);
+        alert('Fehler beim Öffnen des Datei-Browsers: ' + error.message);
+    }
+}
+
+function analyzeSelectedFile(filePath) {
+    console.log('Analysiere Datei:', filePath);
+
+    // Versuche Datei-Analyse über API
+    fetch('/file_browser/get_file_info?path=' + encodeURIComponent(filePath))
+        .then(response => response.json())
+        .then(data => {
+            console.log('Datei-Info erhalten:', data);
+
+            if (data.analysis && data.analysis.stitch_count) {
+                // Automatisch Stichzahl-Felder ausfüllen
+                document.getElementById('stitch_count').value = data.analysis.stitch_count;
+                if (data.analysis.width_mm) {
+                    document.getElementById('design_width_mm').value = Math.round(data.analysis.width_mm);
+                }
+                if (data.analysis.height_mm) {
+                    document.getElementById('design_height_mm').value = Math.round(data.analysis.height_mm);
+                }
+                console.log('Stichzahl-Felder automatisch ausgefüllt');
+            }
+        })
+        .catch(error => {
+            console.error('Fehler bei Datei-Analyse:', error);
+        });
 }
 
 function selectOriginalLogo() {
+    // Prüfe ob FileBrowser verfügbar ist
+    if (typeof fileBrowser === 'undefined' || !fileBrowser) {
+        alert('File Browser nicht verfügbar. Bitte Seite neu laden.');
+        console.error('FileBrowser object not found');
+        return;
+    }
+
     // Öffne File-Browser Modal für Original-Logo
     fileBrowser.openModal(function(selectedFile) {
         document.getElementById('original_logo_path').value = selectedFile.path;
@@ -777,7 +855,55 @@ function analyzeSelectedFile(filePath) {
 
 function handleDesignUpload(input) {
     if (input.files && input.files[0]) {
+        // Setze Design-Status automatisch auf "logo_available"
+        const designStatusSelect = document.getElementById('design_status');
+        if (designStatusSelect && !designStatusSelect.value) {
+            designStatusSelect.value = 'logo_available';
+            // Trigger onchange event to show the correct section
+            toggleDesignWorkflow();
+        }
+
+        // Analysiere die Datei
         analyzeDesignFile(input);
+
+        // Markiere als bereit
+        markDesignAsReady();
+    }
+}
+
+function analyzeDesignFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Zeige, dass die Datei hochgeladen wurde
+    console.log('Design-Datei hochgeladen:', file.name);
+
+    // Versuche Datei-Analyse (falls DST)
+    if (file.name.toLowerCase().endsWith('.dst')) {
+        const formData = new FormData();
+        formData.append('design_file', file);
+
+        fetch('/orders/analyze_file', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.stitch_count) {
+                // Automatisch Stichzahl-Felder ausfüllen
+                document.getElementById('stitch_count').value = data.stitch_count;
+                if (data.width_mm) {
+                    document.getElementById('design_width_mm').value = Math.round(data.width_mm);
+                }
+                if (data.height_mm) {
+                    document.getElementById('design_height_mm').value = Math.round(data.height_mm);
+                }
+                console.log('DST-Analyse erfolgreich:', data);
+            }
+        })
+        .catch(error => {
+            console.error('Fehler bei DST-Analyse:', error);
+        });
     }
 }
 
@@ -787,6 +913,24 @@ function markDesignAsReady() {
         workflowCard.className = 'card mb-3 border-success';
     }
     updateStatusDisplay('Design bereit - Auftrag kann fortgesetzt werden');
+}
+
+function toggleDesignWorkflow() {
+    const designStatus = document.getElementById('design_status').value;
+
+    // Verstecke alle Sektionen
+    document.getElementById('logo-available-section').style.display = 'none';
+    document.getElementById('logo-creation-section').style.display = 'none';
+    document.getElementById('logo-adaptation-section').style.display = 'none';
+
+    // Zeige die richtige Sektion
+    if (designStatus === 'logo_available') {
+        document.getElementById('logo-available-section').style.display = 'block';
+    } else if (designStatus === 'logo_needs_creation') {
+        document.getElementById('logo-creation-section').style.display = 'block';
+    } else if (designStatus === 'logo_needs_adaptation') {
+        document.getElementById('logo-adaptation-section').style.display = 'block';
+    }
 }
 
 // Live-Preiskalkulation
