@@ -284,20 +284,20 @@ def kassen_index():
 
         # Heutige Statistiken
         today_receipts_query = KassenBeleg.query.filter(
-            db.func.date(KassenBeleg.datum) == today,
+            db.func.date(KassenBeleg.erstellt_am) == today,
             KassenBeleg.storniert == False
         )
 
         today_receipts = today_receipts_query.count()
-        today_revenue = db.session.query(db.func.sum(KassenBeleg.summe_brutto)).filter(
-            db.func.date(KassenBeleg.datum) == today,
+        today_revenue = db.session.query(db.func.sum(KassenBeleg.brutto_gesamt)).filter(
+            db.func.date(KassenBeleg.erstellt_am) == today,
             KassenBeleg.storniert == False
         ).scalar() or 0
 
         # Letzte Belege
         recent_receipts = KassenBeleg.query.filter(
-            db.func.date(KassenBeleg.datum) == today
-        ).order_by(KassenBeleg.datum.desc()).limit(10).all()
+            db.func.date(KassenBeleg.erstellt_am) == today
+        ).order_by(KassenBeleg.erstellt_am.desc()).limit(10).all()
 
         return render_template('kasse/index.html',
                              today_revenue=today_revenue,
@@ -334,7 +334,7 @@ def tagesabschluss():
 
         # Tagesstatistiken
         belege = KassenBeleg.query.filter(
-            db.func.date(KassenBeleg.datum) == today,
+            db.func.date(KassenBeleg.erstellt_am) == today,
             KassenBeleg.storniert == False
         ).all()
 

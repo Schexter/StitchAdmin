@@ -631,8 +631,8 @@ def complete_production(order_id):
 
                 # Items aus Auftrag übernehmen
                 items = []
-                if order.order_items:
-                    for order_item in order.order_items:
+                if order.items:
+                    for order_item in order.items:
                         items.append({
                             'article_id': order_item.article_id,
                             'name': order_item.article.name if order_item.article else 'Unbekannt',

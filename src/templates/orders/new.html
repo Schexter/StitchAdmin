@@ -434,9 +434,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 <i class="bi bi-info-circle" data-bs-toggle="tooltip" 
                                                    title="Ca. 1000 Stiche pro cm² bei normaler Dichte"></i>
                                             </label>
-                                            <input type="number" class="form-control" id="stitch_count" 
-                                                   name="stitch_count" min="0" step="100" 
-                                                   placeholder="z.B. 5000" onchange="calculatePrice()">
+                                            <input type="number" class="form-control" id="stitch_count"
+                                                   name="stitch_count" min="0" step="100"
+                                                   placeholder="z.B. 5000" onchange="roundAndCalculateStitchCount(this)">
+                                            <small class="text-muted">Wird automatisch auf 100er-Schritte aufgerundet</small>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
@@ -799,8 +800,37 @@ function selectDesignFile() {
     }
 }
 
+// Rundet Stichanzahl auf den nächsten gültigen Bereich (100er-Schritte) auf
+function roundUpStitchCount(stitchCount) {
+    if (!stitchCount || stitchCount <= 0) return 0;
+    // Aufrunden auf nächste 100
+    return Math.ceil(stitchCount / 100) * 100;
+}
+
+// Handler für manuelle Stichzahl-Eingabe - rundet auf und berechnet Preis
+function roundAndCalculateStitchCount(input) {
+    const value = parseInt(input.value) || 0;
+    if (value > 0) {
+        const rounded = roundUpStitchCount(value);
+        if (rounded !== value) {
+            input.value = rounded;
+            console.log('Stichzahl aufgerundet:', value, '->', rounded);
+        }
+    }
+    calculatePrice();
+}
+
 function analyzeSelectedFile(filePath) {
     console.log('Analysiere Datei:', filePath);
+
+    // Zeige Lade-Indikator
+    const resultDiv = document.getElementById('file-analysis-result');
+    if (resultDiv) {
+        resultDiv.innerHTML = `
+            <div class="alert alert-info">
+                <i class="bi bi-hourglass-split"></i> Analysiere Datei...
+            </div>`;
+    }
 
     // Versuche Datei-Analyse über API
     fetch('/file_browser/get_file_info?path=' + encodeURIComponent(filePath))
@@ -808,9 +838,13 @@ function analyzeSelectedFile(filePath) {
         .then(data => {
             console.log('Datei-Info erhalten:', data);
 
-            if (data.analysis && data.analysis.stitch_count) {
-                // Automatisch Stichzahl-Felder ausfüllen
-                document.getElementById('stitch_count').value = data.analysis.stitch_count;
+            if (data.analysis && data.analysis.success) {
+                // Stichzahl aufrunden und Felder ausfüllen
+                if (data.analysis.stitch_count) {
+                    const roundedStitchCount = roundUpStitchCount(data.analysis.stitch_count);
+                    document.getElementById('stitch_count').value = roundedStitchCount;
+                    console.log('Stichzahl:', data.analysis.stitch_count, '-> gerundet:', roundedStitchCount);
+                }
                 if (data.analysis.width_mm) {
                     document.getElementById('design_width_mm').value = Math.round(data.analysis.width_mm);
                 }
@@ -818,10 +852,48 @@ function analyzeSelectedFile(filePath) {
                     document.getElementById('design_height_mm').value = Math.round(data.analysis.height_mm);
                 }
                 console.log('Stichzahl-Felder automatisch ausgefüllt');
+
+                // Zeige Analyse-Ergebnis
+                if (resultDiv) {
+                    const originalCount = data.analysis.stitch_count || 0;
+                    const roundedCount = roundUpStitchCount(originalCount);
+                    let html = `<div class="alert alert-success">
+                        <h6><i class="bi bi-check-circle"></i> Datei analysiert:</h6>
+                        <ul class="mb-0">
+                            <li><strong>Datei:</strong> ${data.name}</li>`;
+
+                    if (data.analysis.stitch_count) {
+                        html += `<li><strong>Stichzahl:</strong> ${originalCount.toLocaleString()} → <strong>${roundedCount.toLocaleString()}</strong> (aufgerundet)</li>`;
+                        html += `<li><strong>Abmessungen:</strong> ${Math.round(data.analysis.width_mm)} × ${Math.round(data.analysis.height_mm)} mm</li>`;
+                    }
+
+                    html += `</ul></div>`;
+                    resultDiv.innerHTML = html;
+                }
+
+                // Preiskalkulation aktualisieren
+                calculatePrice();
+            } else {
+                // Zeige zumindest den Dateinamen
+                if (resultDiv) {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Datei ausgewählt:</strong> ${data.name || filePath.split('/').pop()}
+                            ${data.analysis && data.analysis.error ? '<br><small class="text-muted">' + data.analysis.error + '</small>' : ''}
+                        </div>`;
+                }
             }
         })
         .catch(error => {
             console.error('Fehler bei Datei-Analyse:', error);
+            if (resultDiv) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Datei ausgewählt:</strong> ${filePath.split('/').pop() || filePath.split('\\').pop()}
+                    </div>`;
+            }
         });
 }
 
@@ -837,20 +909,6 @@ function selectOriginalLogo() {
     fileBrowser.openModal(function(selectedFile) {
         document.getElementById('original_logo_path').value = selectedFile.path;
     });
-}
-
-function analyzeSelectedFile(filePath) {
-    // Simuliere Datei-Analyse für ausgewählte Datei
-    const resultDiv = document.getElementById('file-analysis-result');
-    
-    resultDiv.innerHTML = `
-        <div class="alert alert-info">
-            <i class="bi bi-info-circle"></i>
-            <strong>Datei ausgewählt:</strong> ${filePath.split('/').pop()}
-        </div>`;
-    
-    // TODO: Hier könnte eine echte Datei-Analyse implementiert werden
-    // über einen separaten AJAX-Call
 }
 
 function handleDesignUpload(input) {
@@ -1212,21 +1270,21 @@ document.addEventListener('change', function(e) {
 function analyzeDesignFile(input) {
     const file = input.files[0];
     const resultDiv = document.getElementById('file-analysis-result');
-    
+
     if (!file) {
         resultDiv.innerHTML = '';
         return;
     }
-    
+
     // Zeige Loading
     resultDiv.innerHTML = `
         <div class="alert alert-info">
             <i class="bi bi-hourglass-split"></i> Analysiere Datei...
         </div>`;
-    
+
     const formData = new FormData();
     formData.append('design_file', file);
-    
+
     fetch('/orders/analyze_file', {
         method: 'POST',
         body: formData
@@ -1237,32 +1295,34 @@ function analyzeDesignFile(input) {
             let html = `<div class="alert alert-success">
                 <h6><i class="bi bi-check-circle"></i> Datei analysiert:</h6>
                 <ul class="mb-0">`;
-            
+
             // DST-spezifische Informationen
             if (data.stitch_count) {
-                html += `<li><strong>Stichzahl:</strong> ${data.stitch_count.toLocaleString()} Stiche</li>`;
+                const originalCount = data.stitch_count;
+                const roundedCount = roundUpStitchCount(originalCount);
+                html += `<li><strong>Stichzahl:</strong> ${originalCount.toLocaleString()} → <strong>${roundedCount.toLocaleString()}</strong> (aufgerundet)</li>`;
                 html += `<li><strong>Abmessungen:</strong> ${data.width_mm} × ${data.height_mm} mm</li>`;
-                
-                // Automatisch Felder ausfüllen
-                document.getElementById('stitch_count').value = data.stitch_count;
+
+                // Automatisch Felder ausfüllen - mit aufgerundeter Stichzahl
+                document.getElementById('stitch_count').value = roundedCount;
                 document.getElementById('design_width_mm').value = Math.round(data.width_mm);
                 document.getElementById('design_height_mm').value = Math.round(data.height_mm);
             }
-            
+
             // Druck-spezifische Informationen
             if (data.width_cm) {
                 html += `<li><strong>Druckgröße:</strong> ${data.width_cm} × ${data.height_cm} cm</li>`;
-                
+
                 if (data.width_px) {
                     html += `<li><strong>Auflösung:</strong> ${data.width_px} × ${data.height_px} px</li>`;
                     html += `<li><strong>DPI:</strong> ${data.dpi[0]} × ${data.dpi[1]}</li>`;
                 }
-                
+
                 // Automatisch Felder ausfüllen
                 document.getElementById('print_width_cm').value = data.width_cm;
                 document.getElementById('print_height_cm').value = data.height_cm;
             }
-            
+
             html += `</ul></div>`;
             resultDiv.innerHTML = html;
             

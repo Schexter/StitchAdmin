@@ -83,6 +83,25 @@ def index():
 def new():
     """Neuen Auftrag erstellen"""
     if request.method == 'POST':
+        # Hilfsfunktion zum Parsen von Datumsfeldern
+        def parse_date(date_str):
+            """Parst Datumsstring zu date-Objekt oder None (für Date-Spalten)"""
+            if not date_str or date_str.strip() == '':
+                return None
+            try:
+                return datetime.strptime(date_str.strip(), '%Y-%m-%d').date()
+            except (ValueError, AttributeError):
+                return None
+
+        def parse_datetime(date_str):
+            """Parst Datumsstring zu datetime-Objekt oder None (für DateTime-Spalten)"""
+            if not date_str or date_str.strip() == '':
+                return None
+            try:
+                return datetime.strptime(date_str.strip(), '%Y-%m-%d')
+            except (ValueError, AttributeError):
+                return None
+
         # Neuen Auftrag erstellen
         order = Order(
             id=generate_order_id(),
@@ -94,7 +113,7 @@ def new():
             internal_notes=request.form.get('notes', ''),
             customer_notes=request.form.get('customer_notes', ''),
             total_price=float(request.form.get('price', 0) or 0),
-            due_date=request.form.get('pickup_date') or None,
+            due_date=parse_datetime(request.form.get('pickup_date')),
             rush_order=request.form.get('rush_order', False) == 'on',
             created_by=current_user.username
         )
@@ -119,15 +138,9 @@ def new():
         order.design_status = design_status
         
         if design_status == 'needs_order':
-            order.design_supplier_id = request.form.get('design_supplier_id')
+            order.design_supplier_id = request.form.get('design_supplier_id') or None
             order.design_order_notes = request.form.get('design_order_notes')
-            
-            expected_date_str = request.form.get('design_expected_date')
-            if expected_date_str:
-                try:
-                    order.design_expected_date = datetime.strptime(expected_date_str, '%Y-%m-%d').date()
-                except ValueError:
-                    pass
+            order.design_expected_date = parse_date(request.form.get('design_expected_date'))
         
         elif design_status == 'customer_provided':
             # Wenn Kunde Design bereitstellt, aber keine Datei hochgeladen wurde
@@ -135,19 +148,67 @@ def new():
                 order.design_status = 'none'  # Zurücksetzen auf "none" wenn keine Datei
         
         # Design-Datei hochladen (wenn vorhanden)
+        design_file_processed = False
+
         if 'design_file' in request.files:
             file = request.files['design_file']
             if file and file.filename:
                 # Sichere Dateiname generieren
-                filename = f"{order.id}_{file.filename}"
-                upload_path = os.path.join('uploads', 'designs', filename)
-                os.makedirs(os.path.dirname(upload_path), exist_ok=True)
+                filename = f"{order.id}_{secure_filename(file.filename)}"
+                upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'designs')
+                os.makedirs(upload_dir, exist_ok=True)
+                upload_path = os.path.join(upload_dir, filename)
                 file.save(upload_path)
                 order.design_file_path = upload_path
-                
+                order.design_file = f"uploads/designs/{filename}"
+                design_file_processed = True
+
                 # Status auf "customer_provided" setzen wenn Datei hochgeladen
                 if order.design_status == 'none':
                     order.design_status = 'customer_provided'
+
+        # NEU: Wenn ein Dateipfad über den File-Browser ausgewählt wurde
+        design_file_path_input = request.form.get('design_file_path', '').strip()
+        if design_file_path_input and not design_file_processed:
+            # Prüfe ob die Datei existiert
+            if os.path.exists(design_file_path_input):
+                # Kopiere die Datei in den Upload-Ordner
+                original_filename = os.path.basename(design_file_path_input)
+                filename = f"{order.id}_{secure_filename(original_filename)}"
+                upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'designs')
+                os.makedirs(upload_dir, exist_ok=True)
+                upload_path = os.path.join(upload_dir, filename)
+
+                # Datei kopieren
+                import shutil
+                shutil.copy2(design_file_path_input, upload_path)
+
+                order.design_file_path = upload_path
+                order.design_file = f"uploads/designs/{filename}"
+                design_file_processed = True
+
+                # Status auf "customer_provided" setzen
+                if order.design_status == 'none':
+                    order.design_status = 'customer_provided'
+
+        # NEU: DST-Datei analysieren wenn vorhanden
+        if design_file_processed and order.design_file_path:
+            file_ext = os.path.splitext(order.design_file_path)[1].lower()
+            if file_ext in ['.dst', '.pes', '.jef', '.exp']:
+                try:
+                    analysis = analyze_dst_file_robust(order.design_file_path)
+                    if analysis.get('success'):
+                        # Nur überschreiben wenn nicht manuell eingegeben
+                        if not order.stitch_count or order.stitch_count == 0:
+                            order.stitch_count = analysis.get('stitch_count', 0)
+                        if not order.design_width_mm or order.design_width_mm == 0:
+                            order.design_width_mm = analysis.get('width_mm', 0)
+                        if not order.design_height_mm or order.design_height_mm == 0:
+                            order.design_height_mm = analysis.get('height_mm', 0)
+                        # Speichere komplette Analyse als JSON
+                        order.file_analysis = json.dumps(analysis)
+                except Exception as e:
+                    current_app.logger.error(f"Fehler bei DST-Analyse: {e}")
         
         # In Datenbank speichern
         db.session.add(order)
@@ -260,8 +321,18 @@ def photos(order_id):
 def edit(order_id):
     """Auftrag bearbeiten"""
     order = Order.query.get_or_404(order_id)
-    
+
     if request.method == 'POST':
+        # Hilfsfunktion zum Parsen von Datumsfeldern
+        def parse_datetime(date_str):
+            """Parst Datumsstring zu datetime-Objekt oder None (für DateTime-Spalten)"""
+            if not date_str or date_str.strip() == '':
+                return None
+            try:
+                return datetime.strptime(date_str.strip(), '%Y-%m-%d')
+            except (ValueError, AttributeError):
+                return None
+
         # Auftrag aktualisieren
         order.customer_id = request.form.get('customer_id')
         order.order_type = request.form.get('order_type', 'embroidery')
@@ -269,7 +340,7 @@ def edit(order_id):
         order.internal_notes = request.form.get('notes', '')
         order.customer_notes = request.form.get('customer_notes', '')
         order.total_price = float(request.form.get('price', 0) or 0)
-        order.due_date = request.form.get('pickup_date') or None
+        order.due_date = parse_datetime(request.form.get('pickup_date'))
         order.rush_order = request.form.get('rush_order', False) == 'on'
         order.updated_at = datetime.utcnow()
         order.updated_by = current_user.username

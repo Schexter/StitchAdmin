@@ -489,13 +489,17 @@ class Rechnung(db.Model):
     
     def calculate_totals(self):
         """Berechnet Gesamtsummen aus Positionen"""
-        self.netto_gesamt = sum(pos.netto_betrag for pos in self.positionen)
-        self.mwst_gesamt = sum(pos.mwst_betrag for pos in self.positionen)
-        
+        from decimal import Decimal
+        self.netto_gesamt = sum((pos.netto_betrag or Decimal('0')) for pos in self.positionen)
+        self.mwst_gesamt = sum((pos.mwst_betrag or Decimal('0')) for pos in self.positionen)
+
+        # Rabatt absichern (None -> 0)
+        rabatt = self.rabatt_betrag if self.rabatt_betrag is not None else Decimal('0')
+
         # Rabatt abziehen
-        netto_nach_rabatt = self.netto_gesamt - self.rabatt_betrag
-        mwst_nach_rabatt = netto_nach_rabatt * (self.mwst_gesamt / self.netto_gesamt if self.netto_gesamt > 0 else 0)
-        
+        netto_nach_rabatt = self.netto_gesamt - rabatt
+        mwst_nach_rabatt = netto_nach_rabatt * (self.mwst_gesamt / self.netto_gesamt if self.netto_gesamt > 0 else Decimal('0'))
+
         self.brutto_gesamt = netto_nach_rabatt + mwst_nach_rabatt
     
     def is_overdue(self):

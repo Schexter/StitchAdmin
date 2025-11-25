@@ -120,14 +120,14 @@ def create_post_entry_from_packing_list(packing_list):
         else:
             recipient_name = f"{customer.first_name or ''} {customer.last_name or ''}".strip()
 
-        recipient_address = f"{customer.street or ''}\n{customer.postcode or ''} {customer.city or ''}".strip()
+        recipient_address = f"{customer.street or ''}\n{customer.postal_code or ''} {customer.city or ''}".strip()
 
     # Absender (Firma)
     company_settings = CompanySettings.get_settings()
     sender_name = company_settings.company_name if company_settings else 'StitchAdmin'
     sender_address = ''
     if company_settings:
-        sender_address = f"{company_settings.street or ''}\n{company_settings.postcode or ''} {company_settings.city or ''}".strip()
+        sender_address = f"{company_settings.street or ''}\n{company_settings.postal_code or ''} {company_settings.city or ''}".strip()
 
     # PostEntry erstellen
     post_entry = PostEntry(
