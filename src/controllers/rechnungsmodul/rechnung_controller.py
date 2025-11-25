@@ -19,7 +19,6 @@ import json
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for, send_file
-from sqlalchemy.exc import SQLAlchemyError
 import io
 
 # Imports für Models und Services
@@ -27,7 +26,7 @@ try:
     from src.models import db
     from src.models.models import Customer, Order
     from src.models.rechnungsmodul import (
-        Rechnung, RechnungsPosition, RechnungsZahlung, MwStSatz, RechnungsStatus, ZugpferdProfil
+        Rechnung, RechnungsPosition, RechnungsStatus, ZugpferdProfil
     )
     from src.services.zugpferd_service import ZugpferdService
     from src.services.pdf_service import PDFService
@@ -69,12 +68,11 @@ def rechnungs_index():
     Zeigt alle Rechnungen mit Filter- und Suchfunktionen
     """
     try:
-        from datetime import date, datetime
-        from dateutil.relativedelta import relativedelta
+        from datetime import date
         
         # Filter-Parameter
         status_filter = request.args.get('status', '')
-        customer_filter = request.args.get('customer', '')
+        request.args.get('customer', '')
         period_filter = request.args.get('period', '')
         
         # Basis-Query

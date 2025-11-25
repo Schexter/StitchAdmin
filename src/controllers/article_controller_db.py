@@ -6,12 +6,11 @@ Artikel-Verwaltung mit Datenbank
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import login_required, current_user
 from datetime import datetime
-from src.models import db, Article, ActivityLog, Supplier, ArticleVariant, ProductCategory, Brand, PriceCalculationSettings
+from src.models import db, Article, ActivityLog, Supplier, ProductCategory, Brand, PriceCalculationSettings
 from src.services import LShopImportService
 from werkzeug.utils import secure_filename
 import os
 import tempfile
-import pandas as pd
 import json
 
 # Blueprint erstellen
@@ -92,8 +91,7 @@ def new():
     if request.method == 'POST':
         # Preis-Konvertierung (Komma zu Punkt)
         price_str = request.form.get('price', '0').replace(',', '.')
-        purchase_price_str = request.form.get('purchase_price', '0').replace(',', '.')
-        
+
         # Neuen Artikel erstellen
         article = Article(
             id=generate_article_id(),
@@ -107,7 +105,6 @@ def new():
             color=request.form.get('color', ''),
             size=request.form.get('size', ''),
             price=float(price_str or 0),
-            purchase_price=float(purchase_price_str or 0),
             stock=int(request.form.get('stock', 0) or 0),
             min_stock=int(request.form.get('min_stock', 0) or 0),
             location=request.form.get('location', ''),
@@ -561,7 +558,7 @@ def import_lshop_analyze():
         return jsonify({'success': False, 'error': analysis['error']})
     
     # Hole Spalten-Mapping Preview
-    mapping_preview = service.get_column_mapping_preview()
+    service.get_column_mapping_preview()
     
     # Speichere Filepath in Session für späteren Import
     session['import_file_path'] = filepath

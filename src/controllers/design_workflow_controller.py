@@ -5,16 +5,13 @@ Erstellt von Hans Hahn - Alle Rechte vorbehalten
 """
 
 from flask import Blueprint, request, redirect, url_for, flash, session, jsonify
-from werkzeug.utils import secure_filename
 from datetime import datetime
-import os
 
 from src.utils.design_upload import (
     save_design_file, 
     save_link, 
     get_link, 
-    should_show_graphics_manager,
-    needs_graphics_manager
+    should_show_graphics_manager
 )
 
 # Blueprint
@@ -150,7 +147,7 @@ def edit_link(order_id):
     try:
         from src.models.models import Order
         
-        order = Order.query.get_or_404(order_id)
+        Order.query.get_or_404(order_id)
         link = get_link(order_id)
         
         return f"""
@@ -171,7 +168,7 @@ def graphics_manager(order_id):
     try:
         from src.models.models import Order
         
-        order = Order.query.get_or_404(order_id)
+        Order.query.get_or_404(order_id)
         
         # Prüfe ob Link vorhanden
         if not should_show_graphics_manager(order_id):

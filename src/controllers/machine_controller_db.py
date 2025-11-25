@@ -7,7 +7,6 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 from src.models import db, Machine, Order, ProductionSchedule, ActivityLog
-import json
 
 # Blueprint erstellen
 machine_bp = Blueprint('machines', __name__, url_prefix='/machines')

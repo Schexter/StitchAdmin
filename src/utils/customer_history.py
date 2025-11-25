@@ -11,13 +11,16 @@ CUSTOMER_HISTORY_FILE = 'customer_history.json'
 def load_customer_history():
     """Lade Kunden-Historie aus JSON-Datei"""
     if os.path.exists(CUSTOMER_HISTORY_FILE):
-        with open(CUSTOMER_HISTORY_FILE, 'r') as f:
-            return json.load(f)
+        try:
+            with open(CUSTOMER_HISTORY_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return {}
     return {}
 
 def save_customer_history(history):
     """Speichere Kunden-Historie in JSON-Datei"""
-    with open(CUSTOMER_HISTORY_FILE, 'w') as f:
+    with open(CUSTOMER_HISTORY_FILE, 'w', encoding='utf-8') as f:
         json.dump(history, f, indent=2, ensure_ascii=False)
 
 def add_customer_history(customer_id, action, details, user='system'):

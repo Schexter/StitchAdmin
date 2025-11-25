@@ -1,0 +1,1488 @@
+openapi: 3.0.3
+info:
+  title: StitchAdmin 2.0 API
+  description: |
+    Modernisierte ERP-Lösung für Stickerei-Betriebe
+
+    ## Authentifizierung
+    Die meisten Endpunkte erfordern eine Session-basierte Authentifizierung über Flask-Login.
+    Melden Sie sich zuerst über `/auth/login` an, um eine Session zu erhalten.
+
+    ## Berechtigung
+    Viele Endpunkte erfordern Admin-Rechte. Diese sind mit dem Tag `admin` gekennzeichnet.
+
+    ## Datenformate
+    - Alle Datumsangaben sind im ISO 8601 Format (YYYY-MM-DD oder YYYY-MM-DDTHH:MM:SS)
+    - Preise sind als Float-Werte in Euro
+    - IDs sind alphanumerische Strings oder Integers je nach Entität
+
+    Erstellt von Hans Hahn - Alle Rechte vorbehalten
+  version: 2.0.0
+  contact:
+    name: StitchAdmin Support
+    email: admin@stitchadmin.local
+
+servers:
+  - url: http://localhost:5000
+    description: Entwicklungsserver
+  - url: https://stitchadmin.example.com
+    description: Produktionsserver
+
+tags:
+  - name: Authentifizierung
+    description: Login und Logout
+  - name: Dashboard
+    description: Dashboard und Übersichten
+  - name: Kunden
+    description: Kundenverwaltung
+  - name: Artikel
+    description: Artikelverwaltung
+  - name: Aufträge
+    description: Auftragsverwaltung
+  - name: Maschinen
+    description: Maschinenverwaltung
+  - name: Garne
+    description: Garnverwaltung
+  - name: Produktion
+    description: Produktionsplanung und -steuerung
+  - name: Versand
+    description: Versandverwaltung
+  - name: Lieferanten
+    description: Lieferantenverwaltung
+  - name: Benutzer
+    description: Benutzerverwaltung
+  - name: Einstellungen
+    description: Systemeinstellungen
+  - name: Aktivitäten
+    description: Aktivitätsprotokoll
+  - name: Kasse
+    description: Kassensystem mit TSE
+  - name: Rechnungen
+    description: Rechnungsverwaltung (ZUGFeRD)
+  - name: API
+    description: API-Endpunkte
+  - name: Design-Workflow
+    description: Design- und Grafikverwaltung
+  - name: Dateibrowser
+    description: Dateiverwaltung
+
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: Session-Cookie nach Login
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Fehlermeldung"
+      required:
+        - success
+        - error
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        username:
+          type: string
+          example: "admin"
+        email:
+          type: string
+          format: email
+          example: "admin@stitchadmin.local"
+        is_admin:
+          type: boolean
+          example: true
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-01-01T10:00:00"
+      required:
+        - id
+        - username
+        - email
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "CUST001"
+        customer_number:
+          type: string
+          example: "K-2025-001"
+        company_name:
+          type: string
+          example: "Musterfirma GmbH"
+        first_name:
+          type: string
+          example: "Max"
+        last_name:
+          type: string
+          example: "Mustermann"
+        email:
+          type: string
+          format: email
+          example: "max@example.com"
+        phone:
+          type: string
+          example: "+49 123 456789"
+        street:
+          type: string
+          example: "Musterstraße 1"
+        postal_code:
+          type: string
+          example: "12345"
+        city:
+          type: string
+          example: "Musterstadt"
+        country:
+          type: string
+          example: "Deutschland"
+        customer_type:
+          type: string
+          enum: [private, business]
+          example: "business"
+        tax_id:
+          type: string
+          example: "DE123456789"
+        payment_terms:
+          type: integer
+          example: 14
+        discount:
+          type: number
+          format: float
+          example: 5.0
+        notes:
+          type: string
+        active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+
+    Article:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "ART001"
+        article_number:
+          type: string
+          example: "A-2025-001"
+        name:
+          type: string
+          example: "T-Shirt Basic Weiß"
+        description:
+          type: string
+          example: "Hochwertiges Baumwoll-T-Shirt"
+        supplier:
+          type: string
+          example: "L-Shop"
+        supplier_article_number:
+          type: string
+          example: "TS-001-W"
+        category:
+          type: string
+          example: "Textilien"
+        brand:
+          type: string
+          example: "Fruit of the Loom"
+        price:
+          type: number
+          format: float
+          example: 15.99
+          description: "Verkaufspreis"
+        purchase_price_single:
+          type: number
+          format: float
+          example: 8.50
+        purchase_price_carton:
+          type: number
+          format: float
+          example: 7.20
+        purchase_price_10carton:
+          type: number
+          format: float
+          example: 6.80
+        stock:
+          type: integer
+          example: 50
+        min_stock:
+          type: integer
+          example: 10
+        unit:
+          type: string
+          example: "Stück"
+        barcode:
+          type: string
+          example: "4260123456789"
+        active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "ORD001"
+        order_number:
+          type: string
+          example: "A-2025-001"
+        customer_id:
+          type: string
+          example: "CUST001"
+        customer_name:
+          type: string
+          example: "Max Mustermann"
+        order_date:
+          type: string
+          format: date
+          example: "2025-01-15"
+        delivery_date:
+          type: string
+          format: date
+          example: "2025-01-22"
+        status:
+          type: string
+          enum: [new, accepted, in_progress, production, ready, completed, cancelled]
+          example: "new"
+        order_type:
+          type: string
+          enum: [stickerei, druck, beflockung, logo]
+          example: "stickerei"
+        total_price:
+          type: number
+          format: float
+          example: 350.00
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        notes:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        article_id:
+          type: string
+          example: "ART001"
+        article_name:
+          type: string
+          example: "T-Shirt Basic Weiß"
+        quantity:
+          type: integer
+          example: 10
+        unit_price:
+          type: number
+          format: float
+          example: 15.99
+        total_price:
+          type: number
+          format: float
+          example: 159.90
+        design_file:
+          type: string
+          example: "design_001.dst"
+        position:
+          type: string
+          example: "Brust links"
+
+    Machine:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "MACH001"
+        name:
+          type: string
+          example: "Stickmaschine 1"
+        machine_type:
+          type: string
+          enum: [stickmaschine, druckmaschine, plottermaschine, laser, andere]
+          example: "stickmaschine"
+        manufacturer:
+          type: string
+          example: "Brother"
+        model:
+          type: string
+          example: "PR-1050X"
+        serial_number:
+          type: string
+          example: "SN123456789"
+        heads:
+          type: integer
+          example: 10
+          description: "Anzahl Köpfe/Nadeln"
+        max_area_x:
+          type: integer
+          example: 360
+          description: "Maximale Stickfläche X in mm"
+        max_area_y:
+          type: integer
+          example: 200
+          description: "Maximale Stickfläche Y in mm"
+        active:
+          type: boolean
+          example: true
+        maintenance_interval_days:
+          type: integer
+          example: 30
+        last_maintenance:
+          type: string
+          format: date
+          example: "2025-01-01"
+
+    Thread:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "THR001"
+        thread_number:
+          type: string
+          example: "G-2025-001"
+        manufacturer:
+          type: string
+          example: "Madeira"
+        color_code:
+          type: string
+          example: "1001"
+        color_name:
+          type: string
+          example: "Weiß"
+        category:
+          type: string
+          enum: [rayon, polyester, metallic, baumwolle, sonstiges]
+          example: "polyester"
+        stock:
+          type: integer
+          example: 25
+          description: "Bestand in Spulen"
+        min_stock:
+          type: integer
+          example: 5
+        unit_price:
+          type: number
+          format: float
+          example: 3.50
+        active:
+          type: boolean
+          example: true
+
+    Supplier:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "SUP001"
+        name:
+          type: string
+          example: "L-Shop"
+        company_name:
+          type: string
+          example: "L-Shop Textilhandel GmbH"
+        contact_person:
+          type: string
+          example: "Frau Schmidt"
+        email:
+          type: string
+          format: email
+          example: "info@lshop.de"
+        phone:
+          type: string
+          example: "+49 123 456789"
+        website:
+          type: string
+          format: uri
+          example: "https://www.lshop.de"
+        webshop_url:
+          type: string
+          format: uri
+          example: "https://shop.lshop.de"
+        webshop_username:
+          type: string
+          example: "kunde123"
+        webshop_password:
+          type: string
+          example: "********"
+          description: "Verschlüsselt gespeichert"
+        payment_terms:
+          type: integer
+          example: 30
+          description: "Zahlungsziel in Tagen"
+        active:
+          type: boolean
+          example: true
+        notes:
+          type: string
+
+    ActivityLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-01-15T10:30:00"
+        username:
+          type: string
+          example: "admin"
+        action:
+          type: string
+          example: "create_article"
+        details:
+          type: string
+          example: "Artikel ART001 erstellt"
+        ip_address:
+          type: string
+          example: "192.168.1.100"
+
+    Brand:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Fruit of the Loom"
+        description:
+          type: string
+          example: "Hochwertige Textilmarke"
+        website:
+          type: string
+          format: uri
+          example: "https://www.fruit.com"
+        active:
+          type: boolean
+          example: true
+        article_count:
+          type: integer
+          example: 150
+
+security:
+  - sessionAuth: []
+
+paths:
+  # ==================== AUTHENTIFIZIERUNG ====================
+  /auth/login:
+    post:
+      tags:
+        - Authentifizierung
+      summary: Benutzer-Login
+      description: Meldet einen Benutzer an und erstellt eine Session
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "admin"
+                password:
+                  type: string
+                  example: "admin"
+              required:
+                - username
+                - password
+      responses:
+        '302':
+          description: Redirect zum Dashboard bei Erfolg
+        '200':
+          description: Login-Formular mit Fehlermeldung
+
+  /auth/logout:
+    get:
+      tags:
+        - Authentifizierung
+      summary: Benutzer-Logout
+      description: Meldet den aktuellen Benutzer ab
+      responses:
+        '302':
+          description: Redirect zur Login-Seite
+
+  # ==================== DASHBOARD ====================
+  /dashboard:
+    get:
+      tags:
+        - Dashboard
+      summary: Haupt-Dashboard
+      description: Zeigt Dashboard mit Statistiken und Übersichten
+      responses:
+        '200':
+          description: Dashboard-HTML-Seite
+
+  # ==================== API - ARTIKEL ====================
+  /api/articles:
+    get:
+      tags:
+        - API
+      summary: Artikel-Liste abrufen
+      description: Holt Artikel mit optionalen Filtern für Lieferant und Suche
+      parameters:
+        - name: supplier_id
+          in: query
+          schema:
+            type: string
+          description: Lieferanten-ID zum Filtern
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Suchbegriff (Artikelnummer, Name, Lieferanten-Artikelnummer)
+      responses:
+        '200':
+          description: Erfolgreiche Abfrage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  articles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Article'
+                  count:
+                    type: integer
+                    example: 42
+                  source:
+                    type: string
+                    enum: [database, json_fallback]
+                    example: "database"
+        '500':
+          description: Serverfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/articles/{article_id}:
+    get:
+      tags:
+        - API
+      summary: Artikel-Details abrufen
+      description: Holt Details eines spezifischen Artikels
+      parameters:
+        - name: article_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Artikel-ID
+      responses:
+        '200':
+          description: Erfolgreiche Abfrage
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  article:
+                    $ref: '#/components/schemas/Article'
+        '404':
+          description: Artikel nicht gefunden
+        '500':
+          description: Serverfehler
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/articles/search:
+    get:
+      tags:
+        - API
+      summary: Artikel-Suche für Kassensystem
+      description: Sucht Artikel nach Artikelnummer, Name oder Barcode
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Suchbegriff
+      responses:
+        '200':
+          description: Suchergebnisse
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    article_number:
+                      type: string
+                    name:
+                      type: string
+                    price:
+                      type: number
+                      format: float
+                    stock_quantity:
+                      type: integer
+                    barcode:
+                      type: string
+                    category:
+                      type: string
+
+  /api/top-selling-articles:
+    get:
+      tags:
+        - API
+      summary: Meistverkaufte Artikel
+      description: Holt die am häufigsten verkauften Artikel für Schnellzugriff
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 6
+          description: Anzahl der Artikel
+      responses:
+        '200':
+          description: Top-Artikel
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    article_number:
+                      type: string
+                    name:
+                      type: string
+                    price:
+                      type: number
+                    stock_quantity:
+                      type: integer
+
+  # ==================== API - DEBUG ====================
+  /api/debug/suppliers:
+    get:
+      tags:
+        - API
+      summary: Debug - Alle Lieferanten
+      description: Debug-Endpunkt zum Anzeigen aller Lieferanten
+      responses:
+        '200':
+          description: Lieferanten-Liste
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  suppliers:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        active:
+                          type: boolean
+                        article_count:
+                          type: integer
+                  count:
+                    type: integer
+
+  /api/debug/articles-suppliers:
+    get:
+      tags:
+        - API
+      summary: Debug - Artikel-Lieferanten-Mapping
+      description: Zeigt Anzahl der Artikel pro Lieferant
+      responses:
+        '200':
+          description: Mapping-Daten
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  supplier_mappings:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        supplier_name:
+                          type: string
+                        article_count:
+                          type: integer
+                  total_groups:
+                    type: integer
+
+  # ==================== KUNDEN ====================
+  /customers:
+    get:
+      tags:
+        - Kunden
+      summary: Kunden-Übersicht
+      description: Zeigt alle Kunden mit optionaler Suche
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Suchbegriff für Kunden
+      responses:
+        '200':
+          description: Kunden-Liste HTML
+
+  /customers/new:
+    get:
+      tags:
+        - Kunden
+      summary: Neuer Kunde - Formular
+      description: Zeigt Formular zum Erstellen eines neuen Kunden
+      responses:
+        '200':
+          description: Formular HTML
+
+    post:
+      tags:
+        - Kunden
+      summary: Neuen Kunden erstellen
+      description: Erstellt einen neuen Kunden
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                company_name:
+                  type: string
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                email:
+                  type: string
+                phone:
+                  type: string
+                street:
+                  type: string
+                postal_code:
+                  type: string
+                city:
+                  type: string
+                customer_type:
+                  type: string
+                  enum: [private, business]
+      responses:
+        '302':
+          description: Redirect zur Kundendetails-Seite
+
+  /customers/{customer_id}:
+    get:
+      tags:
+        - Kunden
+      summary: Kunden-Details
+      description: Zeigt Details eines Kunden
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Kunden-Details HTML
+
+  /customers/{customer_id}/edit:
+    get:
+      tags:
+        - Kunden
+      summary: Kunde bearbeiten - Formular
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bearbeitungs-Formular HTML
+
+    post:
+      tags:
+        - Kunden
+      summary: Kunde aktualisieren
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Customer'
+      responses:
+        '302':
+          description: Redirect zur Kundendetails-Seite
+
+  /customers/{customer_id}/delete:
+    post:
+      tags:
+        - Kunden
+      summary: Kunde löschen
+      parameters:
+        - name: customer_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect zur Kunden-Übersicht
+
+  # ==================== ARTIKEL ====================
+  /articles:
+    get:
+      tags:
+        - Artikel
+      summary: Artikel-Übersicht
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Artikel-Liste HTML
+
+  /articles/new:
+    get:
+      tags:
+        - Artikel
+      summary: Neuer Artikel - Formular
+      responses:
+        '200':
+          description: Formular HTML
+
+    post:
+      tags:
+        - Artikel
+      summary: Neuen Artikel erstellen
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Article'
+      responses:
+        '302':
+          description: Redirect zur Artikeldetails-Seite
+
+  /articles/{article_id}:
+    get:
+      tags:
+        - Artikel
+      summary: Artikel-Details
+      parameters:
+        - name: article_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Artikel-Details HTML
+
+  /articles/{article_id}/edit:
+    post:
+      tags:
+        - Artikel
+      summary: Artikel aktualisieren
+      parameters:
+        - name: article_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Article'
+      responses:
+        '302':
+          description: Redirect zur Artikeldetails-Seite
+
+  /articles/{article_id}/stock:
+    post:
+      tags:
+        - Artikel
+      summary: Lagerbestand aktualisieren
+      parameters:
+        - name: article_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [add, remove, set]
+                quantity:
+                  type: integer
+                order_number:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        '302':
+          description: Redirect zurück
+
+  /articles/import/lshop:
+    post:
+      tags:
+        - Artikel
+      summary: L-Shop Excel-Import
+      description: Importiert Artikel aus L-Shop Excel-Datei
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                excel_file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Import-Ergebnis
+
+  # ==================== AUFTRÄGE ====================
+  /orders:
+    get:
+      tags:
+        - Aufträge
+      summary: Auftrags-Übersicht
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [new, accepted, in_progress, production, ready, completed, cancelled]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Auftrags-Liste HTML
+
+  /orders/new:
+    post:
+      tags:
+        - Aufträge
+      summary: Neuen Auftrag erstellen
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                customer_id:
+                  type: string
+                order_type:
+                  type: string
+                delivery_date:
+                  type: string
+                  format: date
+      responses:
+        '302':
+          description: Redirect zur Auftragsdetails-Seite
+
+  /orders/{order_id}:
+    get:
+      tags:
+        - Aufträge
+      summary: Auftrags-Details
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Auftrags-Details HTML
+
+  /orders/{order_id}/status:
+    post:
+      tags:
+        - Aufträge
+      summary: Auftragsstatus aktualisieren
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [new, accepted, in_progress, production, ready, completed, cancelled]
+                comment:
+                  type: string
+      responses:
+        '302':
+          description: Redirect zurück
+
+  /orders/{order_id}/add-item:
+    post:
+      tags:
+        - Aufträge
+      summary: Artikel zu Auftrag hinzufügen
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                article_id:
+                  type: string
+                quantity:
+                  type: integer
+      responses:
+        '200':
+          description: Erfolgreich hinzugefügt
+
+  # ==================== PRODUKTION ====================
+  /production:
+    get:
+      tags:
+        - Produktion
+      summary: Produktions-Übersicht
+      responses:
+        '200':
+          description: Produktions-Übersicht HTML
+
+  /production/planning:
+    get:
+      tags:
+        - Produktion
+      summary: Produktionsplanung
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Planungs-Ansicht HTML
+
+  /production/order/{order_id}/start:
+    post:
+      tags:
+        - Produktion
+      summary: Produktion starten
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                machine_id:
+                  type: string
+      responses:
+        '302':
+          description: Redirect zurück
+
+  /production/api/order/schedule:
+    post:
+      tags:
+        - Produktion
+      summary: Auftrag einplanen (Drag & Drop)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order_id:
+                  type: string
+                machine_id:
+                  type: string
+                start_time:
+                  type: string
+                  format: date-time
+                duration_hours:
+                  type: number
+      responses:
+        '200':
+          description: Erfolgreich eingeplant
+
+  # ==================== KASSE ====================
+  /kasse:
+    get:
+      tags:
+        - Kasse
+      summary: Kassensystem-Übersicht
+      security: []
+      responses:
+        '200':
+          description: Kassen-Übersicht HTML
+
+  /kasse/verkauf:
+    get:
+      tags:
+        - Kasse
+      summary: Verkaufs-Interface
+      security: []
+      responses:
+        '200':
+          description: Verkaufs-Interface HTML
+
+  /kasse/artikel/suchen:
+    get:
+      tags:
+        - Kasse
+      summary: Artikel-Suche (AJAX)
+      security: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Suchergebnisse JSON
+
+  /kasse/verkauf/abschliessen:
+    post:
+      tags:
+        - Kasse
+      summary: Verkauf abschließen (mit TSE)
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                zahlungsart:
+                  type: string
+                  enum: [bar, karte, rechnung]
+                items:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: Verkauf erfolgreich abgeschlossen
+
+  /kasse/tagesabschluss:
+    get:
+      tags:
+        - Kasse
+      summary: Tagesabschluss
+      security: []
+      parameters:
+        - name: datum
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Tagesabschluss HTML
+
+  # ==================== RECHNUNGEN ====================
+  /rechnung:
+    get:
+      tags:
+        - Rechnungen
+      summary: Rechnungs-Übersicht
+      security: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: customer
+          in: query
+          schema:
+            type: string
+        - name: period
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rechnungs-Liste HTML
+
+  /rechnung/neu:
+    post:
+      tags:
+        - Rechnungen
+      summary: Neue Rechnung erstellen
+      security: []
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                customer_id:
+                  type: string
+                positions:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '302':
+          description: Redirect zur Rechnung
+
+  /rechnung/{rechnung_id}/pdf:
+    get:
+      tags:
+        - Rechnungen
+      summary: Rechnung als PDF
+      security: []
+      parameters:
+        - name: rechnung_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: PDF-Datei
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  /rechnung/{rechnung_id}/download:
+    get:
+      tags:
+        - Rechnungen
+      summary: ZUGFeRD-PDF herunterladen
+      security: []
+      parameters:
+        - name: rechnung_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: ZUGFeRD PDF-Datei
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+
+  # ==================== EINSTELLUNGEN ====================
+  /settings:
+    get:
+      tags:
+        - Einstellungen
+      summary: Einstellungs-Übersicht
+      responses:
+        '200':
+          description: Einstellungen HTML
+
+  /settings/brands:
+    get:
+      tags:
+        - Einstellungen
+      summary: Marken-Verwaltung
+      description: Verwaltung von Produktmarken (nur Admin)
+      responses:
+        '200':
+          description: Marken-Liste HTML
+
+  /settings/brands/new:
+    post:
+      tags:
+        - Einstellungen
+      summary: Neue Marke erstellen
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                website:
+                  type: string
+      responses:
+        '302':
+          description: Redirect zur Marken-Übersicht
+
+  /settings/brands/{brand_id}/toggle:
+    post:
+      tags:
+        - Einstellungen
+      summary: Marke aktivieren/deaktivieren
+      parameters:
+        - name: brand_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Status geändert
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  # ==================== AKTIVITÄTEN ====================
+  /activities:
+    get:
+      tags:
+        - Aktivitäten
+      summary: Aktivitäts-Protokoll
+      parameters:
+        - name: user
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Aktivitäts-Liste HTML
+
+  /activities/export:
+    get:
+      tags:
+        - Aktivitäten
+      summary: Aktivitäten exportieren (CSV)
+      description: Nur für Administratoren
+      parameters:
+        - name: user
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: CSV-Datei
+          content:
+            text/csv:
+              schema:
+                type: string
