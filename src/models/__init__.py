@@ -59,6 +59,16 @@ from .settings import (
     CalculationMode
 )
 
+# Design-Management
+from .design import (
+    Design,
+    DesignVersion,
+    DesignUsage,
+    ThreadBrand,
+    ThreadColor,
+    DesignOrder
+)
+
 # Rechnungsmodul (optional)
 try:
     from .rechnungsmodul import (
@@ -162,6 +172,14 @@ __all__ = [
     'OperatingCostCategory',
     'OperatingCost',
     'CalculationMode',
+    
+    # Design-Management
+    'Design',
+    'DesignVersion',
+    'DesignUsage',
+    'ThreadBrand',
+    'ThreadColor',
+    'DesignOrder',
     
     # Rechnungsmodul (optional)
     'Receipt',

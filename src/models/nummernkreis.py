@@ -41,6 +41,9 @@ class DocumentType:
     # Einkauf-Modul (NEU)
     PURCHASE_ORDER = 'purchase_order'  # Einkaufsbestellung (Artikel bei Lieferanten)
     DESIGN_ORDER = 'design_order'      # Design-Bestellung (Puncher/Digitizer)
+    
+    # Design-Management
+    DESIGN = 'design'                  # Design-Bibliothek (D-2025-0001)
 
 
 class NumberSequenceSettings(db.Model):
@@ -135,6 +138,13 @@ class NumberSequenceSettings(db.Model):
                 },
                 DocumentType.DESIGN_ORDER: {
                     'prefix': 'DO',
+                    'use_year': True,
+                    'use_month': False,
+                    'format_pattern': '{prefix}-{year}-{number:04d}'
+                },
+                # Design-Management
+                DocumentType.DESIGN: {
+                    'prefix': 'D',
                     'use_year': True,
                     'use_month': False,
                     'format_pattern': '{prefix}-{year}-{number:04d}'

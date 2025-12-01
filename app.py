@@ -189,6 +189,9 @@ def create_app():
     # Design-Freigabe System
     register_blueprint_safe('src.controllers.design_approval_controller', 'design_approval_bp', 'Design-Freigabe')
 
+    # Design-Archiv & Bestellungen
+    register_blueprint_safe('src.controllers.design_controller', 'designs_bp', 'Design-Archiv')
+
     # Multi-Position-Design API
     register_blueprint_safe('src.controllers.order_design_controller', 'order_design_bp', 'Design-Positionen API')
 

@@ -22,5 +22,21 @@
     "action": "supplier_created",
     "details": "Lieferant erstellt: LF001 - L-shop",
     "ip_address": "N/A"
+  },
+  {
+    "id": 4,
+    "timestamp": "2025-12-01T15:14:39.844357",
+    "username": "Hans",
+    "action": "supplier_order_created",
+    "details": "Bestellung PO-2025-0004 f\u00fcr L-shop erstellt (1 Artikel neu mit Lieferant verkn\u00fcpft)",
+    "ip_address": "N/A"
+  },
+  {
+    "id": 5,
+    "timestamp": "2025-12-01T15:25:07.772689",
+    "username": "Hans",
+    "action": "order_placed",
+    "details": "Bestellung PO-2025-0004 aufgegeben (online)",
+    "ip_address": "N/A"
   }
 ]

@@ -641,21 +641,280 @@ def api_rechnung_mahnung(rechnung_id):
 @rechnung_bp.route('/api/<int:rechnung_id>/stornieren', methods=['POST'])
 def api_rechnung_stornieren(rechnung_id):
     """
-    Rechnung stornieren
+    Rechnung stornieren - erstellt eine Stornorechnung
     """
     try:
-        # TODO: Stornierung implementieren
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+
+        # Prüfen ob Rechnung bereits storniert
+        if rechnung.status == RechnungsStatus.STORNIERT:
+            return jsonify({
+                'success': False,
+                'message': 'Rechnung ist bereits storniert'
+            }), 400
+
+        # Storno-Grund aus Request holen
+        data = request.get_json() or {}
+        storno_grund = data.get('grund', 'Storniert durch Benutzer')
+
+        # Stornorechnung erstellen (negative Beträge)
+        storno_nummer = f"ST-{rechnung.rechnungsnummer}"
+
+        # Prüfen ob Stornorechnung bereits existiert
+        existing_storno = Rechnung.query.filter_by(rechnungsnummer=storno_nummer).first()
+        if existing_storno:
+            return jsonify({
+                'success': False,
+                'message': 'Stornorechnung existiert bereits'
+            }), 400
+
+        # Neue Stornorechnung mit negativen Beträgen
+        stornorechnung = Rechnung(
+            rechnungsnummer=storno_nummer,
+            richtung=rechnung.richtung,
+            kunde_id=rechnung.kunde_id,
+            kunde_name=rechnung.kunde_name,
+            kunde_adresse=rechnung.kunde_adresse,
+            kunde_email=rechnung.kunde_email,
+            kunde_steuernummer=rechnung.kunde_steuernummer,
+            kunde_ust_id=rechnung.kunde_ust_id,
+            rechnungsdatum=date.today(),
+            leistungsdatum=rechnung.leistungsdatum,
+            faelligkeitsdatum=date.today(),
+            netto_gesamt=-rechnung.netto_gesamt,
+            mwst_gesamt=-rechnung.mwst_gesamt,
+            brutto_gesamt=-rechnung.brutto_gesamt,
+            status=RechnungsStatus.STORNIERT,
+            zugpferd_profil=rechnung.zugpferd_profil,
+            bemerkungen=f"Stornorechnung zu {rechnung.rechnungsnummer}\nGrund: {storno_grund}",
+            erstellt_von=current_user.username if current_user.is_authenticated else 'System'
+        )
+
+        # Storno-Positionen erstellen (negative Beträge)
+        for pos in rechnung.positionen:
+            storno_pos = RechnungsPosition(
+                position=pos.position,
+                artikel_id=pos.artikel_id,
+                artikel_nummer=pos.artikel_nummer,
+                artikel_name=f"STORNO: {pos.artikel_name}",
+                beschreibung=pos.beschreibung,
+                menge=-pos.menge,
+                einheit=pos.einheit,
+                einzelpreis=pos.einzelpreis,
+                mwst_satz=pos.mwst_satz,
+                mwst_betrag=-pos.mwst_betrag,
+                rabatt_prozent=pos.rabatt_prozent,
+                rabatt_betrag=-pos.rabatt_betrag if pos.rabatt_betrag else 0,
+                netto_betrag=-pos.netto_betrag,
+                brutto_betrag=-pos.brutto_betrag
+            )
+            stornorechnung.positionen.append(storno_pos)
+
+        # Originalrechnung als storniert markieren
+        rechnung.status = RechnungsStatus.STORNIERT
+        rechnung.bemerkungen = (rechnung.bemerkungen or '') + f"\n\n--- STORNIERT am {date.today().strftime('%d.%m.%Y')} ---\nGrund: {storno_grund}\nStornorechnung: {storno_nummer}"
+        rechnung.bearbeitet_am = datetime.utcnow()
+        rechnung.bearbeitet_von = current_user.username if current_user.is_authenticated else 'System'
+
+        db.session.add(stornorechnung)
+        db.session.commit()
+
+        logger.info(f"Rechnung {rechnung.rechnungsnummer} storniert, Stornorechnung {storno_nummer} erstellt")
+
         return jsonify({
             'success': True,
-            'message': 'Rechnung wurde storniert'
+            'message': f'Rechnung wurde storniert. Stornorechnung: {storno_nummer}',
+            'storno_rechnung_id': stornorechnung.id,
+            'storno_nummer': storno_nummer
         })
-        
+
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Fehler beim Stornieren: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'message': str(e)
         }), 500
+
+@rechnung_bp.route('/<int:rechnung_id>/archiv/speichern', methods=['POST'])
+def rechnung_archiv_speichern(rechnung_id):
+    """
+    Speichert die Rechnung als PDF im Archiv
+    """
+    try:
+        import os
+        from flask import current_app
+
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+
+        # Archiv-Verzeichnis erstellen
+        archiv_dir = os.path.join(current_app.instance_path, 'rechnungen_archiv')
+        jahr_dir = os.path.join(archiv_dir, str(rechnung.rechnungsdatum.year))
+        monat_dir = os.path.join(jahr_dir, f"{rechnung.rechnungsdatum.month:02d}")
+
+        os.makedirs(monat_dir, exist_ok=True)
+
+        # PDF generieren
+        zugpferd_service = ZugpferdService()
+        pdf_content = zugpferd_service.create_invoice_from_rechnung(rechnung)
+
+        # Dateiname: Rechnungsnummer_Kunde.pdf
+        safe_kunde = "".join(c for c in (rechnung.kunde_name or 'Unbekannt') if c.isalnum() or c in ' _-')[:50]
+        filename = f"{rechnung.rechnungsnummer}_{safe_kunde}.pdf"
+        filepath = os.path.join(monat_dir, filename)
+
+        # PDF speichern
+        with open(filepath, 'wb') as f:
+            f.write(pdf_content)
+
+        # Pfad in Datenbank speichern (relativ zum instance-Ordner)
+        rel_path = os.path.join('rechnungen_archiv', str(rechnung.rechnungsdatum.year),
+                                f"{rechnung.rechnungsdatum.month:02d}", filename)
+        rechnung.pdf_datei = rel_path
+        rechnung.bearbeitet_am = datetime.utcnow()
+        db.session.commit()
+
+        logger.info(f"Rechnung {rechnung.rechnungsnummer} im Archiv gespeichert: {filepath}")
+
+        flash(f"Rechnung wurde im Archiv gespeichert", "success")
+        return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
+
+    except Exception as e:
+        logger.error(f"Fehler beim Archivieren: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Fehler beim Archivieren: {str(e)}", "error")
+        return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
+
+
+@rechnung_bp.route('/<int:rechnung_id>/archiv/oeffnen')
+def rechnung_archiv_oeffnen(rechnung_id):
+    """
+    Öffnet die archivierte PDF-Datei einer Rechnung
+    """
+    try:
+        import os
+        from flask import current_app
+
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+
+        if not rechnung.pdf_datei:
+            flash("Keine archivierte PDF-Datei vorhanden. Bitte zuerst archivieren.", "warning")
+            return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
+
+        # Vollständigen Pfad erstellen
+        filepath = os.path.join(current_app.instance_path, rechnung.pdf_datei)
+
+        if not os.path.exists(filepath):
+            flash("Archivierte PDF-Datei nicht gefunden. Bitte erneut archivieren.", "error")
+            rechnung.pdf_datei = None
+            db.session.commit()
+            return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
+
+        # PDF aus Archiv senden
+        with open(filepath, 'rb') as f:
+            pdf_content = f.read()
+
+        return send_file(
+            io.BytesIO(pdf_content),
+            mimetype='application/pdf',
+            as_attachment=False,
+            download_name=f'{rechnung.rechnungsnummer}.pdf'
+        )
+
+    except Exception as e:
+        logger.error(f"Fehler beim Öffnen der archivierten Rechnung: {str(e)}")
+        flash(f"Fehler: {str(e)}", "error")
+        return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
+
+
+@rechnung_bp.route('/<int:rechnung_id>/archiv/download')
+def rechnung_archiv_download(rechnung_id):
+    """
+    Lädt die archivierte PDF-Datei herunter
+    """
+    try:
+        import os
+        from flask import current_app
+
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+
+        if not rechnung.pdf_datei:
+            flash("Keine archivierte PDF-Datei vorhanden.", "warning")
+            return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
+
+        filepath = os.path.join(current_app.instance_path, rechnung.pdf_datei)
+
+        if not os.path.exists(filepath):
+            flash("Archivierte PDF-Datei nicht gefunden.", "error")
+            return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
+
+        with open(filepath, 'rb') as f:
+            pdf_content = f.read()
+
+        return send_file(
+            io.BytesIO(pdf_content),
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'{rechnung.rechnungsnummer}.pdf'
+        )
+
+    except Exception as e:
+        logger.error(f"Fehler beim Download: {str(e)}")
+        flash(f"Fehler: {str(e)}", "error")
+        return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
+
+
+@rechnung_bp.route('/archiv')
+def rechnungs_archiv():
+    """
+    Zeigt alle archivierten Rechnungen nach Jahr/Monat
+    """
+    try:
+        import os
+        from flask import current_app
+        from collections import defaultdict
+
+        # Alle Rechnungen mit PDF-Archiv laden
+        rechnungen_mit_archiv = Rechnung.query.filter(
+            Rechnung.pdf_datei != None,
+            Rechnung.pdf_datei != ''
+        ).order_by(Rechnung.rechnungsdatum.desc()).all()
+
+        # Nach Jahr und Monat gruppieren
+        archiv_struktur = defaultdict(lambda: defaultdict(list))
+
+        for rechnung in rechnungen_mit_archiv:
+            if rechnung.rechnungsdatum:
+                jahr = rechnung.rechnungsdatum.year
+                monat = rechnung.rechnungsdatum.month
+                archiv_struktur[jahr][monat].append(rechnung)
+
+        # Sortieren (neueste zuerst)
+        archiv_struktur = dict(sorted(archiv_struktur.items(), reverse=True))
+        for jahr in archiv_struktur:
+            archiv_struktur[jahr] = dict(sorted(archiv_struktur[jahr].items(), reverse=True))
+
+        # Statistiken
+        total_count = len(rechnungen_mit_archiv)
+        total_betrag = sum(float(r.brutto_gesamt or 0) for r in rechnungen_mit_archiv)
+
+        return render_template('rechnung/archiv.html',
+            archiv_struktur=archiv_struktur,
+            total_count=total_count,
+            total_betrag=total_betrag,
+            page_title="Rechnungsarchiv"
+        )
+
+    except Exception as e:
+        logger.error(f"Fehler beim Laden des Archivs: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash(f"Fehler beim Laden des Archivs: {str(e)}", "error")
+        return redirect(url_for('rechnung.rechnungs_index'))
+
 
 @rechnung_bp.route('/export')
 def export_rechnungen():
@@ -664,11 +923,11 @@ def export_rechnungen():
     """
     try:
         format_type = request.args.get('format', 'csv')
-        
+
         # TODO: Export implementieren
         flash(f"Export im Format {format_type} wird noch implementiert", "info")
         return redirect(url_for('rechnung.rechnungs_index'))
-        
+
     except Exception as e:
         logger.error(f"Fehler beim Export: {str(e)}")
         flash(f"Fehler beim Export: {str(e)}", "error")
