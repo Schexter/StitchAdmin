@@ -69,6 +69,9 @@ from .design import (
     DesignOrder
 )
 
+# TODO / Aufgaben-System
+from .todo import Todo, TodoTemplate
+
 # Rechnungsmodul (optional)
 try:
     from .rechnungsmodul import (
@@ -180,6 +183,10 @@ __all__ = [
     'ThreadBrand',
     'ThreadColor',
     'DesignOrder',
+    
+    # TODO / Aufgaben-System
+    'Todo',
+    'TodoTemplate',
     
     # Rechnungsmodul (optional)
     'Receipt',

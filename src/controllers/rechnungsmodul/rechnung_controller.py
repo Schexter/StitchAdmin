@@ -916,6 +916,217 @@ def rechnungs_archiv():
         return redirect(url_for('rechnung.rechnungs_index'))
 
 
+@rechnung_bp.route('/<int:rechnung_id>/verknuepfen')
+def rechnung_verknuepfen(rechnung_id):
+    """
+    Rechnung mit Auftrag verknüpfen (Rückwärts-Verknüpfung)
+    Zeigt alle Aufträge die noch nicht mit einer Rechnung verknüpft sind
+    """
+    try:
+        from src.models.models import Order
+        
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+        
+        # Aufträge ohne Rechnung oder mit dieser Rechnung
+        auftraege = Order.query.filter(
+            db.or_(
+                Order.invoice_id == None,
+                Order.invoice_id == rechnung.id
+            ),
+            Order.status.notin_(['cancelled', 'draft'])
+        ).order_by(Order.created_at.desc()).limit(100).all()
+        
+        # Passende Aufträge hervorheben (gleicher Kunde)
+        passende_auftraege = []
+        andere_auftraege = []
+        
+        for auftrag in auftraege:
+            if str(auftrag.customer_id) == str(rechnung.kunde_id):
+                passende_auftraege.append(auftrag)
+            else:
+                andere_auftraege.append(auftrag)
+        
+        return render_template('rechnung/verknuepfen.html',
+            rechnung=rechnung,
+            passende_auftraege=passende_auftraege,
+            andere_auftraege=andere_auftraege,
+            aktueller_auftrag=rechnung.auftrag
+        )
+        
+    except Exception as e:
+        logger.error(f"Fehler beim Laden der Aufträge: {str(e)}")
+        flash(f"Fehler: {str(e)}", "error")
+        return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
+
+
+@rechnung_bp.route('/<int:rechnung_id>/verknuepfen', methods=['POST'])
+def rechnung_verknuepfen_speichern(rechnung_id):
+    """
+    Speichert die Verknüpfung Rechnung <-> Auftrag
+    """
+    try:
+        from src.models.models import Order
+        
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+        
+        order_id = request.form.get('order_id')
+        
+        # Alte Verknüpfung lösen (falls vorhanden)
+        if rechnung.auftrag_id:
+            alter_auftrag = Order.query.get(rechnung.auftrag_id)
+            if alter_auftrag:
+                alter_auftrag.invoice_id = None
+        
+        if order_id and order_id != 'none':
+            # Neue Verknüpfung setzen
+            auftrag = Order.query.get_or_404(order_id)
+            
+            # Prüfen ob Auftrag bereits andere Rechnung hat
+            if auftrag.invoice_id and auftrag.invoice_id != rechnung.id:
+                andere_rechnung = Rechnung.query.get(auftrag.invoice_id)
+                if andere_rechnung:
+                    flash(f"Achtung: Auftrag war bereits mit Rechnung {andere_rechnung.rechnungsnummer} verknüpft. Alte Verknüpfung wurde gelöst.", "warning")
+                    andere_rechnung.auftrag_id = None
+            
+            # Bidirektionale Verknüpfung
+            rechnung.auftrag_id = order_id
+            auftrag.invoice_id = rechnung.id
+            
+            # Workflow-Status aktualisieren
+            if auftrag.workflow_status in ['delivered', 'picked_up', 'shipped']:
+                auftrag.workflow_status = 'invoiced'
+            
+            flash(f"Rechnung wurde mit Auftrag {auftrag.order_number} verknüpft.", "success")
+        else:
+            # Verknüpfung entfernen
+            rechnung.auftrag_id = None
+            flash("Auftragsverknüpfung wurde entfernt.", "info")
+        
+        rechnung.bearbeitet_am = datetime.utcnow()
+        rechnung.bearbeitet_von = current_user.username if current_user.is_authenticated else 'System'
+        
+        db.session.commit()
+        
+        return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
+        
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Fehler beim Verknüpfen: {str(e)}")
+        flash(f"Fehler: {str(e)}", "error")
+        return redirect(url_for('rechnung.rechnung_verknuepfen', rechnung_id=rechnung_id))
+
+
+@rechnung_bp.route('/api/<int:rechnung_id>/verknuepfen', methods=['POST'])
+def api_rechnung_verknuepfen(rechnung_id):
+    """
+    API: Rechnung mit Auftrag verknüpfen
+    """
+    try:
+        from src.models.models import Order
+        
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+        data = request.get_json() or {}
+        order_id = data.get('order_id')
+        
+        if not order_id:
+            return jsonify({'success': False, 'error': 'Keine Auftrags-ID angegeben'}), 400
+        
+        auftrag = Order.query.get_or_404(order_id)
+        
+        # Bidirektionale Verknüpfung
+        rechnung.auftrag_id = order_id
+        auftrag.invoice_id = rechnung.id
+        
+        rechnung.bearbeitet_am = datetime.utcnow()
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Rechnung mit Auftrag {auftrag.order_number} verknüpft',
+            'order_number': auftrag.order_number
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@rechnung_bp.route('/api/order/<order_id>/verknuepfen', methods=['POST'])
+def api_auftrag_mit_rechnung_verknuepfen(order_id):
+    """
+    API: Auftrag mit bestehender Rechnung verknüpfen (aus Auftragsansicht)
+    """
+    try:
+        from src.models.models import Order
+        
+        auftrag = Order.query.get_or_404(order_id)
+        data = request.get_json() or {}
+        rechnung_id = data.get('rechnung_id')
+        
+        if not rechnung_id:
+            return jsonify({'success': False, 'error': 'Keine Rechnungs-ID angegeben'}), 400
+        
+        rechnung = Rechnung.query.get_or_404(rechnung_id)
+        
+        # Bidirektionale Verknüpfung
+        auftrag.invoice_id = rechnung.id
+        rechnung.auftrag_id = order_id
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Auftrag mit Rechnung {rechnung.rechnungsnummer} verknüpft',
+            'rechnungsnummer': rechnung.rechnungsnummer
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@rechnung_bp.route('/suche/fuer-auftrag/<order_id>')
+def suche_rechnungen_fuer_auftrag(order_id):
+    """
+    Sucht passende Rechnungen für einen Auftrag (für Verknüpfungs-Dialog)
+    """
+    try:
+        from src.models.models import Order
+        
+        auftrag = Order.query.get_or_404(order_id)
+        
+        # Suche Rechnungen die:
+        # 1. Gleicher Kunde
+        # 2. Noch nicht verknüpft oder mit diesem Auftrag verknüpft
+        # 3. Nicht storniert
+        
+        query = Rechnung.query.filter(
+            Rechnung.kunde_id == str(auftrag.customer_id),
+            Rechnung.status != RechnungsStatus.STORNIERT,
+            db.or_(
+                Rechnung.auftrag_id == None,
+                Rechnung.auftrag_id == order_id
+            )
+        ).order_by(Rechnung.rechnungsdatum.desc())
+        
+        rechnungen = query.limit(20).all()
+        
+        return jsonify({
+            'success': True,
+            'rechnungen': [{
+                'id': r.id,
+                'rechnungsnummer': r.rechnungsnummer,
+                'datum': r.rechnungsdatum.strftime('%d.%m.%Y') if r.rechnungsdatum else '',
+                'betrag': float(r.brutto_gesamt or 0),
+                'status': r.status.value if hasattr(r.status, 'value') else r.status,
+                'bereits_verknuepft': r.auftrag_id == order_id
+            } for r in rechnungen]
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @rechnung_bp.route('/export')
 def export_rechnungen():
     """

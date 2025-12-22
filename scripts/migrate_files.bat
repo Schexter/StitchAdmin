@@ -13,6 +13,7 @@ set NEW_PATH=C:\SoftwareEntwicklung\StitchAdmin2.0
 echo Schritt 1: Models kopieren...
 echo.
 
+
 REM Models Dateien
 xcopy "%OLD_PATH%\src\models\models.py" "%NEW_PATH%\src\models\" /Y /Q
 xcopy "%OLD_PATH%\src\models\article_supplier.py" "%NEW_PATH%\src\models\" /Y /Q

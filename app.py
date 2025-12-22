@@ -223,6 +223,9 @@ def create_app():
     register_blueprint_safe('src.controllers.permissions_controller', 'permissions_bp', 'Berechtigungsverwaltung')
     register_blueprint_safe('src.controllers.dashboard_api_controller', 'dashboard_api_bp', 'Dashboard-API')
 
+    # Design-Erstellung (Fremd- und Eigenerstellung)
+    register_blueprint_safe('src.controllers.design_creation_controller', 'design_creation_bp', 'Design-Erstellung')
+
     # ==========================================
     # HAUPT-ROUTEN
     # ==========================================
@@ -445,6 +448,8 @@ def create_app():
     @app.context_processor
     def inject_globals():
         """Globale Template-Variablen, inkl. Branding."""
+        from datetime import date
+        
         try:
             from src.models.branding_settings import BrandingSettings
             branding_settings = BrandingSettings.get_settings()
@@ -462,7 +467,8 @@ def create_app():
         return {
             'app_name': 'StitchAdmin 2.0',
             'app_version': '2.0.2',
-            'branding': branding_settings
+            'branding': branding_settings,
+            'today': date.today()
         }
 
     # ==========================================
