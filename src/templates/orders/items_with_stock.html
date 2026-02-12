@@ -82,7 +82,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">Positionen & Bestand</h5>
         {% if items_to_order > 0 %}
-        <a href="{{ url_for('suppliers.orders') }}" class="btn btn-sm btn-warning">
+        <a href="{{ url_for('suppliers.all_orders') }}" class="btn btn-sm btn-warning">
             <i class="bi bi-cart3"></i> Zur Bestellübersicht
         </a>
         {% endif %}
