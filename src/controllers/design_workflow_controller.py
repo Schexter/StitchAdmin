@@ -210,4 +210,3 @@ def register_design_workflow_blueprint(app):
     """Registriert Blueprint"""
     app.register_blueprint(design_workflow_bp)
     register_template_helpers(app)
-    print("[OK] Einfacher Design-Workflow Blueprint registriert")

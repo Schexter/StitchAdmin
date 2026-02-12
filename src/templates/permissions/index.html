@@ -109,7 +109,13 @@
                         {% for module in modules|sort(attribute='sort_order') %}
                         <tr>
                             <td>
-                                <span style="font-size: 1.5rem;">{{ module.icon }}</span>
+                                <span style="font-size: 1.5rem;">
+                                    {% if module.icon and module.icon.startswith('bi-') %}
+                                        <i class="bi {{ module.icon }}"></i>
+                                    {% else %}
+                                        <i class="bi bi-grid-fill"></i>
+                                    {% endif %}
+                                </span>
                                 <strong class="ms-2">{{ module.display_name }}</strong>
                                 <br>
                                 <small class="text-muted">{{ module.description }}</small>

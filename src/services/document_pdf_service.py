@@ -138,21 +138,13 @@ class DocumentPDFService:
                 'small_business_text': self.company_settings.small_business_text,
             }
         else:
-            # Fallback
+            # Keine Firmeneinstellungen konfiguriert
             return {
-                'name': 'StitchAdmin GmbH',
-                'street': 'Musterstraße 123',
-                'city': '12345 Musterstadt',
-                'phone': '0123-456789',
-                'email': 'info@stitchadmin.de',
-                'website': '',
-                'tax_id': '',
-                'vat_id': '',
-                'bank_name': 'Musterbank',
-                'iban': 'DE89 3704 0044 0532 0130 00',
-                'bic': 'COBADEFFXXX',
-                'logo_path': None,
-                'small_business': False,
+                'name': 'Bitte Firmeneinstellungen konfigurieren',
+                'street': '', 'city': '', 'phone': '', 'email': '',
+                'website': '', 'tax_id': '', 'vat_id': '',
+                'bank_name': '', 'iban': '', 'bic': '',
+                'logo_path': None, 'small_business': False,
                 'small_business_text': '',
             }
     

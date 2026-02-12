@@ -432,10 +432,6 @@ class LShopImportService:
             except:
                 pass
             
-            # DEBUG: Zeige Mapping-Info
-            print(f"DEBUG: Column Mapping: {column_mapping}")
-            print(f"DEBUG: DataFrame Columns: {list(self.df.columns)}")
-            
             for index, row in self.df.iterrows():
                 try:
                     # Skip leere Zeilen
@@ -463,10 +459,6 @@ class LShopImportService:
                                 if pd.notna(value) and str(value).strip():
                                     article_data[target_field] = str(value).strip()
                     
-                    # DEBUG für erste 3 Zeilen
-                    if index < 3:
-                        print(f"DEBUG Zeile {index+1}: Extracted Data: {article_data}")
-                    
                     # Verbesserte Validierung
                     has_required_data = bool(
                         article_data.get('supplier_article_number') or 
@@ -474,8 +466,6 @@ class LShopImportService:
                     )
                     
                     if not has_required_data:
-                        if index < 3:  # Debug nur für erste Zeilen
-                            print(f"DEBUG: Zeile {index+1} übersprungen - keine Pflichtdaten")
                         skipped_count += 1
                         continue
                     
@@ -493,10 +483,6 @@ class LShopImportService:
                     
                     # *** NEUE EINFACHE ID-GENERIERUNG ***
                     article_id = self.generate_article_id()
-                    
-                    # DEBUG für erste 3 Artikel
-                    if index < 3:
-                        print(f"DEBUG: Versuche Artikel zu erstellen - {article_id} - {article_data.get('article_number')} - {article_data.get('name')}")
                     
                     # Prüfe ob Artikel bereits existiert
                     existing_article = None
@@ -519,18 +505,8 @@ class LShopImportService:
 
                         # *** NEU: Automatische Lieferantenzuordnung auch bei Update ***
                         matched_supplier = existing_article.auto_assign_supplier()
-                        if matched_supplier and index < 3:
-                            print(f"DEBUG: Lieferant für Update zugeordnet: {matched_supplier.name}")
-
                         updated_count += 1
-
-                        if index < 3:
-                            print(f"DEBUG: Artikel aktualisiert: {existing_article.id}")
                     else:
-                        # *** REPARATUR: Erstelle neuen Artikel mit korrekter ID ***
-                        if index < 3:
-                            print(f"DEBUG: Erstelle neuen Artikel: {article_id}")
-                        
                         # *** NEUE REPARATUR: Erstelle Marken und Kategorien automatisch ***
                         brand_obj = self.create_or_get_brand(article_data.get('manufacturer'))
                         category_obj = self.create_or_get_category(article_data.get('category'))
@@ -576,39 +552,26 @@ class LShopImportService:
 
                         # *** NEU: Automatische Lieferantenzuordnung ***
                         matched_supplier = article.auto_assign_supplier()
-                        if matched_supplier:
-                            if index < 3:
-                                print(f"DEBUG: Lieferant automatisch zugeordnet: {matched_supplier.name}")
-
                         imported_count += 1
-
-                        if index < 3:
-                            print(f"DEBUG: Artikel zur Session hinzugefügt: {article.id} - {article.article_number}")
                     
                     # Commit in Batches mit Fehlerbehandlung
                     if (imported_count + updated_count) % 50 == 0:
                         try:
                             db.session.commit()
-                            if index < 200:  # Debug für erste 200 Zeilen
-                                print(f"DEBUG: Batch-Commit bei Zeile {index+1} erfolgreich")
                         except Exception as commit_error:
                             db.session.rollback()
                             error_count += 1
                             error_msg = f"Batch-Commit Fehler bei Zeile {index+1}: {str(commit_error)}"
                             errors.append(error_msg)
-                            print(f"DEBUG COMMIT ERROR: {error_msg}")
                 
                 except Exception as e:
                     error_count += 1
                     error_msg = f"Zeile {index+1}: {str(e)}"
                     errors.append(error_msg)
-                    print(f"DEBUG ERROR: {error_msg}")
                     continue
             
             # Final commit
-            print(f"DEBUG: Final Commit - {imported_count} neue Artikel, {updated_count} aktualisiert")
             db.session.commit()
-            print(f"DEBUG: Commit erfolgreich!")
             
             return {
                 'success': True,
@@ -623,7 +586,6 @@ class LShopImportService:
         except Exception as e:
             db.session.rollback()
             error_msg = f'Fehler beim Import: {e}'
-            print(f"DEBUG CRITICAL ERROR: {error_msg}")
             return {
                 'success': False,
                 'error': str(e),

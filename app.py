@@ -83,9 +83,13 @@ def create_app():
     os.makedirs(instance_dir, exist_ok=True)
     os.makedirs(upload_dir, exist_ok=True)
 
-    # Datenbank-Konfiguration mit absolutem Pfad im DATA_DIR
-    db_path = os.path.join(instance_dir, 'stitchadmin.db')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+    # Datenbank-Konfiguration (PostgreSQL via DATABASE_URL oder SQLite als Fallback)
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url:
+        app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+    else:
+        db_path = os.path.join(instance_dir, 'stitchadmin.db')
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
     app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -544,6 +548,35 @@ if __name__ == '__main__':
         from src.models.models import db, User
         db.create_all()
         
+        # Migriere Modul-Icons von Emojis/Text auf Bootstrap Icons
+        try:
+            from src.models.user_permissions import Module
+            icon_mapping = {
+                'CRM': 'bi-people-fill', '👥': 'bi-people-fill',
+                'PROD': 'bi-gear-wide-connected', '🏭': 'bi-gear-wide-connected',
+                'POS': 'bi-cash-stack', '💰': 'bi-cash-stack',
+                'ACC': 'bi-calculator-fill', '📈': 'bi-calculator-fill',
+                'DOC': 'bi-folder2-open', '📁': 'bi-folder2-open',
+                'ADM': 'bi-sliders', '⚙️': 'bi-sliders',
+                'WH': 'bi-box-seam-fill', '📦': 'bi-box-seam-fill',
+                'DSN': 'bi-palette-fill', '🎨': 'bi-palette-fill',
+                'EK': 'bi-cart-plus-fill', '🛒': 'bi-cart-plus-fill',
+                'palette': 'bi-palette-fill',
+            }
+            modules = Module.query.all()
+            updated = False
+            for m in modules:
+                if m.icon in icon_mapping:
+                    m.icon = icon_mapping[m.icon]
+                    updated = True
+                elif m.icon and not m.icon.startswith('bi-'):
+                    m.icon = 'bi-grid-fill'
+                    updated = True
+            if updated:
+                db.session.commit()
+        except Exception:
+            pass
+
         # Erstelle Admin-User falls nicht vorhanden
         if not User.query.filter_by(username='admin').first():
             admin = User(username='admin', email='admin@example.com', is_admin=True)

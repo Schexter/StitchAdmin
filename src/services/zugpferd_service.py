@@ -676,9 +676,9 @@ class ZugpferdService:
             'discount_percent': float(rechnung.rabatt_prozent or 0),
             'subject': f"Rechnung {rechnung.rechnungsnummer}",
             'bank_details': {
-                'bank_name': settings.bank_name if 'settings' in locals() else 'Musterbank',
-                'iban': settings.iban if 'settings' in locals() else 'DE89370400440532013000',
-                'bic': settings.bic if 'settings' in locals() else 'COBADEFFXXX'
+                'bank_name': settings.bank_name if 'settings' in locals() and settings else '',
+                'iban': settings.iban if 'settings' in locals() and settings else '',
+                'bic': settings.bic if 'settings' in locals() and settings else ''
             },
-            'footer_text': settings.invoice_footer_text if 'settings' in locals() and settings.invoice_footer_text else 'Vielen Dank für Ihren Auftrag!'
+            'footer_text': settings.invoice_footer_text if 'settings' in locals() and settings and settings.invoice_footer_text else 'Vielen Dank für Ihren Auftrag!'
         }

@@ -84,7 +84,11 @@
                         </td>
                         <td>
                             <span class="badge bg-{{ module.color }}" style="font-size: 1.2em;">
-                                {{ module.icon }}
+                                {% if module.icon and module.icon.startswith('bi-') %}
+                                    <i class="bi {{ module.icon }}"></i>
+                                {% else %}
+                                    <i class="bi bi-grid-fill"></i>
+                                {% endif %}
                             </span>
                         </td>
                         <td>

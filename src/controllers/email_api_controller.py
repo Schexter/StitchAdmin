@@ -94,11 +94,9 @@ def test_outlook():
     """
     try:
         from src.services.outlook_service import OutlookService, OUTLOOK_AVAILABLE
-        import traceback
         import platform
 
         current_platform = platform.system()
-        print(f"[TEST-OUTLOOK] Plattform = {current_platform}")
 
         # Prüfe zuerst die Plattform
         if current_platform != 'Windows':
@@ -108,7 +106,6 @@ def test_outlook():
                 'message': f'Outlook-Integration ist nur unter Windows verfuegbar. Aktuelle Plattform: {current_platform}. Wenn Sie WSL nutzen, starten Sie StitchAdmin direkt unter Windows.'
             })
 
-        print(f"[TEST-OUTLOOK] OUTLOOK_AVAILABLE = {OUTLOOK_AVAILABLE}")
         if not OUTLOOK_AVAILABLE:
             return jsonify({
                 'success': False,
@@ -117,25 +114,20 @@ def test_outlook():
 
         service = OutlookService()
 
-        is_avail = service.is_available()
-        print(f"[TEST-OUTLOOK] is_available = {is_avail}")
-        if not is_avail:
+        if not service.is_available():
             return jsonify({
                 'success': False,
                 'message': 'Outlook ist nicht verfuegbar. Stellen Sie sicher, dass Outlook installiert und geoeffnet ist.'
             })
 
         # Verbindung explizit herstellen
-        connected = service.connect()
-        print(f"[TEST-OUTLOOK] connected = {connected}")
-        if not connected:
+        if not service.connect():
             return jsonify({
                 'success': False,
                 'message': 'Konnte keine Verbindung zu Outlook herstellen. Bitte Outlook oeffnen und erneut versuchen.'
             })
 
         # Test-E-Mail erstellen (wird nur angezeigt, nicht gesendet)
-        print("[TEST-OUTLOOK] Erstelle Test-E-Mail...")
         try:
             success = service.create_email(
                 to='test@example.com',  # Dummy-Adresse damit Outlook es akzeptiert
@@ -155,10 +147,8 @@ Diese E-Mail wurde automatisch generiert.
                 html_body=True,
                 display_first=True  # Nur anzeigen, nicht senden
             )
-            print(f"[TEST-OUTLOOK] create_email returned {success}")
         except Exception as create_error:
-            print(f"[TEST-OUTLOOK] create_email Exception: {create_error}")
-            traceback.print_exc()
+            logger.error(f"Test-Outlook create_email failed: {create_error}")
             return jsonify({
                 'success': False,
                 'message': f'Fehler beim Erstellen der E-Mail: {str(create_error)}'
@@ -177,7 +167,6 @@ Diese E-Mail wurde automatisch generiert.
 
     except Exception as e:
         logger.error(f"Outlook-Test fehlgeschlagen: {e}")
-        traceback.print_exc()
         return jsonify({
             'success': False,
             'message': f'Fehler: {str(e)}'
@@ -315,8 +304,6 @@ def send_invoice_email(rechnung_id):
 
     except Exception as e:
         logger.error(f"Rechnungsversand fehlgeschlagen: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({
             'success': False,
             'message': str(e)

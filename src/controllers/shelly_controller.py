@@ -449,4 +449,3 @@ def api_dashboard_data():
 def register_shelly_blueprint(app):
     """Registriert Shelly Blueprint"""
     app.register_blueprint(shelly_bp)
-    print("[OK] Shelly-Geräte Blueprint registriert")

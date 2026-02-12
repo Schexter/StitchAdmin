@@ -32,7 +32,7 @@ class Module(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False, index=True)  # z.B. "crm"
     display_name = db.Column(db.String(100), nullable=False)  # "CRM - Kundenverwaltung"
     description = db.Column(db.String(255))  # "Verwaltung von Kunden und Kontakten"
-    icon = db.Column(db.String(50), default="📦")  # Emoji oder Icon-Klasse
+    icon = db.Column(db.String(50), default="bi-grid-fill")  # Bootstrap Icon Klasse
     color = db.Column(db.String(50), default="primary")  # Bootstrap-Farbe
     route = db.Column(db.String(200))  # "customers.index" (Blueprint.route)
     category = db.Column(db.String(50), default="core")  # "core", "finance", "production", "admin"

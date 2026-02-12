@@ -832,11 +832,14 @@ def generiere_rechnung_pdf(rechnung):
         elements.append(Paragraph(f"<b>Zahlungsbedingungen:</b> {rechnung.zahlungstext}", style_small))
         elements.append(Spacer(1, 5*mm))
     
-    # Bankverbindung
-    elements.append(Paragraph("""
-        <b>Bankverbindung:</b><br/>
-        StitchAdmin GmbH | IBAN: DE89 3704 0044 0532 0130 00 | BIC: COBADEFFXXX
-    """, style_small))
+    # Bankverbindung aus Firmeneinstellungen
+    try:
+        from src.models.company_settings import CompanySettings
+        cs = CompanySettings.get_settings()
+        bank_text = f"{cs.display_name or ''} | IBAN: {cs.iban or ''} | BIC: {cs.bic or ''}"
+    except Exception:
+        bank_text = "Bankverbindung: Bitte in Einstellungen konfigurieren"
+    elements.append(Paragraph(f"<b>Bankverbindung:</b><br/>{bank_text}", style_small))
     
     doc.build(elements)
     

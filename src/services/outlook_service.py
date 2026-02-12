@@ -43,19 +43,13 @@ class OutlookService:
     def is_available() -> bool:
         """Prüft ob Outlook-Integration verfügbar ist"""
         if not OUTLOOK_AVAILABLE:
-            print("[OUTLOOK] win32com nicht verfuegbar")
             return False
 
         try:
-            # COM initialisieren (wichtig fuer Threads!)
             pythoncom.CoInitialize()
-            print("[OUTLOOK] Versuche Outlook.Application zu erstellen...")
             outlook = win32com.client.Dispatch("Outlook.Application")
-            result = outlook is not None
-            print(f"[OUTLOOK] Outlook.Application erstellt: {result}")
-            return result
+            return outlook is not None
         except Exception as e:
-            print(f"[OUTLOOK] Fehler beim Erstellen von Outlook.Application: {e}")
             logger.debug(f"Outlook nicht verfügbar: {e}")
             return False
 

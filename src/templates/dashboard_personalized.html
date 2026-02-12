@@ -46,8 +46,13 @@
     }
     
     .module-icon {
-        font-size: 3rem;
+        font-size: 2.8rem;
         margin-bottom: 1rem;
+        color: #495057;
+    }
+
+    .module-icon i {
+        font-size: 2.8rem;
     }
     
     .module-card h3 {
@@ -247,7 +252,13 @@
             <a href="{{ url_for(module.route) }}" class="text-decoration-none">
                 <div class="card module-card border-{{ module.color }}">
                     <div class="card-body">
-                        <div class="module-icon">{{ module.icon }}</div>
+                        <div class="module-icon">
+                            {% if module.icon and module.icon.startswith('bi-') %}
+                                <i class="bi {{ module.icon }}"></i>
+                            {% else %}
+                                <i class="bi bi-grid-fill"></i>
+                            {% endif %}
+                        </div>
                         <h3>{{ module.display_name }}</h3>
                         <p>{{ module.description }}</p>
                         

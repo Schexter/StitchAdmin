@@ -159,8 +159,7 @@ def new():
             if not article.price:
                 article.price = article.price_calculated
                 
-        except Exception as e:
-            print(f"Fehler bei erweiterter Preiskalkulation, verwende Legacy: {e}")
+        except Exception:
             # Fallback auf alte Methode
             article.calculate_prices(use_new_system=False)
         
@@ -488,8 +487,6 @@ def import_lshop():
                 flash(f"Fehler beim Lesen der Excel-Datei: {analysis['error']}", 'error')
                 os.remove(filepath)
                 return redirect(request.url)
-            
-            print(f"Analyse erfolgreich: {analysis['total_rows']} Zeilen gefunden")
             
             # Validiere Daten
             validation = service.validate_data()

@@ -164,11 +164,9 @@ Ihr StitchAdmin Team
 
 def send_admin_notification(subject, message):
     """Benachrichtigung an alle Admins"""
-    from src.controllers.user_controller import load_users
-    users = load_users()
-    
-    admin_emails = [user['email'] for user in users.values() 
-                   if user.get('is_admin') and user.get('email')]
+    from src.models.models import User
+    admin_users = User.query.filter_by(is_admin=True).all()
+    admin_emails = [u.email for u in admin_users if u.email]
     
     success_count = 0
     for email in admin_emails:

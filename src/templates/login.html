@@ -5,29 +5,44 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-4">
-        <div class="card">
+        <div class="card shadow">
             <div class="card-body p-5">
-                <h2 class="text-center mb-4">
+                <!-- Logo -->
+                {% if branding and branding.logo_path %}
+                <div class="text-center mb-4">
+                    <img src="{{ url_for('static', filename=branding.logo_path) }}"
+                         alt="Logo" style="max-height: 80px; max-width: 100%;">
+                </div>
+                {% endif %}
+                <h2 class="text-center mb-1">
                     <i class="bi bi-box-seam"></i> StitchAdmin
                 </h2>
-                <h4 class="text-center mb-4">Anmeldung</h4>
-                
+                <h4 class="text-center mb-4 text-muted">Anmeldung</h4>
+
                 <form method="POST">
                     <div class="mb-3">
                         <label for="username" class="form-label">Benutzername</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="bi bi-person"></i></span>
-                            <input type="text" class="form-control form-control-lg" id="username" 
+                            <input type="text" class="form-control form-control-lg" id="username"
                                    name="username" required autofocus>
                         </div>
                     </div>
-                    <div class="mb-4">
+                    <div class="mb-3">
                         <label for="password" class="form-label">Passwort</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                            <input type="password" class="form-control form-control-lg" id="password" 
+                            <input type="password" class="form-control form-control-lg" id="password"
                                    name="password" required>
+                            <button class="btn btn-outline-secondary" type="button" id="togglePassword"
+                                    title="Passwort anzeigen/verbergen">
+                                <i class="bi bi-eye" id="toggleIcon"></i>
+                            </button>
                         </div>
+                    </div>
+                    <div class="mb-4 form-check">
+                        <input type="checkbox" class="form-check-input" id="remember" name="remember">
+                        <label class="form-check-label" for="remember">Angemeldet bleiben</label>
                     </div>
                     <div class="d-grid">
                         <button type="submit" class="btn btn-primary btn-lg">
@@ -35,12 +50,22 @@
                         </button>
                     </div>
                 </form>
-                
-                <div class="text-center mt-4 text-muted">
-                    <small>Standard-Login: admin / admin123</small>
-                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.getElementById('togglePassword').addEventListener('click', function() {
+    const pw = document.getElementById('password');
+    const icon = document.getElementById('toggleIcon');
+    if (pw.type === 'password') {
+        pw.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        pw.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+});
+</script>
 {% endblock %}

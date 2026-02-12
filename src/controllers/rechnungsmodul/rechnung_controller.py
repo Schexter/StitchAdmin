@@ -186,8 +186,6 @@ def rechnungs_index():
 
     except Exception as e:
         logger.error(f"Fehler in rechnungs_index: {str(e)}")
-        import traceback
-        traceback.print_exc()
         flash(f"Fehler beim Laden der Rechnungsübersicht: {str(e)}", "error")
         return render_template('rechnung/index.html',
             ausgangsrechnungen=[],
@@ -318,8 +316,6 @@ def rechnung_erstellen():
     except Exception as e:
         db.session.rollback()
         logger.error(f"Fehler beim Erstellen der Rechnung: {str(e)}")
-        import traceback
-        traceback.print_exc()
         flash(f"Fehler beim Erstellen der Rechnung: {str(e)}", "error")
         return redirect(url_for('rechnung.neue_rechnung'))
 
@@ -508,8 +504,6 @@ def eingangsrechnung_erstellen():
     except Exception as e:
         db.session.rollback()
         logger.error(f"Fehler beim Erfassen der Eingangsrechnung: {str(e)}")
-        import traceback
-        traceback.print_exc()
         flash(f"Fehler beim Erfassen: {str(e)}", "error")
         return redirect(url_for('rechnung.neue_eingangsrechnung'))
 
@@ -556,8 +550,6 @@ def rechnung_pdf(rechnung_id):
 
     except Exception as e:
         logger.error(f"Fehler beim Generieren des PDFs: {str(e)}")
-        import traceback
-        traceback.print_exc()
         flash(f"Fehler beim Generieren des PDFs: {str(e)}", "error")
         return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
 
@@ -585,8 +577,6 @@ def rechnung_download(rechnung_id):
 
     except Exception as e:
         logger.error(f"Fehler beim ZUGFeRD-Download: {str(e)}")
-        import traceback
-        traceback.print_exc()
         flash(f"Fehler beim Download: {str(e)}", "error")
         return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
 
@@ -731,8 +721,6 @@ def api_rechnung_stornieren(rechnung_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Fehler beim Stornieren: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({
             'success': False,
             'message': str(e)
@@ -783,8 +771,6 @@ def rechnung_archiv_speichern(rechnung_id):
 
     except Exception as e:
         logger.error(f"Fehler beim Archivieren: {str(e)}")
-        import traceback
-        traceback.print_exc()
         flash(f"Fehler beim Archivieren: {str(e)}", "error")
         return redirect(url_for('rechnung.rechnung_detail', rechnung_id=rechnung_id))
 
@@ -910,8 +896,6 @@ def rechnungs_archiv():
 
     except Exception as e:
         logger.error(f"Fehler beim Laden des Archivs: {str(e)}")
-        import traceback
-        traceback.print_exc()
         flash(f"Fehler beim Laden des Archivs: {str(e)}", "error")
         return redirect(url_for('rechnung.rechnungs_index'))
 

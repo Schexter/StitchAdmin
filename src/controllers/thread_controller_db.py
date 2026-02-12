@@ -468,14 +468,11 @@ def import_threads():
                 try:
                     from src.utils.pdf_analyzer import ThreadColorPDFAnalyzer
                     analyzer = ThreadColorPDFAnalyzer()
-                    print("[PDF-Import] Verwende vollständigen PDF-Analyzer")
-                except ImportError as e:
-                    print(f"[PDF-Import] Vollständiger Analyzer nicht verfügbar ({e}), verwende Lite-Version")
+                except ImportError:
                     from src.utils.pdf_analyzer_lite import ThreadColorPDFAnalyzerLite
                     analyzer = ThreadColorPDFAnalyzerLite()
 
                 result = analyzer.analyze_pdf(temp_path)
-                print(f"[PDF-Import] Analyse-Ergebnis: {result.get('message', 'Keine Nachricht')}")
 
                 if result['success'] and result['colors']:
                     imported = 0
@@ -551,8 +548,6 @@ def import_threads():
                 flash(f'PDF-Analyzer nicht verfügbar. Bitte installieren Sie die erforderlichen Bibliotheken: {str(e)}', 'danger')
             except Exception as e:
                 flash(f'Fehler beim PDF-Import: {str(e)}', 'danger')
-                import traceback
-                traceback.print_exc()
             finally:
                 # Temporäre Datei löschen
                 if os.path.exists(temp_path):

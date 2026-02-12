@@ -10,6 +10,9 @@ from src.models import db, Order, Machine, ProductionSchedule, ActivityLog, Pack
 from sqlalchemy import and_
 import json
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Blueprint erstellen
 production_bp = Blueprint('production', __name__, url_prefix='/production')
@@ -37,9 +40,9 @@ def load_production_settings():
                     'distraction_factor': settings_data.get('production_factors', {}).get('distraction_factor', 0.85),
                     'color_scheme': settings_data.get('calendar_settings', {}).get('color_scheme', {})
                 }
-        except Exception as e:
-            print(f"Fehler beim Laden der Produktions-Einstellungen: {e}")
-    
+        except Exception:
+            pass
+
     return default_settings
 
 def calculate_thread_requirements(order):
@@ -78,8 +81,8 @@ def calculate_thread_requirements(order):
                         'is_low_stock': current_stock <= min_stock
                     })
         except Exception as e:
-            print(f"Fehler bei Garnbedarfsberechnung: {e}")
-    
+            logger.warning(f"Fehler bei Garnbedarfsberechnung: {e}")
+
     return thread_requirements
 
 def log_activity(action, details):
@@ -101,7 +104,6 @@ def _record_automatic_thread_usage(order):
         return
 
     if not order.stitch_count or order.stitch_count == 0:
-        print(f"[INFO] Kein stitch_count für Auftrag {order.id}, überspringe Garnverbrauchserfassung")
         return
 
     selected_threads = []
@@ -122,13 +124,10 @@ def _record_automatic_thread_usage(order):
                         selected_threads.append({'thread_id': threads[0].id})
 
     if not selected_threads:
-        print(f"[INFO] Keine Garne für Auftrag {order.id}, überspringe Garnverbrauchserfassung")
         return
 
     total_usage_meters = (order.stitch_count * 0.5 / 1000) * 1.1
     usage_per_thread = total_usage_meters / len(selected_threads)
-
-    print(f"[INFO] Erfasse Garnverbrauch für Auftrag {order.id}: {len(selected_threads)} Garne, gesamt {total_usage_meters:.1f}m")
 
     for thread_data in selected_threads:
         thread_id = thread_data.get('thread_id')
@@ -137,7 +136,6 @@ def _record_automatic_thread_usage(order):
 
         thread = Thread.query.get(thread_id)
         if not thread:
-            print(f"[WARNUNG] Garn {thread_id} nicht gefunden")
             continue
 
         usage = ThreadUsage(
@@ -156,12 +154,8 @@ def _record_automatic_thread_usage(order):
         if stock and stock.quantity > 0:
             stock.quantity = max(0, stock.quantity - usage_per_thread)
             stock.last_updated = datetime.utcnow()
-            print(f"[INFO] Lagerbestand aktualisiert: {thread.color_name_de} -{usage_per_thread:.1f}m")
-        else:
-            print(f"[WARNUNG] Kein Lagerbestand für Garn {thread.color_name_de}")
 
     db.session.commit()
-    print(f"[OK] Garnverbrauch für Auftrag {order.id} erfolgreich erfasst")
 
 
 # =====================================================
@@ -490,7 +484,7 @@ def complete_production(order_id):
     try:
         _record_automatic_thread_usage(order)
     except Exception as e:
-        print(f"[WARNUNG] Automatische Garnverbrauchserfassung fehlgeschlagen: {e}")
+        logger.warning(f"Automatische Garnverbrauchserfassung fehlgeschlagen: {e}")
 
     from src.models import OrderStatusHistory
     history = OrderStatusHistory(
@@ -528,7 +522,7 @@ def complete_production(order_id):
             for error in workflow_result['errors']:
                 flash(f"Workflow-Fehler: {error}", 'warning')
     except Exception as e:
-        print(f"[WARNUNG] Workflow-Integration fehlgeschlagen: {e}")
+        logger.warning(f"Workflow-Integration fehlgeschlagen: {e}")
 
     log_activity('production_completed', f'Produktion abgeschlossen: Auftrag {order.id}')
     flash(f'Produktion für Auftrag {order.id} wurde abgeschlossen!', 'success')
@@ -824,6 +818,5 @@ def api_schedule_order():
 try:
     from .production_calendar_extensions import register_calendar_routes
     register_calendar_routes(production_bp, load_production_settings, log_activity)
-    print("[OK] Production Calendar Extensions registriert (mehrtägige Aufträge unterstützt)")
-except ImportError as e:
-    print(f"[INFO] Calendar Extensions nicht verfügbar: {e}")
+except ImportError:
+    pass

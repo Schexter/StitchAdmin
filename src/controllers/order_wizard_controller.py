@@ -959,7 +959,7 @@ def erstelle_dokument(data, typ='angebot'):
             # === LEGACY SYSTEM: Order Model ===
             
             # Auftragsnummer generieren
-            from src.controllers.order_controller import generate_order_id
+            from src.controllers.order_controller_db import generate_order_id
             order_id = generate_order_id()
             
             order = Order(

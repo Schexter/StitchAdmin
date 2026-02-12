@@ -59,20 +59,20 @@ class Customer(db.Model):
     vat_id = db.Column(db.String(50))
     
     # Kontaktdaten
-    email = db.Column(db.String(120))
+    email = db.Column(db.String(120), index=True)
     phone = db.Column(db.String(50))
     mobile = db.Column(db.String(50))
-    
+
     # Adresse
     street = db.Column(db.String(200))
     house_number = db.Column(db.String(20))
     postal_code = db.Column(db.String(20))
     city = db.Column(db.String(100))
     country = db.Column(db.String(100), default='Deutschland')
-    
+
     # Sonstiges
-    customer_number = db.Column(db.String(50))  # Kundennummer (mit Index)
-    barcode = db.Column(db.String(100))  # Barcode für Kundenkarte (mit Index)
+    customer_number = db.Column(db.String(50), index=True)
+    barcode = db.Column(db.String(100), index=True)
     newsletter = db.Column(db.Boolean, default=False)
     notes = db.Column(db.Text)
 
@@ -139,11 +139,11 @@ class Article(db.Model):
     location = db.Column(db.String(100))
     
     # Lieferant
-    supplier = db.Column(db.String(100))
-    supplier_article_number = db.Column(db.String(100))  # Herstellernummer
-    
+    supplier = db.Column(db.String(100), index=True)
+    supplier_article_number = db.Column(db.String(100), index=True)
+
     # Status
-    active = db.Column(db.Boolean, default=True)
+    active = db.Column(db.Boolean, default=True, index=True)
     
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -333,10 +333,10 @@ class Order(db.Model):
     __tablename__ = 'orders'
     
     id = db.Column(db.String(50), primary_key=True)
-    customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'))
+    customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'), index=True)
     order_number = db.Column(db.String(50), unique=True)
-    order_type = db.Column(db.String(20))  # embroidery, printing, dtf, combined
-    status = db.Column(db.String(50), default='new')
+    order_type = db.Column(db.String(20))
+    status = db.Column(db.String(50), default='new', index=True)
     
     # Allgemeine Details
     description = db.Column(db.Text)

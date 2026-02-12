@@ -757,24 +757,29 @@ def calculate_price():
     # Produktionskosten
     production_cost = 0
     
+    # Preise aus Kalkulationseinstellungen laden
+    try:
+        from src.models.models import PriceCalculationSettings
+        calc = PriceCalculationSettings.query.first()
+        price_per_1000 = float(calc.price_per_1000_stitches) if calc and calc.price_per_1000_stitches else 1.50
+        price_per_cm2 = float(calc.price_per_cm2) if calc and calc.price_per_cm2 else 0.05
+        setup_fee = float(calc.setup_fee) if calc and calc.setup_fee else 15.00
+    except Exception:
+        price_per_1000 = 1.50
+        price_per_cm2 = 0.05
+        setup_fee = 15.00
+
     if order_type in ['embroidery', 'combined']:
         stitch_count = int(data.get('stitch_count', 0))
         if stitch_count > 0:
-            # Preis pro 1000 Stiche (aus Settings oder Default)
-            price_per_1000 = 1.50  # TODO: Aus Settings laden
             production_cost += (stitch_count / 1000) * price_per_1000 * quantity
-    
+
     if order_type in ['printing', 'dtf', 'combined']:
         width_cm = float(data.get('print_width_cm', 0))
         height_cm = float(data.get('print_height_cm', 0))
         if width_cm > 0 and height_cm > 0:
-            # Preis pro cm² (aus Settings oder Default)
-            price_per_cm2 = 0.05  # TODO: Aus Settings laden
             area_cm2 = width_cm * height_cm
             production_cost += area_cm2 * price_per_cm2 * quantity
-    
-    # Einrichtungskosten
-    setup_fee = 15.00  # TODO: Aus Settings laden
     
     # Mengenrabatt
     discount_percent = 0
