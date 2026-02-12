@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design-Freigabe - Auftrag {{ order.order_number }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- SignaturePad -->
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.5/dist/signature_pad.umd.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .approval-card {
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .design-preview {
+            max-height: 400px;
+            object-fit: contain;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        .signature-pad-container {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            background: #fff;
+        }
+        #signature-pad {
+            width: 100%;
+            height: 200px;
+        }
+        .spec-item {
+            padding: 10px 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .success-icon {
+            font-size: 80px;
+            color: #28a745;
+        }
+        .btn-approve {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+        }
+        .btn-approve:hover {
+            background: linear-gradient(135deg, #218838, #1aa179);
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="card approval-card">
+                    <div class="card-header bg-primary text-white py-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h3 class="mb-1">
+                                    <i class="bi bi-palette"></i> Design-Freigabe
+                                </h3>
+                                <p class="mb-0 opacity-75">Auftrag {{ order.order_number }}</p>
+                            </div>
+                            <div class="text-end">
+                                <small class="d-block">{{ process_details.type }}</small>
+                                <i class="bi {{ process_details.type_icon }} fs-2"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-4">
+                        {% if already_approved %}
+                        <!-- Bereits freigegeben -->
+                        <div class="text-center py-5">
+                            <i class="bi bi-check-circle-fill success-icon"></i>
+                            <h3 class="mt-3">Design bereits freigegeben</h3>
+                            <p class="text-muted">
+                                Dieses Design wurde am {{ order.design_approval_date.strftime('%d.%m.%Y um %H:%M') }} Uhr freigegeben.
+                            </p>
+                        </div>
+
+                        {% else %}
+                        <!-- Freigabe-Formular -->
+
+                        <!-- Kundeninfo -->
+                        <div class="alert alert-info">
+                            <i class="bi bi-person-circle"></i>
+                            Guten Tag <strong>{{ customer.display_name }}</strong>,
+                            bitte prüfen Sie das Design und geben Sie es frei, damit wir mit der Produktion beginnen können.
+                        </div>
+
+                        <div class="row">
+                            <!-- Design-Vorschau -->
+                            <div class="col-md-6 mb-4">
+                                <h5><i class="bi bi-image"></i> Design-Vorschau</h5>
+                                <div class="border rounded p-3 text-center bg-light">
+                                    {% if design_info.has_file %}
+                                    <img src="{{ url_for('design_approval.design_preview', token=token) }}"
+                                         alt="Design-Vorschau"
+                                         class="design-preview img-fluid"
+                                         onerror="this.src='https://via.placeholder.com/400x300?text=Design+nicht+verfügbar'">
+                                    {% else %}
+                                    <div class="py-5 text-muted">
+                                        <i class="bi bi-image fs-1"></i>
+                                        <p>Design-Vorschau wird vorbereitet</p>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Spezifikationen -->
+                            <div class="col-md-6 mb-4">
+                                <h5><i class="bi bi-list-check"></i> Spezifikationen</h5>
+
+                                {% if process_details.type == 'Stickerei' %}
+                                <div class="spec-item">
+                                    <small class="text-muted">Stichzahl</small>
+                                    <div class="fw-bold">{{ process_details.stitch_count|default('N/A') }} Stiche</div>
+                                </div>
+                                <div class="spec-item">
+                                    <small class="text-muted">Größe</small>
+                                    <div class="fw-bold">{{ process_details.width|default('?') }} x {{ process_details.height|default('?') }} mm</div>
+                                </div>
+                                <div class="spec-item">
+                                    <small class="text-muted">Position</small>
+                                    <div class="fw-bold">{{ process_details.position|default('Nach Absprache') }}</div>
+                                </div>
+                                {% if process_details.colors %}
+                                <div class="spec-item">
+                                    <small class="text-muted">Garnfarben</small>
+                                    <div class="fw-bold">{{ process_details.colors }}</div>
+                                </div>
+                                {% endif %}
+
+                                {% elif 'Druck' in process_details.type %}
+                                <div class="spec-item">
+                                    <small class="text-muted">Größe</small>
+                                    <div class="fw-bold">{{ process_details.width|default('?') }} x {{ process_details.height|default('?') }} cm</div>
+                                </div>
+                                <div class="spec-item">
+                                    <small class="text-muted">Druckverfahren</small>
+                                    <div class="fw-bold">{{ process_details.method|default('Digital') }}</div>
+                                </div>
+                                {% if process_details.coverage %}
+                                <div class="spec-item">
+                                    <small class="text-muted">Farbdeckung</small>
+                                    <div class="fw-bold">ca. {{ process_details.coverage }}%</div>
+                                </div>
+                                {% endif %}
+                                {% endif %}
+
+                                <!-- Allgemeine Infos -->
+                                <div class="spec-item">
+                                    <small class="text-muted">Auftragsbeschreibung</small>
+                                    <div class="fw-bold">{{ order.description|default('Keine Beschreibung') }}</div>
+                                </div>
+
+                                {% if order.items.count() > 0 %}
+                                <div class="spec-item">
+                                    <small class="text-muted">Artikel</small>
+                                    <div class="fw-bold">
+                                        {% for item in order.items %}
+                                        {{ item.quantity }}x {{ item.article.name if item.article else 'Artikel' }}
+                                        {% if item.textile_color %} ({{ item.textile_color }}){% endif %}
+                                        {% if not loop.last %}<br>{% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <hr>
+
+                        <!-- Unterschrift -->
+                        <h5 class="mb-3"><i class="bi bi-pen"></i> Ihre Unterschrift</h5>
+                        <p class="text-muted small">Bitte unterschreiben Sie im Feld unten mit der Maus oder dem Finger.</p>
+
+                        <div class="signature-pad-container p-2 mb-3">
+                            <canvas id="signature-pad"></canvas>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mb-3" onclick="clearSignature()">
+                            <i class="bi bi-eraser"></i> Unterschrift löschen
+                        </button>
+
+                        <!-- Anmerkungen -->
+                        <div class="mb-4">
+                            <label class="form-label"><i class="bi bi-chat-text"></i> Anmerkungen (optional)</label>
+                            <textarea id="notes" class="form-control" rows="3"
+                                      placeholder="Haben Sie Anmerkungen oder Änderungswünsche?"></textarea>
+                        </div>
+
+                        <!-- Bestätigung -->
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="confirmCheck">
+                            <label class="form-check-label" for="confirmCheck">
+                                Ich bestätige, dass ich das Design geprüft habe und es für die Produktion freigebe.
+                                Mir ist bewusst, dass nach Freigabe keine Änderungen mehr möglich sind.
+                            </label>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="d-flex gap-3 justify-content-center flex-wrap">
+                            <button type="button" class="btn btn-approve btn-success btn-lg" onclick="submitApproval('approve')">
+                                <i class="bi bi-check-lg"></i> Design freigeben
+                            </button>
+                            <button type="button" class="btn btn-outline-warning btn-lg" onclick="submitApproval('reject')">
+                                <i class="bi bi-pencil"></i> Änderung gewünscht
+                            </button>
+                        </div>
+
+                        {% endif %}
+                    </div>
+
+                    <div class="card-footer text-center text-muted py-3">
+                        <small>StitchAdmin - Professionelle Stickerei & Textildruck</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Signature Pad initialisieren
+        const canvas = document.getElementById('signature-pad');
+        let signaturePad = null;
+
+        if (canvas) {
+            signaturePad = new SignaturePad(canvas, {
+                backgroundColor: 'rgb(255, 255, 255)',
+                penColor: 'rgb(0, 0, 0)'
+            });
+
+            // Canvas Größe anpassen
+            function resizeCanvas() {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                const container = canvas.parentElement;
+                canvas.width = container.offsetWidth * ratio;
+                canvas.height = 200 * ratio;
+                canvas.getContext('2d').scale(ratio, ratio);
+                canvas.style.width = container.offsetWidth + 'px';
+                canvas.style.height = '200px';
+                signaturePad.clear();
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+        }
+
+        function clearSignature() {
+            if (signaturePad) {
+                signaturePad.clear();
+            }
+        }
+
+        function submitApproval(action) {
+            const notes = document.getElementById('notes').value;
+            const confirmed = document.getElementById('confirmCheck').checked;
+
+            // Validierung
+            if (action === 'approve' && !confirmed) {
+                alert('Bitte bestätigen Sie die Freigabe durch Setzen des Häkchens.');
+                return;
+            }
+
+            if (action === 'reject' && !notes.trim()) {
+                alert('Bitte geben Sie Ihre Änderungswünsche an.');
+                document.getElementById('notes').focus();
+                return;
+            }
+
+            // Signatur (nur bei Freigabe)
+            let signature = null;
+            if (action === 'approve' && signaturePad && !signaturePad.isEmpty()) {
+                signature = signaturePad.toDataURL('image/png');
+            }
+
+            // Absenden
+            const submitBtn = event.target;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Wird verarbeitet...';
+
+            fetch('{{ url_for("design_approval.submit_approval", token=token) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: action,
+                    signature: signature,
+                    notes: notes,
+                    confirmed: confirmed
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    } else {
+                        alert(data.message);
+                        location.reload();
+                    }
+                } else {
+                    alert('Fehler: ' + data.message);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = action === 'approve'
+                        ? '<i class="bi bi-check-lg"></i> Design freigeben'
+                        : '<i class="bi bi-pencil"></i> Änderung gewünscht';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.');
+                submitBtn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>

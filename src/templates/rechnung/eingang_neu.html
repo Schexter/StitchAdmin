@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Eingangsrechnung erfassen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1><i class="bi bi-box-arrow-in-left"></i> Eingangsrechnung erfassen</h1>
+    <p class="text-muted">Erfassen Sie eine Rechnung von einem Lieferanten</p>
+
+    <div class="row">
+        <div class="col-md-8">
+            <form method="POST" action="{{ url_for('rechnung.eingangsrechnung_erstellen') }}">
+                <div class="card mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="bi bi-building"></i> Lieferant</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="lieferant_id" class="form-label">Lieferant auswählen *</label>
+                            <select class="form-select" id="lieferant_id" name="lieferant_id" required>
+                                <option value="">-- Lieferant wählen --</option>
+                                {% for lieferant in lieferanten %}
+                                <option value="{{ lieferant.id }}">{{ lieferant.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="lieferant_name" class="form-label">Oder manuell eingeben</label>
+                            <input type="text" class="form-control" id="lieferant_name" name="lieferant_name"
+                                   placeholder="Lieferantenname (wenn nicht in Liste)">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-file-text"></i> Rechnungsdaten</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="rechnungsnummer" class="form-label">Rechnungsnummer (vom Lieferanten) *</label>
+                                <input type="text" class="form-control" id="rechnungsnummer" name="rechnungsnummer"
+                                       placeholder="z.B. RE-12345" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="rechnungsdatum" class="form-label">Rechnungsdatum *</label>
+                                <input type="date" class="form-control" id="rechnungsdatum" name="rechnungsdatum"
+                                       value="{{ heute.strftime('%Y-%m-%d') }}" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="faelligkeitsdatum" class="form-label">Fälligkeitsdatum</label>
+                                <input type="date" class="form-control" id="faelligkeitsdatum" name="faelligkeitsdatum">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="bi bi-currency-euro"></i> Beträge</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="netto_gesamt" class="form-label">Netto-Betrag *</label>
+                                <div class="input-group">
+                                    <input type="number" step="0.01" class="form-control" id="netto_gesamt" name="netto_gesamt"
+                                           placeholder="0,00" required onchange="calculateBrutto()">
+                                    <span class="input-group-text">EUR</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="mwst_gesamt" class="form-label">MwSt-Betrag</label>
+                                <div class="input-group">
+                                    <input type="number" step="0.01" class="form-control" id="mwst_gesamt" name="mwst_gesamt"
+                                           placeholder="0,00" onchange="updateBrutto()">
+                                    <span class="input-group-text">EUR</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="brutto_gesamt" class="form-label">Brutto-Betrag *</label>
+                                <div class="input-group">
+                                    <input type="number" step="0.01" class="form-control" id="brutto_gesamt" name="brutto_gesamt"
+                                           placeholder="0,00" required>
+                                    <span class="input-group-text">EUR</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <button type="button" class="btn btn-outline-secondary" onclick="setMwst(19)">19% MwSt</button>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="setMwst(7)">7% MwSt</button>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="setMwst(0)">0% MwSt</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-chat-text"></i> Bemerkungen</h5>
+                    </div>
+                    <div class="card-body">
+                        <textarea class="form-control" id="bemerkungen" name="bemerkungen" rows="3"
+                                  placeholder="Optionale Bemerkungen..."></textarea>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-circle"></i> Rechnung erfassen
+                    </button>
+                    <a href="{{ url_for('rechnung.rechnungs_index', tab='eingang') }}" class="btn btn-secondary btn-lg">
+                        <i class="bi bi-x"></i> Abbrechen
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Hinweise</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        <strong>Eingangsrechnungen</strong> sind Rechnungen, die Sie von Ihren Lieferanten erhalten und bezahlen müssen.
+                    </p>
+                    <hr>
+                    <p class="text-muted small">
+                        <i class="bi bi-lightbulb"></i> Die Rechnungsnummer sollte die Original-Nummer vom Lieferanten sein.
+                    </p>
+                    <p class="text-muted small">
+                        <i class="bi bi-lightbulb"></i> Geben Sie das Fälligkeitsdatum ein, um Zahlungserinnerungen zu erhalten.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function setMwst(percent) {
+    const netto = parseFloat(document.getElementById('netto_gesamt').value) || 0;
+    const mwst = netto * (percent / 100);
+    const brutto = netto + mwst;
+
+    document.getElementById('mwst_gesamt').value = mwst.toFixed(2);
+    document.getElementById('brutto_gesamt').value = brutto.toFixed(2);
+}
+
+function calculateBrutto() {
+    const netto = parseFloat(document.getElementById('netto_gesamt').value) || 0;
+    // Standard: 19% MwSt
+    const mwst = netto * 0.19;
+    const brutto = netto + mwst;
+
+    document.getElementById('mwst_gesamt').value = mwst.toFixed(2);
+    document.getElementById('brutto_gesamt').value = brutto.toFixed(2);
+}
+
+function updateBrutto() {
+    const netto = parseFloat(document.getElementById('netto_gesamt').value) || 0;
+    const mwst = parseFloat(document.getElementById('mwst_gesamt').value) || 0;
+    const brutto = netto + mwst;
+
+    document.getElementById('brutto_gesamt').value = brutto.toFixed(2);
+}
+</script>
+{% endblock %}

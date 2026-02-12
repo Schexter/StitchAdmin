@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}Einkaufsstatistiken - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h1><i class="bi bi-graph-up"></i> Einkaufsstatistiken</h1>
+                <p class="text-muted">Analysen und Auswertungen {{ year }}</p>
+            </div>
+            <div>
+                <a href="{{ url_for('purchasing.dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI-Karten -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-calendar-check"></i> Jahresvolumen</h5>
+                <p class="card-text display-6">{{ "%.0f"|format(yearly_volume) }}€</p>
+                <small>{{ yearly_orders }} Bestellungen</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-calendar-month"></i> Monat</h5>
+                <p class="card-text display-6">{{ "%.0f"|format(monthly_volume) }}€</p>
+                <small>{{ monthly_orders }} Bestellungen</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-calculator"></i> Durchschnitt/Monat</h5>
+                <p class="card-text display-6">{{ "%.0f"|format(yearly_volume / 12) }}€</p>
+                <small>ca. {{ (yearly_orders / 12)|int }} Bestellungen</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-bag-check"></i> Ø Bestellwert</h5>
+                <p class="card-text display-6">{% if yearly_orders > 0 %}{{ "%.0f"|format(yearly_volume / yearly_orders) }}€{% else %}-{% endif %}</p>
+                <small>pro Bestellung</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Top Lieferanten -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-trophy"></i> Top 10 Lieferanten {{ year }}</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>#</th>
+                            <th>Lieferant</th>
+                            <th class="text-end">Bestellungen</th>
+                            <th class="text-end">Volumen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for name, total, count in top_suppliers %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td><strong>{{ name }}</strong></td>
+                            <td class="text-end">{{ count }}</td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(total or 0) }}€</strong></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                                Keine Daten vorhanden
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monatliche Entwicklung -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Monatliche Entwicklung</h5>
+            </div>
+            <div class="card-body">
+                {% if monthly_data %}
+                <div class="chart-container" style="position: relative; height: 300px;">
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-bar-chart display-4 d-block mb-2"></i>
+                    Keine Daten vorhanden
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Zusätzliche Statistiken -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Übersicht</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <i class="bi bi-building display-4 text-primary"></i>
+                            <h3 class="mt-2">{{ top_suppliers|length }}</h3>
+                            <p class="text-muted mb-0">Aktive Lieferanten</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <i class="bi bi-box-seam display-4 text-success"></i>
+                            <h3 class="mt-2">{{ yearly_orders }}</h3>
+                            <p class="text-muted mb-0">Bestellungen {{ year }}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <i class="bi bi-currency-euro display-4 text-warning"></i>
+                            <h3 class="mt-2">{{ "%.0f"|format(yearly_volume) }}€</h3>
+                            <p class="text-muted mb-0">Gesamtvolumen</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 border rounded">
+                            <i class="bi bi-graph-up-arrow display-4 text-info"></i>
+                            <h3 class="mt-2">{% if yearly_orders > 0 %}{{ "%.0f"|format(yearly_volume / yearly_orders) }}€{% else %}-{% endif %}</h3>
+                            <p class="text-muted mb-0">Ø pro Bestellung</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if monthly_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('monthlyChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [{% for m in monthly_data %}'{{ m.month }}'{% if not loop.last %},{% endif %}{% endfor %}],
+            datasets: [{
+                label: 'Einkaufsvolumen (€)',
+                data: [{% for m in monthly_data %}{{ m.volume or 0 }}{% if not loop.last %},{% endif %}{% endfor %}],
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString('de-DE') + ' €';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.parsed.y.toLocaleString('de-DE') + ' €';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+{% block title %}Neuer Lieferschein{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('lieferscheine.index') }}">Lieferscheine</a></li>
+                    <li class="breadcrumb-item active">Neu</li>
+                </ol>
+            </nav>
+            <h2><i class="fas fa-plus-circle text-success me-2"></i>Neuer Lieferschein</h2>
+        </div>
+    </div>
+
+    <!-- Schnellauswahl: Aus Auftrag -->
+    {% if offene_auftraege %}
+    <div class="card shadow-sm mb-4 border-info">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="fas fa-magic me-2"></i>Aus bestehendem Auftrag erstellen</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for auftrag in offene_auftraege[:6] %}
+                <div class="col-md-4 mb-2">
+                    <a href="{{ url_for('lieferscheine.aus_auftrag', auftrag_id=auftrag.id) }}" class="btn btn-outline-info w-100 text-start">
+                        <strong>{{ auftrag.dokument_nummer }}</strong><br>
+                        <small>{{ auftrag.kunde.display_name if auftrag.kunde else '-' }}</small>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="POST" id="lieferscheinForm">
+        <input type="hidden" name="positionen_json" id="positionenJson">
+        
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Kunde -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-user me-2"></i>Kunde *</h5>
+                    </div>
+                    <div class="card-body">
+                        <select name="kunde_id" class="form-select form-select-lg" required>
+                            <option value="">-- Kunde wählen --</option>
+                            {% for kunde in kunden %}
+                            <option value="{{ kunde.id }}">{{ kunde.display_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Versand -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-shipping-fast me-2"></i>Versandinformationen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Lieferdatum</label>
+                                <input type="date" name="lieferdatum" class="form-control" value="{{ today }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Versandart</label>
+                                <select name="versandart" class="form-select">
+                                    <option value="versand">📦 Versand</option>
+                                    <option value="abholung">🏃 Abholung</option>
+                                    <option value="spedition">🚛 Spedition</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Sendungsnummer</label>
+                                <input type="text" name="tracking_nummer" class="form-control" placeholder="Optional">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Betreff</label>
+                            <input type="text" name="betreff" class="form-control" placeholder="z.B. Bestellung vom...">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Positionen -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Positionen</h5>
+                        <button type="button" class="btn btn-success btn-sm" onclick="neuePosition()">
+                            <i class="fas fa-plus me-1"></i> Position
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-hover mb-0" id="positionenTabelle" style="display: none;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Pos.</th>
+                                    <th>Artikelnr.</th>
+                                    <th>Bezeichnung</th>
+                                    <th>Menge</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="positionenBody"></tbody>
+                        </table>
+                        <div id="keinePositionen" class="text-center py-4 text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                            <p class="mb-0">Noch keine Positionen</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm sticky-top" style="top: 20px;">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Optionen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Interne Notiz</label>
+                            <textarea name="interne_notiz" class="form-control" rows="3"></textarea>
+                        </div>
+                        <hr>
+                        <div class="mb-2 d-flex justify-content-between">
+                            <span>Positionen:</span>
+                            <strong id="anzahlPositionen">0</strong>
+                        </div>
+                        <hr>
+                        <button type="submit" class="btn btn-success w-100 mb-2">
+                            <i class="fas fa-save me-1"></i> Lieferschein erstellen
+                        </button>
+                        <a href="{{ url_for('lieferscheine.index') }}" class="btn btn-outline-secondary w-100">Abbrechen</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="positionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Position hinzufügen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Artikelnummer</label>
+                    <input type="text" class="form-control" id="posArtikelnummer">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Bezeichnung *</label>
+                    <input type="text" class="form-control" id="posBezeichnung" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Beschreibung</label>
+                    <textarea class="form-control" id="posBeschreibung" rows="2"></textarea>
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <label class="form-label">Menge *</label>
+                        <input type="number" class="form-control" id="posMenge" value="1" min="1">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label">Einheit</label>
+                        <select class="form-select" id="posEinheit">
+                            <option value="Stk.">Stk.</option>
+                            <option value="Karton">Karton</option>
+                            <option value="Palette">Palette</option>
+                        </select>
+                    </div>
+                </div>
+                <input type="hidden" id="posEditIndex" value="-1">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" onclick="positionSpeichern()">Übernehmen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let positionen = [];
+
+document.getElementById('lieferscheinForm').addEventListener('submit', function(e) {
+    if (positionen.length === 0) {
+        e.preventDefault();
+        alert('Bitte mindestens eine Position hinzufügen.');
+        return;
+    }
+    document.getElementById('positionenJson').value = JSON.stringify(positionen);
+});
+
+function neuePosition() {
+    document.getElementById('posArtikelnummer').value = '';
+    document.getElementById('posBezeichnung').value = '';
+    document.getElementById('posBeschreibung').value = '';
+    document.getElementById('posMenge').value = '1';
+    document.getElementById('posEinheit').value = 'Stk.';
+    document.getElementById('posEditIndex').value = '-1';
+    new bootstrap.Modal(document.getElementById('positionModal')).show();
+}
+
+function positionSpeichern() {
+    const bez = document.getElementById('posBezeichnung').value.trim();
+    if (!bez) { alert('Bezeichnung erforderlich'); return; }
+    
+    const pos = {
+        artikelnummer: document.getElementById('posArtikelnummer').value,
+        bezeichnung: bez,
+        beschreibung: document.getElementById('posBeschreibung').value,
+        menge: parseInt(document.getElementById('posMenge').value) || 1,
+        einheit: document.getElementById('posEinheit').value,
+        typ: 'artikel'
+    };
+    
+    const idx = parseInt(document.getElementById('posEditIndex').value);
+    if (idx >= 0) positionen[idx] = pos;
+    else positionen.push(pos);
+    
+    render();
+    bootstrap.Modal.getInstance(document.getElementById('positionModal')).hide();
+}
+
+function positionEntfernen(idx) {
+    positionen.splice(idx, 1);
+    render();
+}
+
+function render() {
+    const tbody = document.getElementById('positionenBody');
+    const tabelle = document.getElementById('positionenTabelle');
+    const keine = document.getElementById('keinePositionen');
+    
+    if (positionen.length === 0) {
+        tabelle.style.display = 'none';
+        keine.style.display = 'block';
+    } else {
+        tabelle.style.display = 'table';
+        keine.style.display = 'none';
+        tbody.innerHTML = positionen.map((p, i) => `
+            <tr>
+                <td>${i+1}</td>
+                <td><code>${p.artikelnummer || '-'}</code></td>
+                <td><strong>${p.bezeichnung}</strong></td>
+                <td>${p.menge} ${p.einheit}</td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="positionEntfernen(${i})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+    document.getElementById('anzahlPositionen').textContent = positionen.length;
+}
+
+render();
+</script>
+{% endblock %}

@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}Buchungsjournal{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-journal-text"></i> Buchungsjournal
+        </h2>
+        <div>
+            <a href="{{ url_for('buchungen.eingangsrechnung_neu') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Eingangsrechnung buchen
+            </a>
+            <a href="{{ url_for('buchungen.konten') }}" class="btn btn-outline-primary">
+                <i class="bi bi-list-ul"></i> Konten&uuml;bersicht
+            </a>
+            <button type="button" class="btn btn-success" onclick="exportDatev()">
+                <i class="bi bi-download"></i> DATEV Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistiken -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Erl&ouml;se</h5>
+                    <h3 class="mb-0">{{ "%.2f"|format(stats.erloese_gesamt) }} &euro;</h3>
+                    <small>Zeitraum</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Kasse</h5>
+                    <h3 class="mb-0">{{ "%.2f"|format(stats.kasse_saldo) }} &euro;</h3>
+                    <small>Saldo Konto 1000</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Bank</h5>
+                    <h3 class="mb-0">{{ "%.2f"|format(stats.bank_saldo) }} &euro;</h3>
+                    <small>Saldo Konto 1200</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title">Forderungen</h5>
+                    <h3 class="mb-0">{{ "%.2f"|format(stats.forderungen_saldo) }} &euro;</h3>
+                    <small>Saldo Konto 1400</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-funnel"></i> Filter</h5>
+        </div>
+        <div class="card-body">
+            <form id="filterForm" onsubmit="loadBuchungen(); return false;">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label class="form-label">Von Datum</label>
+                        <input type="date" class="form-control" id="datumVon"
+                               value="{{ datum_von.strftime('%Y-%m-%d') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Bis Datum</label>
+                        <input type="date" class="form-control" id="datumBis"
+                               value="{{ datum_bis.strftime('%Y-%m-%d') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Konto</label>
+                        <select class="form-select" id="konto">
+                            <option value="">Alle Konten</option>
+                            {% for konto in konten %}
+                            <option value="{{ konto.konto_nummer }}">
+                                {{ konto.konto_nummer }} - {{ konto.konto_bezeichnung }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Beleg-Typ</label>
+                        <select class="form-select" id="belegTyp">
+                            <option value="">Alle Typen</option>
+                            <option value="Verkauf">Verkauf</option>
+                            <option value="Rechnung">Rechnung</option>
+                            <option value="Zahlung">Zahlung</option>
+                            <option value="Steuer">Steuer</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Buchungen Tabelle -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Buchungen</h5>
+        </div>
+        <div class="card-body">
+            <div id="loadingSpinner" class="text-center d-none">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Lade...</span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover table-sm" id="buchungenTable">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Beleg</th>
+                            <th>Soll</th>
+                            <th>Haben</th>
+                            <th class="text-end">Betrag</th>
+                            <th>Text</th>
+                            <th>Typ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="buchungenBody">
+                        <!-- Wird per JavaScript gef&uuml;llt -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="noBuchungen" class="alert alert-info d-none">
+                <i class="bi bi-info-circle"></i> Keine Buchungen f&uuml;r den gew&auml;hlten Zeitraum gefunden.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Lade Buchungen beim Seitenstart
+document.addEventListener('DOMContentLoaded', function() {
+    loadBuchungen();
+});
+
+function loadBuchungen() {
+    const datumVon = document.getElementById('datumVon').value;
+    const datumBis = document.getElementById('datumBis').value;
+    const konto = document.getElementById('konto').value;
+    const belegTyp = document.getElementById('belegTyp').value;
+
+    // Zeige Loading
+    document.getElementById('loadingSpinner').classList.remove('d-none');
+    document.getElementById('buchungenBody').innerHTML = '';
+    document.getElementById('noBuchungen').classList.add('d-none');
+
+    // Build query params
+    const params = new URLSearchParams();
+    if (datumVon) params.append('datum_von', datumVon);
+    if (datumBis) params.append('datum_bis', datumBis);
+    if (konto) params.append('konto', konto);
+    if (belegTyp) params.append('beleg_typ', belegTyp);
+
+    fetch(`/buchungen/api/buchungen?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loadingSpinner').classList.add('d-none');
+
+            if (data.success && data.buchungen.length > 0) {
+                renderBuchungen(data.buchungen);
+            } else {
+                document.getElementById('noBuchungen').classList.remove('d-none');
+            }
+        })
+        .catch(error => {
+            console.error('Fehler beim Laden der Buchungen:', error);
+            document.getElementById('loadingSpinner').classList.add('d-none');
+            alert('Fehler beim Laden der Buchungen');
+        });
+}
+
+function renderBuchungen(buchungen) {
+    const tbody = document.getElementById('buchungenBody');
+    tbody.innerHTML = '';
+
+    buchungen.forEach(b => {
+        const row = document.createElement('tr');
+
+        // Badge-Farbe nach Typ
+        let badgeClass = 'bg-secondary';
+        if (b.typ === 'Verkauf') badgeClass = 'bg-success';
+        else if (b.typ === 'Rechnung') badgeClass = 'bg-primary';
+        else if (b.typ === 'Zahlung') badgeClass = 'bg-info';
+        else if (b.typ === 'Steuer') badgeClass = 'bg-warning';
+
+        row.innerHTML = `
+            <td>${formatDate(b.datum)}</td>
+            <td><small class="font-monospace">${b.beleg || '-'}</small></td>
+            <td><span class="badge bg-light text-dark">${b.konto_soll}</span></td>
+            <td><span class="badge bg-light text-dark">${b.konto_haben}</span></td>
+            <td class="text-end"><strong>${formatCurrency(b.betrag)}</strong></td>
+            <td><small>${b.text || ''}</small></td>
+            <td><span class="badge ${badgeClass}">${b.typ}</span></td>
+        `;
+
+        tbody.appendChild(row);
+    });
+}
+
+function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('de-DE');
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('de-DE', {
+        style: 'currency',
+        currency: 'EUR'
+    }).format(amount);
+}
+
+function exportDatev() {
+    const datumVon = document.getElementById('datumVon').value;
+    const datumBis = document.getElementById('datumBis').value;
+
+    if (!datumVon || !datumBis) {
+        alert('Bitte w\u00e4hlen Sie einen Zeitraum aus!');
+        return;
+    }
+
+    const url = `/buchungen/export/datev?datum_von=${datumVon}&datum_bis=${datumBis}`;
+    window.location.href = url;
+}
+</script>
+{% endblock %}

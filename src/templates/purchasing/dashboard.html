@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block title %}Einkauf - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-cart4"></i> Einkauf</h1>
+        <p class="text-muted">Bestellungen, Wareneingang & Lieferantenverwaltung</p>
+        <div class="mt-3">
+            <a href="{{ url_for('purchasing.orders') }}" class="btn btn-primary btn-lg me-2">
+                <i class="bi bi-list-ul"></i> Alle Bestellungen
+            </a>
+            <a href="{{ url_for('purchasing.suggestions') }}" class="btn btn-success btn-lg me-2">
+                <i class="bi bi-lightbulb"></i> Bestellvorschläge
+            </a>
+            <a href="{{ url_for('suppliers.index') }}" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-building"></i> Lieferanten
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Statistik-KPIs -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-box-seam"></i> Offene Bestellungen
+                </h5>
+                <p class="card-text display-6">{{ stats.open_orders }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-lightbulb"></i> Bestellvorschläge
+                </h5>
+                <p class="card-text display-6">{{ stats.suggestions_count }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-truck"></i> Lieferungen heute
+                </h5>
+                <p class="card-text display-6">{{ stats.expected_today }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-currency-euro"></i> Monat
+                </h5>
+                <p class="card-text display-6">{{ "%.0f"|format(stats.monthly_volume) }}€</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Warnung bei überfälligen Lieferungen -->
+{% if stats.overdue > 0 %}
+<div class="alert alert-danger d-flex align-items-center mb-4">
+    <i class="bi bi-exclamation-triangle-fill me-2 fs-4"></i>
+    <div>
+        <strong>{{ stats.overdue }} überfällige Lieferung(en)!</strong>
+        <span class="ms-2">Bitte prüfen Sie den Wareneingang.</span>
+    </div>
+    <a href="{{ url_for('purchasing.receiving') }}" class="btn btn-danger btn-sm ms-auto">
+        <i class="bi bi-arrow-right"></i> Anzeigen
+    </a>
+</div>
+{% endif %}
+
+<!-- Schnellzugriff-Kacheln -->
+<div class="row mt-4">
+    <div class="col-md-4 mb-3">
+        <a href="{{ url_for('purchasing.pending_items') }}" class="card text-decoration-none h-100 border-danger">
+            <div class="card-body text-center">
+                <i class="bi bi-cart-plus display-4 text-danger"></i>
+                <h5 class="card-title mt-3">Zu bestellen</h5>
+                <p class="card-text text-muted">Artikel aus Aufträgen bestellen</p>
+                <span class="badge bg-danger">Neu</span>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4 mb-3">
+        <a href="{{ url_for('purchasing.orders') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-list-ul display-4 text-primary"></i>
+                <h5 class="card-title mt-3">Alle Bestellungen</h5>
+                <p class="card-text text-muted">Übersicht aller Einkaufsbestellungen</p>
+                {% if stats.open_orders > 0 %}
+                <span class="badge bg-primary">{{ stats.open_orders }} offen</span>
+                {% endif %}
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4 mb-3">
+        <a href="{{ url_for('purchasing.pending_orders') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-hourglass-split display-4 text-warning"></i>
+                <h5 class="card-title mt-3">Im Zulauf</h5>
+                <p class="card-text text-muted">Bestellungen unterwegs</p>
+                {% set pending_total = pending_by_status.draft + pending_by_status.ordered + pending_by_status.confirmed %}
+                {% if pending_total > 0 %}
+                <span class="badge bg-warning text-dark">{{ pending_total }} ausstehend</span>
+                {% endif %}
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4 mb-3">
+        <a href="{{ url_for('purchasing.suggestions') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-lightbulb display-4 text-success"></i>
+                <h5 class="card-title mt-3">Bestellvorschläge</h5>
+                <p class="card-text text-muted">Automatische Nachbestellempfehlungen</p>
+                {% if stats.suggestions_count > 0 %}
+                <span class="badge bg-success">{{ stats.suggestions_count }} Vorschläge</span>
+                {% endif %}
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4 mb-3">
+        <a href="{{ url_for('purchasing.receiving') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-box-arrow-in-down display-4 text-info"></i>
+                <h5 class="card-title mt-3">Wareneingang</h5>
+                <p class="card-text text-muted">Lieferungen einbuchen & prüfen</p>
+                {% if stats.expected_today > 0 %}
+                <span class="badge bg-info">{{ stats.expected_today }} heute</span>
+                {% endif %}
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4 mb-3">
+        <a href="#" class="card text-decoration-none h-100" title="Kommt in Phase 3">
+            <div class="card-body text-center">
+                <i class="bi bi-rulers display-4 text-secondary"></i>
+                <h5 class="card-title mt-3">Design-Bestellungen</h5>
+                <p class="card-text text-muted">Puncher & Digitizer beauftragen</p>
+                <span class="badge bg-secondary">Phase 3</span>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4 mb-3">
+        <a href="{{ url_for('purchasing.statistics') }}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up display-4 text-danger"></i>
+                <h5 class="card-title mt-3">Statistiken</h5>
+                <p class="card-text text-muted">Einkaufsanalysen & Auswertungen</p>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Unterer Bereich: Tabellen -->
+<div class="row mt-4">
+    <!-- Letzte Bestellungen -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Letzte Bestellungen</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Bestellung</th>
+                            <th>Lieferant</th>
+                            <th>Datum</th>
+                            <th class="text-end">Betrag</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in recent_orders %}
+                        <tr onclick="window.location='{{ url_for('purchasing.order_detail', order_id=order.id) }}'" style="cursor: pointer;">
+                            <td><strong>{{ order.purchase_order_number or order.order_number or order.id }}</strong></td>
+                            <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                            <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</td>
+                            <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} €</td>
+                            <td>
+                                {% if order.status == 'draft' %}
+                                    <span class="badge bg-secondary">Entwurf</span>
+                                {% elif order.status == 'ordered' %}
+                                    <span class="badge bg-primary">Bestellt</span>
+                                {% elif order.status == 'confirmed' %}
+                                    <span class="badge bg-info">Bestätigt</span>
+                                {% elif order.status == 'shipped' %}
+                                    <span class="badge bg-warning text-dark">Unterwegs</span>
+                                {% elif order.status == 'delivered' %}
+                                    <span class="badge bg-success">Geliefert</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ order.status }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                Noch keine Bestellungen vorhanden
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                <a href="{{ url_for('purchasing.orders') }}" class="btn btn-sm btn-outline-primary">
+                    Alle anzeigen <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rechte Spalte: Status & Lieferungen -->
+    <div class="col-md-4">
+        <!-- Status-Übersicht -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Nach Status</h5>
+            </div>
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-pencil text-secondary"></i> Entwürfe</span>
+                    <span class="badge bg-secondary rounded-pill">{{ pending_by_status.draft }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-send text-primary"></i> Bestellt</span>
+                    <span class="badge bg-primary rounded-pill">{{ pending_by_status.ordered }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-check-circle text-info"></i> Bestätigt</span>
+                    <span class="badge bg-info rounded-pill">{{ pending_by_status.confirmed }}</span>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-truck text-warning"></i> Unterwegs</span>
+                    <span class="badge bg-warning text-dark rounded-pill">{{ pending_by_status.shipped }}</span>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Erwartete Lieferungen -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Erwartete Lieferungen</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if expected_deliveries %}
+                <ul class="list-group list-group-flush">
+                    {% for delivery in expected_deliveries %}
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ delivery.supplier.name if delivery.supplier else 'Unbekannt' }}</strong><br>
+                                <small class="text-muted">{{ delivery.purchase_order_number or delivery.order_number or delivery.id }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="{% if delivery.delivery_date and delivery.delivery_date < today %}text-danger fw-bold{% else %}text-primary{% endif %}">
+                                    {{ delivery.delivery_date.strftime('%d.%m.') if delivery.delivery_date else '-' }}
+                                </span><br>
+                                <small class="text-muted">{{ "%.0f"|format(delivery.total_amount or 0) }} €</small>
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-calendar-check fs-1 d-block mb-2"></i>
+                    Keine Lieferungen erwartet
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
+    </a>
+</div>
+{% endblock %}

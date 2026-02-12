@@ -123,6 +123,23 @@ def create_app():
         return db.session.get(User, user_id)
 
     # ==========================================
+    # GLOBALER LOGIN-SCHUTZ (Vorgelagerte Loginseite)
+    # ==========================================
+    @app.before_request
+    def require_login():
+        """Alle Seiten erfordern Login - kein Zugang ohne Anmeldung"""
+        # Erlaubte Endpunkte ohne Login
+        if request.endpoint and (
+            request.endpoint == 'auth.login' or
+            request.endpoint == 'static' or
+            request.endpoint == 'root' or
+            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('setup.'))
+        ):
+            return
+        if not current_user.is_authenticated:
+            return redirect(url_for('auth.login'))
+
+    # ==========================================
     # BLUEPRINT REGISTRIERUNG
     # ==========================================
     blueprints_registered = []
@@ -152,6 +169,7 @@ def create_app():
     register_blueprint_safe('src.controllers.machine_controller_db', 'machine_bp', 'Maschinen')
     register_blueprint_safe('src.controllers.thread_controller_db', 'thread_bp', 'Garne')
     register_blueprint_safe('src.controllers.production_controller_db', 'production_bp', 'Produktion')
+    register_blueprint_safe('src.controllers.production_time_controller', 'production_time_bp', 'Produktionszeit-Tracking')
     register_blueprint_safe('src.controllers.shipping_controller_db', 'shipping_bp', 'Versand')
     register_blueprint_safe('src.controllers.packing_list_controller', 'packing_list_bp', 'Packlisten')
 
@@ -216,6 +234,9 @@ def create_app():
     # CRM - Kundenkontakt-Management
     register_blueprint_safe('src.controllers.crm_controller', 'crm_bp', 'CRM')
 
+    # Dokument-Workflow Admin (Nummernkreise, Zahlungsbedingungen)
+    register_blueprint_safe('src.controllers.document_admin_controller', 'document_admin_bp', 'Dokument-Admin')
+
     # Update & Backup System
     register_blueprint_safe('src.controllers.update_controller', 'update_bp', 'Updates & Backups')
 
@@ -226,12 +247,44 @@ def create_app():
     # Design-Erstellung (Fremd- und Eigenerstellung)
     register_blueprint_safe('src.controllers.design_creation_controller', 'design_creation_bp', 'Design-Erstellung')
 
+    # Auftrags-Wizard (Step-by-Step Auftragserfassung)
+    register_blueprint_safe('src.controllers.order_wizard_controller', 'wizard_bp', 'Auftrags-Wizard')
+
+    # Angebote-Workflow (Document-Workflow Integration)
+    register_blueprint_safe('src.controllers.angebote_workflow_controller', 'angebote_workflow_bp', 'Angebote-Workflow')
+
+    # Auftragsbestätigungen (Document-Workflow Integration)
+    register_blueprint_safe('src.controllers.auftraege_controller', 'auftraege_bp', 'Auftragsbestätigungen')
+
+    # Lieferscheine (Document-Workflow Integration)
+    register_blueprint_safe('src.controllers.lieferscheine_controller', 'lieferscheine_bp', 'Lieferscheine')
+
+    # Rechnungen (Document-Workflow Integration)
+    register_blueprint_safe('src.controllers.rechnungen_controller', 'rechnungen_bp', 'Rechnungen')
+
+    # Setup-Wizard (Erstinstallation)
+    register_blueprint_safe('src.controllers.setup_wizard_controller', 'setup_bp', 'Setup-Wizard')
+    
+    # Buchhaltung & Controlling
+    register_blueprint_safe('src.controllers.buchhaltung_controller', 'buchhaltung_bp', 'Buchhaltung')
+    
+    # Kalender (Outlook-Style)
+    register_blueprint_safe('src.controllers.kalender_controller', 'kalender_bp', 'Kalender')
+
     # ==========================================
     # HAUPT-ROUTEN
     # ==========================================
     @app.route('/')
     def root():
-        """Root-Route - Redirect zum Dashboard oder Login"""
+        """Root-Route - Redirect zum Dashboard, Login oder Setup"""
+        # Setup-Check: Erstinstallation?
+        try:
+            from src.controllers.setup_wizard_controller import is_setup_complete
+            if not is_setup_complete():
+                return redirect(url_for('setup.welcome'))
+        except Exception as e:
+            print(f"[WARNUNG] Setup-Check fehlgeschlagen: {e}")
+        
         if current_user.is_authenticated:
             return redirect(url_for('dashboard'))
         return redirect(url_for('auth.login'))

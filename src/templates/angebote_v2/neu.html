@@ -1,0 +1,470 @@
+{% extends "base.html" %}
+{% block title %}Neues Angebot{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('angebote_workflow.index') }}">Angebote</a></li>
+                    <li class="breadcrumb-item active">Neu</li>
+                </ol>
+            </nav>
+            <h2><i class="fas fa-plus-circle text-success me-2"></i>Neues Angebot</h2>
+        </div>
+    </div>
+
+    <form method="POST" id="angebotForm">
+        <input type="hidden" name="positionen_json" id="positionenJson">
+        
+        <div class="row">
+            <!-- Hauptbereich -->
+            <div class="col-lg-8">
+                <!-- Kunde -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-user me-2"></i>Kunde</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Kunde auswählen *</label>
+                            <select name="kunde_id" id="kundeSelect" class="form-select form-select-lg" required>
+                                <option value="">-- Kunde wählen --</option>
+                                {% for kunde in kunden %}
+                                <option value="{{ kunde.id }}" 
+                                        data-email="{{ kunde.email }}"
+                                        data-phone="{{ kunde.phone }}">
+                                    {{ kunde.display_name }}
+                                    {% if kunde.company_name and kunde.customer_type == 'business' %}
+                                    ({{ kunde.city or '' }})
+                                    {% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div id="kundeDetails" class="d-none">
+                            <div class="alert alert-light">
+                                <strong id="kundeNameAnzeige"></strong><br>
+                                <small class="text-muted">
+                                    <i class="fas fa-envelope me-1"></i><span id="kundeEmailAnzeige"></span>
+                                    <span class="mx-2">|</span>
+                                    <i class="fas fa-phone me-1"></i><span id="kundeTelefonAnzeige"></span>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Betreff & Texte -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-align-left me-2"></i>Betreff & Texte</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Betreff</label>
+                            <input type="text" name="betreff" class="form-control" 
+                                   placeholder="z.B. Firmenkleidung mit Stickerei">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Einleitungstext</label>
+                            <textarea name="einleitung" class="form-control" rows="2">{{ standard_einleitung }}</textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Schlussbemerkung</label>
+                            <textarea name="schlussbemerkung" class="form-control" rows="2">{{ standard_schluss }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Positionen -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Positionen</h5>
+                        <button type="button" class="btn btn-success btn-sm" onclick="neuePosition()">
+                            <i class="fas fa-plus me-1"></i> Position hinzufügen
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="positionenTabelle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 40px;">Pos.</th>
+                                        <th>Bezeichnung</th>
+                                        <th style="width: 80px;">Menge</th>
+                                        <th style="width: 60px;">Einheit</th>
+                                        <th style="width: 100px;">Einzelpreis</th>
+                                        <th style="width: 100px;">Gesamt</th>
+                                        <th style="width: 50px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="positionenBody">
+                                    <!-- Dynamisch gefüllt -->
+                                </tbody>
+                                <tfoot class="table-light">
+                                    <tr>
+                                        <td colspan="5" class="text-end"><strong>Summe Netto:</strong></td>
+                                        <td class="text-end"><strong id="summeNetto">0,00 €</strong></td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                        <div id="keinePositionen" class="text-center py-4 text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2"></i>
+                            <p class="mb-0">Noch keine Positionen hinzugefügt</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seitenleiste -->
+            <div class="col-lg-4">
+                <!-- Optionen -->
+                <div class="card shadow-sm mb-4 sticky-top" style="top: 20px;">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Optionen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Gültigkeit (Tage)</label>
+                            <select name="gueltig_tage" class="form-select">
+                                <option value="14">14 Tage</option>
+                                <option value="30" selected>30 Tage</option>
+                                <option value="60">60 Tage</option>
+                                <option value="90">90 Tage</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Zahlungsbedingung</label>
+                            <select name="zahlungsbedingung_id" class="form-select">
+                                <option value="">Standard</option>
+                                {% for zb in zahlungsbedingungen %}
+                                <option value="{{ zb.id }}" {% if zb.standard %}selected{% endif %}>
+                                    {{ zb.bezeichnung }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Interne Notiz</label>
+                            <textarea name="interne_notiz" class="form-control" rows="2" 
+                                      placeholder="Nur intern sichtbar..."></textarea>
+                        </div>
+
+                        <hr>
+
+                        <!-- Summen -->
+                        <div class="mb-2 d-flex justify-content-between">
+                            <span>Netto:</span>
+                            <strong id="summeNettoSidebar">0,00 €</strong>
+                        </div>
+                        <div class="mb-2 d-flex justify-content-between text-muted">
+                            <span>MwSt. (19%):</span>
+                            <span id="summeMwst">0,00 €</span>
+                        </div>
+                        <div class="mb-3 d-flex justify-content-between fs-5">
+                            <strong>Gesamt:</strong>
+                            <strong class="text-success" id="summeBrutto">0,00 €</strong>
+                        </div>
+
+                        <hr>
+
+                        <button type="submit" class="btn btn-success w-100 mb-2">
+                            <i class="fas fa-save me-1"></i> Angebot erstellen
+                        </button>
+                        <a href="{{ url_for('angebote_workflow.index') }}" class="btn btn-outline-secondary w-100">
+                            Abbrechen
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modal: Neue Position -->
+<div class="modal fade" id="positionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Position hinzufügen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Artikelsuche -->
+                <div class="mb-3">
+                    <label class="form-label">Artikel suchen (optional)</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="artikelSuche" 
+                               placeholder="Artikelnummer oder Name...">
+                    </div>
+                    <div id="artikelSuchergebnisse" class="list-group mt-2" style="display: none;"></div>
+                </div>
+
+                <hr>
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label fw-bold">Bezeichnung *</label>
+                        <input type="text" class="form-control" id="posBezeichnung" required>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea class="form-control" id="posBeschreibung" rows="2"></textarea>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Menge *</label>
+                        <input type="number" class="form-control" id="posMenge" value="1" min="0.01" step="0.01" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Einheit</label>
+                        <select class="form-select" id="posEinheit">
+                            <option value="Stk.">Stk.</option>
+                            <option value="m">m</option>
+                            <option value="m²">m²</option>
+                            <option value="kg">kg</option>
+                            <option value="Std.">Std.</option>
+                            <option value="pauschal">pauschal</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Einzelpreis (netto) *</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="posEinzelpreis" value="0" min="0" step="0.01" required>
+                            <span class="input-group-text">€</span>
+                        </div>
+                    </div>
+                </div>
+
+                <input type="hidden" id="posArtikelId">
+                <input type="hidden" id="posArtikelnummer">
+                <input type="hidden" id="posEditIndex" value="-1">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" onclick="positionSpeichern()">
+                    <i class="fas fa-check me-1"></i> Übernehmen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Positionen Array
+let positionen = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Kunde auswählen
+    document.getElementById('kundeSelect').addEventListener('change', function() {
+        const option = this.options[this.selectedIndex];
+        const details = document.getElementById('kundeDetails');
+        
+        if (this.value) {
+            document.getElementById('kundeNameAnzeige').textContent = option.text;
+            document.getElementById('kundeEmailAnzeige').textContent = option.dataset.email || '-';
+            document.getElementById('kundeTelefonAnzeige').textContent = option.dataset.phone || '-';
+            details.classList.remove('d-none');
+        } else {
+            details.classList.add('d-none');
+        }
+    });
+    
+    // Artikelsuche
+    let sucheTimeout;
+    document.getElementById('artikelSuche').addEventListener('input', function() {
+        clearTimeout(sucheTimeout);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            document.getElementById('artikelSuchergebnisse').style.display = 'none';
+            return;
+        }
+        
+        sucheTimeout = setTimeout(() => {
+            fetch(`{{ url_for('angebote_workflow.api_artikel_suche') }}?q=${encodeURIComponent(query)}`)
+                .then(r => r.json())
+                .then(data => {
+                    const container = document.getElementById('artikelSuchergebnisse');
+                    
+                    if (data.length === 0) {
+                        container.innerHTML = '<div class="list-group-item text-muted">Keine Artikel gefunden</div>';
+                    } else {
+                        container.innerHTML = data.map(a => `
+                            <button type="button" class="list-group-item list-group-item-action"
+                                    onclick="artikelAuswaehlen(${JSON.stringify(a).replace(/"/g, '&quot;')})">
+                                <strong>${a.article_number || ''}</strong> - ${a.name}
+                                <span class="float-end text-success">${a.price.toFixed(2)} €</span>
+                            </button>
+                        `).join('');
+                    }
+                    container.style.display = 'block';
+                });
+        }, 300);
+    });
+    
+    // Form Submit
+    document.getElementById('angebotForm').addEventListener('submit', function(e) {
+        if (positionen.length === 0) {
+            e.preventDefault();
+            alert('Bitte fügen Sie mindestens eine Position hinzu.');
+            return;
+        }
+        document.getElementById('positionenJson').value = JSON.stringify(positionen);
+    });
+    
+    // Initial rendern
+    renderPositionen();
+});
+
+function artikelAuswaehlen(artikel) {
+    document.getElementById('posArtikelId').value = artikel.id;
+    document.getElementById('posArtikelnummer').value = artikel.article_number || '';
+    document.getElementById('posBezeichnung').value = artikel.name;
+    document.getElementById('posEinzelpreis').value = artikel.price.toFixed(2);
+    document.getElementById('artikelSuchergebnisse').style.display = 'none';
+    document.getElementById('artikelSuche').value = '';
+}
+
+function neuePosition() {
+    // Modal zurücksetzen
+    document.getElementById('posArtikelId').value = '';
+    document.getElementById('posArtikelnummer').value = '';
+    document.getElementById('posBezeichnung').value = '';
+    document.getElementById('posBeschreibung').value = '';
+    document.getElementById('posMenge').value = '1';
+    document.getElementById('posEinheit').value = 'Stk.';
+    document.getElementById('posEinzelpreis').value = '0';
+    document.getElementById('posEditIndex').value = '-1';
+    document.getElementById('artikelSuche').value = '';
+    document.getElementById('artikelSuchergebnisse').style.display = 'none';
+    
+    const modal = new bootstrap.Modal(document.getElementById('positionModal'));
+    modal.show();
+}
+
+function positionBearbeiten(index) {
+    const pos = positionen[index];
+    
+    document.getElementById('posArtikelId').value = pos.artikel_id || '';
+    document.getElementById('posArtikelnummer').value = pos.artikelnummer || '';
+    document.getElementById('posBezeichnung').value = pos.bezeichnung;
+    document.getElementById('posBeschreibung').value = pos.beschreibung || '';
+    document.getElementById('posMenge').value = pos.menge;
+    document.getElementById('posEinheit').value = pos.einheit;
+    document.getElementById('posEinzelpreis').value = pos.einzelpreis;
+    document.getElementById('posEditIndex').value = index;
+    
+    const modal = new bootstrap.Modal(document.getElementById('positionModal'));
+    modal.show();
+}
+
+function positionSpeichern() {
+    const bezeichnung = document.getElementById('posBezeichnung').value.trim();
+    const menge = parseFloat(document.getElementById('posMenge').value) || 0;
+    const einzelpreis = parseFloat(document.getElementById('posEinzelpreis').value) || 0;
+    
+    if (!bezeichnung) {
+        alert('Bitte Bezeichnung eingeben');
+        return;
+    }
+    
+    const position = {
+        artikel_id: document.getElementById('posArtikelId').value || null,
+        artikelnummer: document.getElementById('posArtikelnummer').value,
+        bezeichnung: bezeichnung,
+        beschreibung: document.getElementById('posBeschreibung').value,
+        menge: menge,
+        einheit: document.getElementById('posEinheit').value,
+        einzelpreis: einzelpreis,
+        mwst_satz: 19,
+        rabatt_prozent: 0,
+        typ: 'artikel'
+    };
+    
+    const editIndex = parseInt(document.getElementById('posEditIndex').value);
+    
+    if (editIndex >= 0) {
+        positionen[editIndex] = position;
+    } else {
+        positionen.push(position);
+    }
+    
+    renderPositionen();
+    bootstrap.Modal.getInstance(document.getElementById('positionModal')).hide();
+}
+
+function positionEntfernen(index) {
+    if (confirm('Position wirklich entfernen?')) {
+        positionen.splice(index, 1);
+        renderPositionen();
+    }
+}
+
+function renderPositionen() {
+    const tbody = document.getElementById('positionenBody');
+    const keineDiv = document.getElementById('keinePositionen');
+    
+    if (positionen.length === 0) {
+        tbody.innerHTML = '';
+        keineDiv.style.display = 'block';
+        document.getElementById('positionenTabelle').style.display = 'none';
+    } else {
+        keineDiv.style.display = 'none';
+        document.getElementById('positionenTabelle').style.display = 'table';
+        
+        tbody.innerHTML = positionen.map((pos, idx) => {
+            const gesamt = pos.menge * pos.einzelpreis;
+            return `
+                <tr>
+                    <td class="text-muted">${idx + 1}</td>
+                    <td>
+                        <strong>${pos.bezeichnung}</strong>
+                        ${pos.beschreibung ? `<br><small class="text-muted">${pos.beschreibung}</small>` : ''}
+                        ${pos.artikelnummer ? `<br><small class="text-muted">Art.-Nr.: ${pos.artikelnummer}</small>` : ''}
+                    </td>
+                    <td class="text-center">${pos.menge}</td>
+                    <td>${pos.einheit}</td>
+                    <td class="text-end">${pos.einzelpreis.toFixed(2)} €</td>
+                    <td class="text-end"><strong>${gesamt.toFixed(2)} €</strong></td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-secondary" onclick="positionBearbeiten(${idx})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" onclick="positionEntfernen(${idx})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+    
+    berechneSummen();
+}
+
+function berechneSummen() {
+    let netto = 0;
+    positionen.forEach(pos => {
+        netto += pos.menge * pos.einzelpreis;
+    });
+    
+    const mwst = netto * 0.19;
+    const brutto = netto + mwst;
+    
+    const format = (val) => val.toFixed(2).replace('.', ',') + ' €';
+    
+    document.getElementById('summeNetto').textContent = format(netto);
+    document.getElementById('summeNettoSidebar').textContent = format(netto);
+    document.getElementById('summeMwst').textContent = format(mwst);
+    document.getElementById('summeBrutto').textContent = format(brutto);
+}
+</script>
+{% endblock %}

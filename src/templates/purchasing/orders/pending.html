@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}Offene Bestellungen - Einkauf{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+    <!-- Breadcrumb & Header -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('purchasing.dashboard') }}">Einkauf</a></li>
+            <li class="breadcrumb-item active">Offene Bestellungen</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2"><i class="bi bi-clock-history"></i> Offene Bestellungen</h1>
+        <div>
+            <a href="{{ url_for('purchasing.orders') }}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-list"></i> Alle Bestellungen
+            </a>
+            <a href="{{ url_for('purchasing.suggestions') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Neue Bestellung
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistik-Karten -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2">Offene Bestellungen</h6>
+                    <h2 class="card-title mb-0">{{ total_orders }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2">Überfällig</h6>
+                    <h2 class="card-title mb-0">{{ overdue_orders|length }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2">Gesamtwert</h6>
+                    <h2 class="card-title mb-0">{{ "%.2f"|format(total_value) }} €</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2">Entwürfe</h6>
+                    <h2 class="card-title mb-0">{{ orders_by_status.get('draft', [])|length }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Überfällige Bestellungen -->
+    {% if overdue_orders %}
+    <div class="card border-danger mb-4">
+        <div class="card-header bg-danger text-white">
+            <i class="bi bi-exclamation-triangle"></i> Überfällige Bestellungen ({{ overdue_orders|length }})
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Bestellung</th>
+                            <th>Lieferant</th>
+                            <th>Liefertermin</th>
+                            <th>Tage überfällig</th>
+                            <th class="text-end">Betrag</th>
+                            <th class="text-center">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in overdue_orders %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="fw-semibold text-decoration-none">
+                                    {{ order.purchase_order_number or order.order_number or order.id }}
+                                </a>
+                            </td>
+                            <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                            <td class="text-danger">{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</td>
+                            <td>
+                                {% set days_overdue = (today - order.delivery_date).days if order.delivery_date else 0 %}
+                                <span class="badge bg-danger">{{ days_overdue }} Tage</span>
+                            </td>
+                            <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} €</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Bestellte -->
+    {% if orders_by_status.get('ordered') %}
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <i class="bi bi-send"></i> Bestellt ({{ orders_by_status['ordered']|length }})
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Bestellung</th>
+                            <th>Lieferant</th>
+                            <th>Bestelldatum</th>
+                            <th>Liefertermin</th>
+                            <th class="text-end">Betrag</th>
+                            <th class="text-center">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders_by_status['ordered'] %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="fw-semibold text-decoration-none">
+                                    {{ order.purchase_order_number or order.order_number or order.id }}
+                                </a>
+                            </td>
+                            <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                            <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</td>
+                            <td>{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</td>
+                            <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} €</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Bestätigt -->
+    {% if orders_by_status.get('confirmed') %}
+    <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <i class="bi bi-check-circle"></i> Bestätigt ({{ orders_by_status['confirmed']|length }})
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Bestellung</th>
+                            <th>Lieferant</th>
+                            <th>Bestelldatum</th>
+                            <th>Liefertermin</th>
+                            <th class="text-end">Betrag</th>
+                            <th class="text-center">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders_by_status['confirmed'] %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="fw-semibold text-decoration-none">
+                                    {{ order.purchase_order_number or order.order_number or order.id }}
+                                </a>
+                            </td>
+                            <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                            <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</td>
+                            <td>{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</td>
+                            <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} €</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Unterwegs -->
+    {% if orders_by_status.get('shipped') %}
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <i class="bi bi-truck"></i> Unterwegs ({{ orders_by_status['shipped']|length }})
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Bestellung</th>
+                            <th>Lieferant</th>
+                            <th>Bestelldatum</th>
+                            <th>Liefertermin</th>
+                            <th class="text-end">Betrag</th>
+                            <th class="text-center">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders_by_status['shipped'] %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="fw-semibold text-decoration-none">
+                                    {{ order.purchase_order_number or order.order_number or order.id }}
+                                </a>
+                            </td>
+                            <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                            <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</td>
+                            <td>{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</td>
+                            <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} €</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Entwürfe -->
+    {% if orders_by_status.get('draft') %}
+    <div class="card mb-4">
+        <div class="card-header bg-secondary text-white">
+            <i class="bi bi-pencil"></i> Entwürfe ({{ orders_by_status['draft']|length }})
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Bestellung</th>
+                            <th>Lieferant</th>
+                            <th>Erstellt am</th>
+                            <th class="text-end">Betrag</th>
+                            <th class="text-center">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders_by_status['draft'] %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="fw-semibold text-decoration-none">
+                                    {{ order.purchase_order_number or order.order_number or order.id }}
+                                </a>
+                            </td>
+                            <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                            <td>{{ order.created_at.strftime('%d.%m.%Y') if order.created_at else '-' }}</td>
+                            <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} €</td>
+                            <td class="text-center">
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Keine offenen Bestellungen -->
+    {% if total_orders == 0 %}
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-inbox fs-1 text-muted d-block mb-3"></i>
+            <h5 class="text-muted">Keine offenen Bestellungen</h5>
+            <p class="text-muted mb-3">Alle Bestellungen wurden geliefert oder es gibt keine aktiven Bestellungen.</p>
+            <a href="{{ url_for('purchasing.suggestions') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Neue Bestellung erstellen
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}

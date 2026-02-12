@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}Neue Rechnung{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item"><a href="{{ url_for('rechnungen.index') }}">Rechnungen</a></li>
+                <li class="breadcrumb-item active">Neu</li>
+            </ol>
+        </nav>
+        <h2><i class="fas fa-plus-circle text-success me-2"></i>Neue Rechnung</h2>
+    </div>
+
+    <form method="POST" id="rechnungForm">
+        <input type="hidden" name="positionen_json" id="positionenJson">
+        
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-user me-2"></i>Kunde *</h5>
+                    </div>
+                    <div class="card-body">
+                        <select name="kunde_id" class="form-select form-select-lg" required>
+                            <option value="">-- Kunde wählen --</option>
+                            {% for kunde in kunden %}
+                            <option value="{{ kunde.id }}">{{ kunde.display_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Rechnungsdetails</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Rechnungstyp</label>
+                                <select name="rechnungstyp" class="form-select">
+                                    <option value="rechnung">Rechnung</option>
+                                    <option value="anzahlung">Anzahlungsrechnung</option>
+                                    <option value="teilrechnung">Teilrechnung</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Leistungsdatum</label>
+                                <input type="date" name="leistungsdatum" class="form-control">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Zahlungsbedingung</label>
+                                <select name="zahlungsbedingung_id" class="form-select">
+                                    {% for zb in zahlungsbedingungen %}
+                                    <option value="{{ zb.id }}" {% if zb.standard %}selected{% endif %}>{{ zb.bezeichnung }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Betreff</label>
+                            <input type="text" name="betreff" class="form-control" placeholder="z.B. Ihre Bestellung vom...">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Einleitung</label>
+                            <textarea name="einleitung" class="form-control" rows="2">Wir erlauben uns, Ihnen folgende Leistungen in Rechnung zu stellen:</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Positionen</h5>
+                        <button type="button" class="btn btn-success btn-sm" onclick="neuePosition()">
+                            <i class="fas fa-plus me-1"></i> Position
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table mb-0" id="positionenTabelle" style="display: none;">
+                            <thead class="table-light">
+                                <tr><th>Pos.</th><th>Bezeichnung</th><th>Menge</th><th>Preis</th><th>Gesamt</th><th></th></tr>
+                            </thead>
+                            <tbody id="positionenBody"></tbody>
+                            <tfoot class="table-light">
+                                <tr><td colspan="4" class="text-end"><strong>Netto:</strong></td><td class="text-end"><strong id="summeNetto">0,00 €</strong></td><td></td></tr>
+                            </tfoot>
+                        </table>
+                        <div id="keinePositionen" class="text-center py-4 text-muted">
+                            <i class="fas fa-inbox fa-2x mb-2"></i><p class="mb-0">Noch keine Positionen</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm sticky-top" style="top: 20px;">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">Zusammenfassung</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Interne Notiz</label>
+                            <textarea name="interne_notiz" class="form-control" rows="2"></textarea>
+                        </div>
+                        <hr>
+                        <div class="mb-2 d-flex justify-content-between"><span>Netto:</span><strong id="summeNettoSidebar">0,00 €</strong></div>
+                        <div class="mb-2 d-flex justify-content-between text-muted"><span>MwSt.:</span><span id="summeMwst">0,00 €</span></div>
+                        <div class="mb-3 d-flex justify-content-between fs-5"><strong>Gesamt:</strong><strong class="text-success" id="summeBrutto">0,00 €</strong></div>
+                        <hr>
+                        <button type="submit" class="btn btn-success w-100 mb-2"><i class="fas fa-save me-1"></i> Rechnung erstellen</button>
+                        <a href="{{ url_for('rechnungen.index') }}" class="btn btn-outline-secondary w-100">Abbrechen</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<div class="modal fade" id="positionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Position</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3"><label class="form-label fw-bold">Bezeichnung *</label><input type="text" class="form-control" id="posBezeichnung"></div>
+                <div class="mb-3"><label class="form-label">Beschreibung</label><textarea class="form-control" id="posBeschreibung" rows="2"></textarea></div>
+                <div class="row">
+                    <div class="col-4 mb-3"><label class="form-label">Menge</label><input type="number" class="form-control" id="posMenge" value="1" min="0.01" step="0.01"></div>
+                    <div class="col-4 mb-3"><label class="form-label">Einheit</label><select class="form-select" id="posEinheit"><option value="Stk.">Stk.</option><option value="Std.">Std.</option><option value="pauschal">pauschal</option></select></div>
+                    <div class="col-4 mb-3"><label class="form-label">Preis (netto)</label><input type="number" class="form-control" id="posEinzelpreis" value="0" min="0" step="0.01"></div>
+                </div>
+                <input type="hidden" id="posEditIndex" value="-1">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" onclick="positionSpeichern()">Übernehmen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let positionen = [];
+
+document.getElementById('rechnungForm').addEventListener('submit', function(e) {
+    if (positionen.length === 0) { e.preventDefault(); alert('Bitte mindestens eine Position hinzufügen.'); return; }
+    document.getElementById('positionenJson').value = JSON.stringify(positionen);
+});
+
+function neuePosition() {
+    document.getElementById('posBezeichnung').value = '';
+    document.getElementById('posBeschreibung').value = '';
+    document.getElementById('posMenge').value = '1';
+    document.getElementById('posEinheit').value = 'Stk.';
+    document.getElementById('posEinzelpreis').value = '0';
+    document.getElementById('posEditIndex').value = '-1';
+    new bootstrap.Modal(document.getElementById('positionModal')).show();
+}
+
+function positionBearbeiten(idx) {
+    const p = positionen[idx];
+    document.getElementById('posBezeichnung').value = p.bezeichnung;
+    document.getElementById('posBeschreibung').value = p.beschreibung || '';
+    document.getElementById('posMenge').value = p.menge;
+    document.getElementById('posEinheit').value = p.einheit;
+    document.getElementById('posEinzelpreis').value = p.einzelpreis;
+    document.getElementById('posEditIndex').value = idx;
+    new bootstrap.Modal(document.getElementById('positionModal')).show();
+}
+
+function positionSpeichern() {
+    const bez = document.getElementById('posBezeichnung').value.trim();
+    if (!bez) { alert('Bezeichnung erforderlich'); return; }
+    const pos = {
+        bezeichnung: bez,
+        beschreibung: document.getElementById('posBeschreibung').value,
+        menge: parseFloat(document.getElementById('posMenge').value) || 1,
+        einheit: document.getElementById('posEinheit').value,
+        einzelpreis: parseFloat(document.getElementById('posEinzelpreis').value) || 0,
+        mwst_satz: 19, typ: 'artikel'
+    };
+    const idx = parseInt(document.getElementById('posEditIndex').value);
+    if (idx >= 0) positionen[idx] = pos; else positionen.push(pos);
+    render();
+    bootstrap.Modal.getInstance(document.getElementById('positionModal')).hide();
+}
+
+function positionEntfernen(idx) { positionen.splice(idx, 1); render(); }
+
+function render() {
+    const tbody = document.getElementById('positionenBody');
+    const tabelle = document.getElementById('positionenTabelle');
+    const keine = document.getElementById('keinePositionen');
+    if (positionen.length === 0) { tabelle.style.display = 'none'; keine.style.display = 'block'; }
+    else {
+        tabelle.style.display = 'table'; keine.style.display = 'none';
+        tbody.innerHTML = positionen.map((p, i) => {
+            const ges = p.menge * p.einzelpreis;
+            return `<tr><td>${i+1}</td><td><strong>${p.bezeichnung}</strong></td><td>${p.menge} ${p.einheit}</td><td class="text-end">${p.einzelpreis.toFixed(2)} €</td><td class="text-end"><strong>${ges.toFixed(2)} €</strong></td><td><button type="button" class="btn btn-sm btn-outline-secondary" onclick="positionBearbeiten(${i})"><i class="fas fa-edit"></i></button> <button type="button" class="btn btn-sm btn-outline-danger" onclick="positionEntfernen(${i})"><i class="fas fa-trash"></i></button></td></tr>`;
+        }).join('');
+    }
+    berechneSummen();
+}
+
+function berechneSummen() {
+    let netto = 0; positionen.forEach(p => netto += p.menge * p.einzelpreis);
+    const mwst = netto * 0.19, brutto = netto + mwst;
+    const fmt = v => v.toFixed(2).replace('.', ',') + ' €';
+    document.getElementById('summeNetto').textContent = fmt(netto);
+    document.getElementById('summeNettoSidebar').textContent = fmt(netto);
+    document.getElementById('summeMwst').textContent = fmt(mwst);
+    document.getElementById('summeBrutto').textContent = fmt(brutto);
+}
+render();
+</script>
+{% endblock %}

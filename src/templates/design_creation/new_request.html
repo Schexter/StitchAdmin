@@ -1,0 +1,441 @@
+{% extends "base.html" %}
+
+{% block title %}Design-Erstellung - {{ order.order_number }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="bi bi-palette text-primary"></i>
+                Design-Erstellung
+            </h1>
+            <p class="text-muted mb-0">
+                Auftrag <strong>{{ order.order_number }}</strong>
+                {% if order.customer %} - {{ order.customer.display_name }}{% endif %}
+            </p>
+        </div>
+        <a href="{{ url_for('orders.show', order_id=order.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zum Auftrag
+        </a>
+    </div>
+
+    <!-- Auswahl: Fremd- oder Eigenerstellung -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100 border-primary creation-type-card" data-type="external">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-truck fs-1 text-primary mb-3"></i>
+                    <h4>Fremderstellung</h4>
+                    <p class="text-muted">Design bei externem Dienstleister (Puncher/Grafiker) beauftragen</p>
+                    <ul class="list-unstyled text-start mb-0">
+                        <li><i class="bi bi-check text-success"></i> Lieferant auswählen</li>
+                        <li><i class="bi bi-check text-success"></i> Spezifikationen angeben</li>
+                        <li><i class="bi bi-check text-success"></i> Automatische E-Mail mit Dateien</li>
+                        <li><i class="bi bi-check text-success"></i> In Bestellliste aufnehmen</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100 border-success creation-type-card" data-type="internal">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-person-workspace fs-1 text-success mb-3"></i>
+                    <h4>Eigenerstellung</h4>
+                    <p class="text-muted">Design selbst erstellen (intern)</p>
+                    <ul class="list-unstyled text-start mb-0">
+                        <li><i class="bi bi-check text-success"></i> Auftragszettel generieren</li>
+                        <li><i class="bi bi-check text-success"></i> TODO-Aufgabe erstellen</li>
+                        <li><i class="bi bi-check text-success"></i> Fälligkeitsdatum setzen</li>
+                        <li><i class="bi bi-check text-success"></i> Zuweisung an Mitarbeiter</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formular: Fremderstellung -->
+    <div id="external-form" class="creation-form" style="display: none;">
+        <form action="{{ url_for('design_creation.create_external_order', order_id=order.id) }}" method="POST">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-truck"></i> Fremderstellung beauftragen
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Lieferant auswählen -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><strong>Lieferant / Puncher / Grafiker *</strong></label>
+                            <select name="supplier_id" class="form-select" required>
+                                <option value="">-- Bitte auswählen --</option>
+                                {% for supplier in suppliers %}
+                                <option value="{{ supplier.id }}">
+                                    {{ supplier.name }}
+                                    {% if supplier.email %} ({{ supplier.email }}){% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">
+                                <a href="{{ url_for('supplier.list_suppliers') }}" target="_blank">Neuen Lieferanten anlegen</a>
+                            </small>
+                        </div>
+
+                        <!-- Design-Typ -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><strong>Design-Typ *</strong></label>
+                            <select name="design_type" class="form-select" id="design_type">
+                                <option value="embroidery" {{ 'selected' if existing_specs.design_type == 'embroidery' }}>🧵 Stickprogramm</option>
+                                <option value="print" {{ 'selected' if existing_specs.design_type == 'print' }}>🖨️ Druckdatei</option>
+                                <option value="dtf" {{ 'selected' if existing_specs.design_type == 'dtf' }}>🎨 DTF-Design</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Design-Name -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Design-Name</label>
+                            <input type="text" name="design_name" class="form-control" 
+                                   value="Design für {{ order.order_number }}">
+                        </div>
+
+                        <!-- Priorität -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Priorität</label>
+                            <select name="priority" class="form-select">
+                                <option value="low">🟢 Niedrig</option>
+                                <option value="normal" selected>🔵 Normal</option>
+                                <option value="high">🟠 Hoch</option>
+                                <option value="urgent">🔴 Eilig</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h5 class="mb-3"><i class="bi bi-rulers"></i> Spezifikationen</h5>
+
+                    <!-- Stickerei-Spezifikationen -->
+                    <div id="embroidery-specs">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Breite (mm)</label>
+                                <input type="number" name="width_mm" class="form-control" step="0.1"
+                                       value="{{ existing_specs.width_mm or '' }}" placeholder="z.B. 100">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Höhe (mm)</label>
+                                <input type="number" name="height_mm" class="form-control" step="0.1"
+                                       value="{{ existing_specs.height_mm or '' }}" placeholder="z.B. 80">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Max. Stichzahl</label>
+                                <input type="number" name="max_stitch_count" class="form-control"
+                                       value="{{ existing_specs.stitch_count or '' }}" placeholder="z.B. 15000">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Max. Farben</label>
+                                <input type="number" name="max_colors" class="form-control" placeholder="z.B. 6">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Stoffart</label>
+                                <select name="fabric_type" class="form-select">
+                                    <option value="">-- Nicht angegeben --</option>
+                                    <option value="baumwolle">Baumwolle</option>
+                                    <option value="polyester">Polyester</option>
+                                    <option value="fleece">Fleece</option>
+                                    <option value="strick">Strick</option>
+                                    <option value="leder">Leder</option>
+                                    <option value="canvas">Canvas</option>
+                                    <option value="nylon">Nylon</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Stichdichte</label>
+                                <select name="stitch_density" class="form-select">
+                                    <option value="locker">Locker</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="dicht">Dicht</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Position</label>
+                                <input type="text" name="position" class="form-control"
+                                       value="{{ existing_specs.position or '' }}" placeholder="z.B. Brust links">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Druck-Spezifikationen (versteckt wenn nicht Druck) -->
+                    <div id="print-specs" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Breite (cm)</label>
+                                <input type="number" name="print_width_cm" class="form-control" step="0.1" placeholder="z.B. 30">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Höhe (cm)</label>
+                                <input type="number" name="print_height_cm" class="form-control" step="0.1" placeholder="z.B. 40">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Min. DPI</label>
+                                <input type="number" name="min_dpi" class="form-control" value="300">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">Druckmethode</label>
+                                <select name="print_method" class="form-select">
+                                    <option value="">-- Nicht angegeben --</option>
+                                    <option value="siebdruck">Siebdruck</option>
+                                    <option value="digital">Digitaldruck</option>
+                                    <option value="transfer">Transfer</option>
+                                    <option value="dtf">DTF</option>
+                                    <option value="sublimation">Sublimation</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input type="checkbox" name="needs_transparent_bg" class="form-check-input" id="transparent_bg">
+                                    <label class="form-check-label" for="transparent_bg">Transparenter Hintergrund benötigt</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input type="checkbox" name="needs_white_underbase" class="form-check-input" id="white_underbase">
+                                    <label class="form-check-label" for="white_underbase">Weiße Unterlegung (für dunkle Stoffe)</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h5 class="mb-3"><i class="bi bi-chat-text"></i> Beschreibung & Hinweise</h5>
+
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea name="description" class="form-control" rows="3" 
+                                  placeholder="Beschreiben Sie das gewünschte Design..."></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Besondere Anforderungen</label>
+                        <textarea name="special_requirements" class="form-control" rows="2"
+                                  placeholder="Spezielle Wünsche oder Hinweise für den Lieferanten..."></textarea>
+                    </div>
+
+                    <!-- Quelldatei Info -->
+                    {% if existing_specs.source_file_path %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-paperclip"></i>
+                        <strong>Kundenvorlage:</strong> {{ existing_specs.source_file_name }}
+                        <br><small>Diese Datei wird automatisch an die E-Mail angehängt.</small>
+                    </div>
+                    {% endif %}
+
+                    <hr>
+
+                    <!-- Optionen -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input type="checkbox" name="send_email" class="form-check-input" id="send_email" checked>
+                                <label class="form-check-label" for="send_email">
+                                    <i class="bi bi-envelope"></i> Sofort E-Mail an Lieferant senden
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send"></i> Bestellung erstellen
+                    </button>
+                    <a href="{{ url_for('orders.show', order_id=order.id) }}" class="btn btn-outline-secondary">
+                        Abbrechen
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Formular: Eigenerstellung -->
+    <div id="internal-form" class="creation-form" style="display: none;">
+        <form action="{{ url_for('design_creation.create_internal_task', order_id=order.id) }}" method="POST">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-person-workspace"></i> Eigenerstellung (Aufgabe erstellen)
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <!-- Design-Name -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><strong>Design-Name *</strong></label>
+                            <input type="text" name="design_name" class="form-control" required
+                                   value="Design für {{ order.order_number }}">
+                        </div>
+
+                        <!-- Design-Typ -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><strong>Design-Typ *</strong></label>
+                            <select name="design_type" class="form-select">
+                                <option value="embroidery" {{ 'selected' if existing_specs.design_type == 'embroidery' }}>🧵 Stickprogramm</option>
+                                <option value="print" {{ 'selected' if existing_specs.design_type == 'print' }}>🖨️ Druckdatei</option>
+                                <option value="dtf" {{ 'selected' if existing_specs.design_type == 'dtf' }}>🎨 DTF-Design</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Fälligkeitsdatum -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label"><strong>Fällig bis</strong></label>
+                            <input type="date" name="due_date" class="form-control">
+                        </div>
+
+                        <!-- Priorität -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Priorität</label>
+                            <select name="priority" class="form-select">
+                                <option value="low">🟢 Niedrig</option>
+                                <option value="normal" selected>🔵 Normal</option>
+                                <option value="high">🟠 Hoch</option>
+                                <option value="urgent">🔴 Eilig</option>
+                            </select>
+                        </div>
+
+                        <!-- Position -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Position</label>
+                            <input type="text" name="position" class="form-control"
+                                   value="{{ existing_specs.position or '' }}" placeholder="z.B. Brust links">
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h5 class="mb-3"><i class="bi bi-rulers"></i> Spezifikationen</h5>
+
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Breite (mm)</label>
+                            <input type="number" name="width_mm" class="form-control" step="0.1"
+                                   value="{{ existing_specs.width_mm or '' }}" placeholder="z.B. 100">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Höhe (mm)</label>
+                            <input type="number" name="height_mm" class="form-control" step="0.1"
+                                   value="{{ existing_specs.height_mm or '' }}" placeholder="z.B. 80">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Max. Stichzahl</label>
+                            <input type="number" name="max_stitch_count" class="form-control"
+                                   value="{{ existing_specs.stitch_count or '' }}" placeholder="z.B. 15000">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Max. Farben</label>
+                            <input type="number" name="max_colors" class="form-control" placeholder="z.B. 6">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Stoffart</label>
+                            <select name="fabric_type" class="form-select">
+                                <option value="">-- Nicht angegeben --</option>
+                                <option value="baumwolle">Baumwolle</option>
+                                <option value="polyester">Polyester</option>
+                                <option value="fleece">Fleece</option>
+                                <option value="strick">Strick</option>
+                                <option value="leder">Leder</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr>
+                    <h5 class="mb-3"><i class="bi bi-chat-text"></i> Hinweise</h5>
+
+                    <div class="mb-3">
+                        <label class="form-label">Besondere Anforderungen / Notizen</label>
+                        <textarea name="special_requirements" class="form-control" rows="3"
+                                  placeholder="Hinweise für die Erstellung..."></textarea>
+                    </div>
+
+                    <!-- Quelldatei Info -->
+                    {% if existing_specs.source_file_path %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-paperclip"></i>
+                        <strong>Kundenvorlage:</strong> {{ existing_specs.source_file_name }}
+                    </div>
+                    {% endif %}
+
+                    <hr>
+
+                    <!-- Optionen -->
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="generate_pdf" class="form-check-input" id="generate_pdf" checked>
+                        <label class="form-check-label" for="generate_pdf">
+                            <i class="bi bi-file-pdf"></i> Auftragszettel als PDF generieren
+                        </label>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-plus-lg"></i> Aufgabe erstellen
+                    </button>
+                    <a href="{{ url_for('orders.show', order_id=order.id) }}" class="btn btn-outline-secondary">
+                        Abbrechen
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.creation-type-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.creation-type-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+}
+.creation-type-card.selected {
+    border-width: 3px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Karten-Auswahl
+    document.querySelectorAll('.creation-type-card').forEach(card => {
+        card.addEventListener('click', function() {
+            // Alle Karten deselektieren
+            document.querySelectorAll('.creation-type-card').forEach(c => c.classList.remove('selected'));
+            // Diese Karte selektieren
+            this.classList.add('selected');
+            
+            // Formulare verstecken
+            document.querySelectorAll('.creation-form').forEach(f => f.style.display = 'none');
+            
+            // Passendes Formular anzeigen
+            const type = this.dataset.type;
+            document.getElementById(type + '-form').style.display = 'block';
+            
+            // Smooth scroll
+            document.getElementById(type + '-form').scrollIntoView({behavior: 'smooth'});
+        });
+    });
+    
+    // Design-Typ Wechsel (Stickerei vs. Druck)
+    document.getElementById('design_type').addEventListener('change', function() {
+        const isEmbroidery = this.value === 'embroidery';
+        document.getElementById('embroidery-specs').style.display = isEmbroidery ? 'block' : 'none';
+        document.getElementById('print-specs').style.display = isEmbroidery ? 'none' : 'block';
+    });
+});
+</script>
+{% endblock %}

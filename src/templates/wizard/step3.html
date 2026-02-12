@@ -1,0 +1,711 @@
+{% extends "base.html" %}
+{% block title %}Auftrags-Wizard - Schritt 3: Veredelung{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Wizard Progress -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body py-3">
+                    <div class="wizard-progress d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('wizard.step1') }}" class="wizard-step completed text-decoration-none">
+                            <div class="step-circle"><i class="fas fa-check"></i></div>
+                            <span class="step-label">Kunde</span>
+                        </a>
+                        <div class="wizard-line completed"></div>
+                        <a href="{{ url_for('wizard.step2') }}" class="wizard-step completed text-decoration-none">
+                            <div class="step-circle"><i class="fas fa-check"></i></div>
+                            <span class="step-label">Textilien</span>
+                        </a>
+                        <div class="wizard-line completed"></div>
+                        <div class="wizard-step active">
+                            <div class="step-circle">3</div>
+                            <span class="step-label">Veredelung</span>
+                        </div>
+                        <div class="wizard-line"></div>
+                        <div class="wizard-step">
+                            <div class="step-circle">4</div>
+                            <span class="step-label">Kalkulation</span>
+                        </div>
+                        <div class="wizard-line"></div>
+                        <div class="wizard-step">
+                            <div class="step-circle">5</div>
+                            <span class="step-label">Abschluss</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="POST" id="step3Form" enctype="multipart/form-data">
+        <input type="hidden" name="veredelungen_json" id="veredelungenJson">
+        
+        <div class="row">
+            <!-- Linke Spalte: Veredelungs-Liste -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            {% if auftragsart == 'stickerei' %}
+                            <i class="fas fa-thread me-2"></i>Stickerei-Positionen
+                            {% elif auftragsart == 'druck' %}
+                            <i class="fas fa-print me-2"></i>Druck-Positionen
+                            {% else %}
+                            <i class="fas fa-magic me-2"></i>Veredelungs-Positionen
+                            {% endif %}
+                        </h5>
+                        <button type="button" class="btn btn-light btn-sm" onclick="neueVeredelung()">
+                            <i class="fas fa-plus me-1"></i> Position hinzufügen
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="veredelungenListe">
+                            {% if data.veredelungen %}
+                                {% for v in data.veredelungen %}
+                                <!-- Bestehende Veredelungen werden hier gerendert -->
+                                {% endfor %}
+                            {% else %}
+                            <div id="keineVeredelung" class="text-center py-5 text-muted">
+                                <i class="fas fa-paint-brush fa-4x mb-3 opacity-25"></i>
+                                <h5>Noch keine Veredelung hinzugefügt</h5>
+                                <p>Klicken Sie auf "Position hinzufügen" um eine Veredelung zu definieren.</p>
+                                <p class="small">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Sie können diesen Schritt auch überspringen für reine Textilbestellungen.
+                                </p>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info-Box -->
+                <div class="card shadow-sm mb-4 border-info">
+                    <div class="card-body">
+                        <h6 class="text-info"><i class="fas fa-lightbulb me-2"></i>Tipps zur Veredelung</h6>
+                        <ul class="mb-0 small">
+                            <li>Laden Sie DST/EMB-Dateien hoch für automatische Stichzahl-Erkennung</li>
+                            <li>Die Position bestimmt die maximale Größe des Motivs</li>
+                            <li>Mehrere Positionen pro Textil sind möglich (z.B. Brust + Rücken)</li>
+                            <li>Bei Fragen zu Garnfarben nutzen Sie unsere Farbberatung</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rechte Spalte: Zusammenfassung -->
+            <div class="col-lg-4">
+                <div class="card shadow-sm mb-4 sticky-top" style="top: 20px;">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-list-check me-2"></i>Übersicht</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Ausgewählte Textilien -->
+                        <h6 class="text-muted mb-2">Textilien ({{ data.textilien|length }})</h6>
+                        <ul class="list-unstyled small mb-4">
+                            {% for t in data.textilien[:5] %}
+                            <li class="mb-1">
+                                <i class="fas fa-tshirt text-primary me-1"></i>
+                                {{ t.name|truncate(25) }} 
+                                <span class="badge bg-secondary">{{ t.gesamtmenge }} Stk.</span>
+                            </li>
+                            {% endfor %}
+                            {% if data.textilien|length > 5 %}
+                            <li class="text-muted">... und {{ data.textilien|length - 5 }} weitere</li>
+                            {% endif %}
+                        </ul>
+
+                        <!-- Veredelungen -->
+                        <h6 class="text-muted mb-2">Veredelungen</h6>
+                        <div id="veredelungUebersicht">
+                            <p class="text-muted small">Noch keine Veredelung definiert</p>
+                        </div>
+
+                        <hr>
+
+                        <!-- Geschätzte Kosten -->
+                        <div class="d-flex justify-content-between">
+                            <span>Geschätzte Veredelungskosten:</span>
+                            <strong id="geschaetzteKosten">0,00 €</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body d-flex justify-content-between">
+                        <a href="{{ url_for('wizard.step2') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Zurück
+                        </a>
+                        <div>
+                            <button type="submit" name="skip" value="1" class="btn btn-outline-secondary me-2">
+                                Überspringen <i class="fas fa-forward ms-1"></i>
+                            </button>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                Weiter zur Kalkulation <i class="fas fa-arrow-right ms-2"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modal: Neue Veredelung -->
+<div class="modal fade" id="veredelungModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Veredelung hinzufügen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Spalte 1: Typ & Position -->
+                    <div class="col-md-4">
+                        <h6 class="fw-bold mb-3"><i class="fas fa-map-marker-alt me-2"></i>1. Position wählen</h6>
+                        
+                        <!-- Veredelungstyp -->
+                        <div class="mb-3">
+                            <label class="form-label">Veredelungsart</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="vTyp" id="vTypStickerei" value="stickerei" checked>
+                                <label class="btn btn-outline-primary" for="vTypStickerei">
+                                    <i class="fas fa-thread"></i> Stickerei
+                                </label>
+                                <input type="radio" class="btn-check" name="vTyp" id="vTypDruck" value="druck">
+                                <label class="btn btn-outline-primary" for="vTypDruck">
+                                    <i class="fas fa-print"></i> Druck
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Position -->
+                        <div class="mb-3">
+                            <label class="form-label">Position auf Textil</label>
+                            <select class="form-select" id="vPosition">
+                                {% for pos in positionen %}
+                                <option value="{{ pos.key }}" 
+                                        data-max-breite="{{ pos.max_breite }}"
+                                        data-max-hoehe="{{ pos.max_hoehe }}">
+                                    {{ pos.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Positionsvorschau -->
+                        <div class="position-preview text-center p-3 bg-light rounded">
+                            <svg viewBox="0 0 200 250" style="max-height: 200px;">
+                                <!-- T-Shirt Silhouette -->
+                                <path d="M40,50 L60,30 L80,40 L100,35 L120,40 L140,30 L160,50 L150,80 L140,80 L140,220 L60,220 L60,80 L50,80 Z" 
+                                      fill="#e9ecef" stroke="#dee2e6" stroke-width="2"/>
+                                <!-- Markierung -->
+                                <rect id="positionMarker" x="75" y="60" width="50" height="40" 
+                                      fill="rgba(13,110,253,0.3)" stroke="#0d6efd" stroke-width="2" rx="3"/>
+                            </svg>
+                            <small class="text-muted d-block mt-2">
+                                Max. Größe: <span id="maxGroesse">100 x 100</span> mm
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Spalte 2: Design-Upload -->
+                    <div class="col-md-4">
+                        <h6 class="fw-bold mb-3"><i class="fas fa-upload me-2"></i>2. Design hochladen</h6>
+                        
+                        <!-- Upload-Bereich -->
+                        <div class="upload-zone p-4 border-2 border-dashed rounded text-center mb-3" 
+                             id="uploadZone" style="border-style: dashed; cursor: pointer;">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-2"></i>
+                            <p class="mb-1">Design-Datei hierher ziehen</p>
+                            <p class="small text-muted mb-2">oder klicken zum Auswählen</p>
+                            <input type="file" id="designFile" class="d-none" 
+                                   accept=".dst,.emb,.pes,.jef,.exp,.vp3,.png,.jpg,.pdf">
+                            <span class="badge bg-info">DST, EMB, PES, PNG, JPG, PDF</span>
+                        </div>
+
+                        <!-- Upload-Status -->
+                        <div id="uploadStatus" class="d-none">
+                            <div class="alert alert-success py-2">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <span id="uploadFileName">design.dst</span>
+                                <button type="button" class="btn-close btn-sm float-end" onclick="designEntfernen()"></button>
+                            </div>
+                        </div>
+
+                        <!-- Analyse-Ergebnis (bei DST) -->
+                        <div id="analyseErgebnis" class="d-none">
+                            <div class="card bg-light">
+                                <div class="card-body py-2">
+                                    <h6 class="card-title mb-2">
+                                        <i class="fas fa-magic text-success me-1"></i> Automatische Analyse
+                                    </h6>
+                                    <div class="row g-2 small">
+                                        <div class="col-6">
+                                            <strong>Stiche:</strong>
+                                            <span id="analyseStiche">-</span>
+                                        </div>
+                                        <div class="col-6">
+                                            <strong>Größe:</strong>
+                                            <span id="analyseGroesse">-</span>
+                                        </div>
+                                        <div class="col-12">
+                                            <strong>Farben:</strong>
+                                            <span id="analyseFarben">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Oder aus Archiv -->
+                        <div class="text-center my-3">
+                            <span class="text-muted">— oder —</span>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary w-100" onclick="ausArchivWaehlen()">
+                            <i class="fas fa-folder-open me-2"></i> Aus Design-Archiv wählen
+                        </button>
+                    </div>
+
+                    <!-- Spalte 3: Details -->
+                    <div class="col-md-4">
+                        <h6 class="fw-bold mb-3"><i class="fas fa-sliders-h me-2"></i>3. Details</h6>
+                        
+                        <!-- Stickerei-Details -->
+                        <div id="stickereiDetails">
+                            <div class="mb-3">
+                                <label class="form-label">Stichzahl</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="vStiche" 
+                                           value="5000" min="100" max="500000">
+                                    <span class="input-group-text">Stiche</span>
+                                </div>
+                                <small class="text-muted">Wird automatisch erkannt bei DST-Upload</small>
+                            </div>
+
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label">Breite</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="vBreite" value="80" min="10" max="400">
+                                        <span class="input-group-text">mm</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">Höhe</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="vHoehe" value="60" min="10" max="400">
+                                        <span class="input-group-text">mm</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Garnfarben</label>
+                                <div id="garnfarbenContainer">
+                                    <div class="input-group mb-1">
+                                        <span class="input-group-text"><i class="fas fa-palette"></i></span>
+                                        <input type="text" class="form-control" placeholder="z.B. Schwarz, Weiß, Rot">
+                                    </div>
+                                </div>
+                                <small class="text-muted">Garnfarben kommagetrennt eingeben</small>
+                            </div>
+                        </div>
+
+                        <!-- Druck-Details -->
+                        <div id="druckDetails" class="d-none">
+                            <div class="row g-2 mb-3">
+                                <div class="col-6">
+                                    <label class="form-label">Breite</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="vBreiteCm" value="20" min="1" max="50">
+                                        <span class="input-group-text">cm</span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">Höhe</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="vHoeheCm" value="15" min="1" max="50">
+                                        <span class="input-group-text">cm</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Druckart</label>
+                                <select class="form-select" id="vDruckart">
+                                    <option value="dtf">DTF (Direct to Film)</option>
+                                    <option value="sublimation">Sublimation</option>
+                                    <option value="siebdruck">Siebdruck</option>
+                                    <option value="transfer">Transferdruck</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Notiz -->
+                        <div class="mb-3">
+                            <label class="form-label">Anmerkung</label>
+                            <textarea class="form-control" id="vNotiz" rows="2" 
+                                      placeholder="Besondere Hinweise..."></textarea>
+                        </div>
+
+                        <!-- Preis-Vorschau -->
+                        <div class="alert alert-info">
+                            <div class="d-flex justify-content-between">
+                                <span>Geschätzter Preis pro Stück:</span>
+                                <strong id="preisProStueck">2,50 €</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" onclick="veredelungSpeichern()">
+                    <i class="fas fa-check me-1"></i> Veredelung hinzufügen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.wizard-progress { padding: 0 30px; }
+.wizard-step { text-align: center; flex: 0 0 auto; }
+.step-circle {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #e9ecef; color: #6c757d;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; margin: 0 auto 5px; transition: all 0.3s;
+}
+.wizard-step.active .step-circle { background: var(--bs-primary); color: white; }
+.wizard-step.completed .step-circle { background: var(--bs-success); color: white; }
+.step-label { font-size: 0.85rem; color: #6c757d; }
+.wizard-step.active .step-label { color: var(--bs-primary); font-weight: bold; }
+.wizard-line { flex: 1; height: 3px; background: #e9ecef; margin: 0 10px; margin-bottom: 20px; }
+.wizard-line.completed { background: var(--bs-success); }
+
+.upload-zone {
+    border: 2px dashed #dee2e6;
+    transition: all 0.3s;
+}
+.upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--bs-primary);
+    background: rgba(13,110,253,0.05);
+}
+.veredelung-item {
+    border-left: 4px solid var(--bs-primary);
+}
+.veredelung-item.stickerei { border-left-color: var(--bs-success); }
+.veredelung-item.druck { border-left-color: var(--bs-info); }
+</style>
+
+<script>
+// Veredelungen Array
+let veredelungen = {{ data.veredelungen|tojson|safe if data.veredelungen else '[]' }};
+let currentEditIndex = -1;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Upload-Zone Events
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('designFile');
+    
+    uploadZone.addEventListener('click', () => fileInput.click());
+    
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('dragover');
+    });
+    
+    uploadZone.addEventListener('dragleave', () => {
+        uploadZone.classList.remove('dragover');
+    });
+    
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) {
+            fileInput.files = e.dataTransfer.files;
+            handleFileUpload(e.dataTransfer.files[0]);
+        }
+    });
+    
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length) {
+            handleFileUpload(e.target.files[0]);
+        }
+    });
+    
+    // Typ-Wechsel
+    document.querySelectorAll('input[name="vTyp"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.getElementById('stickereiDetails').classList.toggle('d-none', this.value !== 'stickerei');
+            document.getElementById('druckDetails').classList.toggle('d-none', this.value !== 'druck');
+            berechnePreis();
+        });
+    });
+    
+    // Position-Wechsel
+    document.getElementById('vPosition').addEventListener('change', function() {
+        const option = this.options[this.selectedIndex];
+        document.getElementById('maxGroesse').textContent = 
+            option.dataset.maxBreite + ' x ' + option.dataset.maxHoehe;
+        updatePositionMarker(this.value);
+    });
+    
+    // Preis-Berechnung bei Änderungen
+    ['vStiche', 'vBreite', 'vHoehe', 'vBreiteCm', 'vHoeheCm'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', berechnePreis);
+    });
+    
+    // Form Submit
+    document.getElementById('step3Form').addEventListener('submit', function(e) {
+        document.getElementById('veredelungenJson').value = JSON.stringify(veredelungen);
+    });
+    
+    // Initial rendern
+    renderVeredelungen();
+});
+
+function handleFileUpload(file) {
+    document.getElementById('uploadFileName').textContent = file.name;
+    document.getElementById('uploadStatus').classList.remove('d-none');
+    
+    // Prüfen ob DST/EMB für automatische Analyse
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (['dst', 'emb', 'pes', 'jef', 'exp', 'vp3'].includes(ext)) {
+        analysiereDesign(file);
+    }
+}
+
+function analysiereDesign(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    fetch('{{ url_for("wizard.api_design_analyse") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            console.error('Analyse-Fehler:', data.error);
+            return;
+        }
+        
+        // Ergebnisse anzeigen
+        document.getElementById('analyseStiche').textContent = data.stitch_count.toLocaleString('de-DE');
+        document.getElementById('analyseGroesse').textContent = data.width_mm + ' x ' + data.height_mm + ' mm';
+        document.getElementById('analyseFarben').textContent = data.color_count + ' Farben';
+        document.getElementById('analyseErgebnis').classList.remove('d-none');
+        
+        // Werte übernehmen
+        document.getElementById('vStiche').value = data.stitch_count;
+        document.getElementById('vBreite').value = Math.round(data.width_mm);
+        document.getElementById('vHoehe').value = Math.round(data.height_mm);
+        
+        berechnePreis();
+    })
+    .catch(err => console.error('Fehler:', err));
+}
+
+function designEntfernen() {
+    document.getElementById('uploadStatus').classList.add('d-none');
+    document.getElementById('analyseErgebnis').classList.add('d-none');
+    document.getElementById('designFile').value = '';
+}
+
+function berechnePreis() {
+    const typ = document.querySelector('input[name="vTyp"]:checked').value;
+    let preis = 0;
+    
+    if (typ === 'stickerei') {
+        const stiche = parseInt(document.getElementById('vStiche').value) || 0;
+        preis = Math.max(2.00, (stiche / 1000) * 1.50);
+    } else {
+        const breite = parseFloat(document.getElementById('vBreiteCm').value) || 0;
+        const hoehe = parseFloat(document.getElementById('vHoeheCm').value) || 0;
+        const flaeche = breite * hoehe;
+        preis = Math.max(1.50, flaeche * 0.05);
+    }
+    
+    document.getElementById('preisProStueck').textContent = preis.toFixed(2) + ' €';
+}
+
+function updatePositionMarker(position) {
+    const marker = document.getElementById('positionMarker');
+    const positions = {
+        'brust_links': {x: 55, y: 60, w: 35, h: 35},
+        'brust_rechts': {x: 110, y: 60, w: 35, h: 35},
+        'brust_mitte': {x: 65, y: 55, w: 70, h: 45},
+        'ruecken': {x: 60, y: 100, w: 80, h: 100},
+        'ruecken_oben': {x: 70, y: 85, w: 60, h: 20},
+        'aermel_links': {x: 40, y: 55, w: 20, h: 25},
+        'aermel_rechts': {x: 140, y: 55, w: 20, h: 25},
+        'sonstige': {x: 75, y: 100, w: 50, h: 50}
+    };
+    const pos = positions[position] || positions['brust_mitte'];
+    marker.setAttribute('x', pos.x);
+    marker.setAttribute('y', pos.y);
+    marker.setAttribute('width', pos.w);
+    marker.setAttribute('height', pos.h);
+}
+
+function neueVeredelung() {
+    currentEditIndex = -1;
+    // Modal zurücksetzen
+    document.getElementById('vPosition').selectedIndex = 0;
+    document.getElementById('vStiche').value = 5000;
+    document.getElementById('vBreite').value = 80;
+    document.getElementById('vHoehe').value = 60;
+    designEntfernen();
+    
+    const modal = new bootstrap.Modal(document.getElementById('veredelungModal'));
+    modal.show();
+}
+
+function veredelungSpeichern() {
+    const typ = document.querySelector('input[name="vTyp"]:checked').value;
+    const position = document.getElementById('vPosition').value;
+    const positionText = document.getElementById('vPosition').options[document.getElementById('vPosition').selectedIndex].text;
+    
+    const veredelung = {
+        typ: typ,
+        position: position,
+        position_text: positionText,
+        notiz: document.getElementById('vNotiz').value
+    };
+    
+    if (typ === 'stickerei') {
+        veredelung.stitch_count = parseInt(document.getElementById('vStiche').value) || 0;
+        veredelung.breite_mm = parseInt(document.getElementById('vBreite').value) || 0;
+        veredelung.hoehe_mm = parseInt(document.getElementById('vHoehe').value) || 0;
+    } else {
+        veredelung.breite_cm = parseFloat(document.getElementById('vBreiteCm').value) || 0;
+        veredelung.hoehe_cm = parseFloat(document.getElementById('vHoeheCm').value) || 0;
+        veredelung.druckart = document.getElementById('vDruckart').value;
+    }
+    
+    if (currentEditIndex >= 0) {
+        veredelungen[currentEditIndex] = veredelung;
+    } else {
+        veredelungen.push(veredelung);
+    }
+    
+    renderVeredelungen();
+    bootstrap.Modal.getInstance(document.getElementById('veredelungModal')).hide();
+}
+
+function veredelungEntfernen(index) {
+    veredelungen.splice(index, 1);
+    renderVeredelungen();
+}
+
+function renderVeredelungen() {
+    const container = document.getElementById('veredelungenListe');
+    const uebersicht = document.getElementById('veredelungUebersicht');
+    const keineVeredelung = document.getElementById('keineVeredelung');
+    
+    if (veredelungen.length === 0) {
+        if (keineVeredelung) keineVeredelung.classList.remove('d-none');
+        uebersicht.innerHTML = '<p class="text-muted small">Noch keine Veredelung definiert</p>';
+        return;
+    }
+    
+    if (keineVeredelung) keineVeredelung.classList.add('d-none');
+    
+    // Liste rendern
+    container.innerHTML = veredelungen.map((v, i) => `
+        <div class="veredelung-item card mb-3 ${v.typ}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <span class="badge bg-${v.typ === 'stickerei' ? 'success' : 'info'} me-2">
+                            ${v.typ === 'stickerei' ? '🧵 Stickerei' : '🖨️ Druck'}
+                        </span>
+                        <strong>${v.position_text}</strong>
+                    </div>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm me-1" onclick="veredelungBearbeiten(${i})">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="veredelungEntfernen(${i})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="mt-2 small text-muted">
+                    ${v.typ === 'stickerei' 
+                        ? `${v.stitch_count?.toLocaleString('de-DE')} Stiche | ${v.breite_mm} x ${v.hoehe_mm} mm`
+                        : `${v.breite_cm} x ${v.hoehe_cm} cm | ${v.druckart?.toUpperCase()}`
+                    }
+                </div>
+                ${v.notiz ? `<div class="mt-1 small fst-italic">${v.notiz}</div>` : ''}
+            </div>
+        </div>
+    `).join('');
+    
+    // Übersicht aktualisieren
+    uebersicht.innerHTML = veredelungen.map(v => `
+        <div class="small mb-1">
+            <i class="fas fa-${v.typ === 'stickerei' ? 'thread text-success' : 'print text-info'} me-1"></i>
+            ${v.position_text}
+        </div>
+    `).join('');
+    
+    // Geschätzte Kosten
+    let gesamtkosten = 0;
+    const textilMenge = {{ data.textilien|sum(attribute='gesamtmenge')|default(0) }};
+    veredelungen.forEach(v => {
+        if (v.typ === 'stickerei') {
+            gesamtkosten += Math.max(2.00, (v.stitch_count / 1000) * 1.50) * textilMenge;
+        } else {
+            gesamtkosten += Math.max(1.50, (v.breite_cm * v.hoehe_cm) * 0.05) * textilMenge;
+        }
+    });
+    document.getElementById('geschaetzteKosten').textContent = gesamtkosten.toFixed(2) + ' €';
+}
+
+function veredelungBearbeiten(index) {
+    currentEditIndex = index;
+    const v = veredelungen[index];
+    
+    // Werte setzen
+    document.querySelector(`input[name="vTyp"][value="${v.typ}"]`).checked = true;
+    document.getElementById('vPosition').value = v.position;
+    document.getElementById('vNotiz').value = v.notiz || '';
+    
+    if (v.typ === 'stickerei') {
+        document.getElementById('stickereiDetails').classList.remove('d-none');
+        document.getElementById('druckDetails').classList.add('d-none');
+        document.getElementById('vStiche').value = v.stitch_count;
+        document.getElementById('vBreite').value = v.breite_mm;
+        document.getElementById('vHoehe').value = v.hoehe_mm;
+    } else {
+        document.getElementById('stickereiDetails').classList.add('d-none');
+        document.getElementById('druckDetails').classList.remove('d-none');
+        document.getElementById('vBreiteCm').value = v.breite_cm;
+        document.getElementById('vHoeheCm').value = v.hoehe_cm;
+        document.getElementById('vDruckart').value = v.druckart;
+    }
+    
+    berechnePreis();
+    const modal = new bootstrap.Modal(document.getElementById('veredelungModal'));
+    modal.show();
+}
+
+function ausArchivWaehlen() {
+    // TODO: Design-Archiv Modal öffnen
+    alert('Design-Archiv wird in zukünftiger Version implementiert.');
+}
+</script>
+{% endblock %}

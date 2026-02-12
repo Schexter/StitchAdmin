@@ -1,0 +1,508 @@
+{% extends "base.html" %}
+{% block title %}Auftrags-Wizard - Schritt 2: Textilien{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Wizard Progress -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body py-3">
+                    <div class="wizard-progress d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('wizard.step1') }}" class="wizard-step completed text-decoration-none">
+                            <div class="step-circle"><i class="fas fa-check"></i></div>
+                            <span class="step-label">Kunde & Grunddaten</span>
+                        </a>
+                        <div class="wizard-line completed"></div>
+                        <div class="wizard-step active">
+                            <div class="step-circle">2</div>
+                            <span class="step-label">Textilien</span>
+                        </div>
+                        <div class="wizard-line"></div>
+                        <div class="wizard-step">
+                            <div class="step-circle">3</div>
+                            <span class="step-label">Veredelung</span>
+                        </div>
+                        <div class="wizard-line"></div>
+                        <div class="wizard-step">
+                            <div class="step-circle">4</div>
+                            <span class="step-label">Kalkulation</span>
+                        </div>
+                        <div class="wizard-line"></div>
+                        <div class="wizard-step">
+                            <div class="step-circle">5</div>
+                            <span class="step-label">Abschluss</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="POST" id="step2Form">
+        <input type="hidden" name="textilien_json" id="textilienJson">
+        
+        <div class="row">
+            <!-- Linke Spalte: Artikelsuche -->
+            <div class="col-lg-5">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-search me-2"></i>Artikel suchen</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Suchfeld -->
+                        <div class="mb-3">
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text"><i class="fas fa-tshirt"></i></span>
+                                <input type="text" class="form-control" id="artikelSuche" 
+                                       placeholder="Artikelname oder -nummer..."
+                                       autocomplete="off">
+                            </div>
+                        </div>
+
+                        <!-- Filter -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <select class="form-select" id="filterKategorie">
+                                    <option value="">Alle Kategorien</option>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat }}">{{ cat }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <select class="form-select" id="filterMarke">
+                                    <option value="">Alle Marken</option>
+                                    {% for brand in brands %}
+                                    <option value="{{ brand }}">{{ brand }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Suchergebnisse -->
+                        <div id="artikelErgebnisse" class="artikel-liste" style="max-height: 400px; overflow-y: auto;">
+                            <div class="text-center text-muted py-4">
+                                <i class="fas fa-search fa-3x mb-3 opacity-25"></i>
+                                <p>Geben Sie einen Suchbegriff ein oder nutzen Sie die Filter</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rechte Spalte: Warenkorb -->
+            <div class="col-lg-7">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Warenkorb</h5>
+                        <span class="badge bg-light text-success" id="warenkorbCount">{{ data.textilien|length }} Artikel</span>
+                    </div>
+                    <div class="card-body">
+                        <div id="warenkorb">
+                            {% if data.textilien %}
+                                {% for item in data.textilien %}
+                                <div class="warenkorb-item card mb-3" data-id="{{ item.artikel_id }}">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between align-items-start">
+                                            <div>
+                                                <h6 class="mb-1">{{ item.name }}</h6>
+                                                <small class="text-muted">{{ item.artikelnummer }}</small>
+                                            </div>
+                                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="artikelEntfernen('{{ item.artikel_id }}')">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                        <div class="groessen-eingabe mt-3">
+                                            <label class="form-label small fw-bold">Größenstaffel:</label>
+                                            <div class="row g-2">
+                                                {% for groesse in ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'] %}
+                                                <div class="col">
+                                                    <label class="form-label small text-center d-block">{{ groesse }}</label>
+                                                    <input type="number" class="form-control form-control-sm text-center groesse-input"
+                                                           data-groesse="{{ groesse }}"
+                                                           value="{{ item.groessen.get(groesse, 0) }}"
+                                                           min="0" max="999">
+                                                </div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        <div class="mt-2 d-flex justify-content-between align-items-center">
+                                            <span class="text-muted">Gesamt: <strong class="artikel-menge">{{ item.gesamtmenge or 0 }}</strong> Stk.</span>
+                                            <span class="text-primary">{{ "%.2f"|format(item.einzelpreis) }} € / Stk.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div id="warenkorbLeer" class="text-center text-muted py-5">
+                                    <i class="fas fa-shopping-cart fa-3x mb-3 opacity-25"></i>
+                                    <p>Keine Artikel ausgewählt</p>
+                                    <p class="small">Suchen Sie links nach Artikeln und fügen Sie diese hinzu</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-footer bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span>Gesamtmenge: <strong id="gesamtMenge">0</strong> Stk.</span>
+                            <span class="text-muted" id="mengenRabattHinweis"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body d-flex justify-content-between">
+                        <a href="{{ url_for('wizard.step1') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Zurück
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-lg" id="weiterBtn">
+                            Weiter zu Veredelung <i class="fas fa-arrow-right ms-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Artikel-Details Modal -->
+<div class="modal fade" id="artikelModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="artikelModalTitle">Artikel hinzufügen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="artikelModalBody">
+                <!-- Dynamischer Inhalt -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" id="artikelHinzufuegenBtn">
+                    <i class="fas fa-plus me-1"></i> Zum Warenkorb hinzufügen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.wizard-progress { padding: 0 30px; }
+.wizard-step { text-align: center; flex: 0 0 auto; }
+.step-circle {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #e9ecef; color: #6c757d;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; margin: 0 auto 5px; transition: all 0.3s;
+}
+.wizard-step.active .step-circle { background: var(--bs-primary); color: white; }
+.wizard-step.completed .step-circle { background: var(--bs-success); color: white; }
+.step-label { font-size: 0.85rem; color: #6c757d; }
+.wizard-step.active .step-label { color: var(--bs-primary); font-weight: bold; }
+.wizard-line { flex: 1; height: 3px; background: #e9ecef; margin: 0 10px; margin-bottom: 20px; }
+.wizard-line.completed { background: var(--bs-success); }
+
+.artikel-item {
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+.artikel-item:hover {
+    background-color: #f8f9fa;
+    border-color: var(--bs-primary);
+}
+.warenkorb-item {
+    border-left: 4px solid var(--bs-success);
+}
+.groesse-input {
+    padding: 0.25rem;
+}
+</style>
+
+<script>
+// Warenkorb Daten
+let warenkorb = {{ data.textilien|tojson|safe if data.textilien else '[]' }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    const sucheInput = document.getElementById('artikelSuche');
+    const filterKategorie = document.getElementById('filterKategorie');
+    const filterMarke = document.getElementById('filterMarke');
+    
+    let searchTimeout;
+    
+    // Artikelsuche
+    function artikelSuchen() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(function() {
+            const query = sucheInput.value.trim();
+            const kategorie = filterKategorie.value;
+            const marke = filterMarke.value;
+            
+            let url = '{{ url_for("wizard.api_artikel_suche") }}?';
+            if (query) url += 'q=' + encodeURIComponent(query) + '&';
+            if (kategorie) url += 'category=' + encodeURIComponent(kategorie) + '&';
+            if (marke) url += 'brand=' + encodeURIComponent(marke);
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('artikelErgebnisse');
+                    if (data.length === 0) {
+                        container.innerHTML = '<div class="text-center text-muted py-4">Keine Artikel gefunden</div>';
+                        return;
+                    }
+                    
+                    container.innerHTML = data.map(artikel => `
+                        <div class="artikel-item card mb-2" onclick="artikelDetails('${artikel.id}')">
+                            <div class="card-body py-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${artikel.name}</strong>
+                                        <br>
+                                        <small class="text-muted">${artikel.article_number} | ${artikel.brand || ''}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge bg-primary">${artikel.price.toFixed(2)} €</span>
+                                        <br>
+                                        ${artikel.has_variants ? '<small class="text-info"><i class="fas fa-palette"></i> Varianten</small>' : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                });
+        }, 300);
+    }
+    
+    sucheInput.addEventListener('input', artikelSuchen);
+    filterKategorie.addEventListener('change', artikelSuchen);
+    filterMarke.addEventListener('change', artikelSuchen);
+    
+    // Initial laden falls Filter gesetzt
+    if (filterKategorie.value || filterMarke.value) {
+        artikelSuchen();
+    }
+    
+    // Größen-Inputs überwachen
+    document.getElementById('warenkorb').addEventListener('input', function(e) {
+        if (e.target.classList.contains('groesse-input')) {
+            updateWarenkorbItem(e.target);
+        }
+    });
+    
+    // Form Submit
+    document.getElementById('step2Form').addEventListener('submit', function(e) {
+        // Warenkorb-Daten sammeln
+        aktualisiereWarenkorbDaten();
+        
+        if (warenkorb.length === 0) {
+            e.preventDefault();
+            alert('Bitte fügen Sie mindestens einen Artikel hinzu.');
+            return;
+        }
+        
+        document.getElementById('textilienJson').value = JSON.stringify(warenkorb);
+    });
+    
+    // Initial Warenkorb aktualisieren
+    aktualisiereWarenkorbAnzeige();
+});
+
+function artikelDetails(artikelId) {
+    // Varianten laden
+    fetch(`{{ url_for('wizard.api_artikel_varianten', artikel_id='ARTIKEL_ID') }}`.replace('ARTIKEL_ID', artikelId))
+        .then(response => response.json())
+        .then(data => {
+            const modal = new bootstrap.Modal(document.getElementById('artikelModal'));
+            const body = document.getElementById('artikelModalBody');
+            
+            // Modal-Inhalt erstellen
+            let html = `
+                <input type="hidden" id="modalArtikelId" value="${artikelId}">
+                <input type="hidden" id="modalArtikelPreis" value="${data.default_price}">
+            `;
+            
+            // Wenn Varianten vorhanden
+            if (Object.keys(data.farben).length > 0) {
+                html += `
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Farbe wählen</label>
+                        <div class="row g-2">
+                `;
+                
+                for (const [farbe, info] of Object.entries(data.farben)) {
+                    html += `
+                        <div class="col-auto">
+                            <input type="radio" class="btn-check" name="modalFarbe" id="farbe_${farbe}" value="${farbe}">
+                            <label class="btn btn-outline-secondary" for="farbe_${farbe}">
+                                <span class="color-dot" style="background: ${info.hex_color || '#ccc'}"></span>
+                                ${farbe}
+                            </label>
+                        </div>
+                    `;
+                }
+                html += '</div></div>';
+            }
+            
+            // Größenstaffel
+            html += `
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Größenstaffel eingeben</label>
+                    <div class="row g-2" id="modalGroessen">
+            `;
+            
+            const groessen = data.groessen.length > 0 ? data.groessen : ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+            groessen.forEach(g => {
+                html += `
+                    <div class="col">
+                        <label class="form-label small text-center d-block">${g}</label>
+                        <input type="number" class="form-control text-center modal-groesse" 
+                               data-groesse="${g}" value="0" min="0" max="999">
+                    </div>
+                `;
+            });
+            
+            html += `
+                    </div>
+                </div>
+                <div class="alert alert-info">
+                    <strong>Gesamtmenge:</strong> <span id="modalGesamtmenge">0</span> Stück
+                </div>
+            `;
+            
+            body.innerHTML = html;
+            
+            // Größen-Inputs überwachen
+            document.querySelectorAll('.modal-groesse').forEach(input => {
+                input.addEventListener('input', function() {
+                    let total = 0;
+                    document.querySelectorAll('.modal-groesse').forEach(i => {
+                        total += parseInt(i.value) || 0;
+                    });
+                    document.getElementById('modalGesamtmenge').textContent = total;
+                });
+            });
+            
+            // Hinzufügen-Button
+            document.getElementById('artikelHinzufuegenBtn').onclick = function() {
+                artikelZumWarenkorb();
+                modal.hide();
+            };
+            
+            modal.show();
+        });
+}
+
+function artikelZumWarenkorb() {
+    const artikelId = document.getElementById('modalArtikelId').value;
+    const preis = parseFloat(document.getElementById('modalArtikelPreis').value);
+    
+    // Größen sammeln
+    const groessen = {};
+    document.querySelectorAll('.modal-groesse').forEach(input => {
+        const menge = parseInt(input.value) || 0;
+        if (menge > 0) {
+            groessen[input.dataset.groesse] = menge;
+        }
+    });
+    
+    const gesamtmenge = Object.values(groessen).reduce((a, b) => a + b, 0);
+    
+    if (gesamtmenge === 0) {
+        alert('Bitte geben Sie mindestens eine Menge ein.');
+        return;
+    }
+    
+    // Prüfen ob Artikel schon im Warenkorb
+    const existing = warenkorb.find(w => w.artikel_id === artikelId);
+    if (existing) {
+        // Mengen addieren
+        for (const [g, m] of Object.entries(groessen)) {
+            existing.groessen[g] = (existing.groessen[g] || 0) + m;
+        }
+        existing.gesamtmenge = Object.values(existing.groessen).reduce((a, b) => a + b, 0);
+    } else {
+        // Neu hinzufügen
+        warenkorb.push({
+            artikel_id: artikelId,
+            groessen: groessen,
+            gesamtmenge: gesamtmenge,
+            einzelpreis: preis
+        });
+    }
+    
+    aktualisiereWarenkorbAnzeige();
+}
+
+function artikelEntfernen(artikelId) {
+    warenkorb = warenkorb.filter(w => w.artikel_id !== artikelId);
+    aktualisiereWarenkorbAnzeige();
+}
+
+function updateWarenkorbItem(input) {
+    const item = input.closest('.warenkorb-item');
+    const artikelId = item.dataset.id;
+    
+    // Warenkorb-Eintrag finden und aktualisieren
+    const entry = warenkorb.find(w => w.artikel_id === artikelId);
+    if (entry) {
+        const groesse = input.dataset.groesse;
+        entry.groessen[groesse] = parseInt(input.value) || 0;
+        entry.gesamtmenge = Object.values(entry.groessen).reduce((a, b) => a + b, 0);
+        
+        // Anzeige aktualisieren
+        item.querySelector('.artikel-menge').textContent = entry.gesamtmenge;
+    }
+    
+    aktualisiereGesamtmenge();
+}
+
+function aktualisiereWarenkorbDaten() {
+    // Daten aus DOM sammeln
+    document.querySelectorAll('.warenkorb-item').forEach(item => {
+        const artikelId = item.dataset.id;
+        const entry = warenkorb.find(w => w.artikel_id === artikelId);
+        
+        if (entry) {
+            entry.groessen = {};
+            item.querySelectorAll('.groesse-input').forEach(input => {
+                const menge = parseInt(input.value) || 0;
+                if (menge > 0) {
+                    entry.groessen[input.dataset.groesse] = menge;
+                }
+            });
+            entry.gesamtmenge = Object.values(entry.groessen).reduce((a, b) => a + b, 0);
+        }
+    });
+}
+
+function aktualisiereWarenkorbAnzeige() {
+    // TODO: DOM neu rendern (vereinfacht - Seite neu laden wäre sauberer)
+    aktualisiereGesamtmenge();
+    document.getElementById('warenkorbCount').textContent = warenkorb.length + ' Artikel';
+}
+
+function aktualisiereGesamtmenge() {
+    let total = 0;
+    warenkorb.forEach(w => {
+        total += Object.values(w.groessen || {}).reduce((a, b) => a + b, 0);
+    });
+    
+    document.getElementById('gesamtMenge').textContent = total;
+    
+    // Mengenrabatt-Hinweis
+    const hinweis = document.getElementById('mengenRabattHinweis');
+    if (total >= 500) hinweis.textContent = '🎉 20% Mengenrabatt!';
+    else if (total >= 250) hinweis.textContent = '🎉 15% Mengenrabatt!';
+    else if (total >= 100) hinweis.textContent = '🎉 10% Mengenrabatt!';
+    else if (total >= 50) hinweis.textContent = '💡 Ab 100 Stk.: 10% Rabatt';
+    else hinweis.textContent = '';
+}
+</script>
+{% endblock %}

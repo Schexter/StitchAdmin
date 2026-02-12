@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% block title %}Speichereinstellungen{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('settings.index') }}">Einstellungen</a></li>
+            <li class="breadcrumb-item active">Speicherpfade</li>
+        </ol>
+    </nav>
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-folder-open me-2"></i>Speichereinstellungen</h2>
+    </div>
+    
+    <form method="POST" class="needs-validation" novalidate>
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Hauptverzeichnis -->
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-hdd me-2"></i>Hauptverzeichnis (Dokumente)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Basispfad für Geschäftsdokumente</label>
+                            <input type="text" name="base_path" class="form-control form-control-lg" 
+                                   value="{{ settings.base_path or '' }}"
+                                   placeholder="C:\StitchAdmin\Dokumente">
+                            <div class="form-text">
+                                Angebote, Aufträge, Rechnungen, Lieferscheine werden hier gespeichert.<br>
+                                Leer lassen für Standard: <code>{{ default_base }}</code>
+                            </div>
+                        </div>
+                        
+                        {% if validation_errors %}
+                        <div class="alert alert-danger">
+                            <strong><i class="fas fa-exclamation-triangle me-1"></i>Pfad-Probleme:</strong>
+                            <ul class="mb-0 mt-2">
+                                {% for error in validation_errors %}
+                                <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- SEPARATE ARCHIVE (NAS/Netzlaufwerk) -->
+                <div class="card mb-4 border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="fas fa-network-wired me-2"></i>Separate Archive (NAS / Netzlaufwerk)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Diese Verzeichnisse können auf einem <strong>NAS</strong> oder <strong>Netzlaufwerk</strong> liegen.
+                            Geben Sie den vollständigen Pfad an:
+                            <ul class="mb-0 mt-2">
+                                <li>UNC-Pfad: <code>\\NAS\Freigabe\Ordner</code></li>
+                                <li>Netzlaufwerk: <code>Z:\Designs</code></li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Design-Archiv -->
+                        <div class="border rounded p-3 mb-3">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="design_archiv_aktiv" 
+                                       name="design_archiv_aktiv" {% if settings.design_archiv_aktiv %}checked{% endif %}
+                                       onchange="toggleArchive('design_archiv')">
+                                <label class="form-check-label fw-bold" for="design_archiv_aktiv">
+                                    <i class="fas fa-vector-square me-1 text-primary"></i> Design-Archiv
+                                </label>
+                                <small class="d-block text-muted">DST, EMB, PES und andere Stickdateien</small>
+                            </div>
+                            <input type="text" name="design_archiv_path" id="design_archiv_path" class="form-control" 
+                                   value="{{ settings.design_archiv_path or '' }}"
+                                   placeholder="\\NAS\Designs oder Z:\Stickdateien"
+                                   {% if not settings.design_archiv_aktiv %}disabled{% endif %}>
+                        </div>
+                        
+                        <!-- Stickdateien (Produktion) -->
+                        <div class="border rounded p-3 mb-3">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="stickdateien_aktiv" 
+                                       name="stickdateien_aktiv" {% if settings.stickdateien_aktiv %}checked{% endif %}
+                                       onchange="toggleArchive('stickdateien')">
+                                <label class="form-check-label fw-bold" for="stickdateien_aktiv">
+                                    <i class="fas fa-industry me-1 text-success"></i> Stickdateien (Produktion)
+                                </label>
+                                <small class="d-block text-muted">Produktionsfertige DST-Dateien für die Maschinen</small>
+                            </div>
+                            <input type="text" name="stickdateien_path" id="stickdateien_path" class="form-control" 
+                                   value="{{ settings.stickdateien_path or '' }}"
+                                   placeholder="\\NAS\Produktion\DST"
+                                   {% if not settings.stickdateien_aktiv %}disabled{% endif %}>
+                        </div>
+                        
+                        <!-- Freigaben-Archiv -->
+                        <div class="border rounded p-3 mb-3">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="freigaben_archiv_aktiv" 
+                                       name="freigaben_archiv_aktiv" {% if settings.freigaben_archiv_aktiv %}checked{% endif %}
+                                       onchange="toggleArchive('freigaben_archiv')">
+                                <label class="form-check-label fw-bold" for="freigaben_archiv_aktiv">
+                                    <i class="fas fa-check-circle me-1 text-warning"></i> Freigaben-Archiv
+                                </label>
+                                <small class="d-block text-muted">Kunden-Freigabe-PDFs und Bestätigungen</small>
+                            </div>
+                            <input type="text" name="freigaben_archiv_path" id="freigaben_archiv_path" class="form-control" 
+                                   value="{{ settings.freigaben_archiv_path or '' }}"
+                                   placeholder="\\NAS\Freigaben"
+                                   {% if not settings.freigaben_archiv_aktiv %}disabled{% endif %}>
+                        </div>
+                        
+                        <!-- Motiv-Archiv -->
+                        <div class="border rounded p-3 mb-3">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" id="motiv_archiv_aktiv" 
+                                       name="motiv_archiv_aktiv" {% if settings.motiv_archiv_aktiv %}checked{% endif %}
+                                       onchange="toggleArchive('motiv_archiv')">
+                                <label class="form-check-label fw-bold" for="motiv_archiv_aktiv">
+                                    <i class="fas fa-palette me-1 text-danger"></i> Motiv-Archiv
+                                </label>
+                                <small class="d-block text-muted">Grafiken, Vorlagen, AI/PSD-Dateien</small>
+                            </div>
+                            <input type="text" name="motiv_archiv_path" id="motiv_archiv_path" class="form-control" 
+                                   value="{{ settings.motiv_archiv_path or '' }}"
+                                   placeholder="\\NAS\Grafik\Motive"
+                                   {% if not settings.motiv_archiv_aktiv %}disabled{% endif %}>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Ordnerstruktur -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Ordnerstruktur</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <div class="form-check card p-3 h-100 {{ 'border-primary' if settings.folder_structure == 'year_month' }}">
+                                    <input class="form-check-input" type="radio" name="folder_structure" 
+                                           id="struct_year_month" value="year_month" 
+                                           {% if settings.folder_structure == 'year_month' or not settings.folder_structure %}checked{% endif %}>
+                                    <label class="form-check-label" for="struct_year_month">
+                                        <strong>Jahr / Monat</strong>
+                                        <br><small class="text-muted">z.B. Designs/2025/01/</small>
+                                        <br><span class="badge bg-success">Empfohlen</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check card p-3 h-100 {{ 'border-primary' if settings.folder_structure == 'year' }}">
+                                    <input class="form-check-input" type="radio" name="folder_structure" 
+                                           id="struct_year" value="year"
+                                           {% if settings.folder_structure == 'year' %}checked{% endif %}>
+                                    <label class="form-check-label" for="struct_year">
+                                        <strong>Nur Jahr</strong>
+                                        <br><small class="text-muted">z.B. Designs/2025/</small>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check card p-3 h-100 {{ 'border-primary' if settings.folder_structure == 'customer' }}">
+                                    <input class="form-check-input" type="radio" name="folder_structure" 
+                                           id="struct_customer" value="customer"
+                                           {% if settings.folder_structure == 'customer' %}checked{% endif %}>
+                                    <label class="form-check-label" for="struct_customer">
+                                        <strong>Nach Kunde</strong>
+                                        <br><small class="text-muted">z.B. Designs/Mustermann/</small>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check card p-3 h-100 {{ 'border-primary' if settings.folder_structure == 'customer_year' }}">
+                                    <input class="form-check-input" type="radio" name="folder_structure" 
+                                           id="struct_customer_year" value="customer_year"
+                                           {% if settings.folder_structure == 'customer_year' %}checked{% endif %}>
+                                    <label class="form-check-label" for="struct_customer_year">
+                                        <strong>Kunde / Jahr</strong>
+                                        <br><small class="text-muted">z.B. Designs/Mustermann/2025/</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <h6>Dateinamen-Optionen</h6>
+                        <div class="form-check mb-2">
+                            <input type="checkbox" class="form-check-input" id="include_customer" name="include_customer"
+                                   {% if settings.include_customer_in_filename %}checked{% endif %}>
+                            <label class="form-check-label" for="include_customer">
+                                Kundenname in Dateinamen einfügen
+                                <br><small class="text-muted">z.B. Design_20250107_Mustermann.dst</small>
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="include_date" name="include_date"
+                                   {% if settings.include_date_in_filename %}checked{% endif %}>
+                            <label class="form-check-label" for="include_date">
+                                Datum in Dateinamen einfügen
+                                <br><small class="text-muted">z.B. Design_20250107.dst</small>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Dokumentpfade (relativ) -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-folder me-2"></i>Dokumentpfade (relativ zum Basispfad)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Angebote</label>
+                                <input type="text" name="angebote_path" class="form-control" 
+                                       value="{{ settings.angebote_path or 'Angebote' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Auftragsbestätigungen</label>
+                                <input type="text" name="auftraege_path" class="form-control" 
+                                       value="{{ settings.auftraege_path or 'Auftragsbestätigungen' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Lieferscheine</label>
+                                <input type="text" name="lieferscheine_path" class="form-control" 
+                                       value="{{ settings.lieferscheine_path or 'Lieferscheine' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rechnungen (Ausgang)</label>
+                                <input type="text" name="rechnungen_ausgang_path" class="form-control" 
+                                       value="{{ settings.rechnungen_ausgang_path or 'Rechnungen\\Ausgang' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Rechnungen (Eingang)</label>
+                                <input type="text" name="rechnungen_eingang_path" class="form-control" 
+                                       value="{{ settings.rechnungen_eingang_path or 'Rechnungen\\Eingang' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Gutschriften</label>
+                                <input type="text" name="gutschriften_path" class="form-control" 
+                                       value="{{ settings.gutschriften_path or 'Gutschriften' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Designs <small class="text-muted">(falls kein separates Archiv)</small></label>
+                                <input type="text" name="designs_path" class="form-control" 
+                                       value="{{ settings.designs_path or 'Designs' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Backups</label>
+                                <input type="text" name="backup_path" class="form-control" 
+                                       value="{{ settings.backup_path or 'Backups' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sidebar -->
+            <div class="col-lg-4">
+                <div class="card mb-4 sticky-top" style="top: 80px;">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-save me-2"></i>Aktionen</h5>
+                    </div>
+                    <div class="card-body">
+                        <button type="submit" class="btn btn-success w-100 mb-2">
+                            <i class="fas fa-save me-1"></i> Einstellungen speichern
+                        </button>
+                        <button type="submit" name="create_folders" value="1" class="btn btn-outline-primary w-100 mb-2">
+                            <i class="fas fa-folder-plus me-1"></i> Ordner erstellen
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary w-100" onclick="testPaths()">
+                            <i class="fas fa-check-circle me-1"></i> Pfade testen
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-network-wired me-2"></i>NAS-Hinweise</h5>
+                    </div>
+                    <div class="card-body small">
+                        <p><strong>Netzlaufwerk-Formate:</strong></p>
+                        <ul>
+                            <li><code>\\NAS\Freigabe</code> - UNC-Pfad</li>
+                            <li><code>\\192.168.1.100\Share</code> - IP-basiert</li>
+                            <li><code>Z:\Ordner</code> - Verbundenes Laufwerk</li>
+                        </ul>
+                        <p class="mb-0 text-warning">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            NAS muss erreichbar sein wenn StitchAdmin läuft!
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Hinweise</h5>
+                    </div>
+                    <div class="card-body small">
+                        <ul class="mb-0">
+                            <li>Ordnerstruktur gilt für <strong>alle</strong> Pfade</li>
+                            <li>Bestehende Dateien werden <strong>nicht</strong> verschoben</li>
+                            <li>Backup-Ordner sollte im lokalen Backup enthalten sein</li>
+                            <li>Separate Archive haben Vorrang vor Standard-Pfaden</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function toggleArchive(archiveName) {
+    const checkbox = document.getElementById(archiveName + '_aktiv');
+    const input = document.getElementById(archiveName + '_path');
+    
+    if (checkbox.checked) {
+        input.disabled = false;
+        input.focus();
+    } else {
+        input.disabled = true;
+    }
+}
+
+function testPaths() {
+    // Sammle alle aktiven Pfade
+    const paths = [];
+    
+    const basePath = document.querySelector('[name="base_path"]').value;
+    if (basePath) paths.push({name: 'Basispfad', path: basePath});
+    
+    if (document.getElementById('design_archiv_aktiv').checked) {
+        paths.push({name: 'Design-Archiv', path: document.getElementById('design_archiv_path').value});
+    }
+    if (document.getElementById('stickdateien_aktiv').checked) {
+        paths.push({name: 'Stickdateien', path: document.getElementById('stickdateien_path').value});
+    }
+    if (document.getElementById('freigaben_archiv_aktiv').checked) {
+        paths.push({name: 'Freigaben', path: document.getElementById('freigaben_archiv_path').value});
+    }
+    if (document.getElementById('motiv_archiv_aktiv').checked) {
+        paths.push({name: 'Motive', path: document.getElementById('motiv_archiv_path').value});
+    }
+    
+    if (paths.length === 0) {
+        alert('Keine Pfade konfiguriert.');
+        return;
+    }
+    
+    let message = 'Konfigurierte Pfade:\n\n';
+    paths.forEach(p => {
+        message += `${p.name}:\n${p.path}\n\n`;
+    });
+    message += 'Speichern Sie die Einstellungen und klicken Sie "Ordner erstellen" um die Pfade zu testen.';
+    
+    alert(message);
+}
+</script>
+{% endblock %}

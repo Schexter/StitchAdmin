@@ -1,0 +1,19 @@
+[Unit]
+Description=StitchAdmin 2.0 - Gunicorn WSGI Server
+After=network.target
+
+[Service]
+Type=notify
+User=stitchadmin
+Group=stitchadmin
+WorkingDirectory=/opt/stitchadmin/app
+Environment="PATH=/opt/stitchadmin/venv/bin"
+ExecStart=/opt/stitchadmin/venv/bin/gunicorn --config /opt/stitchadmin/app/deploy/gunicorn.conf.py "app:create_app()"
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+KillMode=mixed
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target

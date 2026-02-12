@@ -1,27 +1,41 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-*.egg
 *.egg-info/
 dist/
 build/
+*.egg
 
 # Virtual Environment
 venv/
-env/
+.venv/
 
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
-*~
+
+# Environment & Secrets
+.env
+deploy/env.production
+
+# Database
+instance/stitchadmin.db
+*.db
+
+# Uploads (user data)
+instance/uploads/
+Kunden/
+
+# Build artifacts
+*.exe
+nul
+
+# OS
+Thumbs.db
 .DS_Store
 
+# Logs
+logs/
 *.log
-
-*.tmp
-

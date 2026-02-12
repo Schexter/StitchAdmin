@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Änderungswunsch übermittelt - Auftrag {{ order.order_number }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        .revision-card {
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .revision-icon {
+            font-size: 100px;
+            color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="card revision-card text-center">
+                    <div class="card-body p-5">
+                        <div class="revision-icon mb-4">
+                            <i class="bi bi-pencil-square"></i>
+                        </div>
+
+                        <h2 class="mb-3">Änderungswunsch übermittelt</h2>
+
+                        <p class="lead mb-4">
+                            Vielen Dank für Ihre Rückmeldung zu Auftrag <strong>{{ order.order_number }}</strong>.
+                        </p>
+
+                        <div class="alert alert-warning text-start">
+                            <h6><i class="bi bi-chat-quote"></i> Ihre Anmerkungen:</h6>
+                            <p class="mb-0">{{ order.design_approval_notes }}</p>
+                        </div>
+
+                        <p class="text-muted">
+                            Wir werden Ihre Änderungswünsche prüfen und uns zeitnah bei Ihnen melden.
+                            Sie erhalten einen neuen Freigabe-Link, sobald das Design angepasst wurde.
+                        </p>
+
+                        <hr class="my-4">
+
+                        <p class="small text-muted">
+                            Bei dringenden Fragen erreichen Sie uns unter:
+                            <br>
+                            <i class="bi bi-telephone"></i> +49 (0) 123 456789
+                            <br>
+                            <i class="bi bi-envelope"></i> info@stitchadmin.de
+                        </p>
+                    </div>
+
+                    <div class="card-footer text-muted py-3">
+                        <small>StitchAdmin - Professionelle Stickerei & Textildruck</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

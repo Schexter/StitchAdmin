@@ -1,0 +1,388 @@
+{#
+    Multi-Maschinen Produktionsplanung für Aufträge
+    Ermöglicht die Zuweisung von Design-Positionen zu verschiedenen Maschinen
+
+    Verwendung: {% include 'orders/includes/production_planning.html' %}
+    Voraussetzung: order Objekt muss verfügbar sein
+#}
+
+<div class="card mb-4" id="production-planning-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">
+            <i class="bi bi-gear-wide-connected"></i> Produktionsplanung
+            {% if order.workflow_status == 'in_production' %}
+            <span class="badge bg-warning ms-2">In Produktion</span>
+            {% endif %}
+        </h6>
+        <div>
+            {% if order.workflow_status in ['design_approved', 'confirmed'] %}
+            <button type="button" class="btn btn-sm btn-success" onclick="startProduction()">
+                <i class="bi bi-play-circle"></i> Produktion starten
+            </button>
+            {% endif %}
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="openPlanningModal()">
+                <i class="bi bi-calendar-plus"></i> Planung
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if order.designs.count() > 0 %}
+            <!-- Übersicht der Design-Positionen mit Maschinen-Zuweisung -->
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Typ</th>
+                        <th>Maschine</th>
+                        <th>Geplant</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for design in order.designs %}
+                    <tr>
+                        <td>
+                            <strong>{{ design.get_position_label() }}</strong>
+                            {% if design.is_personalized %}
+                            <span class="badge bg-info">Pers.</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ 'primary' if design.design_type == 'stick' else 'success' }}">
+                                {{ design.get_design_type_label() }}
+                            </span>
+                        </td>
+                        <td>
+                            <select class="form-select form-select-sm machine-select"
+                                    data-design-id="{{ design.id }}"
+                                    style="width: 150px;"
+                                    onchange="assignMachine(this)">
+                                <option value="">Auswählen...</option>
+                                {% for machine in machines %}
+                                    {% if (design.design_type == 'stick' and machine.machine_type in ['embroidery', 'multi']) or
+                                          (design.design_type in ['druck', 'flex'] and machine.machine_type in ['printer', 'press', 'plotter', 'multi']) %}
+                                    <option value="{{ machine.id }}"
+                                            {% if design.assigned_machine_id == machine.id %}selected{% endif %}>
+                                        {{ machine.name }}
+                                    </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            {% if design.scheduled_start %}
+                            {{ design.scheduled_start.strftime('%d.%m. %H:%M') }}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% set schedule = order.production_schedules.filter_by(order_design_id=design.id).first() %}
+                            {% if schedule %}
+                                {% if schedule.status == 'completed' %}
+                                <span class="badge bg-success">Fertig</span>
+                                {% elif schedule.status == 'in_progress' %}
+                                <span class="badge bg-warning">Läuft</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Geplant</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-light text-dark">Nicht geplant</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Zeitschätzung -->
+            <div class="alert alert-light mt-3">
+                <div class="row">
+                    <div class="col-md-4">
+                        <small class="text-muted">Geschätzte Produktionszeit:</small>
+                        <div class="fw-bold">
+                            {% set total_minutes = 0 %}
+                            {% for design in order.designs %}
+                                {% if design.estimated_time_minutes %}
+                                    {% set total_minutes = total_minutes + design.estimated_time_minutes %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if total_minutes > 0 %}
+                                {{ (total_minutes // 60) }}h {{ (total_minutes % 60) }}min
+                            {% else %}
+                                Nicht berechnet
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted">Gesamtstückzahl:</small>
+                        <div class="fw-bold">
+                            {% set total_qty = 0 %}
+                            {% for item in order.items %}{% set total_qty = total_qty + item.quantity %}{% endfor %}
+                            {{ total_qty }} Stück
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <small class="text-muted">Positionen:</small>
+                        <div class="fw-bold">{{ order.designs.count() }} Design-Positionen</div>
+                    </div>
+                </div>
+            </div>
+
+        {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-exclamation-circle fs-2"></i>
+                <p class="mt-2">Keine Design-Positionen für Produktionsplanung vorhanden.</p>
+                <a href="#design-positions-card" class="btn btn-sm btn-outline-primary">
+                    Erst Designs hinzufügen
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal: Produktionsplanung Details -->
+<div class="modal fade" id="planningModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar3"></i> Produktionsplanung - {{ order.order_number }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Maschinen-Übersicht -->
+                    <div class="col-md-4">
+                        <h6>Verfügbare Maschinen</h6>
+                        <div id="machine-list">
+                            {% for machine in machines %}
+                            <div class="card mb-2 machine-card" data-machine-id="{{ machine.id }}">
+                                <div class="card-body p-2">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ machine.name }}</strong>
+                                            <br>
+                                            <small class="text-muted">
+                                                {% if machine.machine_type == 'embroidery' %}Stickmaschine{% endif %}
+                                                {% if machine.machine_type == 'printer' %}Drucker{% endif %}
+                                                {% if machine.machine_type == 'press' %}Presse{% endif %}
+                                                {% if machine.machine_type == 'plotter' %}Plotter (Flex/Flock){% endif %}
+                                            </small>
+                                        </div>
+                                        <span class="badge bg-{{ 'success' if machine.is_active else 'secondary' }}">
+                                            {{ 'Aktiv' if machine.is_active else 'Inaktiv' }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Zeitplanung -->
+                    <div class="col-md-8">
+                        <h6>Zeitplanung</h6>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Position</th>
+                                    <th>Maschine</th>
+                                    <th>Start</th>
+                                    <th>Ende (geschätzt)</th>
+                                    <th>Priorität</th>
+                                </tr>
+                            </thead>
+                            <tbody id="schedule-table">
+                                {% for design in order.designs %}
+                                <tr data-design-id="{{ design.id }}">
+                                    <td>{{ design.get_position_label() }}</td>
+                                    <td>
+                                        <select class="form-select form-select-sm schedule-machine" style="width: 120px;">
+                                            <option value="">-</option>
+                                            {% for machine in machines %}
+                                            <option value="{{ machine.id }}">{{ machine.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="datetime-local" class="form-control form-control-sm schedule-start" style="width: 160px;">
+                                    </td>
+                                    <td>
+                                        <input type="datetime-local" class="form-control form-control-sm schedule-end" style="width: 160px;" readonly>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm schedule-priority" style="width: 80px;">
+                                            <option value="5">Normal</option>
+                                            <option value="1">Hoch</option>
+                                            <option value="10">Niedrig</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+
+                        <!-- Schnellplanung -->
+                        <div class="card bg-light mt-3">
+                            <div class="card-body">
+                                <h6>Schnellplanung</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Startzeit</label>
+                                        <input type="datetime-local" class="form-control form-control-sm" id="quick-start">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Standard-Maschine (Stick)</label>
+                                        <select class="form-select form-select-sm" id="quick-machine-stick">
+                                            <option value="">Automatisch</option>
+                                            {% for machine in machines %}
+                                            {% if machine.machine_type in ['embroidery', 'multi'] %}
+                                            <option value="{{ machine.id }}">{{ machine.name }}</option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Standard-Maschine (Druck/Flex)</label>
+                                        <select class="form-select form-select-sm" id="quick-machine-print">
+                                            <option value="">Automatisch</option>
+                                            {% for machine in machines %}
+                                            {% if machine.machine_type in ['printer', 'press', 'plotter', 'multi'] %}
+                                            <option value="{{ machine.id }}">{{ machine.name }}</option>
+                                            {% endif %}
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-primary btn-sm mt-2" onclick="applyQuickSchedule()">
+                                    <i class="bi bi-lightning"></i> Automatisch planen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="saveSchedule()">
+                    <i class="bi bi-check-lg"></i> Planung speichern
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openPlanningModal() {
+    const modal = new bootstrap.Modal(document.getElementById('planningModal'));
+    modal.show();
+}
+
+function assignMachine(selectElement) {
+    const designId = selectElement.dataset.designId;
+    const machineId = selectElement.value;
+
+    fetch('/orders/api/design/' + designId + '/assign-machine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ machine_id: machineId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            alert('Fehler: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+function startProduction() {
+    if (!confirm('Produktion starten? Der Auftragsstatus wird auf "In Produktion" gesetzt.')) {
+        return;
+    }
+
+    fetch('/orders/{{ order.id }}/start-production', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+function applyQuickSchedule() {
+    const startTime = document.getElementById('quick-start').value;
+    const stickMachine = document.getElementById('quick-machine-stick').value;
+    const printMachine = document.getElementById('quick-machine-print').value;
+
+    if (!startTime) {
+        alert('Bitte Startzeit angeben');
+        return;
+    }
+
+    // Alle Zeilen durchgehen und automatisch füllen
+    const rows = document.querySelectorAll('#schedule-table tr');
+    let currentTime = new Date(startTime);
+
+    rows.forEach(row => {
+        const designId = row.dataset.designId;
+        const machineSelect = row.querySelector('.schedule-machine');
+        const startInput = row.querySelector('.schedule-start');
+
+        // Setze Startzeit
+        startInput.value = formatDateTime(currentTime);
+
+        // Addiere geschätzte Zeit (Platzhalter: 30 min pro Position)
+        currentTime = new Date(currentTime.getTime() + 30 * 60 * 1000);
+    });
+}
+
+function formatDateTime(date) {
+    return date.toISOString().slice(0, 16);
+}
+
+function saveSchedule() {
+    const scheduleData = [];
+    const rows = document.querySelectorAll('#schedule-table tr');
+
+    rows.forEach(row => {
+        const designId = row.dataset.designId;
+        const machineId = row.querySelector('.schedule-machine').value;
+        const startTime = row.querySelector('.schedule-start').value;
+        const priority = row.querySelector('.schedule-priority').value;
+
+        if (machineId && startTime) {
+            scheduleData.push({
+                design_id: designId,
+                machine_id: machineId,
+                scheduled_start: startTime,
+                priority: priority
+            });
+        }
+    });
+
+    fetch('/orders/{{ order.id }}/save-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schedules: scheduleData })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('planningModal')).hide();
+            location.reload();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+</script>

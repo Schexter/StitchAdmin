@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design-Freigaben angefordert</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 40px 0;">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
+                            <h1 style="color: #ffffff; margin: 0; font-size: 24px;">
+                                Design-Freigaben angefordert
+                            </h1>
+                            <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">
+                                {{ approval_links|length }} Auftrag{% if approval_links|length > 1 %}aufträge{% endif %} zur Freigabe
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                                Guten Tag <strong>{{ customer.display_name }}</strong>,
+                            </p>
+
+                            <p style="color: #333333; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                                {% if approval_links|length == 1 %}
+                                das Design für Ihren Auftrag ist fertig und wartet auf Ihre Freigabe.
+                                {% else %}
+                                die Designs für Ihre Aufträge sind fertig und warten auf Ihre Freigabe.
+                                {% endif %}
+                            </p>
+
+                            <!-- Orders List -->
+                            {% for link in approval_links %}
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f8f9fa; border-radius: 8px; margin: 15px 0; border-left: 4px solid #667eea;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                            <tr>
+                                                <td>
+                                                    <p style="margin: 0 0 10px 0; color: #333333; font-size: 16px; font-weight: bold;">
+                                                        Auftrag {{ link.order.order_number }}
+                                                    </p>
+                                                    {% if link.order.description %}
+                                                    <p style="margin: 0 0 10px 0; color: #666666; font-size: 14px;">
+                                                        {{ link.order.description[:100] }}{% if link.order.description|length > 100 %}...{% endif %}
+                                                    </p>
+                                                    {% endif %}
+                                                    <p style="margin: 0 0 15px 0; color: #888888; font-size: 13px;">
+                                                        {% if link.order.order_type == 'embroidery' %}Stickerei{% endif %}
+                                                        {% if link.order.order_type == 'printing' %}Druck{% endif %}
+                                                        {% if link.order.order_type == 'dtf' %}DTF-Druck{% endif %}
+                                                        {% if link.order.order_type == 'combined' %}Stickerei & Druck{% endif %}
+                                                        {% if link.order.stitch_count %}
+                                                        • {{ link.order.stitch_count }} Stiche
+                                                        {% endif %}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <a href="{{ link.url }}"
+                                                       style="display: inline-block; background: linear-gradient(135deg, #28a745, #20c997); color: #ffffff; text-decoration: none; padding: 10px 25px; border-radius: 6px; font-size: 14px; font-weight: bold;">
+                                                        Design freigeben
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endfor %}
+
+                            <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0;">
+                                <strong>Hinweis:</strong> Bitte prüfen Sie jedes Design sorgfältig auf Größe, Position und Farben,
+                                bevor Sie die Freigabe erteilen. Nach der Freigabe beginnt die Produktion.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 20px 30px; border-radius: 0 0 8px 8px; text-align: center;">
+                            <p style="color: #999999; font-size: 12px; margin: 0 0 10px 0;">
+                                Diese E-Mail wurde automatisch generiert. Bitte antworten Sie nicht direkt auf diese E-Mail.
+                            </p>
+                            <p style="color: #999999; font-size: 12px; margin: 0;">
+                                {% if company %}
+                                {{ company.company_name }}
+                                {% if company.phone %} • Tel: {{ company.phone }}{% endif %}
+                                {% else %}
+                                StitchAdmin - Professionelle Stickerei & Textildruck
+                                {% endif %}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

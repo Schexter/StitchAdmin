@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Textildruck-Kalkulation{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('buchhaltung.index') }}">Buchhaltung</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('buchhaltung.kalkulation') }}">Kalkulationen</a></li>
+            <li class="breadcrumb-item active">Textildruck</li>
+        </ol>
+    </nav>
+    
+    <h2><i class="fas fa-tshirt me-2"></i>Textildruck-Kalkulation</h2>
+    
+    <div class="row">
+        <!-- Eingabe -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-siebdruck">Siebdruck</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-dtg">DTG</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-flex">Flex/Flock</button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content">
+                        <!-- SIEBDRUCK -->
+                        <div class="tab-pane fade show active" id="tab-siebdruck">
+                            <form method="POST">
+                                <input type="hidden" name="verfahren" value="siebdruck">
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Stückzahl</label>
+                                        <input type="number" name="menge" class="form-control" value="{{ request.form.get('menge', '100') }}" required>
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Anzahl Farben</label>
+                                        <input type="number" name="anzahl_farben" class="form-control" value="{{ request.form.get('anzahl_farben', '2') }}" min="1" max="12">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Textil EK (€)</label>
+                                        <input type="text" name="textil_ek" class="form-control" value="{{ request.form.get('textil_ek', '3,50') }}">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Gewinn (%)</label>
+                                        <input type="number" name="gewinn" class="form-control" value="{{ request.form.get('gewinn', '30') }}">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-calculator me-2"></i>Berechnen
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <!-- DTG -->
+                        <div class="tab-pane fade" id="tab-dtg">
+                            <form method="POST">
+                                <input type="hidden" name="verfahren" value="dtg">
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Stückzahl</label>
+                                        <input type="number" name="menge" class="form-control" value="25">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Druckfläche (cm²)</label>
+                                        <input type="number" name="druckgroesse" class="form-control" value="400">
+                                    </div>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" name="dunkles_textil" id="dunkles_textil">
+                                    <label class="form-check-label" for="dunkles_textil">Dunkles Textil</label>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100">Berechnen</button>
+                            </form>
+                        </div>
+                        
+                        <!-- FLEX -->
+                        <div class="tab-pane fade" id="tab-flex">
+                            <form method="POST">
+                                <input type="hidden" name="verfahren" value="flex">
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <label class="form-label">Stückzahl</label>
+                                        <input type="number" name="menge" class="form-control" value="50">
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Fläche (cm²)</label>
+                                        <input type="number" name="flaeche" class="form-control" value="150">
+                                    </div>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" name="ist_flock">
+                                    <label class="form-check-label">Flock statt Flex</label>
+                                </div>
+                                <button type="submit" class="btn btn-warning w-100">Berechnen</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Ergebnis -->
+        <div class="col-lg-7">
+            {% if ergebnis %}
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">{{ ergebnis.verfahren }} - Ergebnis</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-4 text-center">
+                            <small class="text-muted">Stückpreis Netto</small>
+                            <h3 class="text-success">{{ ergebnis.vk_pro_stueck_netto }} €</h3>
+                        </div>
+                        <div class="col-4 text-center">
+                            <small class="text-muted">Stückpreis Brutto</small>
+                            <h3 class="text-primary">{{ ergebnis.vk_pro_stueck_brutto }} €</h3>
+                        </div>
+                        <div class="col-4 text-center bg-primary text-white rounded p-2">
+                            <small>Auftragswert</small>
+                            <h3>{{ ergebnis.auftragswert_brutto }} €</h3>
+                        </div>
+                    </div>
+                    
+                    <table class="table table-sm">
+                        <tr><td>Selbstkosten/Stück</td><td class="text-end">{{ ergebnis.selbstkosten_pro_stueck|default(ergebnis.selbstkosten) }} €</td></tr>
+                        <tr><td>Staffelrabatt</td><td class="text-end">{{ ergebnis.staffel_rabatt_prozent }}%</td></tr>
+                        {% if ergebnis.reserve_stueck %}
+                        <tr><td>Reserve</td><td class="text-end">{{ ergebnis.reserve_stueck }} Stück</td></tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+            
+            {% if wettbewerb %}
+            <div class="card mt-4">
+                <div class="card-header"><h6 class="mb-0">Wettbewerbsvergleich</h6></div>
+                <div class="card-body">
+                    <div class="alert alert-{{ 'success' if wettbewerb.status == 'ok' else 'warning' }}">
+                        {{ wettbewerb.empfehlung }}
+                    </div>
+                    <p>Marktdurchschnitt: {{ "%.2f"|format(wettbewerb.durchschnitt_markt) }} €</p>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% else %}
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-tshirt fa-4x text-muted mb-3"></i>
+                    <p class="text-muted">Wählen Sie ein Verfahren und klicken Sie "Berechnen".</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

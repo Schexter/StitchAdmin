@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ungültiger Link - StitchAdmin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        .error-card {
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .error-icon {
+            font-size: 100px;
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <div class="card error-card text-center">
+                    <div class="card-body p-5">
+                        <div class="error-icon mb-4">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                        </div>
+
+                        <h2 class="mb-3">Ungültiger Link</h2>
+
+                        <p class="lead text-muted mb-4">
+                            Der von Ihnen aufgerufene Freigabe-Link ist ungültig oder abgelaufen.
+                        </p>
+
+                        <div class="alert alert-secondary">
+                            <p class="mb-2"><strong>Mögliche Gründe:</strong></p>
+                            <ul class="text-start mb-0">
+                                <li>Der Link wurde bereits verwendet</li>
+                                <li>Der Link ist abgelaufen</li>
+                                <li>Der Link wurde falsch kopiert</li>
+                            </ul>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <p class="text-muted">
+                            Bitte kontaktieren Sie uns, wenn Sie einen neuen Freigabe-Link benötigen:
+                        </p>
+
+                        <p>
+                            <i class="bi bi-telephone"></i> +49 (0) 123 456789
+                            <br>
+                            <i class="bi bi-envelope"></i> info@stitchadmin.de
+                        </p>
+                    </div>
+
+                    <div class="card-footer text-muted py-3">
+                        <small>StitchAdmin - Professionelle Stickerei & Textildruck</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

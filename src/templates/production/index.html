@@ -13,8 +13,11 @@
             <a href="{{ url_for('production.planning') }}" class="btn btn-primary btn-lg me-2">
                 <i class="bi bi-calendar3"></i> Produktionsplanung
             </a>
-            <a href="{{ url_for('production.calendar') }}" class="btn btn-success btn-lg">
+            <a href="{{ url_for('production.calendar') }}" class="btn btn-success btn-lg me-2">
                 <i class="bi bi-calendar-week"></i> Kalenderansicht
+            </a>
+            <a href="{{ url_for('production_time.statistics') }}" class="btn btn-info btn-lg">
+                <i class="bi bi-graph-up"></i> Zeitstatistik
             </a>
         </div>
     </div>
@@ -92,11 +95,18 @@
                             {% if order.production_start %}
                                 <small>Seit: {{ order.production_start.strftime('%H:%M') }}</small><br>
                             {% endif %}
-                            <form method="POST" action="{{ url_for('production.complete_production', order_id=order.id) }}" style="display: inline;">
-                                <button type="submit" class="btn btn-sm btn-success">
-                                    <i class="bi bi-check-lg"></i> Fertig
-                                </button>
-                            </form>
+                            <div class="time-tracker" data-order-id="{{ order.id }}">
+                                <span class="elapsed-time badge bg-secondary me-1" id="timer-{{ order.id }}">--:--</span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-warning me-1 btn-pause"
+                                    data-order-id="{{ order.id }}" title="Pause hinzufügen">
+                                <i class="bi bi-pause-fill"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-success btn-stop-tracking"
+                                    data-order-id="{{ order.id }}" data-bs-toggle="modal"
+                                    data-bs-target="#stopTrackingModal">
+                                <i class="bi bi-check-lg"></i> Fertig
+                            </button>
                         </div>
                     </div>
                     {% endfor %}
@@ -130,11 +140,12 @@
                             {% if order.rush_order %}
                                 <span class="badge bg-danger">Express</span><br>
                             {% endif %}
-                            <form method="POST" action="{{ url_for('production.start_production', order_id=order.id) }}" style="display: inline;">
-                                <button type="submit" class="btn btn-sm btn-primary">
-                                    <i class="bi bi-play-fill"></i> Start
-                                </button>
-                            </form>
+                            <button type="button" class="btn btn-sm btn-primary btn-start-tracking"
+                                    data-order-id="{{ order.id }}"
+                                    data-order-number="{{ order.order_number or order.id }}"
+                                    data-bs-toggle="modal" data-bs-target="#startTrackingModal">
+                                <i class="bi bi-play-fill"></i> Start
+                            </button>
                         </div>
                     </div>
                     {% endfor %}
@@ -142,6 +153,156 @@
                     <p class="text-muted">Keine wartenden Aufträge</p>
                 {% endif %}
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Start Tracking Modal -->
+<div class="modal fade" id="startTrackingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-play-circle"></i> Produktion starten</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="startTrackingForm">
+                <div class="modal-body">
+                    <input type="hidden" id="start-order-id" name="order_id">
+                    <p><strong>Auftrag:</strong> <span id="start-order-number"></span></p>
+
+                    <div class="mb-3">
+                        <label class="form-label">Arbeitstyp</label>
+                        <select class="form-select" name="work_type" id="start-work-type">
+                            <option value="embroidery_setup">Stickerei Einrichtung</option>
+                            <option value="embroidery_run" selected>Stickerei Produktion</option>
+                            <option value="print_setup">Druck Einrichtung</option>
+                            <option value="print_run">Druck Produktion</option>
+                            <option value="dtf_setup">DTF Einrichtung</option>
+                            <option value="dtf_run">DTF Produktion</option>
+                            <option value="quality_check">Qualitätskontrolle</option>
+                            <option value="packing">Verpackung</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Position</label>
+                        <select class="form-select" name="position" id="start-position">
+                            <option value="">-- Keine Angabe --</option>
+                            <option value="brust_links">Brust links</option>
+                            <option value="brust_rechts">Brust rechts</option>
+                            <option value="brust_mitte">Brust Mitte</option>
+                            <option value="ruecken_gross">Rücken groß</option>
+                            <option value="ruecken_klein">Rücken klein</option>
+                            <option value="aermel_links">Ärmel links</option>
+                            <option value="aermel_rechts">Ärmel rechts</option>
+                            <option value="kragen">Kragen</option>
+                            <option value="kappe_vorne">Kappe vorne</option>
+                            <option value="kappe_seite">Kappe Seite</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Stückzahl</label>
+                            <input type="number" class="form-control" name="quantity" id="start-quantity" min="1">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Stichzahl</label>
+                            <input type="number" class="form-control" name="stitch_count" id="start-stitch-count">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-play-fill"></i> Zeiterfassung starten
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Stop Tracking Modal -->
+<div class="modal fade" id="stopTrackingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-check-circle"></i> Produktion beenden</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="stopTrackingForm">
+                <div class="modal-body">
+                    <input type="hidden" id="stop-order-id" name="order_id">
+
+                    <div class="alert alert-info">
+                        <strong>Laufzeit:</strong> <span id="stop-elapsed-time">--:--</span>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Produzierte Stückzahl</label>
+                            <input type="number" class="form-control" name="quantity_produced" id="stop-quantity-produced" min="0">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Ausschuss</label>
+                            <input type="number" class="form-control" name="quantity_rejected" id="stop-quantity-rejected" min="0" value="0">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Stichzahl</label>
+                            <input type="number" class="form-control" name="stitch_count" id="stop-stitch-count">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Farbwechsel</label>
+                            <input type="number" class="form-control" name="color_changes" id="stop-color-changes" min="0">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notizen</label>
+                        <textarea class="form-control" name="notes" id="stop-notes" rows="2"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Probleme / Störungen</label>
+                        <textarea class="form-control" name="issues" id="stop-issues" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg"></i> Zeiterfassung beenden
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Pause Modal -->
+<div class="modal fade" id="pauseModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-pause-circle"></i> Pause</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="pauseForm">
+                <div class="modal-body">
+                    <input type="hidden" id="pause-order-id" name="order_id">
+                    <div class="mb-3">
+                        <label class="form-label">Pausendauer (Minuten)</label>
+                        <input type="number" class="form-control" name="pause_minutes" id="pause-minutes" value="15" min="1">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-warning">Pause eintragen</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -188,4 +349,183 @@
         <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
     </a>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Timer-Objekte für laufende Aufträge
+    const timers = {};
+
+    // Initialisiere Timer für laufende Produktionen
+    document.querySelectorAll('.time-tracker').forEach(tracker => {
+        const orderId = tracker.dataset.orderId;
+        loadTrackingStatus(orderId);
+    });
+
+    // Lade Tracking-Status
+    async function loadTrackingStatus(orderId) {
+        try {
+            const response = await fetch(`/production/time/status/${orderId}`);
+            const data = await response.json();
+
+            if (data.is_tracking) {
+                startTimer(orderId, new Date(data.started_at), data.paused_minutes || 0);
+            }
+        } catch (error) {
+            console.error('Fehler beim Laden des Status:', error);
+        }
+    }
+
+    // Timer starten
+    function startTimer(orderId, startTime, pausedMinutes) {
+        if (timers[orderId]) {
+            clearInterval(timers[orderId]);
+        }
+
+        const timerEl = document.getElementById(`timer-${orderId}`);
+        if (!timerEl) return;
+
+        timers[orderId] = setInterval(() => {
+            const now = new Date();
+            const elapsed = Math.floor((now - startTime) / 1000 / 60) - pausedMinutes;
+            const hours = Math.floor(elapsed / 60);
+            const mins = elapsed % 60;
+            timerEl.textContent = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+        }, 1000);
+    }
+
+    // Start Tracking Button
+    document.querySelectorAll('.btn-start-tracking').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const orderId = this.dataset.orderId;
+            const orderNumber = this.dataset.orderNumber;
+            document.getElementById('start-order-id').value = orderId;
+            document.getElementById('start-order-number').textContent = orderNumber;
+        });
+    });
+
+    // Start Tracking Form
+    document.getElementById('startTrackingForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData);
+
+        try {
+            const response = await fetch('/production/time/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Auch den normalen Produktionsstart triggern
+                const startForm = document.createElement('form');
+                startForm.method = 'POST';
+                startForm.action = `/production/start/${data.order_id}`;
+                document.body.appendChild(startForm);
+                startForm.submit();
+            } else {
+                alert(result.error || 'Fehler beim Starten');
+            }
+        } catch (error) {
+            console.error('Fehler:', error);
+            alert('Fehler beim Starten der Zeiterfassung');
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('startTrackingModal')).hide();
+    });
+
+    // Stop Tracking Button
+    document.querySelectorAll('.btn-stop-tracking').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const orderId = this.dataset.orderId;
+            document.getElementById('stop-order-id').value = orderId;
+
+            // Hole aktuelle Laufzeit
+            const timerEl = document.getElementById(`timer-${orderId}`);
+            if (timerEl) {
+                document.getElementById('stop-elapsed-time').textContent = timerEl.textContent;
+            }
+        });
+    });
+
+    // Stop Tracking Form
+    document.getElementById('stopTrackingForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData);
+
+        try {
+            const response = await fetch('/production/time/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                // Timer stoppen
+                if (timers[data.order_id]) {
+                    clearInterval(timers[data.order_id]);
+                }
+
+                // Auch die normale Produktion abschließen
+                const completeForm = document.createElement('form');
+                completeForm.method = 'POST';
+                completeForm.action = `/production/complete/${data.order_id}`;
+                document.body.appendChild(completeForm);
+                completeForm.submit();
+            } else {
+                alert(result.error || 'Fehler beim Beenden');
+            }
+        } catch (error) {
+            console.error('Fehler:', error);
+            alert('Fehler beim Beenden der Zeiterfassung');
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('stopTrackingModal')).hide();
+    });
+
+    // Pause Button
+    document.querySelectorAll('.btn-pause').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const orderId = this.dataset.orderId;
+            document.getElementById('pause-order-id').value = orderId;
+            new bootstrap.Modal(document.getElementById('pauseModal')).show();
+        });
+    });
+
+    // Pause Form
+    document.getElementById('pauseForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData);
+
+        try {
+            const response = await fetch('/production/time/pause', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                alert(`Pause von ${data.pause_minutes} Minuten eingetragen`);
+                location.reload();
+            } else {
+                alert(result.error || 'Fehler beim Eintragen der Pause');
+            }
+        } catch (error) {
+            console.error('Fehler:', error);
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('pauseModal')).hide();
+    });
+});
+</script>
 {% endblock %}

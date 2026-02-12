@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}E-Mail an {{ customer.display_name }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>
+                <i class="bi bi-envelope"></i>
+                E-Mail schreiben
+            </h1>
+            <p class="text-muted mb-0">
+                An: <a href="{{ url_for('customers.show', customer_id=customer.id) }}">{{ customer.display_name }}</a>
+                {% if customer.email %} &lt;{{ customer.email }}&gt;{% endif %}
+            </p>
+        </div>
+        <a href="{{ url_for('crm.customer_contacts', customer_id=customer.id) }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurueck
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <form method="POST" id="emailForm">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-envelope-paper"></i> Nachricht</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Empfaenger -->
+                        <div class="mb-3">
+                            <label for="to_email" class="form-label">Empfaenger</label>
+                            <input type="email" class="form-control" id="to_email" name="to_email"
+                                   value="{{ customer.email or '' }}" required>
+                        </div>
+
+                        <!-- Betreff -->
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">Betreff</label>
+                            <input type="text" class="form-control" id="subject" name="subject"
+                                   value="{{ prefilled_subject or '' }}" required>
+                        </div>
+
+                        <!-- Inhalt -->
+                        <div class="mb-3">
+                            <label for="body" class="form-label">Nachricht</label>
+                            <textarea class="form-control" id="body" name="body" rows="12">{{ prefilled_body or '' }}</textarea>
+                            <small class="text-muted">
+                                Bei Outlook wird Ihre E-Mail-Signatur automatisch angehaengt.
+                            </small>
+                        </div>
+
+                        <!-- Optionen -->
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="save_contact" name="save_contact" checked>
+                            <label class="form-check-label" for="save_contact">
+                                In Kontakthistorie speichern
+                            </label>
+                        </div>
+
+                        {% if order %}
+                        <input type="hidden" name="order_id" value="{{ order.id }}">
+                        <div class="alert alert-info py-2">
+                            <i class="bi bi-link"></i> Verknuepft mit Auftrag: <strong>{{ order.order_number }}</strong>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="card-footer">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-send"></i> In Outlook oeffnen
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" onclick="previewEmail()">
+                            <i class="bi bi-eye"></i> Vorschau
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Rechte Spalte: Vorlagen -->
+        <div class="col-md-4">
+            <!-- Vorlage auswaehlen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> Vorlage waehlen</h5>
+                </div>
+                <div class="card-body">
+                    <select class="form-select mb-3" id="templateSelect" onchange="loadTemplate()">
+                        <option value="">-- Vorlage waehlen --</option>
+                        {% for template in templates %}
+                        <option value="{{ template.id }}"
+                                data-subject="{{ template.subject }}"
+                                {% if selected_template and selected_template.id == template.id %}selected{% endif %}>
+                            {{ template.category_label }}: {{ template.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <a href="{{ url_for('crm.email_templates') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-gear"></i> Vorlagen verwalten
+                    </a>
+                </div>
+            </div>
+
+            <!-- Platzhalter-Hilfe -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-braces"></i> Platzhalter</h5>
+                </div>
+                <div class="card-body small">
+                    <p class="mb-2">Verfuegbare Platzhalter:</p>
+                    <ul class="list-unstyled mb-0">
+                        <li><code>{anrede}</code> - Herr/Frau</li>
+                        <li><code>{kunde_name}</code> - {{ customer.display_name }}</li>
+                        <li><code>{firma}</code> - {{ customer.company_name or '-' }}</li>
+                        {% if order %}
+                        <li><code>{auftragsnummer}</code> - {{ order.order_number }}</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Letzte Kontakte -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Letzte Kontakte</h5>
+                </div>
+                <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                    {% for contact in customer.contacts.limit(5).all() %}
+                    <div class="list-group-item small">
+                        <div class="d-flex justify-content-between">
+                            <span>
+                                <i class="bi {{ contact.type_icon }} text-{{ contact.type_color }}"></i>
+                                {{ contact.type_label }}
+                            </span>
+                            <small class="text-muted">{{ contact.contact_date.strftime('%d.%m.') if contact.contact_date else '' }}</small>
+                        </div>
+                        {% if contact.subject %}
+                        <small class="text-muted">{{ contact.subject|truncate(40) }}</small>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="list-group-item text-muted small">Keine Kontakte</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function loadTemplate() {
+    const select = document.getElementById('templateSelect');
+    const templateId = select.value;
+
+    if (!templateId) return;
+
+    // Kontext-Daten sammeln
+    const context = {
+        anrede: '{{ "Frau" if customer.gender == "female" else "Herr" if customer.gender == "male" else "" }}',
+        kunde_name: '{{ customer.display_name }}',
+        firma: '{{ customer.company_name or "" }}',
+        {% if order %}
+        auftragsnummer: '{{ order.order_number }}',
+        auftragsdatum: '{{ order.created_at.strftime("%d.%m.%Y") if order.created_at else "" }}',
+        {% endif %}
+    };
+
+    // Vorlage rendern
+    fetch(`/crm/api/template/${templateId}/render`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(context)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('subject').value = data.subject;
+            document.getElementById('body').value = data.body_html || data.body_text;
+        }
+    });
+}
+
+function previewEmail() {
+    const subject = document.getElementById('subject').value;
+    const body = document.getElementById('body').value;
+
+    const previewWindow = window.open('', 'Vorschau', 'width=600,height=500');
+    previewWindow.document.write(`
+        <html>
+        <head><title>E-Mail Vorschau</title>
+        <style>body { font-family: Arial, sans-serif; padding: 20px; }</style>
+        </head>
+        <body>
+            <h3>${subject}</h3>
+            <hr>
+            ${body}
+        </body>
+        </html>
+    `);
+}
+
+// Vorlage beim Laden anwenden falls ausgewaehlt
+document.addEventListener('DOMContentLoaded', function() {
+    const select = document.getElementById('templateSelect');
+    if (select.value) {
+        // Nur laden wenn keine prefilled-Daten
+        if (!document.getElementById('subject').value) {
+            loadTemplate();
+        }
+    }
+});
+</script>
+{% endblock %}

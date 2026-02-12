@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Zahlung erfassen - {{ rechnung.dokument_nummer }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('rechnungen.index') }}">Rechnungen</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('rechnungen.show', id=rechnung.id) }}">{{ rechnung.dokument_nummer }}</a></li>
+                    <li class="breadcrumb-item active">Zahlung</li>
+                </ol>
+            </nav>
+            
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-euro-sign me-2"></i>Zahlung erfassen</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Rechnungsinfo -->
+                    <div class="alert alert-light mb-4">
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>Rechnung:</strong> {{ rechnung.dokument_nummer }}<br>
+                                <strong>Kunde:</strong> {{ rechnung.kunde.display_name if rechnung.kunde else '-' }}
+                            </div>
+                            <div class="col-6 text-end">
+                                <strong>Rechnungsbetrag:</strong> {{ "%.2f"|format(rechnung.summe_brutto or 0) }} €<br>
+                                <strong class="text-warning">Offen:</strong> <span class="text-warning fw-bold">{{ "%.2f"|format(offener_betrag) }} €</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Zahlungsbetrag *</label>
+                            <div class="input-group input-group-lg">
+                                <input type="text" name="betrag" class="form-control text-end" 
+                                       value="{{ "%.2f"|format(offener_betrag) }}" required
+                                       pattern="[0-9]+([,\.][0-9]{1,2})?"
+                                       placeholder="0,00">
+                                <span class="input-group-text">€</span>
+                            </div>
+                            <small class="text-muted">Offener Betrag: {{ "%.2f"|format(offener_betrag) }} €</small>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Zahlungsart</label>
+                                <select name="zahlungsart" class="form-select">
+                                    <option value="ueberweisung">🏦 Überweisung</option>
+                                    <option value="bar">💵 Bar</option>
+                                    <option value="ec_karte">💳 EC-Karte</option>
+                                    <option value="kreditkarte">💳 Kreditkarte</option>
+                                    <option value="paypal">PayPal</option>
+                                    <option value="lastschrift">Lastschrift</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Zahlungsdatum</label>
+                                <input type="date" name="zahlung_datum" class="form-control" value="{{ today }}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Transaktions-ID / Referenz</label>
+                            <input type="text" name="transaktions_id" class="form-control" placeholder="z.B. PayPal-ID, Buchungsnummer...">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Verwendungszweck / Bank-Referenz</label>
+                            <input type="text" name="bank_referenz" class="form-control" placeholder="Verwendungszweck aus Kontoauszug...">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Notiz</label>
+                            <textarea name="notiz" class="form-control" rows="2" placeholder="Optional..."></textarea>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success flex-grow-1">
+                                <i class="fas fa-check me-1"></i> Zahlung erfassen
+                            </button>
+                            <a href="{{ url_for('rechnungen.show', id=rechnung.id) }}" class="btn btn-outline-secondary">
+                                Abbrechen
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Schnellaktionen -->
+            <div class="card shadow-sm mt-4">
+                <div class="card-header bg-light">
+                    <h6 class="mb-0">Schnellauswahl</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" class="btn btn-outline-secondary" onclick="setBetrag({{ offener_betrag }})">
+                            Vollständig ({{ "%.2f"|format(offener_betrag) }} €)
+                        </button>
+                        {% if rechnung.skonto_prozent and rechnung.skonto_prozent > 0 %}
+                        {% set skonto_betrag = offener_betrag * (1 - rechnung.skonto_prozent / 100) %}
+                        <button type="button" class="btn btn-outline-info" onclick="setBetrag({{ skonto_betrag }})">
+                            Mit Skonto ({{ "%.2f"|format(skonto_betrag) }} €)
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function setBetrag(betrag) {
+    document.querySelector('input[name="betrag"]').value = betrag.toFixed(2).replace('.', ',');
+}
+</script>
+{% endblock %}

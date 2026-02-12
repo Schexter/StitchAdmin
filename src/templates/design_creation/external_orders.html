@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Externe Design-Bestellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="bi bi-truck text-primary"></i>
+                Externe Design-Bestellungen
+            </h1>
+            <p class="text-muted mb-0">Bestellungen bei Punchern, Grafikern und DTF-Dienstleistern</p>
+        </div>
+        <a href="{{ url_for('design_creation.dashboard') }}" class="btn btn-outline-primary">
+            <i class="bi bi-house"></i> Dashboard
+        </a>
+    </div>
+
+    <!-- Statistik-Kacheln -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-2">
+            <a href="?status=draft" class="text-decoration-none">
+                <div class="card {{ 'border-secondary border-2' if status_filter == 'draft' else '' }}">
+                    <div class="card-body text-center py-3">
+                        <h3 class="mb-0 text-secondary">{{ stats.draft }}</h3>
+                        <small class="text-muted">Entwurf</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="?status=sent" class="text-decoration-none">
+                <div class="card {{ 'border-info border-2' if status_filter == 'sent' else '' }}">
+                    <div class="card-body text-center py-3">
+                        <h3 class="mb-0 text-info">{{ stats.sent }}</h3>
+                        <small class="text-muted">Angefragt</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="?status=in_progress" class="text-decoration-none">
+                <div class="card {{ 'border-primary border-2' if status_filter == 'in_progress' else '' }}">
+                    <div class="card-body text-center py-3">
+                        <h3 class="mb-0 text-primary">{{ stats.in_progress }}</h3>
+                        <small class="text-muted">In Arbeit</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="?status=delivered" class="text-decoration-none">
+                <div class="card {{ 'border-success border-2' if status_filter == 'delivered' else '' }}">
+                    <div class="card-body text-center py-3">
+                        <h3 class="mb-0 text-success">{{ stats.delivered }}</h3>
+                        <small class="text-muted">Geliefert</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="?status=completed" class="text-decoration-none">
+                <div class="card {{ 'border-dark border-2' if status_filter == 'completed' else '' }}">
+                    <div class="card-body text-center py-3">
+                        <h3 class="mb-0">{{ stats.completed }}</h3>
+                        <small class="text-muted">Abgeschlossen</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="{{ url_for('design_creation.external_orders') }}" class="text-decoration-none">
+                <div class="card {{ 'border-primary border-2' if not status_filter else '' }}">
+                    <div class="card-body text-center py-3">
+                        <h3 class="mb-0 text-primary">{{ orders|length }}</h3>
+                        <small class="text-muted">{{ 'Gefiltert' if status_filter else 'Alle' }}</small>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Tabelle -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>
+                <i class="bi bi-list"></i> Bestellungen
+                {% if status_filter %}<span class="badge bg-primary ms-2">Filter: {{ status_filter }}</span>{% endif %}
+            </span>
+            {% if status_filter %}
+            <a href="{{ url_for('design_creation.external_orders') }}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-x"></i> Filter entfernen
+            </a>
+            {% endif %}
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Bestellnr.</th>
+                        <th>Design</th>
+                        <th>Lieferant</th>
+                        <th>Auftrag</th>
+                        <th>Status</th>
+                        <th>Preis</th>
+                        <th>Erstellt</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for design_order in orders %}
+                    <tr class="{{ 'table-warning' if design_order.is_overdue else '' }}">
+                        <td>
+                            <a href="{{ url_for('design_creation.external_order_detail', order_id=design_order.id) }}">
+                                <strong>{{ design_order.design_order_number }}</strong>
+                            </a>
+                        </td>
+                        <td>
+                            {{ design_order.type_icon }} {{ design_order.design_name[:30] }}
+                            {% if design_order.design_name|length > 30 %}...{% endif %}
+                        </td>
+                        <td>
+                            {% if design_order.supplier %}
+                            <small>{{ design_order.supplier.name }}</small>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if design_order.order %}
+                            <a href="{{ url_for('orders.show', order_id=design_order.order_id) }}">
+                                {{ design_order.order.order_number }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-{{ design_order.status_color }}">
+                                {{ design_order.status_display }}
+                            </span>
+                            {% if design_order.is_overdue %}
+                            <span class="badge bg-danger"><i class="bi bi-exclamation-triangle"></i> Überfällig</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if design_order.quote_price %}
+                            {{ "%.2f"|format(design_order.quote_price) }} €
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <small>{{ design_order.created_at.strftime('%d.%m.%Y') }}</small>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('design_creation.external_order_detail', order_id=design_order.id) }}" 
+                                   class="btn btn-outline-primary" title="Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if design_order.status in ['draft', 'sent'] %}
+                                <button type="button" class="btn btn-outline-info send-email-btn"
+                                        data-order-id="{{ design_order.id }}" title="E-Mail senden">
+                                    <i class="bi bi-envelope"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox fs-1"></i><br>
+                            Keine Bestellungen gefunden.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.send-email-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        if (!confirm('E-Mail an Lieferant senden?')) return;
+        
+        const orderId = this.dataset.orderId;
+        this.disabled = true;
+        this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+        
+        fetch(`/design-creation/order/${orderId}/send-email`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            alert(data.success ? '✅ ' + data.message : '❌ ' + data.error);
+            if (data.success) location.reload();
+            else {
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-envelope"></i>';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

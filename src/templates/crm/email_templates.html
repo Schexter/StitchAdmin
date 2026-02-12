@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}E-Mail-Vorlagen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>
+                <i class="bi bi-file-earmark-text"></i>
+                E-Mail-Vorlagen
+            </h1>
+            <p class="text-muted mb-0">
+                Vorlagen fuer Auftragsbestaetigung, Versandinfo, Rechnungen und mehr
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('crm.new_email_template') }}" class="btn btn-success">
+                <i class="bi bi-plus-lg"></i> Neue Vorlage
+            </a>
+            <a href="{{ url_for('crm.init_default_templates') }}" class="btn btn-outline-primary"
+               onclick="return confirm('Standard-Vorlagen erstellen? Existierende werden nicht ueberschrieben.')">
+                <i class="bi bi-magic"></i> Standard-Vorlagen erstellen
+            </a>
+        </div>
+    </div>
+
+    <!-- Vorlagen nach Kategorie -->
+    {% for category, templates in templates_by_category.items() %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">
+                {% if category.value in ['auftrag_bestaetigung', 'grafik_freigabe', 'produktion_geplant', 'qm_abnahme', 'versand_info'] %}
+                <i class="bi bi-clipboard-check text-primary"></i>
+                {% elif category.value in ['rechnung', 'mahnung', 'zahlungserinnerung'] %}
+                <i class="bi bi-receipt text-success"></i>
+                {% else %}
+                <i class="bi bi-envelope text-secondary"></i>
+                {% endif %}
+                {{ category.value|replace('_', ' ')|title }}
+            </h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 30%;">Name</th>
+                        <th style="width: 35%;">Betreff</th>
+                        <th style="width: 15%;">Status</th>
+                        <th style="width: 20%;">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for template in templates %}
+                    <tr>
+                        <td>
+                            <strong>{{ template.name }}</strong>
+                            {% if template.is_default %}
+                            <span class="badge bg-primary ms-1">Standard</span>
+                            {% endif %}
+                            {% if template.description %}
+                            <br><small class="text-muted">{{ template.description|truncate(50) }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <code>{{ template.subject|truncate(50) }}</code>
+                        </td>
+                        <td>
+                            {% if template.is_active %}
+                            <span class="badge bg-success">Aktiv</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inaktiv</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('crm.edit_email_template', template_id=template.id) }}"
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-pencil"></i> Bearbeiten
+                            </a>
+                            <button class="btn btn-sm btn-outline-danger"
+                                    onclick="deleteTemplate({{ template.id }}, '{{ template.name }}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Noch keine Vorlagen vorhanden.
+        <a href="{{ url_for('crm.init_default_templates') }}">Standard-Vorlagen erstellen?</a>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Loesch-Formular (versteckt) -->
+<form id="deleteForm" method="POST" style="display: none;">
+</form>
+
+<script>
+function deleteTemplate(templateId, templateName) {
+    if (confirm(`Vorlage "${templateName}" wirklich loeschen?`)) {
+        const form = document.getElementById('deleteForm');
+        form.action = `/crm/vorlagen/${templateId}/loeschen`;
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

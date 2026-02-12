@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% block title %}Lieferschein aus Auftrag {{ auftrag.dokument_nummer }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('lieferscheine.index') }}">Lieferscheine</a></li>
+                    <li class="breadcrumb-item active">Aus Auftrag erstellen</li>
+                </ol>
+            </nav>
+            <h2><i class="fas fa-truck text-success me-2"></i>Lieferschein erstellen</h2>
+            <p class="text-muted mb-0">
+                Aus Auftrag: <strong>{{ auftrag.dokument_nummer }}</strong> | 
+                Kunde: <strong>{{ auftrag.kunde.display_name if auftrag.kunde else '-' }}</strong>
+            </p>
+        </div>
+    </div>
+
+    <form method="POST" id="lieferscheinForm">
+        <input type="hidden" name="positionen_json" id="positionenJson">
+        
+        <div class="row">
+            <div class="col-lg-8">
+                <!-- Auftragspositionen -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Positionen auswählen</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 50px;"></th>
+                                        <th>Pos.</th>
+                                        <th>Bezeichnung</th>
+                                        <th class="text-center">Bestellt</th>
+                                        <th class="text-center" style="width: 120px;">Liefermenge</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for pos in auftrag.positionen %}
+                                    {% if pos.typ not in ['dienstleistung', 'text'] %}
+                                    <tr>
+                                        <td class="text-center">
+                                            <input type="checkbox" class="form-check-input position-checkbox" 
+                                                   data-index="{{ loop.index0 }}" checked>
+                                        </td>
+                                        <td>{{ pos.position }}</td>
+                                        <td>
+                                            <strong>{{ pos.bezeichnung }}</strong>
+                                            {% if pos.artikelnummer %}
+                                            <br><small class="text-muted">Art.-Nr.: {{ pos.artikelnummer }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">{{ pos.menge|int }} {{ pos.einheit }}</td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm text-center liefermenge-input"
+                                                   data-index="{{ loop.index0 }}"
+                                                   data-max="{{ pos.menge }}"
+                                                   value="{{ pos.menge|int }}"
+                                                   min="0" max="{{ pos.menge|int }}">
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Versandinfo -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-shipping-fast me-2"></i>Versandinformationen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Lieferdatum</label>
+                                <input type="date" name="lieferdatum" class="form-control" 
+                                       value="{{ auftrag.lieferdatum.strftime('%Y-%m-%d') if auftrag.lieferdatum else '' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Versandart</label>
+                                <select name="versandart" class="form-select">
+                                    <option value="versand">📦 Versand</option>
+                                    <option value="abholung">🏃 Abholung</option>
+                                    <option value="spedition">🚛 Spedition</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Sendungsnummer</label>
+                                <input type="text" name="tracking_nummer" class="form-control" placeholder="Optional">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm sticky-top" style="top: 20px;">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Lieferung</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" name="volllieferung" id="volllieferung" value="1" checked>
+                            <label class="form-check-label" for="volllieferung">
+                                <strong>Vollständige Lieferung</strong><br>
+                                <small class="text-muted">Auftrag wird als "Geliefert" markiert</small>
+                            </label>
+                        </div>
+                        
+                        <div class="alert alert-info mb-3">
+                            <small>
+                                <i class="fas fa-info-circle me-1"></i>
+                                Wenn nicht alle Positionen geliefert werden, wird der Auftrag als "Teilgeliefert" markiert.
+                            </small>
+                        </div>
+
+                        <hr>
+                        
+                        <div class="mb-2 d-flex justify-content-between">
+                            <span>Ausgewählte Positionen:</span>
+                            <strong id="anzahlPositionen">0</strong>
+                        </div>
+
+                        <hr>
+                        
+                        <button type="submit" class="btn btn-success w-100 mb-2">
+                            <i class="fas fa-truck me-1"></i> Lieferschein erstellen
+                        </button>
+                        <a href="{{ url_for('auftraege.show', id=auftrag.id) }}" class="btn btn-outline-secondary w-100">
+                            Zurück zum Auftrag
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+// Auftragspositionen als Basis
+const auftragPositionen = [
+    {% for pos in auftrag.positionen %}
+    {% if pos.typ not in ['dienstleistung', 'text'] %}
+    {
+        artikel_id: {{ pos.artikel_id|tojson if pos.artikel_id else 'null' }},
+        artikelnummer: {{ pos.artikelnummer|tojson if pos.artikelnummer else '""' }},
+        bezeichnung: {{ pos.bezeichnung|tojson }},
+        beschreibung: {{ pos.beschreibung|tojson if pos.beschreibung else '""' }},
+        menge: {{ pos.menge }},
+        einheit: {{ pos.einheit|tojson }},
+        typ: {{ pos.typ|tojson }}
+    },
+    {% endif %}
+    {% endfor %}
+];
+
+function updateAnzahl() {
+    const checkboxes = document.querySelectorAll('.position-checkbox:checked');
+    document.getElementById('anzahlPositionen').textContent = checkboxes.length;
+    
+    // Volllieferung prüfen
+    let istVoll = true;
+    document.querySelectorAll('.liefermenge-input').forEach((input, idx) => {
+        const checkbox = document.querySelector(`.position-checkbox[data-index="${idx}"]`);
+        if (checkbox && checkbox.checked) {
+            const max = parseFloat(input.dataset.max);
+            const val = parseFloat(input.value) || 0;
+            if (val < max) istVoll = false;
+        }
+    });
+    document.getElementById('volllieferung').checked = istVoll;
+}
+
+document.querySelectorAll('.position-checkbox').forEach(cb => {
+    cb.addEventListener('change', updateAnzahl);
+});
+
+document.querySelectorAll('.liefermenge-input').forEach(input => {
+    input.addEventListener('change', updateAnzahl);
+});
+
+document.getElementById('lieferscheinForm').addEventListener('submit', function(e) {
+    const positionen = [];
+    
+    document.querySelectorAll('.position-checkbox').forEach((cb, idx) => {
+        if (cb.checked) {
+            const mengeInput = document.querySelector(`.liefermenge-input[data-index="${idx}"]`);
+            const liefermenge = parseFloat(mengeInput.value) || 0;
+            
+            if (liefermenge > 0) {
+                const pos = auftragPositionen[idx];
+                positionen.push({
+                    ...pos,
+                    liefermenge: liefermenge
+                });
+            }
+        }
+    });
+    
+    if (positionen.length === 0) {
+        e.preventDefault();
+        alert('Bitte mindestens eine Position mit Liefermenge auswählen.');
+        return;
+    }
+    
+    document.getElementById('positionenJson').value = JSON.stringify(positionen);
+});
+
+updateAnzahl();
+</script>
+{% endblock %}

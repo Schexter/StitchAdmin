@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Bestellung {{ order.order_number or order.id }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h1>
+                    <i class="bi bi-receipt"></i>
+                    Bestellung {{ order.purchase_order_number or order.order_number or order.id }}
+                </h1>
+                <p class="text-muted">
+                    {% if supplier %}{{ supplier.name }}{% else %}Kein Lieferant{% endif %}
+                    -
+                    {% if order.status == 'draft' %}
+                        <span class="badge bg-secondary">Entwurf</span>
+                    {% elif order.status == 'ordered' %}
+                        <span class="badge bg-primary">Bestellt</span>
+                    {% elif order.status == 'confirmed' %}
+                        <span class="badge bg-info">Bestätigt</span>
+                    {% elif order.status == 'shipped' %}
+                        <span class="badge bg-warning text-dark">Unterwegs</span>
+                    {% elif order.status == 'partial' %}
+                        <span class="badge bg-danger">Teillieferung</span>
+                    {% elif order.status == 'delivered' %}
+                        <span class="badge bg-success">Geliefert</span>
+                    {% elif order.status == 'cancelled' %}
+                        <span class="badge bg-dark">Storniert</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ order.status }}</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div>
+                {% if order.status == 'draft' %}
+                <a href="{{ url_for('purchasing.place_order', order_id=order.id) }}" class="btn btn-success me-2">
+                    <i class="bi bi-send"></i> Bestellen
+                </a>
+                {% endif %}
+                {% if order.status in ['ordered', 'confirmed', 'shipped', 'partial'] %}
+                <a href="{{ url_for('purchasing.receiving_checklist', order_id=order.id) }}" class="btn btn-success me-2">
+                    <i class="bi bi-clipboard-check"></i> Wareneingang
+                </a>
+                {% endif %}
+                <a href="{{ url_for('purchasing.print_order_checklist', order_id=order.id) }}" class="btn btn-outline-secondary me-2" target="_blank">
+                    <i class="bi bi-printer"></i> Drucken
+                </a>
+                <a href="{{ url_for('purchasing.orders') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Bestellinfos -->
+    <div class="col-md-4">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Bestelldetails</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td class="text-muted">Bestellnummer:</td>
+                        <td><strong>{{ order.purchase_order_number or order.order_number or order.id }}</strong></td>
+                    </tr>
+                    {% if order.supplier_order_number %}
+                    <tr>
+                        <td class="text-muted">Lieferanten-Nr.:</td>
+                        <td>{{ order.supplier_order_number }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td class="text-muted">Bestelldatum:</td>
+                        <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Lieferung erwartet:</td>
+                        <td>
+                            {% if order.delivery_date %}
+                            <span class="{% if order.delivery_date < today and order.status not in ['delivered', 'cancelled'] %}text-danger fw-bold{% endif %}">
+                                {{ order.delivery_date.strftime('%d.%m.%Y') }}
+                            </span>
+                            {% else %}-{% endif %}
+                        </td>
+                    </tr>
+                    {% if order.actual_delivery_date %}
+                    <tr>
+                        <td class="text-muted">Geliefert am:</td>
+                        <td class="text-success">{{ order.actual_delivery_date.strftime('%d.%m.%Y') }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td class="text-muted">Erstellt:</td>
+                        <td>{{ order.created_at.strftime('%d.%m.%Y %H:%M') if order.created_at else '-' }}</td>
+                    </tr>
+                    {% if order.created_by %}
+                    <tr>
+                        <td class="text-muted">Erstellt von:</td>
+                        <td>{{ order.created_by }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+
+        <!-- Lieferant -->
+        {% if supplier %}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-building"></i> Lieferant</h5>
+            </div>
+            <div class="card-body">
+                <strong>{{ supplier.name }}</strong><br>
+                {% if supplier.street %}{{ supplier.street }}<br>{% endif %}
+                {% if supplier.postal_code or supplier.city %}{{ supplier.postal_code }} {{ supplier.city }}<br>{% endif %}
+                {% if supplier.country and supplier.country != 'Deutschland' %}{{ supplier.country }}<br>{% endif %}
+                <hr>
+                {% if supplier.phone %}
+                <i class="bi bi-telephone"></i> {{ supplier.phone }}<br>
+                {% endif %}
+                {% if supplier.email %}
+                <i class="bi bi-envelope"></i> <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a><br>
+                {% endif %}
+                {% if supplier.website %}
+                <i class="bi bi-globe"></i> <a href="{{ supplier.website }}" target="_blank">Website</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Verknüpfte Aufträge -->
+        {% if linked_orders %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-link"></i> Verknüpfte Kundenaufträge</h5>
+            </div>
+            <ul class="list-group list-group-flush">
+                {% for linked in linked_orders %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <a href="{{ url_for('orders.show', order_id=linked.id) }}" target="_blank">
+                        {{ linked.order_number or linked.id }}
+                    </a>
+                    <span class="badge bg-secondary">{{ linked.status }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Positionen -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-list-ul"></i> Bestellpositionen</h5>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="50">#</th>
+                            <th>Artikel</th>
+                            <th class="text-center">Menge</th>
+                            <th class="text-end">Einzelpreis</th>
+                            <th class="text-end">Gesamt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>
+                                <strong>{{ item.article_name or 'Unbekannt' }}</strong><br>
+                                <small class="text-muted">{{ item.article_number or '-' }}</small>
+                                {% if item.size or item.color %}
+                                <br><small class="text-info">
+                                    {% if item.size %}Größe: {{ item.size }}{% endif %}
+                                    {% if item.color %} Farbe: {{ item.color }}{% endif %}
+                                </small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-primary fs-6">{{ item.quantity }}</span>
+                                {% if item.received_quantity is defined and item.received_quantity > 0 %}
+                                <br><small class="text-success">{{ item.received_quantity }} erhalten</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">{{ "%.2f"|format(item.unit_price or 0) }}€</td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(item.total or 0) }}€</strong></td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox display-4 d-block mb-2"></i>
+                                Keine Positionen vorhanden
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>Zwischensumme:</strong></td>
+                            <td class="text-end">{{ "%.2f"|format(order.subtotal or 0) }}€</td>
+                        </tr>
+                        {% if order.shipping_cost %}
+                        <tr>
+                            <td colspan="4" class="text-end">Versandkosten:</td>
+                            <td class="text-end">{{ "%.2f"|format(order.shipping_cost) }}€</td>
+                        </tr>
+                        {% endif %}
+                        {% if order.tax_amount %}
+                        <tr>
+                            <td colspan="4" class="text-end">MwSt.:</td>
+                            <td class="text-end">{{ "%.2f"|format(order.tax_amount) }}€</td>
+                        </tr>
+                        {% endif %}
+                        <tr class="fw-bold fs-5">
+                            <td colspan="4" class="text-end">Gesamtbetrag:</td>
+                            <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }}€</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- Notizen -->
+        {% if order.notes %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-sticky"></i> Notizen</h5>
+            </div>
+            <div class="card-body">
+                <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ order.notes }}</pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Aktionen -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        {% if order.status == 'draft' %}
+                        <a href="{{ url_for('purchasing.place_order', order_id=order.id) }}" class="btn btn-success">
+                            <i class="bi bi-send"></i> Jetzt bestellen
+                        </a>
+                        {% elif order.status == 'ordered' %}
+                        <form method="POST" action="{{ url_for('purchasing.update_status', order_id=order.id) }}" style="display: inline;">
+                            <input type="hidden" name="status" value="confirmed">
+                            <button type="submit" class="btn btn-info">
+                                <i class="bi bi-check-circle"></i> Als bestätigt markieren
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('purchasing.update_status', order_id=order.id) }}" style="display: inline;" class="ms-2">
+                            <input type="hidden" name="status" value="shipped">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="bi bi-truck"></i> Als versendet markieren
+                            </button>
+                        </form>
+                        {% elif order.status in ['confirmed', 'shipped', 'partial'] %}
+                        <a href="{{ url_for('purchasing.receiving_checklist', order_id=order.id) }}" class="btn btn-success">
+                            <i class="bi bi-clipboard-check"></i> Wareneingang erfassen
+                        </a>
+                        {% endif %}
+                    </div>
+                    <div>
+                        {% if order.status == 'draft' %}
+                        <form method="POST" action="{{ url_for('purchasing.cancel_order', order_id=order.id) }}" style="display: inline;" onsubmit="return confirm('Bestellung wirklich stornieren?');">
+                            <button type="submit" class="btn btn-outline-danger">
+                                <i class="bi bi-x-circle"></i> Stornieren
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

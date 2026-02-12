@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% block title %}Angebot {{ angebot.dokument_nummer }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('angebote_workflow.index') }}">Angebote</a></li>
+                    <li class="breadcrumb-item active">{{ angebot.dokument_nummer }}</li>
+                </ol>
+            </nav>
+            <h2 class="mb-1">
+                <i class="fas fa-file-invoice text-primary me-2"></i>
+                Angebot {{ angebot.dokument_nummer }}
+            </h2>
+            <div class="d-flex align-items-center gap-3">
+                {% if angebot.status == 'entwurf' %}
+                <span class="badge bg-secondary fs-6">📝 Entwurf</span>
+                {% elif angebot.status == 'versendet' %}
+                <span class="badge bg-info fs-6">📤 Versendet</span>
+                {% elif angebot.status == 'angenommen' %}
+                <span class="badge bg-success fs-6">✅ Angenommen</span>
+                {% elif angebot.status == 'abgelehnt' %}
+                <span class="badge bg-danger fs-6">❌ Abgelehnt</span>
+                {% elif angebot.status == 'storniert' %}
+                <span class="badge bg-dark fs-6">🚫 Storniert</span>
+                {% endif %}
+                
+                {% if angebot.gueltig_bis %}
+                    {% set heute = import_module('datetime').date.today() %}
+                    {% if angebot.gueltig_bis < heute and angebot.status == 'versendet' %}
+                    <span class="badge bg-warning text-dark">⚠️ Abgelaufen</span>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        <div class="btn-group">
+            <a href="{{ url_for('angebote_workflow.pdf_vorschau', id=angebot.id) }}" 
+               class="btn btn-outline-secondary" target="_blank">
+                <i class="fas fa-file-pdf me-1"></i> PDF
+            </a>
+            <a href="{{ url_for('angebote_workflow.pdf_generieren', id=angebot.id) }}" 
+               class="btn btn-outline-secondary">
+                <i class="fas fa-download me-1"></i> Download
+            </a>
+            {% if angebot.status == 'entwurf' %}
+            <a href="{{ url_for('angebote_workflow.bearbeiten', id=angebot.id) }}" 
+               class="btn btn-warning">
+                <i class="fas fa-edit me-1"></i> Bearbeiten
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Hauptbereich -->
+        <div class="col-lg-8">
+            <!-- Kundendaten -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-user me-2"></i>Kunde</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            {% if angebot.kunde %}
+                            <h5>{{ angebot.kunde.display_name }}</h5>
+                            {% if angebot.rechnungsadresse %}
+                            <p class="mb-0">
+                                {{ angebot.rechnungsadresse.get('street', '') }} {{ angebot.rechnungsadresse.get('house_number', '') }}<br>
+                                {{ angebot.rechnungsadresse.get('postal_code', '') }} {{ angebot.rechnungsadresse.get('city', '') }}
+                            </p>
+                            {% endif %}
+                            {% else %}
+                            <span class="text-muted">Kunde nicht gefunden</span>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            {% if angebot.kunde %}
+                            <table class="table table-sm table-borderless mb-0">
+                                <tr>
+                                    <td class="text-muted" style="width: 80px;">E-Mail:</td>
+                                    <td>{{ angebot.kunde.email or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Telefon:</td>
+                                    <td>{{ angebot.kunde.phone or '-' }}</td>
+                                </tr>
+                            </table>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Positionen -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Positionen</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">Pos.</th>
+                                    <th>Bezeichnung</th>
+                                    <th class="text-center" style="width: 80px;">Menge</th>
+                                    <th class="text-end" style="width: 100px;">Einzelpreis</th>
+                                    <th class="text-end" style="width: 100px;">Gesamt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pos in angebot.positionen %}
+                                <tr>
+                                    <td class="text-muted">{{ pos.position }}</td>
+                                    <td>
+                                        <strong>{{ pos.bezeichnung }}</strong>
+                                        {% if pos.beschreibung %}
+                                        <br><small class="text-muted">{{ pos.beschreibung }}</small>
+                                        {% endif %}
+                                        {% if pos.artikelnummer %}
+                                        <br><small class="text-muted">Art.-Nr.: {{ pos.artikelnummer }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ pos.menge }} {{ pos.einheit }}</td>
+                                    <td class="text-end">{{ "%.2f"|format(pos.einzelpreis_netto) }} €</td>
+                                    <td class="text-end"><strong>{{ "%.2f"|format(pos.netto_gesamt) }} €</strong></td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        Keine Positionen vorhanden
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="4" class="text-end">Zwischensumme (netto):</td>
+                                    <td class="text-end">{{ "%.2f"|format(angebot.summe_netto or 0) }} €</td>
+                                </tr>
+                                {% if angebot.rabatt_betrag and angebot.rabatt_betrag > 0 %}
+                                <tr class="text-danger">
+                                    <td colspan="4" class="text-end">Rabatt ({{ angebot.rabatt_prozent }}%):</td>
+                                    <td class="text-end">- {{ "%.2f"|format(angebot.rabatt_betrag) }} €</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td colspan="4" class="text-end">MwSt. (19%):</td>
+                                    <td class="text-end">{{ "%.2f"|format(angebot.summe_mwst or 0) }} €</td>
+                                </tr>
+                                <tr class="fw-bold fs-5">
+                                    <td colspan="4" class="text-end">Gesamtsumme:</td>
+                                    <td class="text-end text-success">{{ "%.2f"|format(angebot.summe_brutto or 0) }} €</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Texte -->
+            {% if angebot.einleitung or angebot.schlussbemerkung %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-align-left me-2"></i>Texte</h5>
+                </div>
+                <div class="card-body">
+                    {% if angebot.einleitung %}
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Einleitung:</label>
+                        <p>{{ angebot.einleitung }}</p>
+                    </div>
+                    {% endif %}
+                    {% if angebot.schlussbemerkung %}
+                    <div>
+                        <label class="form-label text-muted small">Schlussbemerkung:</label>
+                        <p class="mb-0">{{ angebot.schlussbemerkung }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Seitenleiste -->
+        <div class="col-lg-4">
+            <!-- Aktionen -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Aktionen</h5>
+                </div>
+                <div class="card-body">
+                    {% if angebot.status == 'entwurf' %}
+                    <!-- Entwurf: Versenden -->
+                    <form method="POST" action="{{ url_for('angebote_workflow.versenden', id=angebot.id) }}" class="mb-3">
+                        <button type="submit" class="btn btn-info w-100 mb-2">
+                            <i class="fas fa-paper-plane me-1"></i> Als versendet markieren
+                        </button>
+                    </form>
+                    <a href="{{ url_for('angebote_workflow.email_senden', id=angebot.id) }}" class="btn btn-outline-info w-100 mb-2">
+                        <i class="fas fa-envelope me-1"></i> Per E-Mail senden
+                    </a>
+                    <hr>
+                    <form method="POST" action="{{ url_for('angebote_workflow.stornieren', id=angebot.id) }}"
+                          onsubmit="return confirm('Angebot wirklich stornieren?')">
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="fas fa-ban me-1"></i> Stornieren
+                        </button>
+                    </form>
+                    
+                    {% elif angebot.status == 'versendet' %}
+                    <!-- Versendet: Angenommen/Abgelehnt -->
+                    <form method="POST" action="{{ url_for('angebote_workflow.annehmen', id=angebot.id) }}" class="mb-2">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-check me-1"></i> Angebot angenommen
+                        </button>
+                    </form>
+                    <button type="button" class="btn btn-danger w-100 mb-3" data-bs-toggle="modal" data-bs-target="#ablehnenModal">
+                        <i class="fas fa-times me-1"></i> Angebot abgelehnt
+                    </button>
+                    <hr>
+                    <a href="{{ url_for('angebote_workflow.email_senden', id=angebot.id) }}" class="btn btn-outline-info w-100">
+                        <i class="fas fa-envelope me-1"></i> Erneut senden
+                    </a>
+                    
+                    {% elif angebot.status == 'angenommen' %}
+                    <!-- Angenommen: In Auftrag umwandeln -->
+                    <form method="POST" action="{{ url_for('angebote_workflow.in_auftrag_umwandeln', id=angebot.id) }}">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-file-contract me-1"></i> In Auftrag umwandeln
+                        </button>
+                    </form>
+                    {% if angebot.nachfolger %}
+                    <div class="alert alert-info mt-3 mb-0">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Auftragsbestätigung: 
+                        <a href="{{ url_for('angebote_workflow.show', id=angebot.nachfolger[0].id) }}">
+                            {{ angebot.nachfolger[0].dokument_nummer }}
+                        </a>
+                    </div>
+                    {% endif %}
+                    
+                    {% else %}
+                    <p class="text-muted text-center mb-0">Keine Aktionen verfügbar</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Info-Box -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Erstellt am:</td>
+                            <td>{{ angebot.dokument_datum.strftime('%d.%m.%Y') }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Gültig bis:</td>
+                            <td>{{ angebot.gueltig_bis.strftime('%d.%m.%Y') if angebot.gueltig_bis else '-' }}</td>
+                        </tr>
+                        {% if angebot.versendet_am %}
+                        <tr>
+                            <td class="text-muted">Versendet am:</td>
+                            <td>{{ angebot.versendet_am.strftime('%d.%m.%Y %H:%M') }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if angebot.angenommen_am %}
+                        <tr>
+                            <td class="text-muted">Angenommen am:</td>
+                            <td>{{ angebot.angenommen_am.strftime('%d.%m.%Y %H:%M') }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">Erstellt von:</td>
+                            <td>{{ angebot.erstellt_von or '-' }}</td>
+                        </tr>
+                        {% if angebot.zahlungsbedingung %}
+                        <tr>
+                            <td class="text-muted">Zahlung:</td>
+                            <td>{{ angebot.zahlungsbedingung.bezeichnung }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- Interne Notiz -->
+            {% if angebot.interne_notiz %}
+            <div class="card shadow-sm border-warning">
+                <div class="card-header bg-warning bg-opacity-25">
+                    <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Interne Notiz</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ angebot.interne_notiz }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Ablehnung -->
+<div class="modal fade" id="ablehnenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('angebote_workflow.ablehnen', id=angebot.id) }}">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">Angebot ablehnen</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Ablehnungsgrund (optional)</label>
+                        <textarea name="grund" class="form-control" rows="3" 
+                                  placeholder="z.B. Preis zu hoch, anderer Anbieter gewählt..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-times me-1"></i> Ablehnen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,340 @@
+{% extends "base.html" %}
+{% block title %}Auftrags-Wizard - Schritt 1{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Wizard Progress -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body py-3">
+                    <div class="wizard-progress d-flex justify-content-between align-items-center">
+                        <div class="wizard-step active">
+                            <div class="step-circle">1</div>
+                            <span class="step-label">Kunde & Grunddaten</span>
+                        </div>
+                        <div class="wizard-line"></div>
+                        <div class="wizard-step {% if completion.get(2) %}completed{% endif %}">
+                            <div class="step-circle">2</div>
+                            <span class="step-label">Textilien</span>
+                        </div>
+                        <div class="wizard-line"></div>
+                        <div class="wizard-step {% if completion.get(3) %}completed{% endif %}">
+                            <div class="step-circle">3</div>
+                            <span class="step-label">Veredelung</span>
+                        </div>
+                        <div class="wizard-line"></div>
+                        <div class="wizard-step">
+                            <div class="step-circle">4</div>
+                            <span class="step-label">Kalkulation</span>
+                        </div>
+                        <div class="wizard-line"></div>
+                        <div class="wizard-step">
+                            <div class="step-circle">5</div>
+                            <span class="step-label">Abschluss</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="POST" id="step1Form">
+        <div class="row">
+            <!-- Linke Spalte: Kundenauswahl -->
+            <div class="col-lg-7">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-user me-2"></i>Kunde auswählen</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Kundensuche -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Kundensuche</label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="kundenSuche" 
+                                       placeholder="Name, Firma, E-Mail oder Kundennummer eingeben..."
+                                       autocomplete="off">
+                            </div>
+                            <div id="kundenSuchergebnisse" class="list-group mt-2" style="display:none;"></div>
+                        </div>
+
+                        <!-- Ausgewählter Kunde -->
+                        <div id="ausgewaehlterKunde" class="{% if not data.kunde.id %}d-none{% endif %}">
+                            <div class="alert alert-success d-flex align-items-center">
+                                <i class="fas fa-check-circle fs-4 me-3"></i>
+                                <div class="flex-grow-1">
+                                    <strong id="kundeAnzeige">{{ data.kunde.name }}</strong>
+                                    <br>
+                                    <small class="text-muted" id="kundeDetails">{{ data.kunde.email }}</small>
+                                </div>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="kundeAbwaehlen()">
+                                    <i class="fas fa-times"></i> Ändern
+                                </button>
+                            </div>
+                            <input type="hidden" name="kunde_id" id="kundeId" value="{{ data.kunde.id }}">
+                        </div>
+
+                        <!-- Schnellauswahl -->
+                        <div id="schnellauswahl" class="{% if data.kunde.id %}d-none{% endif %}">
+                            <label class="form-label text-muted">Letzte Kunden</label>
+                            <div class="row g-2">
+                                {% for kunde in recent_customers %}
+                                <div class="col-md-6">
+                                    <button type="button" class="btn btn-outline-secondary w-100 text-start kunde-quick-select"
+                                            data-id="{{ kunde.id }}"
+                                            data-name="{{ kunde.display_name }}"
+                                            data-email="{{ kunde.email }}"
+                                            data-type="{{ kunde.customer_type }}">
+                                        <i class="fas fa-{% if kunde.customer_type == 'business' %}building{% else %}user{% endif %} me-2"></i>
+                                        <span class="fw-bold">{{ kunde.display_name|truncate(20) }}</span>
+                                        <br>
+                                        <small class="text-muted">{{ kunde.email or 'Keine E-Mail' }}</small>
+                                    </button>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="mt-3 text-center">
+                                <a href="{{ url_for('customers.new') }}?redirect=wizard" class="btn btn-outline-primary">
+                                    <i class="fas fa-plus me-1"></i> Neuen Kunden anlegen
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rechte Spalte: Grunddaten -->
+            <div class="col-lg-5">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Grunddaten</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Dokumenttyp -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Was möchten Sie erstellen?</label>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="dokument_typ" id="typAngebot" 
+                                           value="angebot" {% if data.grunddaten.dokument_typ == 'angebot' %}checked{% endif %}>
+                                    <label class="btn btn-outline-info w-100 py-3" for="typAngebot">
+                                        <i class="fas fa-file-alt fs-3 d-block mb-2"></i>
+                                        <strong>Angebot</strong>
+                                    </label>
+                                </div>
+                                <div class="col-6">
+                                    <input type="radio" class="btn-check" name="dokument_typ" id="typAuftrag" 
+                                           value="auftrag" {% if data.grunddaten.dokument_typ == 'auftrag' %}checked{% endif %}>
+                                    <label class="btn btn-outline-success w-100 py-3" for="typAuftrag">
+                                        <i class="fas fa-file-invoice fs-3 d-block mb-2"></i>
+                                        <strong>Auftrag</strong>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Auftragsart -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Auftragsart</label>
+                            <select class="form-select form-select-lg" name="auftragsart">
+                                <option value="stickerei" {% if data.grunddaten.auftragsart == 'stickerei' %}selected{% endif %}>
+                                    🧵 Stickerei
+                                </option>
+                                <option value="druck" {% if data.grunddaten.auftragsart == 'druck' %}selected{% endif %}>
+                                    🖨️ Druck (DTF/Sublimation)
+                                </option>
+                                <option value="beides" {% if data.grunddaten.auftragsart == 'beides' %}selected{% endif %}>
+                                    ✨ Stickerei & Druck
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Projektname -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Projektname / Bezeichnung</label>
+                            <input type="text" class="form-control" name="projektname" 
+                                   value="{{ data.grunddaten.projektname }}"
+                                   placeholder="z.B. Firmenkleidung Mustermann GmbH">
+                        </div>
+
+                        <!-- Wunschtermin -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Wunschtermin</label>
+                            <input type="date" class="form-control" name="wunschtermin" 
+                                   value="{{ data.grunddaten.wunschtermin }}"
+                                   min="{{ today }}">
+                        </div>
+
+                        <!-- Eilauftrag -->
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="eilauftrag" name="eilauftrag"
+                                   {% if data.grunddaten.eilauftrag %}checked{% endif %}>
+                            <label class="form-check-label" for="eilauftrag">
+                                <i class="fas fa-bolt text-warning me-1"></i>
+                                <strong>Eilauftrag</strong>
+                                <small class="text-muted d-block">Gegen Aufpreis bevorzugte Bearbeitung</small>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body d-flex justify-content-between">
+                        <a href="{{ url_for('wizard.start') }}?reset=1" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i> Abbrechen
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            Weiter zu Textilien <i class="fas fa-arrow-right ms-2"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+.wizard-progress {
+    padding: 0 30px;
+}
+.wizard-step {
+    text-align: center;
+    flex: 0 0 auto;
+}
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e9ecef;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin: 0 auto 5px;
+    transition: all 0.3s;
+}
+.wizard-step.active .step-circle {
+    background: var(--bs-primary);
+    color: white;
+}
+.wizard-step.completed .step-circle {
+    background: var(--bs-success);
+    color: white;
+}
+.step-label {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+.wizard-step.active .step-label {
+    color: var(--bs-primary);
+    font-weight: bold;
+}
+.wizard-line {
+    flex: 1;
+    height: 3px;
+    background: #e9ecef;
+    margin: 0 10px;
+    margin-bottom: 20px;
+}
+.kunde-quick-select {
+    border: 2px solid transparent;
+}
+.kunde-quick-select:hover {
+    border-color: var(--bs-primary);
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const sucheInput = document.getElementById('kundenSuche');
+    const suchergebnisse = document.getElementById('kundenSuchergebnisse');
+    const ausgewaehlterKunde = document.getElementById('ausgewaehlterKunde');
+    const schnellauswahl = document.getElementById('schnellauswahl');
+    
+    let searchTimeout;
+    
+    // Kundensuche
+    sucheInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim();
+        
+        if (query.length < 2) {
+            suchergebnisse.style.display = 'none';
+            return;
+        }
+        
+        searchTimeout = setTimeout(function() {
+            fetch('{{ url_for("wizard.api_kunden_suche") }}?q=' + encodeURIComponent(query))
+                .then(response => response.json())
+                .then(data => {
+                    suchergebnisse.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        suchergebnisse.innerHTML = '<div class="list-group-item text-muted">Keine Kunden gefunden</div>';
+                    } else {
+                        data.forEach(function(kunde) {
+                            const item = document.createElement('a');
+                            item.href = '#';
+                            item.className = 'list-group-item list-group-item-action';
+                            item.innerHTML = `
+                                <div class="d-flex justify-content-between">
+                                    <div>
+                                        <i class="fas fa-${kunde.type === 'business' ? 'building' : 'user'} me-2"></i>
+                                        <strong>${kunde.name}</strong>
+                                        ${kunde.customer_number ? '<small class="text-muted ms-2">#' + kunde.customer_number + '</small>' : ''}
+                                    </div>
+                                </div>
+                                <small class="text-muted">${kunde.email || 'Keine E-Mail'}</small>
+                            `;
+                            item.onclick = function(e) {
+                                e.preventDefault();
+                                kundeAuswaehlen(kunde.id, kunde.name, kunde.email, kunde.type);
+                            };
+                            suchergebnisse.appendChild(item);
+                        });
+                    }
+                    suchergebnisse.style.display = 'block';
+                });
+        }, 300);
+    });
+    
+    // Schnellauswahl Buttons
+    document.querySelectorAll('.kunde-quick-select').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            kundeAuswaehlen(
+                this.dataset.id,
+                this.dataset.name,
+                this.dataset.email,
+                this.dataset.type
+            );
+        });
+    });
+});
+
+function kundeAuswaehlen(id, name, email, type) {
+    document.getElementById('kundeId').value = id;
+    document.getElementById('kundeAnzeige').textContent = name;
+    document.getElementById('kundeDetails').textContent = email || 'Keine E-Mail';
+    
+    document.getElementById('ausgewaehlterKunde').classList.remove('d-none');
+    document.getElementById('schnellauswahl').classList.add('d-none');
+    document.getElementById('kundenSuchergebnisse').style.display = 'none';
+    document.getElementById('kundenSuche').value = '';
+}
+
+function kundeAbwaehlen() {
+    document.getElementById('kundeId').value = '';
+    document.getElementById('ausgewaehlterKunde').classList.add('d-none');
+    document.getElementById('schnellauswahl').classList.remove('d-none');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,616 @@
+{% extends "base.html" %}
+
+{% block title %}CRM Aktivitäten{% endblock %}
+
+{% block extra_css %}
+<style>
+.activity-search-header {
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+}
+
+.search-form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+}
+
+.search-form-row .form-group {
+    flex: 1;
+    min-width: 150px;
+}
+
+.search-form-row .form-group.search-main {
+    flex: 2;
+    min-width: 250px;
+}
+
+.search-form-row .form-control,
+.search-form-row .form-select {
+    background: rgba(255,255,255,0.95);
+    border: none;
+}
+
+.search-form-row .btn-search {
+    background: white;
+    color: #0284c7;
+    font-weight: 600;
+    padding: 0.5rem 1.5rem;
+}
+
+.activity-stats {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+    min-width: 180px;
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.stat-icon.calls { background: #dcfce7; color: #16a34a; }
+.stat-icon.visits { background: #dbeafe; color: #2563eb; }
+.stat-icon.emails { background: #f1f5f9; color: #475569; }
+.stat-icon.follow-ups { background: #fee2e2; color: #dc2626; }
+
+.stat-value { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
+.stat-label { font-size: 0.8rem; color: #64748b; }
+
+/* Aktivitäten-Liste */
+.activity-list {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    overflow: hidden;
+}
+
+.activity-item {
+    display: flex;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.2s;
+    cursor: pointer;
+}
+
+.activity-item:hover {
+    background: #f8fafc;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+}
+
+.activity-icon.call_in { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.activity-icon.call_out { background: linear-gradient(135deg, #14b8a6, #0d9488); }
+.activity-icon.customer_visit { background: linear-gradient(135deg, #0ea5e9, #0284c7); }
+.activity-icon.site_visit { background: linear-gradient(135deg, #0284c7, #0369a1); }
+.activity-icon.email { background: linear-gradient(135deg, #64748b, #475569); }
+.activity-icon.quote { background: linear-gradient(135deg, #a855f7, #7c3aed); }
+.activity-icon.complaint { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.activity-icon.meeting { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+
+.activity-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.activity-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 4px;
+}
+
+.activity-title {
+    font-weight: 600;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.activity-date {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    white-space: nowrap;
+}
+
+.activity-customer {
+    font-size: 0.85rem;
+    color: #3b82f6;
+    margin-bottom: 4px;
+}
+
+.activity-customer a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.activity-customer a:hover {
+    text-decoration: underline;
+}
+
+.activity-summary {
+    font-size: 0.85rem;
+    color: #64748b;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.activity-meta {
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.activity-badge {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.activity-badge.outcome {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.activity-badge.follow-up {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.activity-badge.overdue {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.activity-badge.order {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+/* Filter-Tags */
+.active-filters {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: #e0f2fe;
+    color: #0369a1;
+    border-radius: 20px;
+    font-size: 0.8rem;
+}
+
+.filter-tag button {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 3rem;
+    color: #94a3b8;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* Quick Actions */
+.quick-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1rem;
+}
+
+.quick-action-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.quick-action-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+}
+
+.quick-action-btn.active {
+    background: #0ea5e9;
+    border-color: #0ea5e9;
+    color: white;
+}
+
+/* Detail Modal */
+.activity-detail-header {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.activity-detail-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.activity-detail-info h5 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.activity-detail-info p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.detail-section {
+    margin-bottom: 1.25rem;
+}
+
+.detail-section label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin-bottom: 4px;
+    display: block;
+}
+
+.detail-section .value {
+    color: #1e293b;
+}
+
+.detail-section .value a {
+    color: #3b82f6;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header mit Suche -->
+    <div class="activity-search-header">
+        <h4 class="mb-3"><i class="fas fa-search"></i> CRM Aktivitäten durchsuchen</h4>
+        <form method="GET" action="{{ url_for('crm.activities_search') }}" class="search-form-row">
+            <div class="form-group search-main">
+                <input type="text" class="form-control" name="q" placeholder="Suche nach Betreff, Inhalt, Ansprechpartner..." value="{{ request.args.get('q', '') }}">
+            </div>
+            <div class="form-group">
+                <select class="form-select" name="type">
+                    <option value="">Alle Typen</option>
+                    <option value="call_in" {% if request.args.get('type') == 'call_in' %}selected{% endif %}>📞 Anruf (ein)</option>
+                    <option value="call_out" {% if request.args.get('type') == 'call_out' %}selected{% endif %}>📱 Anruf (aus)</option>
+                    <option value="customer_visit" {% if request.args.get('type') == 'customer_visit' %}selected{% endif %}>🏢 Kundenbesuch</option>
+                    <option value="site_visit" {% if request.args.get('type') == 'site_visit' %}selected{% endif %}>🚗 Außentermin</option>
+                    <option value="email" {% if request.args.get('type') == 'email' %}selected{% endif %}>📧 E-Mail</option>
+                    <option value="quote" {% if request.args.get('type') == 'quote' %}selected{% endif %}>📋 Angebot</option>
+                    <option value="complaint" {% if request.args.get('type') == 'complaint' %}selected{% endif %}>⚠️ Reklamation</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <select class="form-select" name="customer_id">
+                    <option value="">Alle Kunden</option>
+                    {% for customer in customers %}
+                    <option value="{{ customer.id }}" {% if request.args.get('customer_id') == customer.id %}selected{% endif %}>{{ customer.display_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <input type="date" class="form-control" name="start_date" value="{{ request.args.get('start_date', '') }}" placeholder="Von">
+            </div>
+            <div class="form-group">
+                <input type="date" class="form-control" name="end_date" value="{{ request.args.get('end_date', '') }}" placeholder="Bis">
+            </div>
+            <button type="submit" class="btn btn-search"><i class="fas fa-search"></i> Suchen</button>
+        </form>
+    </div>
+    
+    <!-- Statistiken -->
+    <div class="activity-stats">
+        <div class="stat-card">
+            <div class="stat-icon calls"><i class="fas fa-phone"></i></div>
+            <div>
+                <div class="stat-value">{{ stats.calls|default(0) }}</div>
+                <div class="stat-label">Telefonate (30 Tage)</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon visits"><i class="fas fa-user-tie"></i></div>
+            <div>
+                <div class="stat-value">{{ stats.visits|default(0) }}</div>
+                <div class="stat-label">Besuche (30 Tage)</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon emails"><i class="fas fa-envelope"></i></div>
+            <div>
+                <div class="stat-value">{{ stats.emails|default(0) }}</div>
+                <div class="stat-label">E-Mails (30 Tage)</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon follow-ups"><i class="fas fa-bell"></i></div>
+            <div>
+                <div class="stat-value">{{ stats.follow_ups|default(0) }}</div>
+                <div class="stat-label">Fällige Wiedervorlagen</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="quick-actions">
+            <a href="{{ url_for('crm.activities_search') }}" class="quick-action-btn {% if not request.args.get('filter') %}active{% endif %}">
+                <i class="fas fa-list"></i> Alle
+            </a>
+            <a href="{{ url_for('crm.activities_search', filter='today') }}" class="quick-action-btn {% if request.args.get('filter') == 'today' %}active{% endif %}">
+                <i class="fas fa-calendar-day"></i> Heute
+            </a>
+            <a href="{{ url_for('crm.activities_search', filter='week') }}" class="quick-action-btn {% if request.args.get('filter') == 'week' %}active{% endif %}">
+                <i class="fas fa-calendar-week"></i> Diese Woche
+            </a>
+            <a href="{{ url_for('crm.activities_search', filter='follow_ups') }}" class="quick-action-btn {% if request.args.get('filter') == 'follow_ups' %}active{% endif %}">
+                <i class="fas fa-bell"></i> Wiedervorlagen
+            </a>
+        </div>
+        <div>
+            <a href="{{ url_for('production.calendar_new') }}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Neue Aktivität
+            </a>
+        </div>
+    </div>
+    
+    <!-- Aktivitäten-Liste -->
+    <div class="activity-list">
+        {% if activities %}
+            {% for activity in activities %}
+            <div class="activity-item" onclick="showActivityDetail({{ activity.id }})">
+                <div class="activity-icon {{ activity.block_type }}">
+                    <i class="fas fa-{{ activity.display_icon }}"></i>
+                </div>
+                <div class="activity-content">
+                    <div class="activity-header">
+                        <span class="activity-title">{{ activity.title }}</span>
+                        <span class="activity-date">{{ activity.start_date.strftime('%d.%m.%Y') }} {{ activity.start_time.strftime('%H:%M') }}</span>
+                    </div>
+                    {% if activity.customer %}
+                    <div class="activity-customer">
+                        <a href="{{ url_for('customer.show', customer_id=activity.customer_id) }}" onclick="event.stopPropagation();">
+                            <i class="fas fa-building"></i> {{ activity.customer.display_name }}
+                        </a>
+                    </div>
+                    {% endif %}
+                    {% if activity.summary %}
+                    <div class="activity-summary">{{ activity.summary }}</div>
+                    {% endif %}
+                    <div class="activity-meta">
+                        {% if activity.order_id %}
+                        <span class="activity-badge order"><i class="fas fa-file-alt"></i> {{ activity.order_id }}</span>
+                        {% endif %}
+                        {% if activity.outcome %}
+                        <span class="activity-badge outcome">{{ activity.outcome_label }}</span>
+                        {% endif %}
+                        {% if activity.contact_person %}
+                        <span class="activity-badge" style="background:#f1f5f9;color:#475569;">
+                            <i class="fas fa-user"></i> {{ activity.contact_person }}
+                        </span>
+                        {% endif %}
+                        {% if activity.needs_follow_up %}
+                        <span class="activity-badge overdue"><i class="fas fa-bell"></i> Wiedervorlage fällig!</span>
+                        {% elif activity.follow_up_date %}
+                        <span class="activity-badge follow-up"><i class="fas fa-calendar"></i> WV: {{ activity.follow_up_date.strftime('%d.%m.') }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="fas fa-search"></i>
+                <h5>Keine Aktivitäten gefunden</h5>
+                <p>Versuche andere Suchbegriffe oder Filter.</p>
+            </div>
+        {% endif %}
+    </div>
+    
+    {% if activities and activities|length >= 50 %}
+    <div class="text-center mt-3">
+        <p class="text-muted">Zeige die ersten 50 Ergebnisse. Verfeinere die Suche für spezifischere Ergebnisse.</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Detail Modal -->
+<div class="modal fade" id="activityDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Aktivität Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="activityDetailContent">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showActivityDetail(activityId) {
+    const modal = new bootstrap.Modal(document.getElementById('activityDetailModal'));
+    const content = document.getElementById('activityDetailContent');
+    
+    content.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+    modal.show();
+    
+    fetch(`/production/api/block/block_${activityId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                content.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                return;
+            }
+            
+            let html = `
+                <div class="activity-detail-header">
+                    <div class="activity-detail-icon ${data.block_type}" style="background: ${data.color};">
+                        <i class="fas fa-${data.icon}"></i>
+                    </div>
+                    <div class="activity-detail-info">
+                        <h5>${data.title}</h5>
+                        <p><i class="fas fa-clock"></i> ${data.start} - ${data.end}</p>
+                    </div>
+                </div>
+            `;
+            
+            if (data.customer_name) {
+                html += `<div class="detail-section">
+                    <label>Kunde</label>
+                    <div class="value"><a href="/customers/${data.customer_id}">${data.customer_name}</a></div>
+                </div>`;
+            }
+            
+            if (data.order_id) {
+                html += `<div class="detail-section">
+                    <label>Auftrag</label>
+                    <div class="value"><a href="/orders/${data.order_id}">${data.order_id}</a></div>
+                </div>`;
+            }
+            
+            if (data.contact_person) {
+                html += `<div class="detail-section">
+                    <label>Ansprechpartner</label>
+                    <div class="value">${data.contact_person}`;
+                if (data.contact_phone) html += ` <a href="tel:${data.contact_phone}"><i class="fas fa-phone"></i> ${data.contact_phone}</a>`;
+                if (data.contact_email) html += ` <a href="mailto:${data.contact_email}"><i class="fas fa-envelope"></i> ${data.contact_email}</a>`;
+                html += `</div></div>`;
+            }
+            
+            if (data.outcome_label) {
+                html += `<div class="detail-section">
+                    <label>Ergebnis</label>
+                    <div class="value"><span class="badge bg-success">${data.outcome_label}</span></div>
+                </div>`;
+            }
+            
+            if (data.summary) {
+                html += `<div class="detail-section">
+                    <label>Zusammenfassung</label>
+                    <div class="value">${data.summary}</div>
+                </div>`;
+            }
+            
+            if (data.content) {
+                html += `<div class="detail-section">
+                    <label>Gesprächsnotizen</label>
+                    <div class="value" style="white-space:pre-wrap;">${data.content}</div>
+                </div>`;
+            }
+            
+            if (data.follow_up_date) {
+                html += `<div class="detail-section">
+                    <label>Wiedervorlage</label>
+                    <div class="value">
+                        <i class="fas fa-bell ${data.needs_follow_up ? 'text-danger' : 'text-warning'}"></i>
+                        ${data.follow_up_date}
+                        ${data.follow_up_notes ? '<br><small>' + data.follow_up_notes + '</small>' : ''}
+                    </div>
+                </div>`;
+            }
+            
+            if (data.notes) {
+                html += `<div class="detail-section">
+                    <label>Notizen</label>
+                    <div class="value">${data.notes}</div>
+                </div>`;
+            }
+            
+            html += `<div class="detail-section">
+                <label>Erfasst</label>
+                <div class="value">${data.created_at || '-'} von ${data.created_by || '-'}</div>
+            </div>`;
+            
+            content.innerHTML = html;
+        })
+        .catch(err => {
+            content.innerHTML = '<div class="alert alert-danger">Fehler beim Laden der Details</div>';
+        });
+}
+</script>
+{% endblock %}

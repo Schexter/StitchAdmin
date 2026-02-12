@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Telefon-Notiz - {{ customer.display_name }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>
+                <i class="bi bi-telephone"></i>
+                Telefon-Notiz
+            </h1>
+            <p class="text-muted mb-0">
+                <a href="{{ url_for('customers.show', customer_id=customer.id) }}">{{ customer.display_name }}</a>
+                {% if customer.phone %} - {{ customer.phone }}{% endif %}
+            </p>
+        </div>
+        <a href="{{ url_for('crm.customer_contacts', customer_id=customer.id) }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurueck
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-md-8">
+            <form method="POST">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-sticky"></i> Gespraechsnotiz</h5>
+                    </div>
+                    <div class="card-body">
+                        <!-- Richtung -->
+                        <div class="mb-3">
+                            <label class="form-label">Anrufrichtung</label>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="direction" id="dir_ausgang" value="ausgang" checked>
+                                <label class="btn btn-outline-success" for="dir_ausgang">
+                                    <i class="bi bi-telephone-outbound"></i> Ausgehend (wir haben angerufen)
+                                </label>
+                                <input type="radio" class="btn-check" name="direction" id="dir_eingang" value="eingang">
+                                <label class="btn btn-outline-info" for="dir_eingang">
+                                    <i class="bi bi-telephone-inbound"></i> Eingehend (Kunde hat angerufen)
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Telefonnummer -->
+                        <div class="mb-3">
+                            <label for="phone_number" class="form-label">Telefonnummer</label>
+                            <input type="text" class="form-control" id="phone_number" name="phone_number"
+                                   value="{{ customer.phone or customer.mobile or '' }}">
+                        </div>
+
+                        <!-- Betreff -->
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">Betreff / Thema</label>
+                            <input type="text" class="form-control" id="subject" name="subject"
+                                   placeholder="z.B. Rueckfrage zu Auftrag, Terminvereinbarung...">
+                        </div>
+
+                        <!-- Notizen -->
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Gespraechsnotizen</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="6"
+                                      placeholder="Was wurde besprochen?"></textarea>
+                        </div>
+
+                        <!-- Auftragsbezug -->
+                        <div class="mb-3">
+                            <label for="order_id" class="form-label">Bezug zu Auftrag (optional)</label>
+                            <select class="form-select" id="order_id" name="order_id">
+                                <option value="">-- Kein Auftragsbezug --</option>
+                                {% for order in orders %}
+                                <option value="{{ order.id }}">
+                                    {{ order.order_number }} - {{ order.created_at.strftime('%d.%m.%Y') if order.created_at else '' }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <hr>
+
+                        <!-- Rueckruf -->
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="callback_required" name="callback_required"
+                                   onchange="toggleCallback()">
+                            <label class="form-check-label" for="callback_required">
+                                <i class="bi bi-telephone-forward"></i> Rueckruf erforderlich
+                            </label>
+                        </div>
+
+                        <div id="callback_options" style="display: none;">
+                            <div class="mb-3">
+                                <label for="callback_date" class="form-label">Rueckruf bis</label>
+                                <input type="datetime-local" class="form-control" id="callback_date" name="callback_date">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg"></i> Notiz speichern
+                        </button>
+                        <a href="{{ url_for('crm.customer_contacts', customer_id=customer.id) }}" class="btn btn-outline-secondary">
+                            Abbrechen
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Rechte Spalte: Schnellinfos -->
+        <div class="col-md-4">
+            <!-- Kontaktdaten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-person"></i> Kontaktdaten</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        {% if customer.phone %}
+                        <tr>
+                            <td><i class="bi bi-telephone"></i></td>
+                            <td><a href="tel:{{ customer.phone }}">{{ customer.phone }}</a></td>
+                        </tr>
+                        {% endif %}
+                        {% if customer.mobile %}
+                        <tr>
+                            <td><i class="bi bi-phone"></i></td>
+                            <td><a href="tel:{{ customer.mobile }}">{{ customer.mobile }}</a></td>
+                        </tr>
+                        {% endif %}
+                        {% if customer.email %}
+                        <tr>
+                            <td><i class="bi bi-envelope"></i></td>
+                            <td><a href="mailto:{{ customer.email }}">{{ customer.email }}</a></td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- Letzte Telefonate -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clock-history"></i> Letzte Telefonate</h5>
+                </div>
+                <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto;">
+                    {% for contact in customer.contacts.filter(
+                        (customer.contacts.entity_class.contact_type == 'telefon_ausgang') |
+                        (customer.contacts.entity_class.contact_type == 'telefon_eingang')
+                    ).limit(5).all() %}
+                    <div class="list-group-item small">
+                        <div class="d-flex justify-content-between">
+                            <span>
+                                <i class="bi {{ contact.type_icon }} text-{{ contact.type_color }}"></i>
+                                {{ contact.type_label }}
+                            </span>
+                            <small class="text-muted">{{ contact.contact_date.strftime('%d.%m.%Y') if contact.contact_date else '' }}</small>
+                        </div>
+                        {% if contact.subject %}
+                        <small class="text-muted">{{ contact.subject|truncate(40) }}</small>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="list-group-item text-muted small">Keine Telefonate bisher</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleCallback() {
+    const checkbox = document.getElementById('callback_required');
+    const options = document.getElementById('callback_options');
+    options.style.display = checkbox.checked ? 'block' : 'none';
+}
+</script>
+{% endblock %}

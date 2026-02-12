@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kassenbeleg {{ beleg.belegnummer }}</title>
+    <style>
+        @media print {
+            body { margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            width: 80mm;
+            padding: 5mm;
+            background: white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+            border-bottom: 1px dashed #000;
+            padding-bottom: 10px;
+        }
+
+        .company-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .company-info {
+            font-size: 10px;
+            line-height: 1.4;
+        }
+
+        .beleg-info {
+            margin: 10px 0;
+            padding: 5px 0;
+            border-bottom: 1px dashed #000;
+        }
+
+        .beleg-nummer {
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .positionen {
+            margin: 10px 0;
+        }
+
+        .position {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        .position-name {
+            flex: 1;
+        }
+
+        .position-menge {
+            width: 30px;
+            text-align: right;
+        }
+
+        .position-preis {
+            width: 60px;
+            text-align: right;
+        }
+
+        .summen {
+            border-top: 1px dashed #000;
+            margin-top: 10px;
+            padding-top: 10px;
+        }
+
+        .summe-zeile {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+        }
+
+        .summe-zeile.total {
+            font-size: 14px;
+            font-weight: bold;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            margin-top: 5px;
+        }
+
+        .zahlungsart {
+            margin: 10px 0;
+            padding: 5px 0;
+            border-top: 1px dashed #000;
+            border-bottom: 1px dashed #000;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 10px;
+        }
+
+        .footer .danke {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .print-btn {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .print-btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn no-print" onclick="window.print()">Drucken</button>
+
+    <div class="header">
+        <div class="company-name">
+            {% if settings and settings.company_name %}
+                {{ settings.company_name }}
+            {% else %}
+                StitchAdmin
+            {% endif %}
+        </div>
+        <div class="company-info">
+            {% if settings %}
+                {% if settings.street %}{{ settings.street }}<br>{% endif %}
+                {% if settings.zip_code or settings.city %}{{ settings.zip_code }} {{ settings.city }}<br>{% endif %}
+                {% if settings.phone %}Tel: {{ settings.phone }}<br>{% endif %}
+                {% if settings.tax_id %}USt-IdNr: {{ settings.tax_id }}{% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="beleg-info">
+        <div class="beleg-nummer">Beleg: {{ beleg.belegnummer }}</div>
+        <div>Datum: {{ beleg.erstellt_am.strftime('%d.%m.%Y %H:%M') }}</div>
+        {% if kunde %}
+        <div>Kunde: {{ kunde.first_name }} {{ kunde.last_name }}</div>
+        {% endif %}
+    </div>
+
+    <div class="positionen">
+        {% for pos in positionen %}
+        <div class="position">
+            <span class="position-name">{{ pos.artikel_name }}</span>
+            <span class="position-menge">{{ pos.menge }}x</span>
+            <span class="position-preis">{{ "%.2f"|format(pos.brutto_betrag) }} EUR</span>
+        </div>
+        {% if pos.menge > 1 %}
+        <div style="font-size: 10px; color: #666; margin-left: 10px;">
+            ({{ pos.menge }} x {{ "%.2f"|format(pos.einzelpreis_brutto) }} EUR)
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+
+    <div class="summen">
+        <div class="summe-zeile">
+            <span>Netto:</span>
+            <span>{{ "%.2f"|format(beleg.netto_gesamt) }} EUR</span>
+        </div>
+        <div class="summe-zeile">
+            <span>MwSt (19%):</span>
+            <span>{{ "%.2f"|format(beleg.mwst_gesamt) }} EUR</span>
+        </div>
+        <div class="summe-zeile total">
+            <span>GESAMT:</span>
+            <span>{{ "%.2f"|format(beleg.brutto_gesamt) }} EUR</span>
+        </div>
+    </div>
+
+    <div class="zahlungsart">
+        <strong>Zahlungsart:</strong> {{ beleg.zahlungsart.value if beleg.zahlungsart else 'Bar' }}
+        {% if beleg.gegeben and beleg.zahlungsart.value == 'BAR' %}
+        <div>Gegeben: {{ "%.2f"|format(beleg.gegeben) }} EUR</div>
+        <div>Rückgeld: {{ "%.2f"|format(beleg.rueckgeld or 0) }} EUR</div>
+        {% endif %}
+    </div>
+
+    <div class="footer">
+        <div class="danke">Vielen Dank für Ihren Einkauf!</div>
+        <div>{{ beleg.erstellt_am.strftime('%d.%m.%Y %H:%M:%S') }}</div>
+    </div>
+
+    <script>
+        // Auto-Print nach kurzer Verzögerung
+        setTimeout(function() {
+            // window.print();
+        }, 500);
+    </script>
+</body>
+</html>

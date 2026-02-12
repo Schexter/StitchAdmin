@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+{% block title %}Auftrags-Wizard - Schritt 5: Zusammenfassung{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Wizard Progress -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body py-3">
+                    <div class="wizard-progress d-flex justify-content-between align-items-center">
+                        <a href="{{ url_for('wizard.step1') }}" class="wizard-step completed text-decoration-none">
+                            <div class="step-circle"><i class="fas fa-check"></i></div>
+                            <span class="step-label">Kunde</span>
+                        </a>
+                        <div class="wizard-line completed"></div>
+                        <a href="{{ url_for('wizard.step2') }}" class="wizard-step completed text-decoration-none">
+                            <div class="step-circle"><i class="fas fa-check"></i></div>
+                            <span class="step-label">Textilien</span>
+                        </a>
+                        <div class="wizard-line completed"></div>
+                        <a href="{{ url_for('wizard.step3') }}" class="wizard-step completed text-decoration-none">
+                            <div class="step-circle"><i class="fas fa-check"></i></div>
+                            <span class="step-label">Veredelung</span>
+                        </a>
+                        <div class="wizard-line completed"></div>
+                        <a href="{{ url_for('wizard.step4') }}" class="wizard-step completed text-decoration-none">
+                            <div class="step-circle"><i class="fas fa-check"></i></div>
+                            <span class="step-label">Kalkulation</span>
+                        </a>
+                        <div class="wizard-line completed"></div>
+                        <div class="wizard-step active">
+                            <div class="step-circle">5</div>
+                            <span class="step-label">Abschluss</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="POST" id="step5Form">
+        <div class="row">
+            <!-- Hauptbereich: Zusammenfassung -->
+            <div class="col-lg-8">
+                <!-- Dokumenttyp-Auswahl -->
+                <div class="card shadow-sm mb-4 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>Dokument erstellen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-check form-check-card h-100">
+                                    <input type="radio" class="btn-check" name="action" id="actionAngebot" 
+                                           value="create_angebot" checked>
+                                    <label class="btn btn-outline-info w-100 h-100 d-flex flex-column align-items-center justify-content-center py-4" for="actionAngebot">
+                                        <i class="fas fa-file-invoice fa-3x mb-3"></i>
+                                        <h5 class="mb-1">Angebot erstellen</h5>
+                                        <small class="text-muted">Unverbindlich, 30 Tage gültig</small>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-check-card h-100">
+                                    <input type="radio" class="btn-check" name="action" id="actionAuftrag" 
+                                           value="create_auftrag">
+                                    <label class="btn btn-outline-success w-100 h-100 d-flex flex-column align-items-center justify-content-center py-4" for="actionAuftrag">
+                                        <i class="fas fa-check-circle fa-3x mb-3"></i>
+                                        <h5 class="mb-1">Direkt als Auftrag</h5>
+                                        <small class="text-muted">Verbindliche Bestellung</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kundendaten -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-user me-2"></i>Kunde</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if kunde %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>{{ kunde.display_name }}</h6>
+                                {% if kunde.company_name and kunde.contact_person %}
+                                <p class="text-muted mb-1">z.Hd. {{ kunde.contact_person }}</p>
+                                {% endif %}
+                                <p class="mb-0">
+                                    {{ kunde.street }} {{ kunde.house_number }}<br>
+                                    {{ kunde.postal_code }} {{ kunde.city }}
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tr>
+                                        <td class="text-muted" style="width: 80px;">E-Mail:</td>
+                                        <td>{{ kunde.email or '-' }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">Telefon:</td>
+                                        <td>{{ kunde.phone or '-' }}</td>
+                                    </tr>
+                                    {% if kunde.customer_number %}
+                                    <tr>
+                                        <td class="text-muted">Kd.-Nr.:</td>
+                                        <td>{{ kunde.customer_number }}</td>
+                                    </tr>
+                                    {% endif %}
+                                </table>
+                            </div>
+                        </div>
+                        {% else %}
+                        <p class="text-danger">Kunde nicht gefunden!</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Positionen -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-list me-2"></i>Positionen</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-striped mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Pos.</th>
+                                        <th>Bezeichnung</th>
+                                        <th class="text-center">Menge</th>
+                                        <th class="text-end">Einzelpreis</th>
+                                        <th class="text-end">Gesamt</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for pos in kalkulation.positionen %}
+                                    <tr>
+                                        <td>{{ pos.nr }}</td>
+                                        <td>
+                                            <strong>{{ pos.bezeichnung }}</strong>
+                                            {% if pos.beschreibung %}
+                                            <br><small class="text-muted">{{ pos.beschreibung }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">{{ pos.menge }} {{ pos.einheit }}</td>
+                                        <td class="text-end">{{ "%.2f"|format(pos.einzelpreis) }} €</td>
+                                        <td class="text-end">{{ "%.2f"|format(pos.gesamt_netto) }} €</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                                <tfoot class="table-light">
+                                    <tr>
+                                        <td colspan="4" class="text-end">Zwischensumme (netto):</td>
+                                        <td class="text-end">{{ "%.2f"|format(kalkulation.summe_netto) }} €</td>
+                                    </tr>
+                                    {% if kalkulation.rabatt_betrag > 0 %}
+                                    <tr class="text-danger">
+                                        <td colspan="4" class="text-end">Rabatt ({{ kalkulation.rabatt_prozent }}%):</td>
+                                        <td class="text-end">- {{ "%.2f"|format(kalkulation.rabatt_betrag) }} €</td>
+                                    </tr>
+                                    {% endif %}
+                                    <tr>
+                                        <td colspan="4" class="text-end">MwSt. ({{ kalkulation.mwst_satz|int }}%):</td>
+                                        <td class="text-end">{{ "%.2f"|format(kalkulation.mwst_betrag) }} €</td>
+                                    </tr>
+                                    <tr class="fw-bold fs-5">
+                                        <td colspan="4" class="text-end">Gesamtsumme:</td>
+                                        <td class="text-end text-success">{{ "%.2f"|format(kalkulation.summe_brutto) }} €</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notizen -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Notizen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Interne Notiz</label>
+                                <textarea class="form-control" name="interne_notiz" rows="3"
+                                          placeholder="Nur für interne Zwecke sichtbar...">{{ data.notizen.intern }}</textarea>
+                                <small class="text-muted">Wird nicht auf dem Dokument gedruckt</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Hinweis für Kunden</label>
+                                <textarea class="form-control" name="kunden_notiz" rows="3"
+                                          placeholder="Erscheint auf dem Dokument...">{{ data.notizen.kunde }}</textarea>
+                                <small class="text-muted">Erscheint auf Angebot/Auftrag</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rechte Spalte: Zusammenfassung & Aktionen -->
+            <div class="col-lg-4">
+                <!-- Summen-Box -->
+                <div class="card shadow-sm mb-4 sticky-top" style="top: 20px;">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0"><i class="fas fa-receipt me-2"></i>Zusammenfassung</h5>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm table-borderless mb-3">
+                            <tr>
+                                <td>Kunde:</td>
+                                <td class="text-end"><strong>{{ data.kunde.name }}</strong></td>
+                            </tr>
+                            <tr>
+                                <td>Artikel:</td>
+                                <td class="text-end">{{ data.textilien|length }} Position(en)</td>
+                            </tr>
+                            <tr>
+                                <td>Gesamtmenge:</td>
+                                <td class="text-end">{{ kalkulation.gesamtmenge }} Stück</td>
+                            </tr>
+                            <tr>
+                                <td>Veredelungen:</td>
+                                <td class="text-end">{{ data.veredelungen|length }} Position(en)</td>
+                            </tr>
+                        </table>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Netto:</span>
+                            <span>{{ "%.2f"|format(kalkulation.netto_nach_rabatt) }} €</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2 text-muted">
+                            <span>MwSt.:</span>
+                            <span>{{ "%.2f"|format(kalkulation.mwst_betrag) }} €</span>
+                        </div>
+
+                        <hr>
+
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="fs-5 fw-bold">Gesamt:</span>
+                            <span class="fs-3 fw-bold text-success">{{ "%.2f"|format(kalkulation.summe_brutto) }} €</span>
+                        </div>
+
+                        <div class="alert alert-light py-2 text-center">
+                            <small>Stückpreis (brutto):</small>
+                            <br>
+                            <strong class="fs-5">
+                                {% if kalkulation.gesamtmenge > 0 %}
+                                {{ "%.2f"|format(kalkulation.summe_brutto / kalkulation.gesamtmenge) }} €
+                                {% else %}
+                                0,00 €
+                                {% endif %}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grunddaten-Info -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0"><i class="fas fa-info-circle me-2"></i>Details</h6>
+                    </div>
+                    <div class="card-body small">
+                        {% if data.grunddaten.projektname %}
+                        <p><strong>Projekt:</strong> {{ data.grunddaten.projektname }}</p>
+                        {% endif %}
+                        <p><strong>Auftragsart:</strong> 
+                            {% if data.grunddaten.auftragsart == 'stickerei' %}🧵 Stickerei
+                            {% elif data.grunddaten.auftragsart == 'druck' %}🖨️ Druck
+                            {% else %}✨ Stickerei & Druck{% endif %}
+                        </p>
+                        {% if data.grunddaten.wunschtermin %}
+                        <p><strong>Wunschtermin:</strong> {{ data.grunddaten.wunschtermin }}</p>
+                        {% endif %}
+                        {% if data.grunddaten.eilauftrag %}
+                        <p class="text-warning"><i class="fas fa-bolt me-1"></i><strong>Eilauftrag!</strong></p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{{ url_for('wizard.step4') }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left me-1"></i> Zurück
+                                </a>
+                                <button type="submit" name="action" value="save_draft" class="btn btn-outline-secondary ms-2">
+                                    <i class="fas fa-save me-1"></i> Als Entwurf speichern
+                                </button>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-lg px-5">
+                                <i class="fas fa-check-circle me-2"></i>
+                                <span id="submitBtnText">Angebot erstellen</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Bestätigungs-Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-check-circle me-2"></i>Bestätigung</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <i class="fas fa-file-invoice fa-4x text-success mb-3"></i>
+                <h4 id="confirmTitle">Angebot erstellen?</h4>
+                <p class="text-muted" id="confirmText">Das Angebot wird erstellt und kann anschließend als PDF exportiert oder per E-Mail versendet werden.</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" id="confirmBtn">
+                    <i class="fas fa-check me-1"></i> Erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.wizard-progress { padding: 0 30px; }
+.wizard-step { text-align: center; flex: 0 0 auto; }
+.step-circle {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: #e9ecef; color: #6c757d;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; margin: 0 auto 5px; transition: all 0.3s;
+}
+.wizard-step.active .step-circle { background: var(--bs-primary); color: white; }
+.wizard-step.completed .step-circle { background: var(--bs-success); color: white; }
+.step-label { font-size: 0.85rem; color: #6c757d; }
+.wizard-step.active .step-label { color: var(--bs-primary); font-weight: bold; }
+.wizard-line { flex: 1; height: 3px; background: #e9ecef; margin: 0 10px; margin-bottom: 20px; }
+.wizard-line.completed { background: var(--bs-success); }
+
+.btn-check:checked + .btn-outline-info {
+    background: var(--bs-info);
+    color: white;
+}
+.btn-check:checked + .btn-outline-success {
+    background: var(--bs-success);
+    color: white;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Dokumenttyp-Auswahl
+    document.querySelectorAll('input[name="action"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const btnText = document.getElementById('submitBtnText');
+            if (this.value === 'create_auftrag') {
+                btnText.textContent = 'Auftrag erstellen';
+            } else {
+                btnText.textContent = 'Angebot erstellen';
+            }
+        });
+    });
+    
+    // Form Submit mit Bestätigung
+    document.getElementById('step5Form').addEventListener('submit', function(e) {
+        const action = document.querySelector('input[name="action"]:checked').value;
+        
+        // Bei Entwurf keine Bestätigung
+        if (action === 'save_draft') {
+            return true;
+        }
+        
+        // TODO: Optional - Bestätigungs-Modal anzeigen
+        // Für jetzt direkt absenden
+        return true;
+    });
+});
+</script>
+{% endblock %}

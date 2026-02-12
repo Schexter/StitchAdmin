@@ -29,7 +29,6 @@ def load_production_settings():
         try:
             with open(settings_file, 'r', encoding='utf-8') as f:
                 settings_data = json.load(f)
-                # Konvertiere zu einfacherer Struktur für Template
                 return {
                     'work_start': 8,
                     'work_end': 17,
@@ -50,16 +49,10 @@ def calculate_thread_requirements(order):
     if not order.stitch_count or order.stitch_count == 0:
         return thread_requirements
     
-    # Standard: 5.5 Meter Garn pro 1000 Stiche
     THREAD_PER_1000_STITCHES = 5.5
-    
-    # Berechne Gesamtgarnbedarf
     total_thread_meters = (order.stitch_count / 1000) * THREAD_PER_1000_STITCHES
-    
-    # Sicherheitsfaktor 15% für Verschnitt, Fadenbruch etc.
     total_thread_meters *= 1.15
     
-    # Wenn Farbinformationen vorhanden sind
     if order.selected_threads:
         try:
             selected_threads = json.loads(order.selected_threads) if isinstance(order.selected_threads, str) else order.selected_threads
@@ -69,21 +62,16 @@ def calculate_thread_requirements(order):
                 from src.models import Thread, ThreadStock
                 thread = Thread.query.get(thread_id)
                 if thread:
-                    # Anteiliger Garnbedarf pro Farbe (vereinfacht)
                     thread_meters_per_color = total_thread_meters / num_colors
-                    
-                    # Hole Lagerbestand
                     stock = ThreadStock.query.filter_by(thread_id=thread_id).first()
                     current_stock = stock.quantity if stock else 0
                     min_stock = stock.min_stock if stock else 5
-                    
-                    # Prüfe ob genug auf Lager
-                    is_sufficient = current_stock >= (thread_meters_per_color / 5000)  # Umrechnung in Konen (5000m pro Kone)
+                    is_sufficient = current_stock >= (thread_meters_per_color / 5000)
                     
                     thread_requirements.append({
                         'thread': thread,
                         'meters_needed': round(thread_meters_per_color, 1),
-                        'cones_needed': round(thread_meters_per_color / 5000, 2),  # Standard: 5000m pro Kone
+                        'cones_needed': round(thread_meters_per_color / 5000, 2),
                         'current_stock': current_stock,
                         'min_stock': min_stock,
                         'is_sufficient': is_sufficient,
@@ -106,35 +94,23 @@ def log_activity(action, details):
     db.session.commit()
 
 def _record_automatic_thread_usage(order):
-    """
-    Erfasst automatisch Garnverbrauch beim Produktionsabschluss
-
-    Basierend auf:
-    - order.selected_threads (JSON mit ausgewählten Garnen)
-    - order.stitch_count (Anzahl Stiche)
-    - order.assigned_machine_id (Zugewiesene Maschine)
-    """
+    """Erfasst automatisch Garnverbrauch beim Produktionsabschluss"""
     from src.models import Thread, ThreadStock, ThreadUsage
 
-    # Nur für Stickerei-Aufträge
     if order.order_type not in ['embroidery', 'combined']:
         return
 
-    # Prüfe ob Stichanzahl vorhanden
     if not order.stitch_count or order.stitch_count == 0:
         print(f"[INFO] Kein stitch_count für Auftrag {order.id}, überspringe Garnverbrauchserfassung")
         return
 
-    # Parse selected_threads JSON
     selected_threads = []
     if order.selected_threads:
         try:
             selected_threads = json.loads(order.selected_threads)
         except:
-            # Fallback: Verwende thread_colors als Komma-getrennte Liste
             if order.thread_colors:
                 thread_colors = [c.strip() for c in order.thread_colors.split(',')]
-                # Versuche Threads zu finden
                 for color in thread_colors:
                     threads = Thread.query.filter(
                         db.or_(
@@ -149,27 +125,21 @@ def _record_automatic_thread_usage(order):
         print(f"[INFO] Keine Garne für Auftrag {order.id}, überspringe Garnverbrauchserfassung")
         return
 
-    # Berechne Garnverbrauch pro Garn
-    # Formel: (Stichanzahl * 0.5mm pro Stich) / 1000 = Meter
-    # + 10% Puffer für Faden wechsel und Verschnitt
     total_usage_meters = (order.stitch_count * 0.5 / 1000) * 1.1
     usage_per_thread = total_usage_meters / len(selected_threads)
 
     print(f"[INFO] Erfasse Garnverbrauch für Auftrag {order.id}: {len(selected_threads)} Garne, gesamt {total_usage_meters:.1f}m")
 
-    # Erstelle ThreadUsage-Einträge
     for thread_data in selected_threads:
         thread_id = thread_data.get('thread_id')
         if not thread_id:
             continue
 
-        # Prüfe ob Thread existiert
         thread = Thread.query.get(thread_id)
         if not thread:
             print(f"[WARNUNG] Garn {thread_id} nicht gefunden")
             continue
 
-        # Erstelle ThreadUsage-Eintrag
         usage = ThreadUsage(
             thread_id=thread_id,
             order_id=order.id,
@@ -182,7 +152,6 @@ def _record_automatic_thread_usage(order):
         )
         db.session.add(usage)
 
-        # Aktualisiere Lagerbestand
         stock = ThreadStock.query.filter_by(thread_id=thread_id).first()
         if stock and stock.quantity > 0:
             stock.quantity = max(0, stock.quantity - usage_per_thread)
@@ -191,30 +160,30 @@ def _record_automatic_thread_usage(order):
         else:
             print(f"[WARNUNG] Kein Lagerbestand für Garn {thread.color_name_de}")
 
-    # Commit alle Änderungen
     db.session.commit()
     print(f"[OK] Garnverbrauch für Auftrag {order.id} erfolgreich erfasst")
+
+
+# =====================================================
+# STANDARD ROUTES
+# =====================================================
 
 @production_bp.route('/')
 @login_required
 def index():
     """Produktions-Übersicht"""
-    # Aktuelle Produktionen (Status: in_progress)
     current_productions = Order.query.filter_by(
         status='in_progress'
     ).order_by(Order.production_start.desc()).all()
     
-    # Wartende Aufträge (Status: accepted)
     waiting_orders = Order.query.filter_by(
         status='accepted'
     ).order_by(Order.rush_order.desc(), Order.created_at).all()
     
-    # Maschinen-Status
     machines = Machine.query.filter_by(status='active').all()
     machine_status = {}
     
     for machine in machines:
-        # Aktueller Auftrag auf der Maschine
         current_order = Order.query.filter_by(
             assigned_machine_id=machine.id,
             status='in_progress'
@@ -226,7 +195,6 @@ def index():
             'is_busy': current_order is not None
         }
     
-    # Produktionsstatistiken für heute
     today = date.today()
     stats = {
         'completed_today': Order.query.filter(
@@ -249,11 +217,11 @@ def index():
                          machine_status=machine_status,
                          stats=stats)
 
+
 @production_bp.route('/planning')
 @login_required
 def planning():
     """Produktionsplanung"""
-    # Datum-Filter
     start_date = request.args.get('start_date', date.today().isoformat())
     end_date = request.args.get('end_date', (date.today() + timedelta(days=7)).isoformat())
     
@@ -264,7 +232,6 @@ def planning():
         start = date.today()
         end = date.today() + timedelta(days=7)
     
-    # Geplante Produktionen laden
     schedules = ProductionSchedule.query.filter(
         and_(
             ProductionSchedule.scheduled_start >= start,
@@ -272,17 +239,14 @@ def planning():
         )
     ).order_by(ProductionSchedule.scheduled_start).all()
     
-    # Nach Maschine gruppieren
     schedule_by_machine = {}
     for schedule in schedules:
         if schedule.machine_id not in schedule_by_machine:
             schedule_by_machine[schedule.machine_id] = []
         schedule_by_machine[schedule.machine_id].append(schedule)
     
-    # Verfügbare Maschinen
     machines_list = Machine.query.filter_by(status='active').all()
     
-    # Maschinen nach Typ gruppieren
     machines = {
         'embroidery_machines': {},
         'printing_machines': {},
@@ -297,26 +261,20 @@ def planning():
         elif machine.type == 'dtf':
             machines['dtf_machines'][machine.id] = machine
     
-    # Produktions-Queue erstellen
     production_queue = {
         'embroidery': [],
         'printing': [],
         'dtf': []
     }
     
-    # Wartende Aufträge nach Typ gruppieren
     waiting_orders = Order.query.filter_by(status='accepted').all()
     
     for order in waiting_orders:
         priority_weight = 1 if order.rush_order else 3
-        
-        # Produktionszeit schätzen (vereinfacht)
-        production_time_hours = 2  # Standard: 2 Stunden
+        production_time_hours = 2
         if order.stitch_count:
-            # Geschätzt: 10000 Stiche pro Stunde
             production_time_hours = round(order.stitch_count / 10000, 1)
         
-        # Garnbedarf berechnen für Stickaufträge
         thread_requirements = []
         if order.order_type in ['embroidery', 'combined']:
             thread_requirements = calculate_thread_requirements(order)
@@ -335,19 +293,15 @@ def planning():
         elif order.order_type == 'dtf':
             production_queue['dtf'].append(queue_item)
         elif order.order_type == 'combined':
-            # Kombinierte Aufträge in beide Queues
             production_queue['embroidery'].append(queue_item)
             production_queue['printing'].append(queue_item)
     
-    # Nach Priorität sortieren
     for queue_type in production_queue:
         production_queue[queue_type].sort(key=lambda x: (x['priority_weight'], x['order'].created_at))
     
-    # Warnungen für niedrigen Garnbestand sammeln
     low_stock_warnings = []
     from src.models import ThreadStock
     
-    # Prüfe alle aktiven Garnbestände
     low_stocks = db.session.query(ThreadStock).filter(
         ThreadStock.quantity <= ThreadStock.min_stock
     ).all()
@@ -370,19 +324,17 @@ def planning():
                          start_date=start_date,
                          end_date=end_date)
 
+
 @production_bp.route('/schedule')
 @login_required
 def schedule():
-    """Produktionszeitplan - Aufträge nach Priorität sortiert"""
-    # Hole alle akzeptierten und in Arbeit befindlichen Aufträge
+    """Produktionszeitplan"""
     orders = Order.query.filter(
         Order.status.in_(['accepted', 'in_progress'])
     ).all()
     
-    # Berechne Prioritäten und Produktionszeiten
     scheduled_orders = []
     for order in orders:
-        # Prioritätsgewichtung
         priority_weight = 0
         if order.priority == 'urgent':
             priority_weight = 1000
@@ -390,14 +342,12 @@ def schedule():
             priority_weight = 500
         elif order.priority == 'normal':
             priority_weight = 100
-        else:  # low
+        else:
             priority_weight = 10
             
-        # Express-Aufträge bekommen extra Gewicht
         if order.rush_order:
             priority_weight += 1500
             
-        # Abholdatum berücksichtigen
         if order.pickup_date:
             days_until_pickup = (order.pickup_date - date.today()).days
             if days_until_pickup <= 1:
@@ -407,16 +357,12 @@ def schedule():
             elif days_until_pickup <= 7:
                 priority_weight += 500
         
-        # Produktionszeit schätzen
-        production_time_hours = 2.0  # Standard
+        production_time_hours = 2.0
         if order.order_type == 'embroidery' and order.total_stitches:
-            # 10.000 Stiche pro Stunde
             production_time_hours = order.total_stitches / 10000
         elif order.order_type == 'printing':
-            # DTF/Textildruck: 30 Stück pro Stunde
             production_time_hours = order.quantity / 30
         elif order.order_type == 'combined':
-            # Kombiniert: längere Zeit
             production_time_hours = 3.0
             
         production_time_minutes = int(production_time_hours * 60)
@@ -428,21 +374,19 @@ def schedule():
             'production_time_minutes': production_time_minutes
         })
     
-    # Nach Priorität sortieren (höchste zuerst)
     scheduled_orders.sort(key=lambda x: (-x['priority_weight'], x['order'].created_at))
     
     return render_template('production/schedule.html',
                          scheduled_orders=scheduled_orders)
 
+
 @production_bp.route('/worklist')
 @login_required
 def worklist():
-    """Arbeitsliste für Maschinen - gefiltert nach Maschinentyp"""
-    # Maschinentyp aus Query-Parameter holen
+    """Arbeitsliste für Maschinen"""
     machine_type = request.args.get('type', 'embroidery')
     machine_id = request.args.get('machine_id')
     
-    # Maschineninformationen
     machine_name = "Alle Maschinen"
     if machine_id:
         machine = Machine.query.get(machine_id)
@@ -450,26 +394,22 @@ def worklist():
             machine_name = machine.name
             machine_type = machine.machine_type
     
-    # Aufträge filtern
     query = Order.query.filter(
         Order.status.in_(['accepted', 'in_progress'])
     )
     
-    # Nach Maschinentyp filtern
     if machine_type == 'embroidery':
         query = query.filter(
             Order.order_type.in_(['embroidery', 'combined'])
         )
-    else:  # printing/dtf
+    else:
         query = query.filter(
             Order.order_type.in_(['printing', 'dtf', 'combined'])
         )
     
-    # Nach spezifischer Maschine filtern, wenn angegeben
     if machine_id:
         query = query.filter(Order.assigned_machine_id == machine_id)
     
-    # Sortierung: Dringende zuerst, dann nach Erstelldatum
     orders = query.order_by(
         db.case(
             (Order.priority == 'urgent', 1),
@@ -487,6 +427,7 @@ def worklist():
                          machine_type=machine_type,
                          machine_name=machine_name)
 
+
 @production_bp.route('/order/<order_id>/start', methods=['POST'])
 @login_required
 def start_production(order_id):
@@ -497,10 +438,8 @@ def start_production(order_id):
         flash('Nur angenommene Aufträge können gestartet werden!', 'danger')
         return redirect(url_for('production.index'))
     
-    # Maschine zuweisen
     machine_id = request.form.get('machine_id')
     if machine_id:
-        # Prüfen ob Maschine frei ist
         busy_order = Order.query.filter_by(
             assigned_machine_id=machine_id,
             status='in_progress'
@@ -512,11 +451,9 @@ def start_production(order_id):
         
         order.assigned_machine_id = machine_id
     
-    # Status aktualisieren
     order.status = 'in_progress'
     order.production_start = datetime.utcnow()
     
-    # Status-Historie
     from src.models import OrderStatusHistory
     history = OrderStatusHistory(
         order_id=order_id,
@@ -526,15 +463,12 @@ def start_production(order_id):
         changed_by=current_user.username
     )
     db.session.add(history)
-    
     db.session.commit()
     
-    # Aktivität protokollieren
-    log_activity('production_started', 
-                f'Produktion gestartet: Auftrag {order.id}')
-    
+    log_activity('production_started', f'Produktion gestartet: Auftrag {order.id}')
     flash(f'Produktion für Auftrag {order.id} wurde gestartet!', 'success')
     return redirect(url_for('production.index'))
+
 
 @production_bp.route('/order/<order_id>/complete', methods=['POST'])
 @login_required
@@ -546,23 +480,18 @@ def complete_production(order_id):
         flash('Nur laufende Produktionen können abgeschlossen werden!', 'danger')
         return redirect(url_for('production.index'))
 
-    # Status aktualisieren
     order.status = 'ready'
     order.production_end = datetime.utcnow()
 
-    # Produktionszeit berechnen
     if order.production_start:
         duration = order.production_end - order.production_start
         order.production_minutes = int(duration.total_seconds() / 60)
 
-    # AUTOMATISCHE GARNVERBRAUCH-ERFASSUNG
     try:
         _record_automatic_thread_usage(order)
     except Exception as e:
         print(f"[WARNUNG] Automatische Garnverbrauchserfassung fehlgeschlagen: {e}")
-        # Nicht kritisch - Produktion kann trotzdem abgeschlossen werden
 
-    # Status-Historie
     from src.models import OrderStatusHistory
     history = OrderStatusHistory(
         order_id=order_id,
@@ -572,12 +501,9 @@ def complete_production(order_id):
         changed_by=current_user.username
     )
     db.session.add(history)
-
     db.session.commit()
 
-    # WORKFLOW-INTEGRATION: Automatische Packlisten-Erstellung
     try:
-        # Erstelle Mock-Production-Objekt für Workflow
         class ProductionMock:
             def __init__(self, order_id, completed_by):
                 self.id = None
@@ -601,82 +527,13 @@ def complete_production(order_id):
         elif workflow_result.get('errors'):
             for error in workflow_result['errors']:
                 flash(f"Workflow-Fehler: {error}", 'warning')
-
     except Exception as e:
         print(f"[WARNUNG] Workflow-Integration fehlgeschlagen: {e}")
-        # Nicht kritisch - Produktion ist trotzdem abgeschlossen
 
-    # Aktivität protokollieren
-    log_activity('production_completed',
-                f'Produktion abgeschlossen: Auftrag {order.id}')
-
-    # WORKFLOW-AUTOMATISIERUNG: Packliste & Post-Eintrag erstellen
-    try:
-        settings = CompanySettings.get_settings()
-
-        # 1. Packliste erstellen (wenn aktiviert)
-        if settings.auto_create_packing_list and order.auto_create_packing_list:
-            # Prüfe ob bereits eine Packliste existiert
-            existing_pl = PackingList.query.filter_by(order_id=order.id).first()
-            if not existing_pl:
-                # Erstelle Packliste
-                packing_list = PackingList(
-                    packing_list_number=PackingList.generate_packing_list_number(),
-                    order_id=order.id,
-                    customer_id=order.customer_id,
-                    status='ready',
-                    customer_notes=order.customer_notes or '',
-                    created_by=current_user.id
-                )
-
-                # Items aus Auftrag übernehmen
-                items = []
-                if order.items:
-                    for order_item in order.items:
-                        items.append({
-                            'article_id': order_item.article_id,
-                            'name': order_item.article.name if order_item.article else 'Unbekannt',
-                            'quantity': order_item.quantity,
-                            'ean': order_item.article.ean if order_item.article else ''
-                        })
-                packing_list.set_items_list(items)
-
-                db.session.add(packing_list)
-                db.session.flush()  # Um ID zu erhalten
-
-                # Verknüpfe mit Auftrag
-                order.packing_list_id = packing_list.id
-
-                # 2. Post-Eintrag erstellen (wenn Packliste erstellt wurde)
-                post_entry = PostEntry(
-                    type='outgoing',
-                    customer_id=order.customer_id,
-                    status='draft',
-                    packing_list_id=packing_list.id,
-                    is_auto_created=True,
-                    created_by=current_user.id,
-                    created_at=datetime.utcnow()
-                )
-                db.session.add(post_entry)
-                db.session.flush()
-
-                # Verknüpfe Post-Eintrag mit Packliste
-                packing_list.post_entry_id = post_entry.id
-
-                db.session.commit()
-
-                log_activity('packing_list_auto_created',
-                           f'Packliste {packing_list.packing_list_number} automatisch erstellt für Auftrag {order.id}')
-
-                flash(f'Packliste {packing_list.packing_list_number} und Post-Eintrag wurden automatisch erstellt.', 'info')
-    except Exception as e:
-        print(f"[WARNUNG] Workflow-Automatisierung fehlgeschlagen: {e}")
-        import traceback
-        traceback.print_exc()
-        # Nicht kritisch - Produktion wurde erfolgreich abgeschlossen
-
+    log_activity('production_completed', f'Produktion abgeschlossen: Auftrag {order.id}')
     flash(f'Produktion für Auftrag {order.id} wurde abgeschlossen!', 'success')
     return redirect(url_for('production.index'))
+
 
 @production_bp.route('/schedule/new', methods=['POST'])
 @login_required
@@ -688,19 +545,14 @@ def schedule_production():
     scheduled_time = request.form.get('scheduled_time')
     duration_minutes = int(request.form.get('duration_minutes', 60))
     
-    # Zeitpunkt berechnen
     try:
-        scheduled_start = datetime.strptime(
-            f"{scheduled_date} {scheduled_time}", 
-            '%Y-%m-%d %H:%M'
-        )
+        scheduled_start = datetime.strptime(f"{scheduled_date} {scheduled_time}", '%Y-%m-%d %H:%M')
     except:
         flash('Ungültiges Datum/Zeit Format!', 'danger')
         return redirect(url_for('production.planning'))
     
     scheduled_end = scheduled_start + timedelta(minutes=duration_minutes)
     
-    # Prüfen ob Zeitslot frei ist
     conflict = ProductionSchedule.query.filter(
         and_(
             ProductionSchedule.machine_id == machine_id,
@@ -722,7 +574,6 @@ def schedule_production():
         flash('Maschine ist zu diesem Zeitpunkt bereits belegt!', 'danger')
         return redirect(url_for('production.planning'))
     
-    # Planung erstellen
     schedule = ProductionSchedule(
         machine_id=machine_id,
         order_id=order_id,
@@ -737,12 +588,10 @@ def schedule_production():
     db.session.add(schedule)
     db.session.commit()
     
-    # Aktivität protokollieren
-    log_activity('production_scheduled', 
-                f'Produktion eingeplant: Auftrag {order_id} auf Maschine {machine_id}')
-    
+    log_activity('production_scheduled', f'Produktion eingeplant: Auftrag {order_id} auf Maschine {machine_id}')
     flash('Produktion wurde eingeplant!', 'success')
     return redirect(url_for('production.planning'))
+
 
 @production_bp.route('/schedule/<int:schedule_id>/cancel', methods=['POST'])
 @login_required
@@ -756,34 +605,29 @@ def cancel_schedule(schedule_id):
     
     db.session.commit()
     
-    # Aktivität protokollieren
-    log_activity('production_schedule_cancelled', 
-                f'Produktionsplanung storniert: ID {schedule_id}')
-    
+    log_activity('production_schedule_cancelled', f'Produktionsplanung storniert: ID {schedule_id}')
     flash('Produktionsplanung wurde storniert!', 'success')
     return redirect(url_for('production.planning'))
 
-# API-Endpoints
+
+# =====================================================
+# ALTER KALENDER (Backup)
+# =====================================================
+
 @production_bp.route('/calendar')
 @login_required
 def calendar():
-    """Produktionskalender mit visueller Ansicht"""
-    # Woche auswählen
+    """Produktionskalender - ALTER STYLE (Backup)"""
     week_offset = request.args.get('week', 0, type=int)
     today = date.today()
     
-    # Wochenstart (Montag)
     days_since_monday = today.weekday()
     week_start = today - timedelta(days=days_since_monday) + timedelta(weeks=week_offset)
     week_end = week_start + timedelta(days=6)
     
-    # Bürozeiten und Pausen aus Settings laden
     settings = load_production_settings()
-    
-    # Maschinen laden
     machines = Machine.query.filter_by(status='active').order_by(Machine.type, Machine.name).all()
     
-    # Produktionspläne für die Woche laden
     schedules = ProductionSchedule.query.filter(
         and_(
             ProductionSchedule.scheduled_start >= week_start,
@@ -792,7 +636,6 @@ def calendar():
         )
     ).all()
     
-    # Nach Tag und Maschine gruppieren
     calendar_data = {}
     for day_offset in range(7):
         current_date = week_start + timedelta(days=day_offset)
@@ -804,10 +647,8 @@ def calendar():
                            and s.scheduled_start.date() == current_date]
             calendar_data[current_date][machine.id] = day_schedules
     
-    # Wartende Aufträge für Drag & Drop
     waiting_orders = Order.query.filter_by(status='accepted').order_by(
-        Order.rush_order.desc(), 
-        Order.created_at
+        Order.rush_order.desc(), Order.created_at
     ).all()
     
     return render_template('production/calendar.html',
@@ -819,7 +660,12 @@ def calendar():
                          waiting_orders=waiting_orders,
                          settings=settings,
                          today=today,
-                         timedelta=timedelta)  # Für Template-Nutzung
+                         timedelta=timedelta)
+
+
+# =====================================================
+# API ENDPOINTS
+# =====================================================
 
 @production_bp.route('/api/machine/<machine_id>/availability')
 @login_required
@@ -832,7 +678,6 @@ def api_machine_availability(machine_id):
     except:
         return jsonify({'error': 'Invalid date format'}), 400
     
-    # Geplante Zeiten für diese Maschine und Tag
     schedules = ProductionSchedule.query.filter(
         and_(
             ProductionSchedule.machine_id == machine_id,
@@ -855,6 +700,7 @@ def api_machine_availability(machine_id):
         'busy_slots': busy_slots
     })
 
+
 @production_bp.route('/api/schedule/move', methods=['POST'])
 @login_required
 def api_move_schedule():
@@ -866,7 +712,6 @@ def api_move_schedule():
     
     schedule = ProductionSchedule.query.get_or_404(schedule_id)
     
-    # Neue Zeit berechnen
     try:
         new_start_dt = datetime.strptime(new_start, '%Y-%m-%d %H:%M')
         duration = schedule.scheduled_end - schedule.scheduled_start
@@ -874,7 +719,6 @@ def api_move_schedule():
     except:
         return jsonify({'error': 'Invalid datetime format'}), 400
     
-    # Konfliktprüfung
     conflict = ProductionSchedule.query.filter(
         and_(
             ProductionSchedule.machine_id == new_machine_id,
@@ -896,7 +740,6 @@ def api_move_schedule():
     if conflict:
         return jsonify({'error': 'Time slot is already occupied'}), 409
     
-    # Update schedule
     schedule.machine_id = new_machine_id
     schedule.scheduled_start = new_start_dt
     schedule.scheduled_end = new_end_dt
@@ -907,10 +750,11 @@ def api_move_schedule():
     
     return jsonify({'success': True, 'schedule_id': schedule_id})
 
+
 @production_bp.route('/api/order/schedule', methods=['POST'])
 @login_required
 def api_schedule_order():
-    """Auftrag einplanen (Drag & Drop aus Warteschlange)"""
+    """Auftrag einplanen (Drag & Drop)"""
     data = request.get_json()
     order_id = data.get('order_id')
     machine_id = data.get('machine_id')
@@ -922,14 +766,12 @@ def api_schedule_order():
     if order.status != 'accepted':
         return jsonify({'error': 'Order must be in accepted status'}), 400
     
-    # Zeit berechnen
     try:
         start_dt = datetime.strptime(start_time, '%Y-%m-%d %H:%M')
         end_dt = start_dt + timedelta(hours=duration_hours)
     except:
         return jsonify({'error': 'Invalid datetime format'}), 400
     
-    # Konfliktprüfung
     conflict = ProductionSchedule.query.filter(
         and_(
             ProductionSchedule.machine_id == machine_id,
@@ -950,7 +792,6 @@ def api_schedule_order():
     if conflict:
         return jsonify({'error': 'Time slot is already occupied'}), 409
     
-    # Neue Planung erstellen
     schedule = ProductionSchedule(
         machine_id=machine_id,
         order_id=order_id,
@@ -973,3 +814,16 @@ def api_schedule_order():
             'description': order.description or 'Keine Beschreibung'
         }
     })
+
+
+# =====================================================
+# NEUER KALENDER - MIT MEHRTÄGIGER UNTERSTÜTZUNG
+# =====================================================
+
+# Import und Registrierung der Kalender-Erweiterungen
+try:
+    from .production_calendar_extensions import register_calendar_routes
+    register_calendar_routes(production_bp, load_production_settings, log_activity)
+    print("[OK] Production Calendar Extensions registriert (mehrtägige Aufträge unterstützt)")
+except ImportError as e:
+    print(f"[INFO] Calendar Extensions nicht verfügbar: {e}")

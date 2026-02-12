@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Dokument-Einstellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-file-earmark-text"></i> Dokument-Einstellungen</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('settings.index') }}">Einstellungen</a></li>
+                    <li class="breadcrumb-item active">Dokumente</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Nummernkreise -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-hash"></i> Nummernkreise</h5>
+                    <a href="{{ url_for('document_admin.nummernkreise_index') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-gear"></i> Verwalten
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        Belegnummern für Angebote, Rechnungen, Lieferscheine etc.
+                    </p>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Belegart</th>
+                                    <th>Nächste Nummer</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for nk in nummernkreise %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ nk.bezeichnung or nk.belegart }}</strong>
+                                    </td>
+                                    <td>
+                                        <code>{{ nk.vorschau_naechste() }}</code>
+                                    </td>
+                                    <td>
+                                        {% if nk.aktiv %}
+                                        <span class="badge bg-success">Aktiv</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Inaktiv</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">
+                                        <i class="bi bi-exclamation-circle"></i> Keine Nummernkreise vorhanden
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Zahlungsbedingungen -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-credit-card"></i> Zahlungsbedingungen</h5>
+                    <a href="{{ url_for('document_admin.zahlungsbedingungen_index') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-gear"></i> Verwalten
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        Vorlagen für Zahlungsziele, Skonto und Anzahlungen.
+                    </p>
+                    
+                    <div class="list-group list-group-flush">
+                        {% for zb in zahlungsbedingungen[:5] %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <strong>{{ zb.bezeichnung }}</strong>
+                                {% if zb.standard %}
+                                <span class="badge bg-primary ms-1">Standard</span>
+                                {% endif %}
+                                <br>
+                                <small class="text-muted">
+                                    {{ zb.zahlungsziel_tage }} Tage
+                                    {% if zb.skonto_prozent > 0 %}
+                                    • {{ zb.skonto_prozent }}% Skonto
+                                    {% endif %}
+                                    {% if zb.anzahlung_erforderlich %}
+                                    • {{ zb.anzahlung_prozent }}% Anzahlung
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="list-group-item text-center text-muted px-0">
+                            <i class="bi bi-exclamation-circle"></i> Keine Zahlungsbedingungen vorhanden
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    {% if zahlungsbedingungen|length > 5 %}
+                    <div class="text-center mt-2">
+                        <small class="text-muted">+ {{ zahlungsbedingungen|length - 5 }} weitere</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Info-Box -->
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h6><i class="bi bi-info-circle"></i> Dokument-Workflow</h6>
+                <p class="mb-2">
+                    Der Dokument-Workflow ermöglicht die durchgängige Belegkette:
+                </p>
+                <div class="d-flex align-items-center flex-wrap gap-2">
+                    <span class="badge bg-secondary">Angebot</span>
+                    <i class="bi bi-arrow-right"></i>
+                    <span class="badge bg-primary">Auftragsbestätigung</span>
+                    <i class="bi bi-arrow-right"></i>
+                    <span class="badge bg-info">Produktion</span>
+                    <i class="bi bi-arrow-right"></i>
+                    <span class="badge bg-warning text-dark">Lieferschein</span>
+                    <i class="bi bi-arrow-right"></i>
+                    <span class="badge bg-success">Rechnung</span>
+                </div>
+                <hr>
+                <small>
+                    <strong>GoBD-konform:</strong> Alle Belegnummern sind fortlaufend und lückenlos.
+                    Stornierte Belege erhalten eine Gutschrift mit eigener Nummer.
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

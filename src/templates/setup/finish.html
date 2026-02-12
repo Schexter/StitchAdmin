@@ -1,0 +1,106 @@
+{% extends "setup/base_setup.html" %}
+{% block title %}Setup abgeschlossen{% endblock %}
+
+{% block content %}
+<div class="text-center mb-4">
+    <div style="font-size: 5rem;">🎉</div>
+    <h2 class="mt-3">Setup abgeschlossen!</h2>
+    <p class="text-muted">StitchAdmin 2.0 ist bereit für den Einsatz</p>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Zusammenfassung</h5>
+    </div>
+    <div class="card-body">
+        <table class="table table-borderless mb-0">
+            <tr>
+                <td class="text-muted" style="width: 150px;"><i class="fas fa-building me-2"></i>Firma:</td>
+                <td><strong>{{ company.display_name if company else '-' }}</strong></td>
+            </tr>
+            <tr>
+                <td class="text-muted"><i class="fas fa-map-marker-alt me-2"></i>Adresse:</td>
+                <td>
+                    {% if company %}
+                    {{ company.street }} {{ company.house_number }}, {{ company.postal_code }} {{ company.city }}
+                    {% else %}-{% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="text-muted"><i class="fas fa-folder me-2"></i>Dokumente:</td>
+                <td>
+                    {% if storage and storage.base_path %}
+                    <code>{{ storage.base_path }}</code>
+                    {% else %}Standard-Pfad{% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="text-muted"><i class="fas fa-university me-2"></i>Bank:</td>
+                <td>
+                    {% if company and company.iban %}
+                    {{ company.bank_name or 'Bank' }} ({{ company.iban[:8] }}...)
+                    {% else %}-{% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="text-muted"><i class="fas fa-envelope me-2"></i>E-Mail:</td>
+                <td>
+                    {% if company %}
+                    {{ {'outlook': 'Microsoft Outlook', 'smtp': 'SMTP-Server', 'mailto': 'Standard-Mailprogramm'}.get(company.email_method, 'Outlook') }}
+                    {% else %}Outlook{% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td class="text-muted"><i class="fas fa-user-shield me-2"></i>Admin:</td>
+                <td><strong>{{ admin.username if admin else '-' }}</strong></td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 text-center p-3">
+            <i class="fas fa-book fa-2x text-primary mb-2"></i>
+            <h6>Dokumentation</h6>
+            <small class="text-muted">Anleitungen und Hilfe</small>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 text-center p-3">
+            <i class="fas fa-cog fa-2x text-secondary mb-2"></i>
+            <h6>Einstellungen</h6>
+            <small class="text-muted">Weitere Konfiguration</small>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 text-center p-3">
+            <i class="fas fa-headset fa-2x text-success mb-2"></i>
+            <h6>Support</h6>
+            <small class="text-muted">Bei Fragen helfen wir</small>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info">
+    <h5><i class="fas fa-lightbulb me-2"></i>Erste Schritte</h5>
+    <ol class="mb-0">
+        <li>Legen Sie Ihre <strong>Kunden</strong> an</li>
+        <li>Erstellen Sie Ihre <strong>Artikel</strong> und Dienstleistungen</li>
+        <li>Konfigurieren Sie <strong>Nummernkreise</strong> für Dokumente</li>
+        <li>Richten Sie <strong>Zahlungsbedingungen</strong> ein</li>
+        <li>Erstellen Sie Ihr erstes <strong>Angebot</strong>!</li>
+    </ol>
+</div>
+
+<form method="POST">
+    <div class="d-flex justify-content-center gap-3 mt-4">
+        <a href="{{ url_for('setup.admin') }}" class="btn btn-outline-secondary btn-setup">
+            <i class="fas fa-arrow-left me-2"></i> Zurück
+        </a>
+        <button type="submit" class="btn btn-success btn-setup btn-lg">
+            <i class="fas fa-rocket me-2"></i> StitchAdmin starten
+        </button>
+    </div>
+</form>
+{% endblock %}

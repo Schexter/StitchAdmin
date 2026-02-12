@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Produktionsauftrag {{ order.order_number }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #333;
+        }
+        .page {
+            page-break-after: always;
+        }
+        .page:last-child {
+            page-break-after: avoid;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 3px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .header-left h1 {
+            font-size: 18pt;
+            margin-bottom: 5px;
+        }
+        .header-right {
+            text-align: right;
+        }
+        .order-number {
+            font-size: 24pt;
+            font-weight: bold;
+            color: #0066cc;
+        }
+        .priority-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .priority-urgent { background: #dc3545; color: white; }
+        .priority-high { background: #ffc107; color: #333; }
+        .priority-normal { background: #6c757d; color: white; }
+
+        /* Info-Boxen */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .info-box {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+        }
+        .info-box h3 {
+            font-size: 9pt;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 3px;
+        }
+        .info-value {
+            font-size: 11pt;
+            font-weight: bold;
+        }
+
+        /* Design-Positionen */
+        .design-section {
+            margin-bottom: 20px;
+        }
+        .design-section h2 {
+            font-size: 12pt;
+            background: #f5f5f5;
+            padding: 8px 10px;
+            border-left: 4px solid #0066cc;
+            margin-bottom: 10px;
+        }
+        .design-card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 10px;
+            display: grid;
+            grid-template-columns: 80px 1fr;
+            gap: 15px;
+        }
+        .design-thumbnail {
+            width: 80px;
+            height: 80px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8pt;
+            color: #999;
+        }
+        .design-thumbnail img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        .design-info table {
+            width: 100%;
+            font-size: 9pt;
+        }
+        .design-info td {
+            padding: 2px 5px;
+        }
+        .design-info td:first-child {
+            color: #666;
+            width: 100px;
+        }
+
+        /* Artikel-Tabelle */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 9pt;
+        }
+        .items-table th, .items-table td {
+            border: 1px solid #ddd;
+            padding: 6px 8px;
+            text-align: left;
+        }
+        .items-table th {
+            background: #f5f5f5;
+            font-weight: bold;
+        }
+        .items-table tr:nth-child(even) {
+            background: #fafafa;
+        }
+
+        /* Personalisierung-Liste */
+        .personalization-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
+            font-size: 8pt;
+        }
+        .pers-item {
+            border: 1px solid #ddd;
+            padding: 5px;
+            display: grid;
+            grid-template-columns: 20px 1fr 60px 20px;
+            gap: 5px;
+            align-items: center;
+        }
+        .pers-number {
+            font-weight: bold;
+            color: #666;
+        }
+        .pers-name {
+            font-weight: bold;
+        }
+        .pers-size {
+            font-size: 7pt;
+            color: #666;
+        }
+        .pers-checkbox {
+            width: 15px;
+            height: 15px;
+            border: 1px solid #333;
+        }
+
+        /* Maschinen-Planung */
+        .machine-section {
+            margin-bottom: 15px;
+        }
+        .machine-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9pt;
+        }
+        .machine-table th, .machine-table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+        .machine-table th {
+            background: #e9ecef;
+        }
+
+        /* Checkliste */
+        .checklist {
+            border: 2px solid #333;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+        .checklist h3 {
+            font-size: 10pt;
+            margin-bottom: 10px;
+        }
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px dotted #ddd;
+        }
+        .checklist-box {
+            width: 15px;
+            height: 15px;
+            border: 1px solid #333;
+            margin-right: 10px;
+        }
+
+        /* QM-Bereich */
+        .qm-section {
+            border: 2px solid #28a745;
+            border-radius: 5px;
+            padding: 10px;
+            margin-top: 15px;
+        }
+        .qm-section h3 {
+            color: #28a745;
+            font-size: 10pt;
+            margin-bottom: 10px;
+        }
+        .qm-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        .qm-field {
+            border-bottom: 1px solid #ddd;
+            padding: 5px 0;
+        }
+        .qm-label {
+            font-size: 8pt;
+            color: #666;
+        }
+        .qm-input {
+            height: 20px;
+        }
+
+        /* Unterschriften */
+        .signatures {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            margin-top: 20px;
+        }
+        .signature-field {
+            border-top: 1px solid #333;
+            padding-top: 5px;
+            text-align: center;
+            font-size: 8pt;
+            color: #666;
+        }
+
+        /* Notizen */
+        .notes-box {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            min-height: 80px;
+            margin-bottom: 15px;
+        }
+        .notes-box h3 {
+            font-size: 9pt;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        /* Print-spezifisch */
+        @media print {
+            .no-print { display: none; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Seite 1: Übersicht -->
+    <div class="page">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-left">
+                <h1>PRODUKTIONSAUFTRAG</h1>
+                <div>{{ company_name or 'StitchAdmin' }}</div>
+            </div>
+            <div class="header-right">
+                <div class="order-number">{{ order.order_number }}</div>
+                {% if order.priority == 'urgent' %}
+                <div class="priority-badge priority-urgent">DRINGEND</div>
+                {% elif order.priority == 'high' %}
+                <div class="priority-badge priority-high">HOCH</div>
+                {% else %}
+                <div class="priority-badge priority-normal">NORMAL</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Info-Grid -->
+        <div class="info-grid">
+            <div class="info-box">
+                <h3>Kunde</h3>
+                <div class="info-value">{{ order.customer.display_name if order.customer else 'Unbekannt' }}</div>
+                {% if order.customer and order.customer.company_name %}
+                <div style="font-size: 9pt; color: #666;">{{ order.customer.company_name }}</div>
+                {% endif %}
+            </div>
+            <div class="info-box">
+                <h3>Liefertermin</h3>
+                <div class="info-value">
+                    {% if order.expected_delivery %}
+                    {{ order.expected_delivery.strftime('%d.%m.%Y') }}
+                    {% else %}
+                    Nach Absprache
+                    {% endif %}
+                </div>
+            </div>
+            <div class="info-box">
+                <h3>Stückzahl gesamt</h3>
+                <div class="info-value">
+                    {% set total_qty = 0 %}
+                    {% for item in order.items %}{% set total_qty = total_qty + item.quantity %}{% endfor %}
+                    {{ total_qty }} Stück
+                </div>
+            </div>
+        </div>
+
+        <!-- Artikel-Übersicht -->
+        <h2 style="font-size: 11pt; margin: 15px 0 10px 0;">Artikel</h2>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 30px;">#</th>
+                    <th>Artikel</th>
+                    <th style="width: 80px;">Größe</th>
+                    <th style="width: 100px;">Farbe</th>
+                    <th style="width: 60px;">Menge</th>
+                    <th style="width: 30px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order.items %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ item.article.name if item.article else 'Artikel' }}</td>
+                    <td>{{ item.textile_size or '-' }}</td>
+                    <td>{{ item.textile_color or '-' }}</td>
+                    <td style="text-align: center; font-weight: bold;">{{ item.quantity }}</td>
+                    <td><div class="pers-checkbox"></div></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Design-Positionen -->
+        <div class="design-section">
+            <h2>Design-Positionen ({{ order.designs.count() }})</h2>
+
+            {% for design in order.designs %}
+            <div class="design-card">
+                <div class="design-thumbnail">
+                    {% if design.design_thumbnail_path %}
+                    <img src="{{ url_for('static', filename='uploads/' + design.design_thumbnail_path) }}" alt="">
+                    {% else %}
+                    Kein Bild
+                    {% endif %}
+                </div>
+                <div class="design-info">
+                    <table>
+                        <tr>
+                            <td>Position:</td>
+                            <td><strong>{{ design.get_position_label() }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Verfahren:</td>
+                            <td>{{ design.get_design_type_label() }}</td>
+                        </tr>
+                        {% if design.design_type == 'stick' %}
+                        <tr>
+                            <td>Stichzahl:</td>
+                            <td>{{ "{:,}".format(design.stitch_count or 0) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Größe:</td>
+                            <td>{{ design.width_mm or '?' }} x {{ design.height_mm or '?' }} mm</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td>Druckgröße:</td>
+                            <td>{{ design.print_width_cm or '?' }} x {{ design.print_height_cm or '?' }} cm</td>
+                        </tr>
+                        {% endif %}
+                        {% if design.is_personalized %}
+                        <tr>
+                            <td>Personalisiert:</td>
+                            <td><strong style="color: #17a2b8;">{{ design.personalizations.count() }} Namen</strong></td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Maschinen-Planung -->
+        {% if order.production_schedules.count() > 0 %}
+        <div class="machine-section">
+            <h2 style="font-size: 11pt; margin-bottom: 10px;">Maschinen-Planung</h2>
+            <table class="machine-table">
+                <thead>
+                    <tr>
+                        <th>Position</th>
+                        <th>Maschine</th>
+                        <th>Geplanter Start</th>
+                        <th>Geschätzte Dauer</th>
+                        <th style="width: 30px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for schedule in order.production_schedules %}
+                    <tr>
+                        <td>{{ schedule.order_design.get_position_label() if schedule.order_design else '-' }}</td>
+                        <td>{{ schedule.machine.name if schedule.machine else '-' }}</td>
+                        <td>{{ schedule.scheduled_start.strftime('%d.%m. %H:%M') if schedule.scheduled_start else '-' }}</td>
+                        <td>{{ schedule.estimated_duration_minutes or '?' }} min</td>
+                        <td><div class="pers-checkbox"></div></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+
+        <!-- Notizen -->
+        {% if order.special_instructions %}
+        <div class="notes-box">
+            <h3>Besondere Anweisungen</h3>
+            <div>{{ order.special_instructions }}</div>
+        </div>
+        {% endif %}
+
+        <!-- QM-Bereich -->
+        <div class="qm-section">
+            <h3>Qualitätskontrolle</h3>
+            <div class="qm-grid">
+                <div class="qm-field">
+                    <div class="qm-label">Geprüft von:</div>
+                    <div class="qm-input"></div>
+                </div>
+                <div class="qm-field">
+                    <div class="qm-label">Datum:</div>
+                    <div class="qm-input"></div>
+                </div>
+                <div class="qm-field">
+                    <div class="qm-label">Ergebnis: <span style="margin-left: 20px;">[ ] OK [ ] Nacharbeit</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seite 2: Personalisierung (falls vorhanden) -->
+    {% set has_personalizations = order.designs.filter_by(is_personalized=True).count() > 0 %}
+    {% if has_personalizations %}
+    <div class="page">
+        <div class="header">
+            <div class="header-left">
+                <h1>PERSONALISIERUNG</h1>
+                <div>{{ order.order_number }}</div>
+            </div>
+            <div class="header-right">
+                <div style="font-size: 12pt;">Seite 2</div>
+            </div>
+        </div>
+
+        {% for design in order.designs %}
+        {% if design.is_personalized %}
+        <h2 style="font-size: 11pt; margin: 15px 0 10px 0; background: #e9ecef; padding: 8px;">
+            {{ design.get_position_label() }} - {{ design.personalizations.count() }} Stück
+        </h2>
+
+        <div class="personalization-grid">
+            {% for pers in design.personalizations.order_by('sequence_number') %}
+            <div class="pers-item">
+                <span class="pers-number">{{ pers.sequence_number or loop.index }}</span>
+                <span class="pers-name">{{ pers.get_display_text() }}</span>
+                <span class="pers-size">
+                    {% if pers.order_item %}
+                    {{ pers.order_item.textile_size or '' }}
+                    {% endif %}
+                </span>
+                <div class="pers-checkbox"></div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
+
+        <!-- Checkliste Personalisierung -->
+        <div class="checklist" style="margin-top: 20px;">
+            <h3>Checkliste Personalisierung</h3>
+            <div class="checklist-item">
+                <div class="checklist-box"></div>
+                <span>Alle Namen korrekt geschrieben</span>
+            </div>
+            <div class="checklist-item">
+                <div class="checklist-box"></div>
+                <span>Schriftart und Größe überprüft</span>
+            </div>
+            <div class="checklist-item">
+                <div class="checklist-box"></div>
+                <span>Position auf Textil markiert</span>
+            </div>
+            <div class="checklist-item">
+                <div class="checklist-box"></div>
+                <span>Reihenfolge nach Größe sortiert</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Auto-Print Script -->
+    <script>
+        {% if autoprint %}
+        window.onload = function() {
+            window.print();
+        };
+        {% endif %}
+    </script>
+</body>
+</html>

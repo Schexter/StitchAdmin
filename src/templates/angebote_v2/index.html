@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}Angebote - Übersicht{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-file-invoice text-primary me-2"></i>Angebote</h2>
+            <p class="text-muted mb-0">Verwaltung aller Kundenangebote</p>
+        </div>
+        <div>
+            <a href="{{ url_for('wizard.start') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-magic me-1"></i> Wizard
+            </a>
+            <a href="{{ url_for('angebote_workflow.neu') }}" class="btn btn-success">
+                <i class="fas fa-plus me-1"></i> Neues Angebot
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Statistik-Karten -->
+        <div class="col-12 mb-4">
+            <div class="row g-3">
+                <div class="col-md-2">
+                    <div class="card bg-light h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.gesamt }}</h3>
+                            <small class="text-muted">Gesamt</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-secondary text-white h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.entwurf }}</h3>
+                            <small>Entwürfe</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-info text-white h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.versendet }}</h3>
+                            <small>Versendet</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-success text-white h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.angenommen }}</h3>
+                            <small>Angenommen</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-danger text-white h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.abgelehnt }}</h3>
+                            <small>Abgelehnt</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-warning h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.ueberfaellig }}</h3>
+                            <small>Überfällig</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="GET" class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="alle" {% if status_filter == 'alle' %}selected{% endif %}>Alle Status</option>
+                                <option value="entwurf" {% if status_filter == 'entwurf' %}selected{% endif %}>📝 Entwurf</option>
+                                <option value="versendet" {% if status_filter == 'versendet' %}selected{% endif %}>📤 Versendet</option>
+                                <option value="angenommen" {% if status_filter == 'angenommen' %}selected{% endif %}>✅ Angenommen</option>
+                                <option value="abgelehnt" {% if status_filter == 'abgelehnt' %}selected{% endif %}>❌ Abgelehnt</option>
+                                <option value="storniert" {% if status_filter == 'storniert' %}selected{% endif %}>🚫 Storniert</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Kunde suchen</label>
+                            <input type="text" name="kunde" class="form-control" 
+                                   value="{{ kunde_filter }}" placeholder="Name, Firma...">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-search me-1"></i> Filtern
+                            </button>
+                        </div>
+                        <div class="col-md-2">
+                            <a href="{{ url_for('angebote_workflow.index') }}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-times me-1"></i> Reset
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Angebots-Liste -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    {% if angebote %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Nummer</th>
+                                    <th>Kunde</th>
+                                    <th>Betreff</th>
+                                    <th class="text-center">Datum</th>
+                                    <th class="text-center">Gültig bis</th>
+                                    <th class="text-end">Betrag</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="text-end">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for angebot in angebote %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('angebote_workflow.show', id=angebot.id) }}" class="fw-bold text-decoration-none">
+                                            {{ angebot.dokument_nummer }}
+                                        </a>
+                                    </td>
+                                    <td>
+                                        {% if angebot.kunde %}
+                                        {{ angebot.kunde.display_name }}
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ angebot.betreff|truncate(40) if angebot.betreff else '-' }}
+                                    </td>
+                                    <td class="text-center">
+                                        {{ angebot.dokument_datum.strftime('%d.%m.%Y') }}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if angebot.gueltig_bis %}
+                                            {% if angebot.gueltig_bis < today %}
+                                            <span class="text-danger">
+                                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                                {{ angebot.gueltig_bis.strftime('%d.%m.%Y') }}
+                                            </span>
+                                            {% else %}
+                                            {{ angebot.gueltig_bis.strftime('%d.%m.%Y') }}
+                                            {% endif %}
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>{{ "%.2f"|format(angebot.summe_brutto or 0) }} €</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if angebot.status == 'entwurf' %}
+                                        <span class="badge bg-secondary">📝 Entwurf</span>
+                                        {% elif angebot.status == 'versendet' %}
+                                        <span class="badge bg-info">📤 Versendet</span>
+                                        {% elif angebot.status == 'angenommen' %}
+                                        <span class="badge bg-success">✅ Angenommen</span>
+                                        {% elif angebot.status == 'abgelehnt' %}
+                                        <span class="badge bg-danger">❌ Abgelehnt</span>
+                                        {% elif angebot.status == 'storniert' %}
+                                        <span class="badge bg-dark">🚫 Storniert</span>
+                                        {% else %}
+                                        <span class="badge bg-light text-dark">{{ angebot.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('angebote_workflow.show', id=angebot.id) }}" 
+                                               class="btn btn-outline-primary" title="Anzeigen">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{{ url_for('angebote_workflow.pdf_vorschau', id=angebot.id) }}" 
+                                               class="btn btn-outline-secondary" title="PDF" target="_blank">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </a>
+                                            {% if angebot.status == 'entwurf' %}
+                                            <a href="{{ url_for('angebote_workflow.bearbeiten', id=angebot.id) }}" 
+                                               class="btn btn-outline-warning" title="Bearbeiten">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-file-invoice fa-4x text-muted mb-3"></i>
+                        <h5>Keine Angebote gefunden</h5>
+                        <p class="text-muted">
+                            {% if status_filter != 'alle' or kunde_filter %}
+                            Versuchen Sie andere Filtereinstellungen.
+                            {% else %}
+                            Erstellen Sie Ihr erstes Angebot!
+                            {% endif %}
+                        </p>
+                        <a href="{{ url_for('angebote_workflow.neu') }}" class="btn btn-success">
+                            <i class="fas fa-plus me-1"></i> Neues Angebot
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% set today = None %}
+{% import "macros.html" as macros ignore missing %}
+{% endblock %}

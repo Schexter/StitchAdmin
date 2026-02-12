@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Stickpreis-Kalkulation{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('buchhaltung.index') }}">Buchhaltung</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('buchhaltung.kalkulation') }}">Kalkulationen</a></li>
+            <li class="breadcrumb-item active">Stickpreis</li>
+        </ol>
+    </nav>
+    
+    <h2><i class="fas fa-tag me-2"></i>Stickpreis-Kalkulation</h2>
+    <p class="text-muted">Berechnen Sie den Preis pro Stickerei basierend auf Stichzahl und Farbwechsel.</p>
+    
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Eingabewerte</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <h6 class="text-muted mb-3">Design-Parameter</h6>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Stichzahl</label>
+                                <input type="number" name="stichzahl" class="form-control" 
+                                       value="{{ request.form.get('stichzahl', '10000') }}" required>
+                                <div class="form-text">Anzahl der Stiche im Design</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Farbwechsel</label>
+                                <input type="number" name="farbwechsel" class="form-control" 
+                                       value="{{ request.form.get('farbwechsel', '5') }}">
+                                <div class="form-text">Anzahl der Garnwechsel</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Stückzahl</label>
+                            <input type="number" name="menge" class="form-control" 
+                                   value="{{ request.form.get('menge', '100') }}" required>
+                        </div>
+                        
+                        <hr>
+                        <h6 class="text-muted mb-3">Preisparameter</h6>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Preis pro 1.000 Stiche</label>
+                                <div class="input-group">
+                                    <input type="text" name="preis_1000" class="form-control" 
+                                           value="{{ request.form.get('preis_1000', '0,80') }}">
+                                    <span class="input-group-text">€</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Preis pro Farbwechsel</label>
+                                <div class="input-group">
+                                    <input type="text" name="preis_farbwechsel" class="form-control" 
+                                           value="{{ request.form.get('preis_farbwechsel', '0,50') }}">
+                                    <span class="input-group-text">€</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Mindestpreis/Stück</label>
+                                <div class="input-group">
+                                    <input type="text" name="mindestpreis" class="form-control" 
+                                           value="{{ request.form.get('mindestpreis', '5,00') }}">
+                                    <span class="input-group-text">€</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Einrichtekosten (einmalig)</label>
+                                <div class="input-group">
+                                    <input type="text" name="einrichtekosten" class="form-control" 
+                                           value="{{ request.form.get('einrichtekosten', '0') }}">
+                                    <span class="input-group-text">€</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="fas fa-calculator me-2"></i>Berechnen
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            {% if ergebnis %}
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Kalkulationsergebnis</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-6">
+                            <div class="border rounded p-3 text-center bg-light">
+                                <small class="text-muted d-block">Stückpreis Netto</small>
+                                <h3 class="text-success mb-0">{{ ergebnis.stueckpreis_netto }} €</h3>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-3 text-center bg-light">
+                                <small class="text-muted d-block">Stückpreis Brutto</small>
+                                <h3 class="text-primary mb-0">{{ ergebnis.stueckpreis_brutto }} €</h3>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <table class="table table-sm">
+                        <tr>
+                            <td>Stichzahl</td>
+                            <td class="text-end">{{ "{:,.0f}".format(ergebnis.stichzahl) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Preis für Stiche</td>
+                            <td class="text-end">{{ ergebnis.preis_stiche }} €</td>
+                        </tr>
+                        <tr>
+                            <td>Farbwechsel ({{ ergebnis.farbwechsel }}x)</td>
+                            <td class="text-end">{{ ergebnis.preis_farbwechsel }} €</td>
+                        </tr>
+                        {% if ergebnis.mindestpreis_aktiv %}
+                        <tr class="table-warning">
+                            <td colspan="2"><i class="fas fa-info-circle me-1"></i>Mindestpreis angewendet</td>
+                        </tr>
+                        {% endif %}
+                        {% if ergebnis.einrichte_pro_stueck > 0 %}
+                        <tr>
+                            <td>Einrichten/Stück</td>
+                            <td class="text-end">{{ ergebnis.einrichte_pro_stueck }} €</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                    
+                    <hr>
+                    
+                    <div class="bg-primary text-white rounded p-3 text-center">
+                        <small class="d-block">Auftragssumme ({{ ergebnis.menge }} Stück)</small>
+                        <h2 class="mb-0">{{ ergebnis.auftragssumme_brutto }} € brutto</h2>
+                        <small>({{ ergebnis.auftragssumme_netto }} € netto)</small>
+                    </div>
+                    
+                    {% if ergebnis.einrichtekosten_gesamt > 0 %}
+                    <div class="alert alert-info mt-3 mb-0">
+                        <small>
+                            <i class="fas fa-info-circle me-1"></i>
+                            Einrichtekosten {{ ergebnis.einrichtekosten_gesamt }} € auf {{ ergebnis.menge }} Stück verteilt
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-calculator fa-4x text-muted mb-3"></i>
+                    <p class="text-muted">Geben Sie die Parameter ein und klicken Sie "Berechnen".</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

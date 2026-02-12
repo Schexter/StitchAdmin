@@ -1,0 +1,349 @@
+{% extends "base.html" %}
+
+{% block title %}Dokument scannen - {{ post_entry.entry_number }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('documents.post_list') }}">Postbuch</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('documents.post_view', entry_id=post_entry.id) }}">{{ post_entry.entry_number }}</a></li>
+            <li class="breadcrumb-item active">Dokument scannen</li>
+        </ol>
+    </nav>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1>Dokument scannen - {{ post_entry.entry_number }}</h1>
+            <p class="text-muted">Fotografieren Sie Briefe, Rechnungen oder Paketlabel - Texterkennung erfolgt automatisch</p>
+        </div>
+    </div>
+
+    <!-- Kamera-Upload Bereich -->
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-camera"></i> Dokument scannen oder hochladen</h5>
+                </div>
+                <div class="card-body">
+                    <div id="camera-container"></div>
+
+                    <!-- OCR Status -->
+                    <div id="ocr-status" class="mt-3" style="display: none;">
+                        <div class="alert alert-info">
+                            <i class="fas fa-circle-notch fa-spin"></i> Texterkennung läuft...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vorhandene Fotos -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Hochgeladene Dokumente</h5>
+                </div>
+                <div class="card-body">
+                    <div id="existing-photos" class="row">
+                        <!-- Wird per JavaScript gefüllt -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Post-Info -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Posteingangs-Info</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Eintrag:</strong> {{ post_entry.entry_number }}</p>
+                    <p><strong>Typ:</strong>
+                        <span class="badge bg-secondary">{{ post_entry.type }}</span>
+                    </p>
+                    <p><strong>Betreff:</strong> {{ post_entry.subject }}</p>
+                    {% if post_entry.customer %}
+                    <p><strong>Kunde:</strong> {{ post_entry.customer.company_name or (post_entry.customer.first_name + ' ' + post_entry.customer.last_name) }}</p>
+                    {% endif %}
+                    <p><strong>Status:</strong>
+                        <span class="badge bg-info">{{ post_entry.status }}</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Dokument-Typen -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Dokument-Typen</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li><strong>Rechnung:</strong> Automatische Betragserkennung</li>
+                        <li><strong>Brief:</strong> Volltext-Erkennung</li>
+                        <li><strong>Paket:</strong> Tracking-Nummer erkennen</li>
+                        <li><strong>Sonstiges:</strong> Allgemeine Dokumentation</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- OCR-Ergebnis -->
+            <div class="card" id="ocr-result-card" style="display: none;">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-check-circle"></i> Erkannte Daten</h5>
+                </div>
+                <div class="card-body">
+                    <div id="ocr-result-content">
+                        <!-- Wird per JavaScript gefüllt -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Mobile-optimierte Styles */
+    .camera-upload-container {
+        max-width: 100%;
+    }
+
+    #camera-video {
+        width: 100%;
+        max-width: 640px;
+        border-radius: 8px;
+        background: #000;
+    }
+
+    .camera-controls {
+        margin-top: 15px;
+        text-align: center;
+    }
+
+    .camera-controls .btn {
+        margin: 5px;
+        min-width: 120px;
+    }
+
+    .upload-options .btn {
+        padding: 15px;
+        font-size: 1.1rem;
+    }
+
+    .photo-preview-area img {
+        border-radius: 8px;
+        border: 2px solid #ddd;
+    }
+
+    .uploaded-photos .card {
+        height: 100%;
+    }
+
+    .uploaded-photos .card-img-top {
+        height: 150px;
+        object-fit: cover;
+    }
+
+    .ocr-preview {
+        max-height: 300px;
+        overflow-y: auto;
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 0.9rem;
+        white-space: pre-wrap;
+    }
+
+    /* Touch-freundliche Buttons auf Mobile */
+    @media (max-width: 768px) {
+        .camera-controls .btn,
+        .upload-options .btn {
+            padding: 20px;
+            font-size: 1.2rem;
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        #camera-video {
+            max-height: 400px;
+        }
+    }
+</style>
+
+<script src="{{ url_for('static', filename='js/camera-upload.js') }}"></script>
+<script>
+    let currentPostEntryId = {{ post_entry.id }};
+
+    // Kamera-Upload initialisieren
+    document.addEventListener('DOMContentLoaded', function() {
+        const cameraUpload = new CameraUpload({
+            targetElement: '#camera-container',
+            uploadUrl: `/api/photos/upload/post-entry/${currentPostEntryId}`,
+            photoType: 'invoice',  // Standard-Typ
+            onSuccess: function(result) {
+                console.log('Upload erfolgreich!', result);
+
+                // Success-Nachricht anzeigen
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-success alert-dismissible fade show mt-3';
+                alertDiv.innerHTML = `
+                    <strong>Erfolgreich!</strong> Dokument wurde hochgeladen${result.ocr ? ' und Text wurde erkannt' : ''}.
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('#camera-container').prepend(alertDiv);
+
+                // OCR-Ergebnis anzeigen
+                if (result.ocr) {
+                    displayOCRResult(result.ocr);
+                }
+
+                // Foto-Liste aktualisieren
+                loadExistingPhotos();
+
+                // Nach 5 Sekunden ausblenden
+                setTimeout(() => {
+                    alertDiv.remove();
+                }, 5000);
+            },
+            onError: function(error) {
+                console.error('Upload-Fehler:', error);
+
+                // Fehler-Nachricht anzeigen
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger alert-dismissible fade show mt-3';
+                alertDiv.innerHTML = `
+                    <strong>Fehler!</strong> ${error.message || 'Upload fehlgeschlagen'}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                `;
+                document.querySelector('#camera-container').prepend(alertDiv);
+            },
+            onUploadStart: function() {
+                // OCR-Status anzeigen
+                document.getElementById('ocr-status').style.display = 'block';
+            },
+            onUploadEnd: function() {
+                // OCR-Status ausblenden
+                document.getElementById('ocr-status').style.display = 'none';
+            }
+        });
+
+        // Vorhandene Fotos laden
+        loadExistingPhotos();
+    });
+
+    function displayOCRResult(ocrData) {
+        const resultCard = document.getElementById('ocr-result-card');
+        const resultContent = document.getElementById('ocr-result-content');
+
+        let html = '';
+
+        // Extrahierte Daten
+        if (ocrData.extracted_data) {
+            const data = ocrData.extracted_data;
+
+            if (data.primary_amount) {
+                html += `<p><strong>Betrag:</strong> ${data.primary_amount.toFixed(2)} €</p>`;
+            }
+
+            if (data.primary_date) {
+                html += `<p><strong>Datum:</strong> ${new Date(data.primary_date).toLocaleDateString('de-DE')}</p>`;
+            }
+
+            if (data.primary_tracking) {
+                html += `<p><strong>Tracking:</strong> ${data.primary_tracking}</p>`;
+            }
+
+            if (data.references && Object.keys(data.references).length > 0) {
+                html += '<p><strong>Referenzen:</strong><br>';
+                for (const [key, value] of Object.entries(data.references)) {
+                    html += `${key}: ${value}<br>`;
+                }
+                html += '</p>';
+            }
+        }
+
+        // Text-Preview
+        if (ocrData.text) {
+            html += `<hr><p><strong>Erkannter Text (Auszug):</strong></p>`;
+            html += `<div class="ocr-preview">${ocrData.text}</div>`;
+        }
+
+        resultContent.innerHTML = html;
+        resultCard.style.display = 'block';
+    }
+
+    function loadExistingPhotos() {
+        fetch(`/api/photos/post-entry/${currentPostEntryId}/photos`)
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    displayPhotos(result.photos);
+
+                    // OCR-Text anzeigen (wenn vorhanden)
+                    if (result.ocr_text || result.extracted_data) {
+                        displayOCRResult({
+                            text: result.ocr_text,
+                            extracted_data: result.extracted_data
+                        });
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Fehler beim Laden der Fotos:', error);
+            });
+    }
+
+    function displayPhotos(photos) {
+        const container = document.getElementById('existing-photos');
+
+        if (!photos || photos.length === 0) {
+            container.innerHTML = '<div class="col-12"><p class="text-muted">Noch keine Dokumente hochgeladen</p></div>';
+            return;
+        }
+
+        let html = '';
+        photos.forEach((photo, index) => {
+            html += `
+                <div class="col-md-4 mb-3">
+                    <div class="card">
+                        <img src="${photo.url}" class="card-img-top" alt="Dokument ${index + 1}">
+                        <div class="card-body">
+                            <p class="card-text small">
+                                <strong>Typ:</strong> ${photo.type}<br>
+                                ${photo.description ? `<strong>Beschreibung:</strong> ${photo.description}<br>` : ''}
+                                <strong>Hochgeladen:</strong> ${new Date(photo.timestamp).toLocaleString('de-DE')}
+                            </p>
+                            <button class="btn btn-sm btn-danger" onclick="deletePhoto('${photo.path}')">
+                                <i class="fas fa-trash"></i> Löschen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+    }
+
+    function deletePhoto(photoPath) {
+        if (confirm('Dokument wirklich löschen?')) {
+            fetch(`/api/photos/delete/post-entry/${currentPostEntryId}/${encodeURIComponent(photoPath)}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    loadExistingPhotos();
+                } else {
+                    alert('Fehler beim Löschen: ' + result.error);
+                }
+            })
+            .catch(error => {
+                console.error('Fehler:', error);
+                alert('Fehler beim Löschen');
+            });
+        }
+    }
+</script>
+{% endblock %}

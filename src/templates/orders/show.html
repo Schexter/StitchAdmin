@@ -424,6 +424,18 @@
         </div>
         {% endif %}
 
+        <!-- CRM Aktivitäten (Telefonate, Besuche, E-Mails) -->
+        {% if activities is defined and activities %}
+        <div class="card mb-4">
+            {% set order_id = order.id %}
+            {% set context = 'order' %}
+            {% set show_customer = true %}
+            {% set show_order = false %}
+            {% set limit = 5 %}
+            {% include 'crm/_activities_widget.html' %}
+        </div>
+        {% endif %}
+        
         <!-- Aktionen -->
         <div class="card">
             <div class="card-header">
@@ -431,6 +443,10 @@
             </div>
             <div class="card-body">
                 <div class="d-grid gap-2">
+                    <!-- Neue Aktivität erfassen -->
+                    <a href="{{ url_for('production.calendar_new') }}?order={{ order.id }}{% if order.customer %}&customer={{ order.customer.id }}{% endif %}" class="btn btn-info">
+                        <i class="bi bi-telephone-plus"></i> Telefonat / Aktivität erfassen
+                    </a>
                     <!-- Foto-Dokumentation -->
                     <a href="{{ url_for('orders.photos', order_id=order.id) }}" class="btn btn-primary">
                         <i class="bi bi-camera"></i> Fotos / QM-Dokumentation

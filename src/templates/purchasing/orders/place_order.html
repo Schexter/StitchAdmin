@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Bestellung aufgeben - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-send"></i> Bestellung aufgeben</h4>
+            </div>
+            <div class="card-body">
+                <!-- Bestellübersicht -->
+                <div class="alert alert-info">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Bestellnummer:</strong><br>
+                            <span class="fs-4">{{ order.order_number }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Lieferant:</strong><br>
+                            <span class="fs-4">{{ supplier.name if supplier else '-' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Positionen -->
+                <h5 class="mt-4"><i class="bi bi-list"></i> Bestellpositionen</h5>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Artikel</th>
+                            <th class="text-center">Menge</th>
+                            <th class="text-end">Preis</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order.get_items() %}
+                        <tr>
+                            <td>
+                                {{ item.article_name }}<br>
+                                <small class="text-muted">{{ item.article_number or '' }}</small>
+                                {% if item.size or item.color %}
+                                <small class="text-info">{{ item.size }} {{ item.color }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ item.quantity }}</td>
+                            <td class="text-end">{{ "%.2f"|format(item.total or 0) }} €</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-light">
+                            <th colspan="2">Gesamtbetrag</th>
+                            <th class="text-end fs-5">{{ "%.2f"|format(order.total_amount or 0) }} €</th>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <hr>
+
+                <!-- Bestellformular -->
+                <form method="POST">
+                    <h5><i class="bi bi-telephone"></i> Wie wurde bestellt?</h5>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card h-100 order-method-card" data-method="online">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-globe display-4 text-primary"></i>
+                                    <h5 class="mt-2">Online bestellt</h5>
+                                    <p class="text-muted small">Im Webshop oder per E-Mail</p>
+                                    <input type="radio" name="order_method" value="online" class="form-check-input" checked>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card h-100 order-method-card" data-method="phone">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-telephone display-4 text-success"></i>
+                                    <h5 class="mt-2">Telefonisch bestellt</h5>
+                                    <p class="text-muted small">Per Telefon oder Fax</p>
+                                    <input type="radio" name="order_method" value="phone" class="form-check-input">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-hash"></i> Bestellnummer beim Lieferanten (optional)</label>
+                        <input type="text" name="supplier_order_number" class="form-control"
+                               placeholder="z.B. AB-12345 oder Bestätigung von Lieferant">
+                        <small class="text-muted">Falls der Lieferant eine eigene Bestellnummer mitgeteilt hat</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-chat-text"></i> Notizen</label>
+                        <textarea name="notes" class="form-control" rows="2"
+                                  placeholder="Optionale Anmerkungen zur Bestellung..."></textarea>
+                    </div>
+
+                    <!-- Lieferzeit-Info -->
+                    {% if supplier %}
+                    <div class="alert alert-success">
+                        <i class="bi bi-truck"></i>
+                        <strong>Voraussichtliche Lieferung:</strong>
+                        {% set delivery_days = supplier.avg_delivery_days or supplier.delivery_time_days or 7 %}
+                        {% set expected_date = (today + timedelta(days=delivery_days|int)) if today else '-' %}
+                        ca. {{ delivery_days|int }} Tage ({{ expected_date.strftime('%d.%m.%Y') if expected_date != '-' else '-' }})
+                        {% if supplier.on_time_delivery_rate %}
+                        <br><small>Pünktlichkeitsrate: {{ "%.0f"|format(supplier.on_time_delivery_rate) }}%</small>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Zurück
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-lg"></i> Bestellung aufgeben
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.order-method-card {
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+.order-method-card:hover {
+    border-color: #0d6efd;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+.order-method-card.selected {
+    border-color: #0d6efd;
+    background-color: #e7f1ff;
+}
+</style>
+
+<script>
+document.querySelectorAll('.order-method-card').forEach(card => {
+    card.addEventListener('click', function() {
+        document.querySelectorAll('.order-method-card').forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+        this.querySelector('input[type="radio"]').checked = true;
+    });
+});
+
+// Initial selection
+document.querySelector('.order-method-card[data-method="online"]').classList.add('selected');
+</script>
+{% endblock %}

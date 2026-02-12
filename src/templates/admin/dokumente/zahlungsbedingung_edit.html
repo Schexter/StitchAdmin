@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block title %}{% if zb %}Zahlungsbedingung bearbeiten{% else %}Neue Zahlungsbedingung{% endif %} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="bi bi-credit-card"></i>
+                {% if zb %}Zahlungsbedingung bearbeiten{% else %}Neue Zahlungsbedingung{% endif %}
+            </h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('settings.index') }}">Einstellungen</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('document_admin.zahlungsbedingungen_index') }}">Zahlungsbedingungen</a></li>
+                    <li class="breadcrumb-item active">{% if zb %}{{ zb.bezeichnung }}{% else %}Neu{% endif %}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <!-- Grunddaten -->
+                        <h6 class="text-muted mb-3">Grunddaten</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label class="form-label" for="bezeichnung">Bezeichnung *</label>
+                                    <input type="text" class="form-control" id="bezeichnung" name="bezeichnung" 
+                                           value="{{ zb.bezeichnung if zb else '' }}" required
+                                           placeholder="z.B. 14 Tage netto">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label" for="kurztext">Kurztext</label>
+                                    <input type="text" class="form-control" id="kurztext" name="kurztext" 
+                                           value="{{ zb.kurztext if zb else '' }}" maxlength="50"
+                                           placeholder="z.B. 14T">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label" for="zahlungsziel_tage">Zahlungsziel (Tage) *</label>
+                                    <input type="number" class="form-control" id="zahlungsziel_tage" name="zahlungsziel_tage" 
+                                           value="{{ zb.zahlungsziel_tage if zb else 14 }}" min="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label" for="sortierung">Sortierung</label>
+                                    <input type="number" class="form-control" id="sortierung" name="sortierung" 
+                                           value="{{ zb.sortierung if zb else 0 }}" min="0">
+                                    <small class="text-muted">Kleinere Zahlen erscheinen zuerst</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3 pt-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="standard" name="standard"
+                                               {% if zb and zb.standard %}checked{% endif %}>
+                                        <label class="form-check-label" for="standard">
+                                            Als Standard für neue Kunden
+                                        </label>
+                                    </div>
+                                    {% if zb %}
+                                    <div class="form-check mt-2">
+                                        <input class="form-check-input" type="checkbox" id="aktiv" name="aktiv"
+                                               {% if zb.aktiv %}checked{% endif %}>
+                                        <label class="form-check-label" for="aktiv">
+                                            Aktiv
+                                        </label>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <!-- Skonto -->
+                        <h6 class="text-muted mb-3">
+                            <i class="bi bi-percent"></i> Skonto
+                            <small class="text-muted">(optional)</small>
+                        </h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label" for="skonto_prozent">Skonto (%)</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="skonto_prozent" name="skonto_prozent" 
+                                               value="{{ zb.skonto_prozent if zb else '' }}" min="0" max="10" step="0.5"
+                                               placeholder="z.B. 2">
+                                        <span class="input-group-text">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label" for="skonto_tage">Skonto innerhalb (Tage)</label>
+                                    <input type="number" class="form-control" id="skonto_tage" name="skonto_tage" 
+                                           value="{{ zb.skonto_tage if zb else '' }}" min="0"
+                                           placeholder="z.B. 7">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <!-- Anzahlung -->
+                        <h6 class="text-muted mb-3">
+                            <i class="bi bi-cash-stack"></i> Anzahlung
+                            <small class="text-muted">(optional)</small>
+                        </h6>
+                        
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="anzahlung_erforderlich" 
+                                       name="anzahlung_erforderlich" 
+                                       {% if zb and zb.anzahlung_erforderlich %}checked{% endif %}
+                                       onchange="toggleAnzahlung()">
+                                <label class="form-check-label" for="anzahlung_erforderlich">
+                                    Anzahlung erforderlich
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div id="anzahlung_details" style="{% if not zb or not zb.anzahlung_erforderlich %}display: none;{% endif %}">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="anzahlung_prozent">Anzahlung (%)</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="anzahlung_prozent" name="anzahlung_prozent" 
+                                                   value="{{ zb.anzahlung_prozent if zb else '' }}" min="0" max="100" step="5"
+                                                   placeholder="z.B. 50">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">oder</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label" for="anzahlung_festbetrag">Festbetrag (€)</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="anzahlung_festbetrag" name="anzahlung_festbetrag" 
+                                                   value="{{ zb.anzahlung_festbetrag if zb else '' }}" min="0" step="10"
+                                                   placeholder="z.B. 100">
+                                            <span class="input-group-text">€</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label" for="anzahlung_text">Anzahlungstext</label>
+                                <input type="text" class="form-control" id="anzahlung_text" name="anzahlung_text" 
+                                       value="{{ zb.anzahlung_text if zb else '' }}"
+                                       placeholder="z.B. 50% bei Auftragserteilung, Rest bei Lieferung">
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <!-- Texte für Dokumente -->
+                        <h6 class="text-muted mb-3">
+                            <i class="bi bi-file-text"></i> Texte für Dokumente
+                        </h6>
+                        
+                        <div class="mb-3">
+                            <label class="form-label" for="text_rechnung">Rechnungstext</label>
+                            <textarea class="form-control" id="text_rechnung" name="text_rechnung" rows="2"
+                                      placeholder="z.B. Zahlbar innerhalb von 14 Tagen ohne Abzug.">{{ zb.text_rechnung if zb else '' }}</textarea>
+                            <small class="text-muted">Wird auf Rechnungen angezeigt</small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label" for="text_rechnung_skonto">Skonto-Text</label>
+                            <textarea class="form-control" id="text_rechnung_skonto" name="text_rechnung_skonto" rows="2"
+                                      placeholder="z.B. Bei Zahlung innerhalb von 7 Tagen gewähren wir 2% Skonto.">{{ zb.text_rechnung_skonto if zb else '' }}</textarea>
+                            <small class="text-muted">Wird zusätzlich angezeigt, wenn Skonto definiert ist</small>
+                        </div>
+                        
+                        <hr>
+                        
+                        <!-- Vorschau -->
+                        <div class="alert alert-secondary">
+                            <strong><i class="bi bi-eye"></i> Vorschau Zahlungstext:</strong>
+                            <p id="vorschau_text" class="mb-0 mt-2 fst-italic">
+                                {{ zb.generiere_zahlungstext() if zb else 'Zahlbar innerhalb von 14 Tagen ohne Abzug.' }}
+                            </p>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('document_admin.zahlungsbedingungen_index') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Zurück
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6><i class="bi bi-lightbulb"></i> Beispiele</h6>
+                    <ul class="small mb-0">
+                        <li><strong>Sofort fällig:</strong> 0 Tage</li>
+                        <li><strong>Standard:</strong> 14 Tage netto</li>
+                        <li><strong>Mit Skonto:</strong> 2% bei Zahlung in 7 Tagen, sonst 30 Tage</li>
+                        <li><strong>Vorkasse:</strong> 100% Anzahlung</li>
+                        <li><strong>Teilzahlung:</strong> 50% Anzahlung, Rest bei Lieferung</li>
+                    </ul>
+                </div>
+            </div>
+            
+            {% if zb %}
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h6><i class="bi bi-clock-history"></i> Historie</h6>
+                    <small class="text-muted">
+                        <strong>Erstellt:</strong> {{ zb.erstellt_am.strftime('%d.%m.%Y %H:%M') if zb.erstellt_am else '-' }}<br>
+                        <strong>Geändert:</strong> {{ zb.geaendert_am.strftime('%d.%m.%Y %H:%M') if zb.geaendert_am else '-' }}
+                    </small>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleAnzahlung() {
+    const checkbox = document.getElementById('anzahlung_erforderlich');
+    const details = document.getElementById('anzahlung_details');
+    details.style.display = checkbox.checked ? 'block' : 'none';
+}
+
+// Vorschau aktualisieren
+function updateVorschau() {
+    const tage = document.getElementById('zahlungsziel_tage').value || 14;
+    const skontoProzent = document.getElementById('skonto_prozent').value;
+    const skontoTage = document.getElementById('skonto_tage').value;
+    const textRechnung = document.getElementById('text_rechnung').value;
+    const textSkonto = document.getElementById('text_rechnung_skonto').value;
+    
+    let text = textRechnung || `Zahlbar innerhalb von ${tage} Tagen ohne Abzug.`;
+    
+    if (skontoProzent && skontoTage) {
+        text += ' ' + (textSkonto || `Bei Zahlung innerhalb von ${skontoTage} Tagen gewähren wir ${skontoProzent}% Skonto.`);
+    }
+    
+    document.getElementById('vorschau_text').textContent = text;
+}
+
+// Event-Listener
+document.getElementById('zahlungsziel_tage').addEventListener('input', updateVorschau);
+document.getElementById('skonto_prozent').addEventListener('input', updateVorschau);
+document.getElementById('skonto_tage').addEventListener('input', updateVorschau);
+document.getElementById('text_rechnung').addEventListener('input', updateVorschau);
+document.getElementById('text_rechnung_skonto').addEventListener('input', updateVorschau);
+</script>
+{% endblock %}

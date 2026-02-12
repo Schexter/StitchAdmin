@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>
+                <i class="bi bi-archive"></i>
+                Rechnungsarchiv
+            </h1>
+            <p class="text-muted mb-0">
+                Alle archivierten Rechnungen nach Jahr und Monat sortiert
+            </p>
+        </div>
+        <div>
+            <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Zur Rechnungsübersicht
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistiken -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ total_count }}</h3>
+                    <p class="mb-0 text-muted">Archivierte Rechnungen</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h3 class="text-success">{{ "%.2f"|format(total_betrag) }} EUR</h3>
+                    <p class="mb-0 text-muted">Gesamtvolumen</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if archiv_struktur %}
+    <!-- Archiv-Ansicht nach Jahr/Monat -->
+    <div class="accordion" id="archivAccordion">
+        {% for jahr, monate in archiv_struktur.items() %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading{{ jahr }}">
+                <button class="accordion-button {% if not loop.first %}collapsed{% endif %}"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#collapse{{ jahr }}"
+                        aria-expanded="{{ 'true' if loop.first else 'false' }}"
+                        aria-controls="collapse{{ jahr }}">
+                    <i class="bi bi-calendar-event me-2"></i>
+                    <strong>{{ jahr }}</strong>
+                    <span class="badge bg-secondary ms-2">
+                        {{ monate.values()|sum(attribute='__len__') }} Rechnungen
+                    </span>
+                </button>
+            </h2>
+            <div id="collapse{{ jahr }}"
+                 class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+                 aria-labelledby="heading{{ jahr }}"
+                 data-bs-parent="#archivAccordion">
+                <div class="accordion-body">
+                    {% for monat, rechnungen in monate.items() %}
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="bi bi-folder2"></i>
+                                {% set monatsnamen = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+                                                      'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'] %}
+                                {{ monatsnamen[monat] }} {{ jahr }}
+                                <span class="badge bg-primary">{{ rechnungen|length }}</span>
+                            </h6>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Rechnungsnr.</th>
+                                            <th>Datum</th>
+                                            <th>Kunde</th>
+                                            <th class="text-end">Betrag</th>
+                                            <th>Status</th>
+                                            <th class="text-center">Aktionen</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for rechnung in rechnungen %}
+                                        <tr>
+                                            <td>
+                                                <a href="{{ url_for('rechnung.rechnung_detail', rechnung_id=rechnung.id) }}">
+                                                    <strong>{{ rechnung.rechnungsnummer }}</strong>
+                                                </a>
+                                            </td>
+                                            <td>{{ rechnung.rechnungsdatum.strftime('%d.%m.%Y') if rechnung.rechnungsdatum else '-' }}</td>
+                                            <td>{{ rechnung.kunde_name or '-' }}</td>
+                                            <td class="text-end">
+                                                <strong>{{ "%.2f"|format(rechnung.brutto_gesamt|float) }} EUR</strong>
+                                            </td>
+                                            <td>
+                                                {% if rechnung.status.value == 'BEZAHLT' %}
+                                                    <span class="badge bg-success">Bezahlt</span>
+                                                {% elif rechnung.status.value == 'OFFEN' %}
+                                                    <span class="badge bg-warning">Offen</span>
+                                                {% elif rechnung.status.value == 'STORNIERT' %}
+                                                    <span class="badge bg-dark">Storniert</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">{{ rechnung.status.value }}</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-center">
+                                                <div class="btn-group btn-group-sm">
+                                                    <a href="{{ url_for('rechnung.rechnung_archiv_oeffnen', rechnung_id=rechnung.id) }}"
+                                                       class="btn btn-outline-primary" target="_blank"
+                                                       title="PDF anzeigen">
+                                                        <i class="bi bi-eye"></i>
+                                                    </a>
+                                                    <a href="{{ url_for('rechnung.rechnung_archiv_download', rechnung_id=rechnung.id) }}"
+                                                       class="btn btn-outline-secondary"
+                                                       title="PDF herunterladen">
+                                                        <i class="bi bi-download"></i>
+                                                    </a>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- Leeres Archiv -->
+    <div class="card">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-archive display-1 text-muted"></i>
+            <h4 class="mt-3">Noch keine Rechnungen archiviert</h4>
+            <p class="text-muted">
+                Archivieren Sie Rechnungen über die Detail-Ansicht, um sie hier zu finden.
+            </p>
+            <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-primary">
+                <i class="bi bi-file-text"></i> Zu den Rechnungen
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Wareneingang - {{ order.purchase_order_number or order.order_number or order.id }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h1><i class="bi bi-box-arrow-in-down"></i> Wareneingang</h1>
+                <p class="text-muted mb-0">
+                    Bestellung <strong>{{ order.purchase_order_number or order.order_number or order.id }}</strong> von
+                    <strong>{{ supplier.name if supplier else '-' }}</strong>
+                </p>
+            </div>
+            <div>
+                <a href="{{ url_for('purchasing.print_order_checklist', order_id=order.id) }}"
+                   class="btn btn-outline-secondary" target="_blank">
+                    <i class="bi bi-printer"></i> Drucken
+                </a>
+                <a href="{{ url_for('purchasing.receiving') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Status-Banner -->
+{% if order.status == 'partial' %}
+<div class="alert alert-warning d-flex align-items-center mb-4">
+    <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+    <div>
+        <strong>Teillieferung!</strong> Es fehlen noch Artikel aus dieser Bestellung.
+    </div>
+</div>
+{% endif %}
+
+<!-- Bestellinfo -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <small class="text-muted">Bestelldatum</small>
+                <h5>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <small class="text-muted">Erwartet am</small>
+                <h5 class="{% if order.delivery_date and order.delivery_date < today %}text-danger{% endif %}">
+                    {{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}
+                </h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <small class="text-muted">Positionen</small>
+                <h5>{{ items|length }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <small class="text-muted">Gesamtwert</small>
+                <h5>{{ "%.2f"|format(order.total_amount or 0) }} €</h5>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Checkliste -->
+<div class="card">
+    <div class="card-header bg-success text-white">
+        <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Wareneingangs-Checkliste</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0" id="checklistTable">
+            <thead class="table-light">
+                <tr>
+                    <th width="50">OK</th>
+                    <th>Artikel</th>
+                    <th class="text-center">Bestellt</th>
+                    <th class="text-center">Erhalten</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr data-index="{{ loop.index0 }}" class="checklist-row">
+                    <td>
+                        <input type="checkbox" class="form-check-input form-check-input-lg item-complete"
+                               data-index="{{ loop.index0 }}"
+                               {% if item.is_complete %}checked{% endif %}
+                               onchange="toggleComplete(this)">
+                    </td>
+                    <td>
+                        <strong>{{ item.article_name }}</strong><br>
+                        <small class="text-muted">{{ item.article_number or '' }}</small>
+                        {% if item.size or item.color %}
+                        <br><small class="text-info">{{ item.size }} {{ item.color }}</small>
+                        {% endif %}
+                        {% if item.ean %}
+                        <br><small class="text-secondary">EAN: {{ item.ean }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <span class="badge bg-primary fs-6">{{ item.quantity }}</span>
+                    </td>
+                    <td class="text-center">
+                        <input type="number" class="form-control form-control-sm text-center received-input"
+                               data-index="{{ loop.index0 }}"
+                               value="{{ item.received_quantity }}"
+                               min="0" max="{{ item.quantity * 2 }}"
+                               style="width: 80px; display: inline-block;"
+                               onchange="updateReceived(this)">
+                    </td>
+                    <td class="status-cell">
+                        {% if item.is_complete %}
+                        <span class="badge bg-success"><i class="bi bi-check-lg"></i> Vollständig</span>
+                        {% elif item.received_quantity > 0 %}
+                        <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Teilweise</span>
+                        {% else %}
+                        <span class="badge bg-secondary"><i class="bi bi-clock"></i> Ausstehend</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" id="markAllComplete" onchange="toggleAllComplete(this)">
+                    <label class="form-check-label" for="markAllComplete">
+                        <strong>Alle Positionen vollständig erhalten</strong>
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-6 text-end">
+                <span id="statusSummary" class="me-3">
+                    <span class="text-success"><i class="bi bi-check-circle"></i> <span id="completeCount">0</span> vollständig</span>
+                    <span class="text-warning ms-2"><i class="bi bi-exclamation-triangle"></i> <span id="partialCount">0</span> teilweise</span>
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notizen -->
+<div class="card mt-4">
+    <div class="card-body">
+        <label class="form-label"><i class="bi bi-chat-text"></i> Anmerkungen zum Wareneingang</label>
+        <textarea id="receivingNotes" class="form-control" rows="2"
+                  placeholder="z.B. Beschädigungen, Abweichungen, Rückfragen..."></textarea>
+    </div>
+</div>
+
+<!-- Aktionen -->
+<div class="d-flex justify-content-between mt-4">
+    <a href="{{ url_for('purchasing.receiving') }}" class="btn btn-secondary btn-lg">
+        <i class="bi bi-arrow-left"></i> Abbrechen
+    </a>
+    <button class="btn btn-success btn-lg" onclick="confirmReceiving()">
+        <i class="bi bi-check-lg"></i> Wareneingang bestätigen
+    </button>
+</div>
+
+<script>
+function toggleComplete(checkbox) {
+    const index = checkbox.dataset.index;
+    const row = checkbox.closest('tr');
+    const receivedInput = row.querySelector('.received-input');
+    const statusCell = row.querySelector('.status-cell');
+
+    if (checkbox.checked) {
+        // Setze auf volle Menge
+        const quantityBadge = row.querySelector('.badge.bg-primary');
+        const quantity = parseInt(quantityBadge.textContent);
+        receivedInput.value = quantity;
+        statusCell.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Vollständig</span>';
+        row.classList.add('table-success');
+    } else {
+        receivedInput.value = 0;
+        statusCell.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-clock"></i> Ausstehend</span>';
+        row.classList.remove('table-success');
+    }
+
+    updateSummary();
+}
+
+function updateReceived(input) {
+    const index = input.dataset.index;
+    const row = input.closest('tr');
+    const checkbox = row.querySelector('.item-complete');
+    const statusCell = row.querySelector('.status-cell');
+    const quantityBadge = row.querySelector('.badge.bg-primary');
+    const expectedQty = parseInt(quantityBadge.textContent);
+    const receivedQty = parseInt(input.value) || 0;
+
+    if (receivedQty >= expectedQty) {
+        checkbox.checked = true;
+        statusCell.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-lg"></i> Vollständig</span>';
+        row.classList.add('table-success');
+        row.classList.remove('table-warning');
+    } else if (receivedQty > 0) {
+        checkbox.checked = false;
+        statusCell.innerHTML = '<span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Teilweise</span>';
+        row.classList.add('table-warning');
+        row.classList.remove('table-success');
+    } else {
+        checkbox.checked = false;
+        statusCell.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-clock"></i> Ausstehend</span>';
+        row.classList.remove('table-success', 'table-warning');
+    }
+
+    updateSummary();
+}
+
+function toggleAllComplete(checkbox) {
+    document.querySelectorAll('.item-complete').forEach(cb => {
+        cb.checked = checkbox.checked;
+        toggleComplete(cb);
+    });
+}
+
+function updateSummary() {
+    let complete = 0;
+    let partial = 0;
+
+    document.querySelectorAll('.checklist-row').forEach(row => {
+        const receivedInput = row.querySelector('.received-input');
+        const quantityBadge = row.querySelector('.badge.bg-primary');
+        const expectedQty = parseInt(quantityBadge.textContent);
+        const receivedQty = parseInt(receivedInput.value) || 0;
+
+        if (receivedQty >= expectedQty) {
+            complete++;
+        } else if (receivedQty > 0) {
+            partial++;
+        }
+    });
+
+    document.getElementById('completeCount').textContent = complete;
+    document.getElementById('partialCount').textContent = partial;
+
+    // Update "Alle vollständig" checkbox
+    const totalItems = document.querySelectorAll('.checklist-row').length;
+    document.getElementById('markAllComplete').checked = complete === totalItems;
+}
+
+function confirmReceiving() {
+    // Sammle alle empfangenen Mengen
+    const receivedItems = {};
+    let hasAnyReceived = false;
+
+    document.querySelectorAll('.received-input').forEach(input => {
+        const index = input.dataset.index;
+        const qty = parseInt(input.value) || 0;
+        receivedItems[index] = qty;
+        if (qty > 0) hasAnyReceived = true;
+    });
+
+    if (!hasAnyReceived) {
+        if (!confirm('Sie haben keine Mengen eingetragen. Möchten Sie trotzdem fortfahren?')) {
+            return;
+        }
+    }
+
+    const notes = document.getElementById('receivingNotes').value;
+    const allComplete = document.getElementById('markAllComplete').checked;
+
+    fetch('{{ url_for("purchasing.confirm_receiving", order_id=order.id) }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            received_items: receivedItems,
+            all_complete: allComplete,
+            notes: notes
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            if (data.has_incomplete) {
+                alert('Teillieferung bestätigt.\n\nDie Bestellung bleibt offen, da nicht alle Artikel vollständig geliefert wurden.');
+            } else {
+                alert('Wareneingang vollständig bestätigt!\n\nDie Lagerbestände wurden aktualisiert.');
+            }
+            window.location.href = '{{ url_for("purchasing.receiving") }}';
+        } else {
+            alert('Fehler: ' + data.message);
+        }
+    })
+    .catch(err => {
+        alert('Fehler beim Bestätigen: ' + err);
+    });
+}
+
+// Initial summary
+updateSummary();
+</script>
+
+<style>
+.form-check-input-lg {
+    width: 1.5em;
+    height: 1.5em;
+}
+.checklist-row {
+    transition: background-color 0.2s;
+}
+</style>
+{% endblock %}

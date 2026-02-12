@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Kontenrahmen einrichten{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('buchhaltung.index') }}">Buchhaltung</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('buchhaltung.kontenplan') }}">Kontenplan</a></li>
+            <li class="breadcrumb-item active">Einrichtung</li>
+        </ol>
+    </nav>
+    
+    <h2><i class="fas fa-cogs me-2"></i>Kontenrahmen einrichten</h2>
+    
+    {% if anzahl_konten > 0 %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>{{ anzahl_konten }} Konten</strong> bereits vorhanden. 
+        Beim Initialisieren werden nur fehlende Konten ergänzt.
+    </div>
+    {% endif %}
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <form method="POST">
+                <!-- Kontenrahmen-Auswahl -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-list-ol me-2"></i>Kontenrahmen wählen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="form-check card p-3 h-100 border-primary">
+                                    <input class="form-check-input" type="radio" name="kontenrahmen" 
+                                           id="skr03" value="SKR03" checked>
+                                    <label class="form-check-label" for="skr03">
+                                        <h5>SKR03</h5>
+                                        <p class="text-muted mb-0">
+                                            Standard für kleine und mittlere Unternehmen.<br>
+                                            Bilanzorientiert, weit verbreitet.
+                                        </p>
+                                        <span class="badge bg-success">Empfohlen</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check card p-3 h-100">
+                                    <input class="form-check-input" type="radio" name="kontenrahmen" 
+                                           id="skr04" value="SKR04">
+                                    <label class="form-check-label" for="skr04">
+                                        <h5>SKR04</h5>
+                                        <p class="text-muted mb-0">
+                                            Prozessgliederungsprinzip.<br>
+                                            Alternativ zum SKR03.
+                                        </p>
+                                        <span class="badge bg-secondary">Alternativ</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Branchen-Vorlage -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="fas fa-industry me-2"></i>Branchen-Vorlage (optional)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Wählen Sie eine Branche für zusätzliche, branchenspezifische Konten.
+                        </p>
+                        
+                        <div class="row g-3">
+                            {% for branche in branchen %}
+                            <div class="col-md-6">
+                                <div class="form-check card p-3 h-100 {{ 'border-primary' if branche.key == 'textildruck_stickerei' }}">
+                                    <input class="form-check-input" type="radio" name="branche" 
+                                           id="branche_{{ branche.key }}" value="{{ branche.key }}"
+                                           {{ 'checked' if branche.key == 'textildruck_stickerei' }}>
+                                    <label class="form-check-label" for="branche_{{ branche.key }}">
+                                        <h6>{{ branche.name }}</h6>
+                                        <p class="small text-muted mb-1">{{ branche.beschreibung }}</p>
+                                        {% if branche.anzahl_zusatz > 0 %}
+                                        <span class="badge bg-info">+{{ branche.anzahl_zusatz }} Konten</span>
+                                        {% endif %}
+                                    </label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                            
+                            <div class="col-md-6">
+                                <div class="form-check card p-3 h-100">
+                                    <input class="form-check-input" type="radio" name="branche" 
+                                           id="branche_keine" value="">
+                                    <label class="form-check-label" for="branche_keine">
+                                        <h6>Keine Vorlage</h6>
+                                        <p class="small text-muted mb-1">Nur Standard-Kontenrahmen</p>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="fas fa-check me-2"></i>Kontenrahmen initialisieren
+                </button>
+            </form>
+        </div>
+        
+        <!-- Info-Sidebar -->
+        <div class="col-lg-4">
+            <div class="card bg-light">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Hinweise</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Textildruck & Stickerei</h6>
+                    <p class="small">Enthält spezielle Konten für:</p>
+                    <ul class="small">
+                        <li>Maschinen (Stick-, Druckmaschinen, Plotter)</li>
+                        <li>Material (Garne, Folien, Farben)</li>
+                        <li>Fremdleistungen (Digitalisierung)</li>
+                        <li>Erlöse nach Verfahren</li>
+                    </ul>
+                    
+                    <hr>
+                    
+                    <h6>Kontenklassen</h6>
+                    <table class="table table-sm small mb-0">
+                        <tr><td>0</td><td>Anlagevermögen</td></tr>
+                        <tr><td>1</td><td>Umlaufvermögen</td></tr>
+                        <tr><td>2</td><td>Eigenkapital</td></tr>
+                        <tr><td>3</td><td>Wareneinkauf</td></tr>
+                        <tr><td>4</td><td>Aufwendungen</td></tr>
+                        <tr><td>7</td><td>Abschreibungen</td></tr>
+                        <tr><td>8</td><td>Erlöse</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

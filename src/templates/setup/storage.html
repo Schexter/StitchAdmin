@@ -1,0 +1,152 @@
+{% extends "setup/base_setup.html" %}
+{% block title %}Speicherpfade{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+    <div class="step-number">📁</div>
+    <h3 class="mt-3">Speicherpfade</h3>
+    <p class="text-muted">Wo sollen Dokumente und PDFs gespeichert werden?</p>
+</div>
+
+<form method="POST">
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-folder-open me-2"></i>Hauptverzeichnis</h5>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Basispfad für alle Dokumente</label>
+                <input type="text" name="base_path" class="form-control form-control-lg" 
+                       value="{{ settings.base_path or default_base }}"
+                       placeholder="{{ default_base }}">
+                <small class="text-muted">
+                    Hier werden alle PDFs, Rechnungen, Angebote etc. gespeichert.<br>
+                    Standard: <code>{{ default_base }}</code>
+                </small>
+            </div>
+            
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Tipp:</strong> Wählen Sie einen Ordner, der in Ihrem Backup enthalten ist!
+                Für Netzwerk-Speicher: <code>\\SERVER\Freigabe\StitchAdmin</code>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Ordnerstruktur</h5>
+        </div>
+        <div class="card-body">
+            <label class="form-label">Wie sollen die Unterordner organisiert werden?</label>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="form-check card p-3 h-100">
+                        <input class="form-check-input" type="radio" name="folder_structure" 
+                               id="struct_year_month" value="year_month" 
+                               {% if settings.folder_structure == 'year_month' or not settings.folder_structure %}checked{% endif %}>
+                        <label class="form-check-label" for="struct_year_month">
+                            <strong>Jahr / Monat</strong>
+                            <br><small class="text-muted">z.B. Rechnungen/2025/01/</small>
+                            <br><span class="badge bg-success">Empfohlen</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check card p-3 h-100">
+                        <input class="form-check-input" type="radio" name="folder_structure" 
+                               id="struct_year" value="year"
+                               {% if settings.folder_structure == 'year' %}checked{% endif %}>
+                        <label class="form-check-label" for="struct_year">
+                            <strong>Nur Jahr</strong>
+                            <br><small class="text-muted">z.B. Rechnungen/2025/</small>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check card p-3 h-100">
+                        <input class="form-check-input" type="radio" name="folder_structure" 
+                               id="struct_customer" value="customer"
+                               {% if settings.folder_structure == 'customer' %}checked{% endif %}>
+                        <label class="form-check-label" for="struct_customer">
+                            <strong>Nach Kunde</strong>
+                            <br><small class="text-muted">z.B. Rechnungen/Mustermann GmbH/</small>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-check card p-3 h-100">
+                        <input class="form-check-input" type="radio" name="folder_structure" 
+                               id="struct_flat" value="flat"
+                               {% if settings.folder_structure == 'flat' %}checked{% endif %}>
+                        <label class="form-check-label" for="struct_flat">
+                            <strong>Flach</strong>
+                            <br><small class="text-muted">Alle in einem Ordner</small>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-file-alt me-2"></i>Dateinamen</h5>
+        </div>
+        <div class="card-body">
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="include_customer" name="include_customer"
+                       {% if settings.include_customer_in_filename %}checked{% endif %}>
+                <label class="form-check-label" for="include_customer">
+                    <strong>Kundenname in Dateinamen</strong>
+                    <br><small class="text-muted">z.B. RE-2025-001_20250107_Mustermann.pdf</small>
+                </label>
+            </div>
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="include_date" name="include_date"
+                       {% if settings.include_date_in_filename %}checked{% endif %}>
+                <label class="form-check-label" for="include_date">
+                    <strong>Datum in Dateinamen</strong>
+                    <br><small class="text-muted">z.B. RE-2025-001_20250107.pdf</small>
+                </label>
+            </div>
+        </div>
+    </div>
+    
+    <div class="alert alert-light">
+        <h6><i class="fas fa-folder me-2"></i>Folgende Ordner werden erstellt:</h6>
+        <div class="row small">
+            <div class="col-md-4">
+                <ul class="mb-0">
+                    <li>Angebote</li>
+                    <li>Auftragsbestätigungen</li>
+                    <li>Lieferscheine</li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <ul class="mb-0">
+                    <li>Rechnungen/Ausgang</li>
+                    <li>Rechnungen/Eingang</li>
+                    <li>Gutschriften</li>
+                </ul>
+            </div>
+            <div class="col-md-4">
+                <ul class="mb-0">
+                    <li>Designs</li>
+                    <li>Backups</li>
+                    <li>Exporte</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="d-flex justify-content-between mt-4">
+        <a href="{{ url_for('setup.branding') }}" class="btn btn-outline-secondary btn-setup">
+            <i class="fas fa-arrow-left me-2"></i> Zurück
+        </a>
+        <button type="submit" class="btn btn-primary btn-setup">
+            Ordner erstellen & weiter <i class="fas fa-arrow-right ms-2"></i>
+        </button>
+    </div>
+</form>
+{% endblock %}

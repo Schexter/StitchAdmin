@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Ratentermine{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-money-bill-wave me-2"></i>Ratentermine</h2>
+        <a href="{{ url_for('kalender.raten_neu') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Neue Ratenzahlung
+        </a>
+    </div>
+    
+    {% if ueberfaellige %}
+    <div class="card border-danger mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Überfällige Raten ({{ ueberfaellige|length }})</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Fällig</th>
+                        <th>Kunde</th>
+                        <th>Rate</th>
+                        <th>Betrag</th>
+                        <th>Überfällig</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in ueberfaellige %}
+                    <tr>
+                        <td>{{ r.datum }}</td>
+                        <td>
+                            <a href="{{ url_for('customers.detail', id=r.kunde_id) }}">
+                                {{ r.kunde_name }}
+                            </a>
+                        </td>
+                        <td>{{ r.titel }}</td>
+                        <td class="fw-bold text-danger">{{ "%.2f"|format(r.betrag) }} €</td>
+                        <td>
+                            <span class="badge bg-danger">{{ abs(r.tage_bis) }} Tage</span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('kalender.index') }}?datum={{ r.datum }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-calendar"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-calendar-check me-2"></i>Kommende Raten ({{ kommende|length }})</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if kommende %}
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Fällig</th>
+                        <th>Kunde</th>
+                        <th>Rate</th>
+                        <th>Betrag</th>
+                        <th>In Tagen</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in kommende %}
+                    <tr>
+                        <td>{{ r.datum }}</td>
+                        <td>
+                            <a href="{{ url_for('customers.detail', id=r.kunde_id) }}">
+                                {{ r.kunde_name }}
+                            </a>
+                        </td>
+                        <td>{{ r.titel }}</td>
+                        <td class="fw-bold">{{ "%.2f"|format(r.betrag) }} €</td>
+                        <td>
+                            {% if r.tage_bis == 0 %}
+                            <span class="badge bg-warning">Heute</span>
+                            {% elif r.tage_bis <= 3 %}
+                            <span class="badge bg-warning">{{ r.tage_bis }} Tage</span>
+                            {% elif r.tage_bis <= 7 %}
+                            <span class="badge bg-info">{{ r.tage_bis }} Tage</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ r.tage_bis }} Tage</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('kalender.index') }}?datum={{ r.datum }}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-calendar"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                <i class="fas fa-check-circle fa-3x mb-3"></i>
+                <p>Keine kommenden Ratentermine in den nächsten 30 Tagen.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

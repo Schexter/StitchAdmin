@@ -1,0 +1,243 @@
+{#
+    Archivierungs-Bereich für abgeschlossene Aufträge
+
+    Verwendung: {% include 'orders/includes/archive_section.html' %}
+    Voraussetzung: order Objekt muss verfügbar sein
+#}
+
+{% if order.archived_at %}
+<!-- Auftrag ist archiviert -->
+<div class="card mb-4 border-secondary">
+    <div class="card-header bg-secondary text-white">
+        <h6 class="mb-0">
+            <i class="bi bi-archive"></i> Archiviert
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <small class="text-muted">Archiviert am:</small>
+                <div class="fw-bold">{{ order.archived_at.strftime('%d.%m.%Y %H:%M') }}</div>
+            </div>
+            <div class="col-md-4">
+                <small class="text-muted">Archiviert von:</small>
+                <div class="fw-bold">{{ order.archived_by or 'System' }}</div>
+            </div>
+            <div class="col-md-4">
+                <small class="text-muted">Grund:</small>
+                <div class="fw-bold">
+                    {% if order.archive_reason == 'completed' %}
+                    Erfolgreich abgeschlossen
+                    {% elif order.archive_reason == 'cancelled' %}
+                    Storniert
+                    {% else %}
+                    {{ order.archive_reason or 'Abgeschlossen' }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="unarchiveOrder()">
+                <i class="bi bi-box-arrow-up"></i> Aus Archiv wiederherstellen
+            </button>
+        </div>
+    </div>
+</div>
+
+{% elif order.workflow_status in ['completed', 'shipped'] and order.payment_status == 'paid' %}
+<!-- Kann archiviert werden -->
+<div class="card mb-4 border-success">
+    <div class="card-header bg-light">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">
+                <i class="bi bi-check-circle text-success"></i> Auftrag abgeschlossen
+            </h6>
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="archiveOrder()">
+                <i class="bi bi-archive"></i> Archivieren
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col-md-3">
+                <div class="text-success mb-1"><i class="bi bi-check-circle-fill fs-4"></i></div>
+                <small>Produktion</small>
+            </div>
+            <div class="col-md-3">
+                <div class="text-success mb-1"><i class="bi bi-check-circle-fill fs-4"></i></div>
+                <small>Verpackt</small>
+            </div>
+            <div class="col-md-3">
+                <div class="text-success mb-1"><i class="bi bi-check-circle-fill fs-4"></i></div>
+                <small>
+                    {% if order.delivery_type == 'shipping' %}Versendet{% else %}Abgeholt{% endif %}
+                </small>
+            </div>
+            <div class="col-md-3">
+                <div class="text-success mb-1"><i class="bi bi-check-circle-fill fs-4"></i></div>
+                <small>Bezahlt</small>
+            </div>
+        </div>
+
+        <div class="alert alert-info mt-3 mb-0 small">
+            <i class="bi bi-info-circle"></i>
+            Dieser Auftrag kann archiviert werden. Archivierte Aufträge erscheinen nicht mehr in der aktiven Auftragsliste,
+            können aber jederzeit im Archiv eingesehen werden.
+        </div>
+    </div>
+</div>
+
+{% elif order.workflow_status == 'completed' or order.workflow_status == 'shipped' %}
+<!-- Fast fertig - zeige was noch fehlt -->
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h6 class="mb-0">
+            <i class="bi bi-hourglass-split"></i> Abschluss-Status
+        </h6>
+    </div>
+    <div class="card-body">
+        <p class="text-muted small mb-3">Folgende Schritte müssen noch erledigt werden, bevor der Auftrag archiviert werden kann:</p>
+
+        <div class="list-group">
+            {% if order.payment_status != 'paid' %}
+            <div class="list-group-item list-group-item-warning d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <div class="flex-grow-1">
+                    <strong>Zahlung ausstehend</strong>
+                    <br>
+                    <small>Status: {{ order.get_payment_status_display() }}</small>
+                </div>
+                <button type="button" class="btn btn-sm btn-success" onclick="markAsPaid()">
+                    <i class="bi bi-check"></i> Als bezahlt markieren
+                </button>
+            </div>
+            {% endif %}
+
+            {% if order.workflow_status not in ['completed', 'shipped'] %}
+            <div class="list-group-item list-group-item-info d-flex align-items-center">
+                <i class="bi bi-info-circle me-2"></i>
+                <div class="flex-grow-1">
+                    <strong>Workflow nicht abgeschlossen</strong>
+                    <br>
+                    <small>Status: {{ order.get_workflow_status_display() }}</small>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Archivierungs-Modal -->
+<div class="modal fade" id="archiveModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-archive"></i> Auftrag archivieren
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Möchten Sie den Auftrag <strong>{{ order.order_number }}</strong> archivieren?</p>
+
+                <div class="mb-3">
+                    <label class="form-label">Archivierungsgrund</label>
+                    <select class="form-select" id="archive_reason">
+                        <option value="completed">Erfolgreich abgeschlossen</option>
+                        <option value="cancelled">Storniert</option>
+                        <option value="other">Sonstiges</option>
+                    </select>
+                </div>
+
+                <div class="mb-3" id="archive_notes_container" style="display: none;">
+                    <label class="form-label">Anmerkungen</label>
+                    <textarea class="form-control" id="archive_notes" rows="2"></textarea>
+                </div>
+
+                <div class="alert alert-info small">
+                    <i class="bi bi-info-circle"></i>
+                    Archivierte Aufträge können jederzeit im Archiv eingesehen und bei Bedarf wiederhergestellt werden.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" onclick="confirmArchive()">
+                    <i class="bi bi-archive"></i> Archivieren
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Toggle Notizen-Feld
+document.getElementById('archive_reason')?.addEventListener('change', function() {
+    const notesContainer = document.getElementById('archive_notes_container');
+    notesContainer.style.display = this.value === 'other' ? 'block' : 'none';
+});
+
+function archiveOrder() {
+    const modal = new bootstrap.Modal(document.getElementById('archiveModal'));
+    modal.show();
+}
+
+function confirmArchive() {
+    const reason = document.getElementById('archive_reason').value;
+    const notes = document.getElementById('archive_notes').value;
+
+    fetch('/orders/{{ order.id }}/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            reason: reason,
+            notes: notes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+function unarchiveOrder() {
+    if (!confirm('Auftrag aus dem Archiv wiederherstellen?')) {
+        return;
+    }
+
+    fetch('/orders/{{ order.id }}/unarchive', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+function markAsPaid() {
+    if (!confirm('Auftrag als vollständig bezahlt markieren?')) {
+        return;
+    }
+
+    fetch('/orders/{{ order.id }}/mark-paid', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+</script>

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Design-Freigabe - Auftrag {{ order.order_number }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- SignaturePad -->
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.5/dist/signature_pad.umd.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .approval-card {
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .design-card {
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        .design-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+        .design-card.approved {
+            border-color: #28a745;
+            background: linear-gradient(to bottom right, #d4edda, #fff);
+        }
+        .design-thumbnail {
+            width: 100%;
+            height: 150px;
+            object-fit: contain;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .design-thumbnail-placeholder {
+            width: 100%;
+            height: 150px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .position-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 0.75rem;
+        }
+        .personalized-badge {
+            background: linear-gradient(135deg, #17a2b8, #138496);
+        }
+        .signature-pad-container {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            background: #fff;
+        }
+        #signature-pad {
+            width: 100%;
+            height: 150px;
+        }
+        .spec-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .spec-row:last-child {
+            border-bottom: none;
+        }
+        .price-summary {
+            background: linear-gradient(135deg, #fff3cd, #ffeeba);
+            border-radius: 12px;
+        }
+        .btn-approve-all {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            border: none;
+            padding: 18px 50px;
+            font-size: 1.3rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+        }
+        .btn-approve-all:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 35px rgba(40, 167, 69, 0.5);
+        }
+        .check-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #28a745;
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        .accordion-button:not(.collapsed) {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .accordion-button:focus {
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <div class="row justify-content-center">
+            <div class="col-lg-11 col-xl-10">
+                <div class="card approval-card">
+                    <!-- Header -->
+                    <div class="card-header bg-primary text-white py-4">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h3 class="mb-1">
+                                    <i class="bi bi-palette"></i> Design-Freigabe
+                                </h3>
+                                <p class="mb-0 opacity-75">
+                                    Auftrag {{ order.order_number }} - {{ designs|length }} Design-Position{{ 'en' if designs|length > 1 else '' }}
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                                {% if company_logo %}
+                                <img src="{{ company_logo }}" alt="Logo" style="max-height: 50px;">
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-4">
+                        {% if already_approved %}
+                        <!-- Bereits freigegeben -->
+                        <div class="text-center py-5">
+                            <i class="bi bi-check-circle-fill text-success" style="font-size: 80px;"></i>
+                            <h3 class="mt-3">Alle Designs wurden freigegeben</h3>
+                            <p class="text-muted">
+                                Die Freigabe erfolgte am {{ order.design_approval_date.strftime('%d.%m.%Y um %H:%M') }} Uhr.
+                            </p>
+                            <div class="alert alert-success mt-4">
+                                <i class="bi bi-info-circle"></i>
+                                Die Produktion wird nach Eingang der Anzahlung gestartet.
+                            </div>
+                        </div>
+
+                        {% else %}
+                        <!-- Begruesssung -->
+                        <div class="alert alert-info mb-4">
+                            <div class="d-flex align-items-start">
+                                <i class="bi bi-person-circle fs-4 me-3"></i>
+                                <div>
+                                    <strong>Guten Tag {{ customer.display_name }},</strong><br>
+                                    bitte pruefen Sie alle Design-Positionen und geben Sie diese frei,
+                                    damit wir mit der Produktion beginnen koennen.
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Design-Positionen als Cards -->
+                        <h5 class="mb-3">
+                            <i class="bi bi-palette2"></i> Design-Positionen zur Freigabe
+                        </h5>
+
+                        <div class="row g-3 mb-4">
+                            {% for design in designs %}
+                            <div class="col-md-6 col-lg-4">
+                                <div class="card design-card h-100 position-relative" id="design-{{ design.id }}">
+                                    {% if design.is_personalized %}
+                                    <span class="badge personalized-badge position-badge">
+                                        <i class="bi bi-person-badge"></i> Personalisiert
+                                    </span>
+                                    {% endif %}
+
+                                    <div class="card-body">
+                                        <!-- Thumbnail -->
+                                        {% if design.design_thumbnail_path %}
+                                        <img src="{{ url_for('static', filename='uploads/' + design.design_thumbnail_path) }}"
+                                             alt="{{ design.get_position_label() }}"
+                                             class="design-thumbnail mb-3"
+                                             onclick="showDesignPreview({{ design.id }})">
+                                        {% else %}
+                                        <div class="design-thumbnail-placeholder mb-3">
+                                            <i class="bi bi-image text-muted fs-1"></i>
+                                        </div>
+                                        {% endif %}
+
+                                        <!-- Position & Typ -->
+                                        <h6 class="mb-2">{{ design.get_position_label() }}</h6>
+                                        <span class="badge bg-{{ 'primary' if design.design_type == 'stick' else 'success' }} mb-2">
+                                            {{ design.get_design_type_label() }}
+                                        </span>
+
+                                        {% if design.design_name %}
+                                        <p class="small text-muted mb-2">{{ design.design_name }}</p>
+                                        {% endif %}
+
+                                        <!-- Details -->
+                                        <div class="small">
+                                            {% if design.design_type == 'stick' and design.stitch_count %}
+                                            <div class="spec-row">
+                                                <span class="text-muted">Stiche:</span>
+                                                <strong>{{ "{:,}".format(design.stitch_count) }}</strong>
+                                            </div>
+                                            <div class="spec-row">
+                                                <span class="text-muted">Groesse:</span>
+                                                <strong>{{ design.width_mm }}x{{ design.height_mm }} mm</strong>
+                                            </div>
+                                            {% elif design.print_width_cm %}
+                                            <div class="spec-row">
+                                                <span class="text-muted">Groesse:</span>
+                                                <strong>{{ design.print_width_cm }}x{{ design.print_height_cm }} cm</strong>
+                                            </div>
+                                            {% endif %}
+
+                                            {% if design.is_personalized %}
+                                            <div class="spec-row">
+                                                <span class="text-muted">Personalisiert:</span>
+                                                <strong>{{ design.personalizations.count() }} Namen</strong>
+                                            </div>
+                                            {% endif %}
+                                        </div>
+
+                                        <!-- Einzelfreigabe-Checkbox -->
+                                        <div class="form-check mt-3">
+                                            <input class="form-check-input design-check" type="checkbox"
+                                                   id="check-{{ design.id }}" value="{{ design.id }}"
+                                                   onchange="updateApprovalStatus()">
+                                            <label class="form-check-label small" for="check-{{ design.id }}">
+                                                Position geprueft und OK
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Auftragsuebersicht Accordion -->
+                        <div class="accordion mb-4" id="orderAccordion">
+                            <!-- Artikel -->
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseItems">
+                                        <i class="bi bi-box-seam me-2"></i> Artikel & Stueckzahl
+                                    </button>
+                                </h2>
+                                <div id="collapseItems" class="accordion-collapse collapse" data-bs-parent="#orderAccordion">
+                                    <div class="accordion-body">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Artikel</th>
+                                                    <th>Groesse</th>
+                                                    <th>Farbe</th>
+                                                    <th class="text-end">Menge</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for item in order.items %}
+                                                <tr>
+                                                    <td>{{ item.article.name if item.article else 'Artikel' }}</td>
+                                                    <td>{{ item.textile_size or '-' }}</td>
+                                                    <td>{{ item.textile_color or '-' }}</td>
+                                                    <td class="text-end">{{ item.quantity }}</td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Personalisierungen (falls vorhanden) -->
+                            {% set has_personalizations = designs|selectattr('is_personalized')|list|length > 0 %}
+                            {% if has_personalizations %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNames">
+                                        <i class="bi bi-people me-2"></i> Personalisierte Namen
+                                    </button>
+                                </h2>
+                                <div id="collapseNames" class="accordion-collapse collapse" data-bs-parent="#orderAccordion">
+                                    <div class="accordion-body">
+                                        {% for design in designs %}
+                                        {% if design.is_personalized %}
+                                        <h6 class="text-primary">{{ design.get_position_label() }}</h6>
+                                        <div class="d-flex flex-wrap gap-2 mb-3">
+                                            {% for pers in design.personalizations %}
+                                            <span class="badge bg-light text-dark border">
+                                                {{ pers.sequence_number }}. {{ pers.get_display_text() }}
+                                            </span>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Preis & Anzahlung -->
+                        {% if order.total_price %}
+                        <div class="price-summary p-4 mb-4">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h5 class="mb-0"><i class="bi bi-receipt"></i> Zahlungsuebersicht</h5>
+                                </div>
+                                <div class="col-md-6">
+                                    <table class="table table-borderless mb-0">
+                                        <tr>
+                                            <td>Gesamtbetrag:</td>
+                                            <td class="text-end fw-bold">{{ "%.2f"|format(order.total_price) }} EUR</td>
+                                        </tr>
+                                        {% if order.deposit_amount %}
+                                        <tr class="table-warning">
+                                            <td><strong>Anzahlung (faellig):</strong></td>
+                                            <td class="text-end"><strong class="fs-5 text-danger">{{ "%.2f"|format(order.deposit_amount) }} EUR</strong></td>
+                                        </tr>
+                                        {% endif %}
+                                    </table>
+                                </div>
+                            </div>
+
+                            {% if bank_details %}
+                            <hr>
+                            <div class="small">
+                                <strong>Bankverbindung fuer die Anzahlung:</strong><br>
+                                {{ bank_details.account_holder }} |
+                                IBAN: <strong>{{ bank_details.iban }}</strong> |
+                                BIC: {{ bank_details.bic }}<br>
+                                Verwendungszweck: <strong>{{ order.order_number }}</strong>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <hr>
+
+                        <!-- Unterschrift -->
+                        <h5 class="mb-3"><i class="bi bi-pen"></i> Ihre Unterschrift</h5>
+                        <p class="text-muted small">Bitte unterschreiben Sie im Feld unten zur Bestaetigung.</p>
+
+                        <div class="signature-pad-container p-2 mb-3">
+                            <canvas id="signature-pad"></canvas>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-outline-secondary mb-4" onclick="clearSignature()">
+                            <i class="bi bi-eraser"></i> Unterschrift loeschen
+                        </button>
+
+                        <!-- Anmerkungen -->
+                        <div class="mb-4">
+                            <label class="form-label"><i class="bi bi-chat-text"></i> Anmerkungen (optional)</label>
+                            <textarea id="notes" class="form-control" rows="2"
+                                      placeholder="Haben Sie Anmerkungen?"></textarea>
+                        </div>
+
+                        <!-- Bestaetigung -->
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="confirmCheck">
+                            <label class="form-check-label" for="confirmCheck">
+                                <strong>Ich bestatige</strong>, dass ich alle <span id="design-count">{{ designs|length }}</span> Design-Positionen geprueft habe
+                                und diese fuer die Produktion freigebe.
+                                Mir ist bewusst, dass nach Freigabe keine Anderungen mehr moeglich sind.
+                            </label>
+                        </div>
+
+                        <!-- Hinweise -->
+                        <div class="alert alert-secondary small mb-4">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Wichtige Hinweise:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Die Produktion beginnt nach Eingang der Anzahlung</li>
+                                <li>Personalisierte Artikel sind vom Umtausch ausgeschlossen</li>
+                                <li>Farbabweichungen zwischen Bildschirm und Endprodukt sind moeglich</li>
+                            </ul>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="d-flex gap-3 justify-content-center flex-wrap">
+                            <button type="button" class="btn btn-approve-all btn-success btn-lg" id="approveBtn"
+                                    onclick="submitApproval('approve')" disabled>
+                                <i class="bi bi-check2-all"></i> Alle Designs freigeben
+                            </button>
+                            <button type="button" class="btn btn-outline-warning btn-lg" onclick="submitApproval('reject')">
+                                <i class="bi bi-pencil"></i> Anderung gewuenscht
+                            </button>
+                        </div>
+
+                        <!-- Fortschritt -->
+                        <div class="text-center mt-3">
+                            <small class="text-muted">
+                                <span id="checked-count">0</span> von {{ designs|length }} Positionen geprueft
+                            </small>
+                            <div class="progress mt-2" style="height: 6px;">
+                                <div class="progress-bar bg-success" id="progress-bar" role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        {% endif %}
+                    </div>
+
+                    <div class="card-footer text-center text-muted py-3">
+                        <small>{{ company_name }} | Professionelle Stickerei & Textildruck</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Design-Vorschau Modal -->
+    <div class="modal fade" id="previewModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="previewModalTitle">Design-Vorschau</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <img src="" id="previewImage" class="img-fluid" style="max-height: 70vh;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const totalDesigns = {{ designs|length }};
+        let checkedDesigns = 0;
+
+        // Signature Pad
+        const canvas = document.getElementById('signature-pad');
+        let signaturePad = null;
+
+        if (canvas) {
+            signaturePad = new SignaturePad(canvas, {
+                backgroundColor: 'rgb(255, 255, 255)',
+                penColor: 'rgb(0, 0, 0)'
+            });
+
+            function resizeCanvas() {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                const container = canvas.parentElement;
+                canvas.width = container.offsetWidth * ratio;
+                canvas.height = 150 * ratio;
+                canvas.getContext('2d').scale(ratio, ratio);
+                canvas.style.width = container.offsetWidth + 'px';
+                canvas.style.height = '150px';
+                signaturePad.clear();
+            }
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+        }
+
+        function clearSignature() {
+            if (signaturePad) signaturePad.clear();
+        }
+
+        function updateApprovalStatus() {
+            const checkboxes = document.querySelectorAll('.design-check');
+            checkedDesigns = 0;
+
+            checkboxes.forEach(cb => {
+                const card = document.getElementById('design-' + cb.value);
+                if (cb.checked) {
+                    checkedDesigns++;
+                    card.classList.add('approved');
+                } else {
+                    card.classList.remove('approved');
+                }
+            });
+
+            // Update UI
+            document.getElementById('checked-count').textContent = checkedDesigns;
+            const progress = (checkedDesigns / totalDesigns) * 100;
+            document.getElementById('progress-bar').style.width = progress + '%';
+
+            // Enable/Disable button
+            const confirmCheck = document.getElementById('confirmCheck').checked;
+            const allChecked = checkedDesigns === totalDesigns;
+            document.getElementById('approveBtn').disabled = !(allChecked && confirmCheck);
+        }
+
+        // Confirm checkbox handler
+        document.getElementById('confirmCheck').addEventListener('change', updateApprovalStatus);
+
+        function showDesignPreview(designId) {
+            // Implementation fuer Design-Vorschau Modal
+            const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+            // In echtem Code: Bild-URL laden
+            modal.show();
+        }
+
+        function submitApproval(action) {
+            const notes = document.getElementById('notes').value;
+            const confirmed = document.getElementById('confirmCheck').checked;
+
+            if (action === 'approve') {
+                if (!confirmed) {
+                    alert('Bitte bestaetigen Sie die Freigabe durch Setzen des Haekchens.');
+                    return;
+                }
+                if (checkedDesigns < totalDesigns) {
+                    alert('Bitte pruefen Sie alle Design-Positionen.');
+                    return;
+                }
+            }
+
+            if (action === 'reject' && !notes.trim()) {
+                alert('Bitte geben Sie Ihre Aenderungswuensche an.');
+                document.getElementById('notes').focus();
+                return;
+            }
+
+            let signature = null;
+            if (action === 'approve' && signaturePad && !signaturePad.isEmpty()) {
+                signature = signaturePad.toDataURL('image/png');
+            }
+
+            const submitBtn = document.getElementById('approveBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Wird verarbeitet...';
+
+            fetch('{{ url_for("design_approval.submit_approval", token=token) }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: action,
+                    signature: signature,
+                    notes: notes,
+                    confirmed: confirmed,
+                    approved_designs: Array.from(document.querySelectorAll('.design-check:checked')).map(cb => cb.value)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.redirect) {
+                        window.location.href = data.redirect;
+                    } else {
+                        alert(data.message);
+                        location.reload();
+                    }
+                } else {
+                    alert('Fehler: ' + data.message);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="bi bi-check2-all"></i> Alle Designs freigeben';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ein Fehler ist aufgetreten.');
+                submitBtn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>

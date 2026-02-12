@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% block title %}Konten&uuml;bersicht{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-list-ul"></i> Konten&uuml;bersicht (SKR03)
+        </h2>
+        <a href="{{ url_for('buchungen.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Zur&uuml;ck zum Journal
+        </a>
+    </div>
+
+    <!-- Konten nach Konto-Art gruppiert -->
+    {% for konto_art, konten_liste in konten_grouped.items() %}
+    <div class="card mb-4">
+        <div class="card-header
+            {% if konto_art == 'Aktiva' %}bg-success text-white
+            {% elif konto_art == 'Passiva' %}bg-danger text-white
+            {% elif konto_art == 'Erlöse' %}bg-primary text-white
+            {% elif konto_art == 'Aufwand' %}bg-warning text-dark
+            {% else %}bg-secondary text-white{% endif %}">
+            <h5 class="mb-0">{{ konto_art }}</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-sm">
+                    <thead>
+                        <tr>
+                            <th style="width: 100px;">Konto-Nr.</th>
+                            <th>Bezeichnung</th>
+                            <th style="width: 120px;" class="text-center">Steuerrelevant</th>
+                            <th style="width: 100px;" class="text-end">Steuersatz</th>
+                            <th style="width: 150px;">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for konto in konten_liste %}
+                        <tr>
+                            <td>
+                                <span class="badge bg-light text-dark font-monospace">
+                                    {{ konto.konto_nummer }}
+                                </span>
+                            </td>
+                            <td>{{ konto.konto_bezeichnung }}</td>
+                            <td class="text-center">
+                                {% if konto.steuer_relevant %}
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                {% else %}
+                                    <i class="bi bi-dash-circle text-muted"></i>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if konto.steuer_satz %}
+                                    {{ "%.0f"|format(konto.steuer_satz) }}%
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('buchungen.index') }}?konto={{ konto.konto_nummer }}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-journal-text"></i> Buchungen
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- Info-Box -->
+    <div class="alert alert-info">
+        <h6><i class="bi bi-info-circle"></i> SKR03 Kontenrahmen</h6>
+        <p class="mb-0">
+            Der SKR03 (Standardkontenrahmen) ist ein in Deutschland weit verbreiteter Kontenrahmen
+            f&uuml;r kleine und mittlere Unternehmen. Er gliedert sich in:
+        </p>
+        <ul class="mb-0 mt-2">
+            <li><strong>Aktiva (Klasse 0-1):</strong> Verm&ouml;genswerte (Kasse, Bank, Forderungen)</li>
+            <li><strong>Passiva (Klasse 2-3):</strong> Eigenkapital und Schulden</li>
+            <li><strong>Erl&ouml;se (Klasse 8):</strong> Betriebliche Erl&ouml;se</li>
+            <li><strong>Aufwand (Klasse 4-7):</strong> Betriebliche Aufwendungen</li>
+        </ul>
+    </div>
+
+    <!-- Zahlungsart-Mappings -->
+    <div class="card">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0">Zahlungsart-Zuordnungen</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">
+                Automatische Zuordnung von Zahlungsarten zu SKR03-Konten bei Buchungen:
+            </p>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Zahlungsart</th>
+                            <th>Ziel-Konto</th>
+                            <th>Beschreibung</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><span class="badge bg-success">BAR</span></td>
+                            <td><span class="badge bg-light text-dark">1000</span> Kasse</td>
+                            <td>Barzahlungen werden auf die Kasse gebucht</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-primary">EC</span></td>
+                            <td><span class="badge bg-light text-dark">1200</span> Bank</td>
+                            <td>EC-Kartenzahlungen werden auf Bank gebucht</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-info">SUMUP</span></td>
+                            <td><span class="badge bg-light text-dark">1200</span> Bank</td>
+                            <td>SumUp-Zahlungen werden auf Bank gebucht</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-warning text-dark">UEBERWEISUNG</span></td>
+                            <td><span class="badge bg-light text-dark">1200</span> Bank</td>
+                            <td>&Uuml;berweisungen werden auf Bank gebucht</td>
+                        </tr>
+                        <tr>
+                            <td><span class="badge bg-danger">RECHNUNG</span></td>
+                            <td><span class="badge bg-light text-dark">1400</span> Forderungen</td>
+                            <td>Rechnungen erzeugen eine Forderung (sp&auml;ter ausgeglichen)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+
+{% block title %}Aktivitäten - {{ customer.display_name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('customers.index') }}">Kunden</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('customers.show', customer_id=customer.id) }}">{{ customer.display_name }}</a></li>
+            <li class="breadcrumb-item active">Aktivitäten</li>
+        </ol>
+    </nav>
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1><i class="fas fa-history"></i> Aktivitäten für {{ customer.display_name }}</h1>
+        <a href="{{ url_for('production.calendar_new') }}?customer={{ customer.id }}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Neue Aktivität
+        </a>
+    </div>
+    
+    {% if activities %}
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:40px;"></th>
+                            <th>Datum</th>
+                            <th>Typ</th>
+                            <th>Betreff</th>
+                            <th>Ansprechpartner</th>
+                            <th>Ergebnis</th>
+                            <th>Auftrag</th>
+                            <th>Wiedervorlage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for activity in activities %}
+                        <tr style="cursor:pointer;" onclick="showActivityDetail({{ activity.id }})">
+                            <td>
+                                <span class="badge rounded-pill" style="background-color: {{ activity.display_color }};">
+                                    <i class="fas fa-{{ activity.display_icon }}"></i>
+                                </span>
+                            </td>
+                            <td>
+                                <strong>{{ activity.start_date.strftime('%d.%m.%Y') }}</strong><br>
+                                <small class="text-muted">{{ activity.start_time.strftime('%H:%M') }}</small>
+                            </td>
+                            <td>{{ activity.type_label }}</td>
+                            <td>
+                                <strong>{{ activity.title }}</strong>
+                                {% if activity.summary %}
+                                <br><small class="text-muted">{{ activity.summary[:80] }}{% if activity.summary|length > 80 %}...{% endif %}</small>
+                                {% endif %}
+                            </td>
+                            <td>{{ activity.contact_person or '-' }}</td>
+                            <td>
+                                {% if activity.outcome %}
+                                <span class="badge bg-success">{{ activity.outcome_label }}</span>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if activity.order_id %}
+                                <a href="{{ url_for('orders.show', order_id=activity.order_id) }}" onclick="event.stopPropagation();">
+                                    {{ activity.order_id }}
+                                </a>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if activity.follow_up_date %}
+                                    {% if activity.needs_follow_up %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-bell"></i> {{ activity.follow_up_date.strftime('%d.%m.') }}
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark">
+                                        {{ activity.follow_up_date.strftime('%d.%m.') }}
+                                    </span>
+                                    {% endif %}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> Keine Aktivitäten für diesen Kunden vorhanden.
+        <a href="{{ url_for('production.calendar_new') }}?customer={{ customer.id }}" class="alert-link">
+            Jetzt erste Aktivität erfassen
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Detail Modal -->
+<div class="modal fade" id="activityDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Aktivität Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="activityDetailContent">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showActivityDetail(activityId) {
+    const modal = new bootstrap.Modal(document.getElementById('activityDetailModal'));
+    const content = document.getElementById('activityDetailContent');
+    
+    content.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+    modal.show();
+    
+    fetch(`/production/api/block/block_${activityId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                content.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                return;
+            }
+            
+            let html = `
+                <div class="row mb-3">
+                    <div class="col-auto">
+                        <span class="badge rounded-pill p-3" style="background-color: ${data.color};">
+                            <i class="fas fa-${data.icon} fa-2x"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <h5 class="mb-1">${data.title}</h5>
+                        <p class="text-muted mb-0">${data.type_label} | ${data.start}</p>
+                    </div>
+                </div>
+            `;
+            
+            if (data.contact_person) {
+                html += `<p><strong>Ansprechpartner:</strong> ${data.contact_person}`;
+                if (data.contact_phone) html += ` <a href="tel:${data.contact_phone}"><i class="fas fa-phone"></i> ${data.contact_phone}</a>`;
+                html += `</p>`;
+            }
+            
+            if (data.outcome_label) {
+                html += `<p><strong>Ergebnis:</strong> <span class="badge bg-success">${data.outcome_label}</span></p>`;
+            }
+            
+            if (data.summary) {
+                html += `<div class="mb-3"><strong>Zusammenfassung:</strong><br>${data.summary}</div>`;
+            }
+            
+            if (data.content) {
+                html += `<div class="mb-3"><strong>Details:</strong><pre style="white-space:pre-wrap;font-family:inherit;">${data.content}</pre></div>`;
+            }
+            
+            if (data.follow_up_date) {
+                html += `<div class="alert ${data.needs_follow_up ? 'alert-danger' : 'alert-warning'}">
+                    <i class="fas fa-bell"></i> <strong>Wiedervorlage:</strong> ${data.follow_up_date}
+                    ${data.follow_up_notes ? '<br>' + data.follow_up_notes : ''}
+                </div>`;
+            }
+            
+            if (data.notes) {
+                html += `<p><strong>Notizen:</strong> ${data.notes}</p>`;
+            }
+            
+            html += `<hr><small class="text-muted">Erstellt: ${data.created_at || '-'} von ${data.created_by || '-'}</small>`;
+            
+            content.innerHTML = html;
+        })
+        .catch(err => {
+            content.innerHTML = '<div class="alert alert-danger">Fehler beim Laden</div>';
+        });
+}
+</script>
+{% endblock %}

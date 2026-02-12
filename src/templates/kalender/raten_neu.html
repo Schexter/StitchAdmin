@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Neue Ratenzahlung{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('kalender.index') }}">Kalender</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('kalender.raten_uebersicht') }}">Ratentermine</a></li>
+            <li class="breadcrumb-item active">Neue Ratenzahlung</li>
+        </ol>
+    </nav>
+    
+    <h2><i class="fas fa-hand-holding-usd me-2"></i>Neue Ratenzahlung anlegen</h2>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Kunde *</label>
+                            <select name="kunde_id" class="form-select" required>
+                                <option value="">-- Kunde wählen --</option>
+                                {% for kunde in kunden %}
+                                <option value="{{ kunde.id }}">{{ kunde.display_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Rechnung (optional)</label>
+                            <select name="dokument_id" class="form-select">
+                                <option value="">-- Keine Verknüpfung --</option>
+                                {% for r in rechnungen %}
+                                <option value="{{ r.id }}">{{ r.dokumentnummer }} - {{ "%.2f"|format(r.summe_brutto or 0) }}€</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Gesamtbetrag *</label>
+                                <div class="input-group">
+                                    <input type="text" name="gesamtbetrag" class="form-control" 
+                                           placeholder="z.B. 1200,00" required>
+                                    <span class="input-group-text">€</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Anzahl Raten *</label>
+                                <input type="number" name="anzahl_raten" class="form-control" 
+                                       value="6" min="2" max="36" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Erste Rate fällig am *</label>
+                                <input type="date" name="erste_rate" class="form-control" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Intervall</label>
+                                <select name="intervall" class="form-select">
+                                    <option value="30" selected>Monatlich (30 Tage)</option>
+                                    <option value="14">Alle 2 Wochen</option>
+                                    <option value="7">Wöchentlich</option>
+                                    <option value="90">Quartalsweise</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info" id="raten-vorschau">
+                            <i class="fas fa-info-circle me-2"></i>
+                            Geben Sie die Daten ein, um eine Vorschau zu sehen.
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save me-2"></i>Ratenzahlung anlegen
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card bg-light">
+                <div class="card-header">
+                    <h5 class="mb-0">Hinweise</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li>Für jede Rate wird automatisch ein <strong>Kalendereintrag</strong> erstellt</li>
+                        <li>3 Tage vor Fälligkeit wird eine <strong>Erinnerung</strong> angezeigt</li>
+                        <li>Überfällige Raten erscheinen im Dashboard</li>
+                        <li>Die Raten werden im <strong>CRM-Profil</strong> des Kunden angezeigt</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Vorschau berechnen
+document.addEventListener('DOMContentLoaded', function() {
+    const gesamtInput = document.querySelector('[name="gesamtbetrag"]');
+    const ratenInput = document.querySelector('[name="anzahl_raten"]');
+    const ersteInput = document.querySelector('[name="erste_rate"]');
+    const intervallInput = document.querySelector('[name="intervall"]');
+    const vorschau = document.getElementById('raten-vorschau');
+    
+    function updateVorschau() {
+        const gesamt = parseFloat(gesamtInput.value.replace(',', '.')) || 0;
+        const raten = parseInt(ratenInput.value) || 1;
+        const erste = ersteInput.value;
+        const intervall = parseInt(intervallInput.value);
+        
+        if (gesamt > 0 && raten > 0 && erste) {
+            const rateBetrag = (gesamt / raten).toFixed(2);
+            
+            // Letzte Rate berechnen
+            const ersteDate = new Date(erste);
+            const letzteDate = new Date(ersteDate);
+            letzteDate.setDate(letzteDate.getDate() + (raten - 1) * intervall);
+            
+            vorschau.innerHTML = `
+                <strong>Vorschau:</strong><br>
+                ${raten} Raten à <strong>${rateBetrag} €</strong><br>
+                Erste Rate: ${ersteDate.toLocaleDateString('de-DE')}<br>
+                Letzte Rate: ${letzteDate.toLocaleDateString('de-DE')}
+            `;
+            vorschau.classList.remove('alert-info');
+            vorschau.classList.add('alert-success');
+        }
+    }
+    
+    [gesamtInput, ratenInput, ersteInput, intervallInput].forEach(el => {
+        el.addEventListener('change', updateVorschau);
+        el.addEventListener('input', updateVorschau);
+    });
+});
+</script>
+{% endblock %}

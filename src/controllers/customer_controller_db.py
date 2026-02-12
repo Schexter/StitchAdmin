@@ -138,9 +138,25 @@ def show(customer_id):
     # Aufträge des Kunden laden
     orders = customer.orders.order_by(Order.created_at.desc()).all() if hasattr(customer, 'orders') else []
     
+    # CRM-Aktivitäten laden (Telefonate, Besuche, E-Mails aus ProductionBlock)
+    activities = []
+    try:
+        from src.models import ProductionBlock
+        activities = ProductionBlock.query.filter(
+            ProductionBlock.customer_id == customer_id,
+            ProductionBlock.is_active == True
+        ).order_by(
+            ProductionBlock.start_date.desc(),
+            ProductionBlock.start_time.desc()
+        ).limit(20).all()
+    except Exception as e:
+        # ProductionBlock noch nicht migriert - ignorieren
+        pass
+    
     return render_template('customers/show.html', 
                          customer=customer, 
                          orders=orders,
+                         activities=activities,
                          history=[])  # TODO: Historie-Feature später implementieren
 
 @customer_bp.route('/<customer_id>/edit', methods=['GET', 'POST'])

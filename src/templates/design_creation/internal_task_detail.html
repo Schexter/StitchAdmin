@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+
+{% block title %}Design-Aufgabe: {{ task.title }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('design_creation.dashboard') }}">Design-Erstellung</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('design_creation.internal_tasks') }}">Aufgaben</a></li>
+                    <li class="breadcrumb-item active">{{ task.title[:30] }}...</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-1">
+                {{ task.type_icon }} {{ task.title }}
+            </h1>
+            <p class="text-muted mb-0">
+                Erstellt am {{ task.created_at.strftime('%d.%m.%Y %H:%M') }} von {{ task.created_by or 'System' }}
+            </p>
+        </div>
+        <div class="btn-group">
+            {% if task.document_path %}
+            <a href="{{ url_for('design_creation.download_task_pdf', task_id=task.id) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-file-pdf"></i> Auftragszettel
+            </a>
+            {% endif %}
+            <a href="{{ url_for('design_creation.internal_tasks') }}" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-left"></i> Zurück
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Hauptbereich: Links -->
+        <div class="col-lg-8">
+            <!-- Status & Fortschritt -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-activity"></i> Status & Fortschritt</span>
+                    <span class="badge bg-{{ task.status_color }} fs-6">{{ task.status_display }}</span>
+                </div>
+                <div class="card-body">
+                    <!-- Fortschrittsbalken -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <label class="form-label mb-0"><strong>Fortschritt</strong></label>
+                            <span id="progress-display" class="fw-bold">{{ task.progress or 0 }}%</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 25px;">
+                            <div id="progress-bar"
+                                 class="progress-bar progress-bar-striped {% if task.status == 'in_progress' %}progress-bar-animated{% endif %} {% if task.progress == 100 %}bg-success{% elif task.progress >= 50 %}bg-info{% else %}bg-primary{% endif %}"
+                                 role="progressbar"
+                                 style="width: {{ task.progress or 0 }}%;"
+                                 aria-valuenow="{{ task.progress or 0 }}"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100">
+                            </div>
+                        </div>
+                        {% if task.status != 'completed' %}
+                        <div class="d-flex gap-2 flex-wrap">
+                            <input type="range" class="form-range flex-grow-1" id="progress-slider"
+                                   min="0" max="100" step="10" value="{{ task.progress or 0 }}"
+                                   style="max-width: 300px;">
+                            <button type="button" class="btn btn-sm btn-primary" id="save-progress-btn">
+                                <i class="bi bi-check"></i> Speichern
+                            </button>
+                            {% if task.status == 'open' %}
+                            <button type="button" class="btn btn-sm btn-success" id="start-task-btn">
+                                <i class="bi bi-play"></i> Bearbeitung starten
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Quick-Aktionen -->
+                    {% if task.status != 'completed' %}
+                    <div class="border-top pt-3">
+                        <div class="row g-2">
+                            <div class="col-auto">
+                                <button class="btn btn-outline-primary btn-sm" onclick="setProgress(25)">25%</button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-outline-primary btn-sm" onclick="setProgress(50)">50%</button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-outline-primary btn-sm" onclick="setProgress(75)">75%</button>
+                            </div>
+                            <div class="col-auto">
+                                <button class="btn btn-outline-success btn-sm" onclick="setProgress(100)">
+                                    <i class="bi bi-check-circle"></i> 100% - Fertig
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Design-Spezifikationen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-rulers"></i> Design-Spezifikationen
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Design-Typ</label>
+                            <p class="mb-0 fw-bold">
+                                {% if task.design_type == 'embroidery' %}
+                                <i class="bi bi-scissors"></i> Stickerei
+                                {% elif task.design_type == 'print' %}
+                                <i class="bi bi-printer"></i> Druck
+                                {% elif task.design_type == 'dtf' %}
+                                <i class="bi bi-palette"></i> DTF
+                                {% else %}
+                                {{ task.design_type or 'Nicht angegeben' }}
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Größe</label>
+                            <p class="mb-0 fw-bold">
+                                {{ task.design_width_mm or '?' }} x {{ task.design_height_mm or '?' }} mm
+                            </p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Stoffart</label>
+                            <p class="mb-0">{{ task.fabric_type or 'Nicht angegeben' }}</p>
+                        </div>
+                        {% if task.design_type == 'embroidery' %}
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Max. Stichzahl</label>
+                            <p class="mb-0">{{ task.max_stitch_count or 'Keine Vorgabe' }}</p>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-muted small">Max. Farben</label>
+                            <p class="mb-0">{{ task.max_colors or 'Keine Vorgabe' }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% set specs = task.get_design_specs() %}
+                    {% if specs.get('position') %}
+                    <div class="mt-3 pt-3 border-top">
+                        <label class="form-label text-muted small">Position</label>
+                        <p class="mb-0">{{ specs.position }}</p>
+                    </div>
+                    {% endif %}
+
+                    {% if specs.get('special_requirements') or specs.get('notes') %}
+                    <div class="mt-3 pt-3 border-top">
+                        <label class="form-label text-muted small">Hinweise / Anforderungen</label>
+                        <div class="alert alert-warning mb-0">
+                            {{ specs.special_requirements or specs.notes }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Ergebnis-Datei Upload -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-cloud-upload"></i> Ergebnis-Datei (Fertiges Design)</span>
+                    {% if task.result_file_path %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Hochgeladen</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if task.result_file_path %}
+                    <div class="alert alert-success d-flex align-items-center justify-content-between">
+                        <div>
+                            <i class="bi bi-file-earmark-check fs-4 me-2"></i>
+                            <strong>{{ task.result_file_name }}</strong>
+                        </div>
+                        <a href="{{ url_for('design_creation.download_task_result', task_id=task.id) }}"
+                           class="btn btn-success">
+                            <i class="bi bi-download"></i> Herunterladen
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    {% if task.status != 'completed' %}
+                    <form action="{{ url_for('design_creation.upload_task_result', task_id=task.id) }}"
+                          method="POST" enctype="multipart/form-data" class="mt-2">
+                        <div class="input-group">
+                            <input type="file" class="form-control" name="result_file" id="result_file"
+                                   accept=".dst,.pes,.jef,.exp,.vp3,.hus,.xxx,.pec,.sew,.png,.jpg,.jpeg,.pdf,.ai,.eps,.svg">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-upload"></i>
+                                {% if task.result_file_path %}Ersetzen{% else %}Hochladen{% endif %}
+                            </button>
+                        </div>
+                        <small class="text-muted">
+                            Akzeptierte Formate: DST, PES, JEF, EXP, VP3, PNG, JPG, PDF, AI, EPS, SVG
+                        </small>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Kommentare -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-chat-dots"></i> Verlauf & Kommentare
+                </div>
+                <div class="card-body">
+                    {% set comments = task.get_comments() %}
+                    {% if comments %}
+                    <div class="timeline">
+                        {% for comment in comments|reverse %}
+                        <div class="d-flex mb-3">
+                            <div class="flex-shrink-0">
+                                <span class="badge bg-light text-dark rounded-circle p-2">
+                                    <i class="bi bi-person"></i>
+                                </span>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <div class="d-flex justify-content-between">
+                                    <strong>{{ comment.user }}</strong>
+                                    <small class="text-muted">{{ comment.timestamp[:16].replace('T', ' ') }}</small>
+                                </div>
+                                <p class="mb-0">{{ comment.text }}</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center mb-0">Noch keine Kommentare</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Seitenleiste: Rechts -->
+        <div class="col-lg-4">
+            <!-- Info-Karten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-info-circle"></i> Details
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span class="text-muted">Priorität</span>
+                        <span class="badge bg-{{ task.priority_color }}">{{ task.priority_display }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span class="text-muted">Fällig am</span>
+                        {% if task.due_date %}
+                        <span class="{% if task.is_overdue %}text-danger fw-bold{% endif %}">
+                            {{ task.due_date.strftime('%d.%m.%Y') }}
+                            {% if task.is_overdue %}
+                            <i class="bi bi-exclamation-triangle"></i>
+                            {% endif %}
+                        </span>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span class="text-muted">Zugewiesen an</span>
+                        <span>{{ task.assigned_to or task.assigned_to_team or 'Nicht zugewiesen' }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span class="text-muted">Team</span>
+                        <span>{{ task.assigned_to_team or '-' }}</span>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Verknüpfter Auftrag -->
+            {% if task.order %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-link-45deg"></i> Verknüpfter Auftrag
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title mb-2">
+                        <a href="{{ url_for('orders.show', order_id=task.order.id) }}">
+                            {{ task.order.order_number }}
+                        </a>
+                    </h5>
+                    {% if task.order.customer %}
+                    <p class="mb-1">
+                        <i class="bi bi-person"></i> {{ task.order.customer.display_name }}
+                    </p>
+                    {% endif %}
+                    <p class="mb-0 text-muted small">
+                        {{ task.order.order_date.strftime('%d.%m.%Y') if task.order.order_date else '' }}
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Quell-Datei -->
+            {% if task.source_file_path %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-file-earmark"></i> Kundenvorlage
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>{{ task.source_file_name or 'Vorlage' }}</strong></p>
+                    <a href="{{ url_for('static', filename='uploads/' + task.source_file_name) }}"
+                       class="btn btn-sm btn-outline-primary" target="_blank">
+                        <i class="bi bi-eye"></i> Ansehen
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Aktionen -->
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-lightning"></i> Aktionen
+                </div>
+                <div class="card-body d-grid gap-2">
+                    {% if task.status == 'open' %}
+                    <button type="button" class="btn btn-success" id="start-task-btn-2">
+                        <i class="bi bi-play-fill"></i> Bearbeitung starten
+                    </button>
+                    {% endif %}
+
+                    {% if task.status in ['open', 'in_progress'] %}
+                    <form action="{{ url_for('design_creation.complete_task', task_id=task.id) }}" method="POST">
+                        <input type="hidden" name="notes" value="">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-check-circle"></i> Als erledigt markieren
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if task.status == 'completed' %}
+                    <div class="alert alert-success mb-0">
+                        <i class="bi bi-check-circle-fill"></i> Erledigt am
+                        {{ task.completed_at.strftime('%d.%m.%Y %H:%M') if task.completed_at else '-' }}
+                        {% if task.completed_by %}
+                        <br><small>von {{ task.completed_by }}</small>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const taskId = {{ task.id }};
+
+// Fortschritt-Slider
+const slider = document.getElementById('progress-slider');
+const progressBar = document.getElementById('progress-bar');
+const progressDisplay = document.getElementById('progress-display');
+
+if (slider) {
+    slider.addEventListener('input', function() {
+        const value = this.value;
+        progressBar.style.width = value + '%';
+        progressDisplay.textContent = value + '%';
+    });
+}
+
+// Fortschritt setzen
+function setProgress(value) {
+    if (slider) slider.value = value;
+    progressBar.style.width = value + '%';
+    progressDisplay.textContent = value + '%';
+    saveProgress(value);
+}
+
+// Fortschritt speichern
+function saveProgress(value) {
+    if (value === undefined && slider) {
+        value = slider.value;
+    }
+
+    const formData = new FormData();
+    formData.append('progress', value);
+
+    fetch(`/design-creation/task/${taskId}/update-progress`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // UI aktualisieren
+            if (data.status === 'completed') {
+                location.reload();
+            }
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+document.getElementById('save-progress-btn')?.addEventListener('click', () => saveProgress());
+
+// Bearbeitung starten
+function startTask() {
+    fetch(`/design-creation/task/${taskId}/start`, {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+document.getElementById('start-task-btn')?.addEventListener('click', startTask);
+document.getElementById('start-task-btn-2')?.addEventListener('click', startTask);
+</script>
+{% endblock %}

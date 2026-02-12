@@ -72,6 +72,16 @@ from .design import (
 # TODO / Aufgaben-System
 from .todo import Todo, TodoTemplate
 
+# Produktionsplanung - Zeitblöcke
+from .production_block import ProductionBlock
+
+# Produktionszeit-Tracking (Lernende Kalkulation)
+from .production_tracking import (
+    ProductionTimeLog,
+    ProductionStatistics,
+    PositionTimeEstimate
+)
+
 # Rechnungsmodul (optional)
 try:
     from .rechnungsmodul import (
@@ -103,6 +113,39 @@ except ImportError:
     POSSession = None
     POSTransaction = None
     POSPayment = None
+
+# Dokument-Workflow (Nummernkreise, Geschäftsdokumente, Zahlungen)
+try:
+    from .document_workflow import (
+        # Enums
+        DokumentTyp,
+        DokumentStatus,
+        PositionsTyp,
+        MwStKennzeichen,
+        # Models
+        Nummernkreis,
+        Zahlungsbedingung,
+        BusinessDocument,
+        DocumentPosition,
+        DocumentPayment,
+        # Helper
+        initialisiere_nummernkreise,
+        initialisiere_zahlungsbedingungen
+    )
+    DOCUMENT_WORKFLOW_AVAILABLE = True
+except ImportError:
+    DOCUMENT_WORKFLOW_AVAILABLE = False
+    DokumentTyp = None
+    DokumentStatus = None
+    PositionsTyp = None
+    MwStKennzeichen = None
+    Nummernkreis = None
+    Zahlungsbedingung = None
+    BusinessDocument = None
+    DocumentPosition = None
+    DocumentPayment = None
+    initialisiere_nummernkreise = None
+    initialisiere_zahlungsbedingungen = None
 
 # Exportiere alle Models
 __all__ = [
@@ -188,6 +231,14 @@ __all__ = [
     'Todo',
     'TodoTemplate',
     
+    # Produktionsplanung
+    'ProductionBlock',
+
+    # Produktionszeit-Tracking
+    'ProductionTimeLog',
+    'ProductionStatistics',
+    'PositionTimeEstimate',
+
     # Rechnungsmodul (optional)
     'Receipt',
     'ReceiptItem',
@@ -201,4 +252,18 @@ __all__ = [
     'POSTransaction',
     'POSPayment',
     'POS_AVAILABLE',
+    
+    # Dokument-Workflow
+    'DokumentTyp',
+    'DokumentStatus',
+    'PositionsTyp',
+    'MwStKennzeichen',
+    'Nummernkreis',
+    'Zahlungsbedingung',
+    'BusinessDocument',
+    'DocumentPosition',
+    'DocumentPayment',
+    'initialisiere_nummernkreise',
+    'initialisiere_zahlungsbedingungen',
+    'DOCUMENT_WORKFLOW_AVAILABLE',
 ]

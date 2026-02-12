@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% block title %}Auftragsbestätigungen - Übersicht{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-file-contract text-primary me-2"></i>Auftragsbestätigungen</h2>
+            <p class="text-muted mb-0">Verwaltung aller Kundenaufträge</p>
+        </div>
+        <div>
+            <a href="{{ url_for('wizard.start') }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-magic me-1"></i> Wizard
+            </a>
+            <a href="{{ url_for('auftraege.neu') }}" class="btn btn-success">
+                <i class="fas fa-plus me-1"></i> Neue AB
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Statistik-Karten -->
+        <div class="col-12 mb-4">
+            <div class="row g-3">
+                <div class="col-md-2">
+                    <div class="card bg-light h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.gesamt }}</h3>
+                            <small class="text-muted">Gesamt</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-secondary text-white h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.entwurf }}</h3>
+                            <small>Entwürfe</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="card bg-info text-white h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.versendet }}</h3>
+                            <small>Versendet</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.in_bearbeitung }}</h3>
+                            <small>In Bearbeitung</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.geliefert }}</h3>
+                            <small>Geliefert</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="GET" class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="alle" {% if status_filter == 'alle' %}selected{% endif %}>Alle Status</option>
+                                <option value="entwurf" {% if status_filter == 'entwurf' %}selected{% endif %}>📝 Entwurf</option>
+                                <option value="versendet" {% if status_filter == 'versendet' %}selected{% endif %}>📤 Versendet</option>
+                                <option value="in_bearbeitung" {% if status_filter == 'in_bearbeitung' %}selected{% endif %}>⚙️ In Bearbeitung</option>
+                                <option value="geliefert" {% if status_filter == 'geliefert' %}selected{% endif %}>✅ Geliefert</option>
+                                <option value="storniert" {% if status_filter == 'storniert' %}selected{% endif %}>🚫 Storniert</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Kunde suchen</label>
+                            <input type="text" name="kunde" class="form-control" 
+                                   value="{{ kunde_filter }}" placeholder="Name, Firma...">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-search me-1"></i> Filtern
+                            </button>
+                        </div>
+                        <div class="col-md-2">
+                            <a href="{{ url_for('auftraege.index') }}" class="btn btn-outline-secondary w-100">
+                                <i class="fas fa-times me-1"></i> Reset
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auftrags-Liste -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    {% if auftraege %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>AB-Nummer</th>
+                                    <th>Kunde</th>
+                                    <th>Betreff</th>
+                                    <th class="text-center">Datum</th>
+                                    <th class="text-center">Lieferdatum</th>
+                                    <th class="text-end">Betrag</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="text-end">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for auftrag in auftraege %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('auftraege.show', id=auftrag.id) }}" class="fw-bold text-decoration-none">
+                                            {{ auftrag.dokument_nummer }}
+                                        </a>
+                                        {% if auftrag.vorgaenger_id %}
+                                        <br><small class="text-muted">aus Angebot</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if auftrag.kunde %}
+                                        {{ auftrag.kunde.display_name }}
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ auftrag.betreff|truncate(40) if auftrag.betreff else '-' }}
+                                    </td>
+                                    <td class="text-center">
+                                        {{ auftrag.dokument_datum.strftime('%d.%m.%Y') }}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if auftrag.lieferdatum %}
+                                        {{ auftrag.lieferdatum.strftime('%d.%m.%Y') }}
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>{{ "%.2f"|format(auftrag.summe_brutto or 0) }} €</strong>
+                                    </td>
+                                    <td class="text-center">
+                                        {% if auftrag.status == 'entwurf' %}
+                                        <span class="badge bg-secondary">📝 Entwurf</span>
+                                        {% elif auftrag.status == 'versendet' %}
+                                        <span class="badge bg-info">📤 Versendet</span>
+                                        {% elif auftrag.status == 'in_bearbeitung' %}
+                                        <span class="badge bg-warning text-dark">⚙️ In Bearbeitung</span>
+                                        {% elif auftrag.status == 'geliefert' %}
+                                        <span class="badge bg-success">✅ Geliefert</span>
+                                        {% elif auftrag.status == 'storniert' %}
+                                        <span class="badge bg-dark">🚫 Storniert</span>
+                                        {% else %}
+                                        <span class="badge bg-light text-dark">{{ auftrag.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('auftraege.show', id=auftrag.id) }}" 
+                                               class="btn btn-outline-primary" title="Anzeigen">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{{ url_for('auftraege.pdf_vorschau', id=auftrag.id) }}" 
+                                               class="btn btn-outline-secondary" title="PDF" target="_blank">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </a>
+                                            {% if auftrag.status == 'entwurf' %}
+                                            <a href="{{ url_for('auftraege.bearbeiten', id=auftrag.id) }}" 
+                                               class="btn btn-outline-warning" title="Bearbeiten">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-file-contract fa-4x text-muted mb-3"></i>
+                        <h5>Keine Auftragsbestätigungen gefunden</h5>
+                        <p class="text-muted">
+                            {% if status_filter != 'alle' or kunde_filter %}
+                            Versuchen Sie andere Filtereinstellungen.
+                            {% else %}
+                            Erstellen Sie Ihre erste Auftragsbestätigung!
+                            {% endif %}
+                        </p>
+                        <a href="{{ url_for('auftraege.neu') }}" class="btn btn-success">
+                            <i class="fas fa-plus me-1"></i> Neue AB
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

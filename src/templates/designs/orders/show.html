@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}{{ order.design_order_number }} - Design-Bestellung{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('designs.design_orders') }}">Design-Bestellungen</a></li>
+                    <li class="breadcrumb-item active">{{ order.design_order_number }}</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-1">
+                {{ order.type_icon }} {{ order.design_order_number }}
+            </h1>
+            <p class="text-muted mb-0">
+                <span class="badge bg-{{ order.status_color }}">{{ order.status_display }}</span>
+                <span class="badge bg-{{ order.priority_color }} ms-1">{{ order.priority_display }}</span>
+                {% if order.is_overdue %}
+                <span class="badge bg-danger ms-1"><i class="bi bi-exclamation-triangle"></i> Überfällig</span>
+                {% endif %}
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('designs.design_order_pdf', order_id=order.id) }}" class="btn btn-outline-primary">
+                <i class="bi bi-file-pdf"></i> PDF erstellen
+            </a>
+            {% if order.status == 'draft' %}
+            <form action="{{ url_for('designs.update_design_order_status', order_id=order.id) }}" method="POST" class="d-inline">
+                <input type="hidden" name="status" value="sent">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-send"></i> Als angefragt markieren
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Linke Spalte -->
+        <div class="col-lg-8">
+            <!-- Design-Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Design-Informationen</h6>
+                </div>
+                <div class="card-body">
+                    <h5>{{ order.design_name or 'Ohne Namen' }}</h5>
+                    {% if order.design_description %}
+                    <p class="text-muted">{{ order.design_description }}</p>
+                    {% endif %}
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless mb-0">
+                                <tr>
+                                    <td class="text-muted">Typ:</td>
+                                    <td>{{ order.type_display }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Art:</td>
+                                    <td>
+                                        {% if order.order_type == 'new_design' %}Neuerstellung
+                                        {% elif order.order_type == 'revision' %}Überarbeitung
+                                        {% elif order.order_type == 'conversion' %}Konvertierung
+                                        {% else %}{{ order.order_type or '-' }}{% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Kunde:</td>
+                                    <td>{{ order.customer.display_name if order.customer else '-' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-sm table-borderless mb-0">
+                                <tr>
+                                    <td class="text-muted">Lieferant:</td>
+                                    <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Erstellt:</td>
+                                    <td>{{ order.created_at.strftime('%d.%m.%Y') }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Liefertermin:</td>
+                                    <td>{{ order.expected_delivery.strftime('%d.%m.%Y') if order.expected_delivery else '-' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Spezifikation -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Technische Spezifikation</h6>
+                </div>
+                <div class="card-body">
+                    {% if order.design_type == 'embroidery' %}
+                    <div class="row g-4">
+                        <div class="col-md-3 col-6">
+                            <div class="text-muted small">Größe</div>
+                            <div class="fw-bold">
+                                {% if order.target_width_mm and order.target_height_mm %}
+                                {{ order.target_width_mm }} × {{ order.target_height_mm }} mm
+                                {% else %}-{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="text-muted small">Max. Stichzahl</div>
+                            <div class="fw-bold">{{ "{:,}".format(order.max_stitch_count) if order.max_stitch_count else '-' }}</div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="text-muted small">Max. Farben</div>
+                            <div class="fw-bold">{{ order.max_colors or '-' }}</div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="text-muted small">Stichdichte</div>
+                            <div class="fw-bold">{{ order.stitch_density or 'Normal' }}</div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="text-muted small">Unterlage</div>
+                            <div class="fw-bold">{{ order.underlay_type or 'Standard' }}</div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="text-muted small">Stoffart</div>
+                            <div class="fw-bold">{{ order.fabric_type or '-' }}</div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="row g-4">
+                        <div class="col-md-3 col-6">
+                            <div class="text-muted small">Größe</div>
+                            <div class="fw-bold">
+                                {% if order.target_print_width_cm and order.target_print_height_cm %}
+                                {{ order.target_print_width_cm }} × {{ order.target_print_height_cm }} cm
+                                {% else %}-{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="text-muted small">Min. DPI</div>
+                            <div class="fw-bold">{{ order.min_dpi or 300 }}</div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="text-muted small">Farbmodus</div>
+                            <div class="fw-bold">{{ (order.color_mode or 'CMYK')|upper }}</div>
+                        </div>
+                        <div class="col-md-3 col-6">
+                            <div class="text-muted small">Druckmethode</div>
+                            <div class="fw-bold">{{ order.print_method or '-' }}</div>
+                        </div>
+                    </div>
+                    {% if order.needs_transparent_bg or order.needs_white_underbase %}
+                    <div class="mt-3">
+                        {% if order.needs_transparent_bg %}
+                        <span class="badge bg-info">Transparenter Hintergrund</span>
+                        {% endif %}
+                        {% if order.needs_white_underbase %}
+                        <span class="badge bg-light text-dark">Weiß-Unterlage</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Besondere Anforderungen -->
+            {% if order.special_requirements %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Besondere Anforderungen</h6>
+                </div>
+                <div class="card-body">
+                    <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ order.special_requirements }}</pre>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Vorlage -->
+            {% if order.source_file_path %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Kundenvorlage</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-file-earmark fs-1 text-muted me-3"></i>
+                        <div>
+                            <div class="fw-bold">{{ order.source_file_name }}</div>
+                            <small class="text-muted">{{ order.source_file_type|upper if order.source_file_type else 'Datei' }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Rechte Spalte: Status & Workflow -->
+        <div class="col-lg-4">
+            <!-- Status-Workflow -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Status ändern</h6>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('designs.update_design_order_status', order_id=order.id) }}" method="POST">
+                        <select name="status" class="form-select mb-3">
+                            <option value="draft" {{ 'selected' if order.status == 'draft' }}>Entwurf</option>
+                            <option value="sent" {{ 'selected' if order.status == 'sent' }}>Angefragt</option>
+                            <option value="quoted" {{ 'selected' if order.status == 'quoted' }}>Angebot erhalten</option>
+                            <option value="accepted" {{ 'selected' if order.status == 'accepted' }}>Angenommen</option>
+                            <option value="deposit_paid" {{ 'selected' if order.status == 'deposit_paid' }}>Anzahlung bezahlt</option>
+                            <option value="in_progress" {{ 'selected' if order.status == 'in_progress' }}>In Bearbeitung</option>
+                            <option value="delivered" {{ 'selected' if order.status == 'delivered' }}>Geliefert</option>
+                            <option value="received" {{ 'selected' if order.status == 'received' }}>Eingegangen</option>
+                            <option value="revision_requested" {{ 'selected' if order.status == 'revision_requested' }}>Überarbeitung angefordert</option>
+                            <option value="completed" {{ 'selected' if order.status == 'completed' }}>Abgeschlossen</option>
+                            <option value="cancelled" {{ 'selected' if order.status == 'cancelled' }}>Storniert</option>
+                        </select>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-check"></i> Status aktualisieren
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Kosten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Kosten</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Angebot:</td>
+                            <td class="text-end">{{ "%.2f €"|format(order.quote_price) if order.quote_price else '-' }}</td>
+                        </tr>
+                        {% if order.deposit_amount %}
+                        <tr>
+                            <td class="text-muted">Anzahlung:</td>
+                            <td class="text-end">{{ "%.2f €"|format(order.deposit_amount) }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr class="border-top">
+                            <td class="text-muted"><strong>Gesamt:</strong></td>
+                            <td class="text-end"><strong>{{ "%.2f €"|format(order.total_price) if order.total_price else '-' }}</strong></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Timeline -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Zeitverlauf</h6>
+                </div>
+                <div class="card-body">
+                    <div class="timeline-simple">
+                        <div class="timeline-item d-flex mb-2">
+                            <div class="timeline-dot bg-success me-2"></div>
+                            <div class="flex-grow-1">
+                                <small class="text-muted">{{ order.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                                <div>Erstellt</div>
+                            </div>
+                        </div>
+                        {% if order.request_sent_at %}
+                        <div class="timeline-item d-flex mb-2">
+                            <div class="timeline-dot bg-info me-2"></div>
+                            <div class="flex-grow-1">
+                                <small class="text-muted">{{ order.request_sent_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                                <div>Anfrage gesendet</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if order.quote_received_at %}
+                        <div class="timeline-item d-flex mb-2">
+                            <div class="timeline-dot bg-primary me-2"></div>
+                            <div class="flex-grow-1">
+                                <small class="text-muted">{{ order.quote_received_at.strftime('%d.%m.%Y') }}</small>
+                                <div>Angebot erhalten</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if order.delivered_at %}
+                        <div class="timeline-item d-flex mb-2">
+                            <div class="timeline-dot bg-success me-2"></div>
+                            <div class="flex-grow-1">
+                                <small class="text-muted">{{ order.delivered_at.strftime('%d.%m.%Y') }}</small>
+                                <div>Geliefert</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if order.completed_at %}
+                        <div class="timeline-item d-flex mb-2">
+                            <div class="timeline-dot bg-dark me-2"></div>
+                            <div class="flex-grow-1">
+                                <small class="text-muted">{{ order.completed_at.strftime('%d.%m.%Y') }}</small>
+                                <div>Abgeschlossen</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- PDF -->
+            {% if order.order_pdf_path %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">Dokumente</h6>
+                </div>
+                <div class="card-body">
+                    <a href="{{ url_for('designs.design_order_pdf', order_id=order.id) }}" class="btn btn-outline-primary w-100">
+                        <i class="bi bi-file-pdf"></i> PDF-Beauftragung herunterladen
+                    </a>
+                    {% if order.order_pdf_generated_at %}
+                    <small class="text-muted d-block mt-2 text-center">
+                        Erstellt: {{ order.order_pdf_generated_at.strftime('%d.%m.%Y %H:%M') }}
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Zurück -->
+    <div class="mt-4">
+        <a href="{{ url_for('designs.design_orders') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+        </a>
+    </div>
+</div>
+
+<style>
+.timeline-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-top: 4px;
+}
+</style>
+{% endblock %}

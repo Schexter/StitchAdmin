@@ -1,0 +1,709 @@
+{#
+    Multi-Position-Design Management für Aufträge
+    Ermöglicht das Hinzufügen mehrerer Design-Positionen (Brust, Ärmel, Rücken, etc.)
+
+    Verwendung: {% include 'orders/includes/design_positions.html' %}
+    Voraussetzung: order Objekt muss verfügbar sein
+#}
+
+<div class="card mb-4" id="design-positions-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">
+            <i class="bi bi-palette2"></i> Design-Positionen
+            <span class="badge bg-secondary ms-2" id="design-count">{{ order.designs.count() if order.designs else 0 }}</span>
+        </h6>
+        <button type="button" class="btn btn-sm btn-success" onclick="openAddDesignModal()">
+            <i class="bi bi-plus-lg"></i> Position hinzufügen
+        </button>
+    </div>
+    <div class="card-body">
+        {% if order.designs and order.designs.count() > 0 %}
+            <div class="table-responsive">
+                <table class="table table-hover" id="design-positions-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">Vorschau</th>
+                            <th>Position</th>
+                            <th>Typ</th>
+                            <th>Details</th>
+                            <th>Freigabe</th>
+                            <th style="width: 120px;">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for design in order.designs.order_by('sort_order') %}
+                        <tr data-design-id="{{ design.id }}">
+                            <td>
+                                {% if design.design_thumbnail_path %}
+                                    <img src="{{ url_for('static', filename='uploads/' + design.design_thumbnail_path) }}"
+                                         alt="Vorschau" class="img-thumbnail" style="max-width: 50px; max-height: 50px;">
+                                {% elif design.design_file_path %}
+                                    <img src="{{ url_for('order_designs.get_design_image', design_id=design.id) }}"
+                                         alt="Vorschau" class="img-thumbnail" style="max-width: 50px; max-height: 50px;"
+                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                    <div class="bg-light align-items-center justify-content-center"
+                                         style="width: 50px; height: 50px; border-radius: 4px; display: none;">
+                                        <i class="bi bi-image text-muted"></i>
+                                    </div>
+                                {% else %}
+                                    <div class="bg-light d-flex align-items-center justify-content-center"
+                                         style="width: 50px; height: 50px; border-radius: 4px;">
+                                        <i class="bi bi-image text-muted"></i>
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ design.get_position_label() }}</strong>
+                                {% if design.is_personalized %}
+                                    <span class="badge bg-info ms-1" title="Personalisiert">
+                                        <i class="bi bi-person-badge"></i>
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-{{ 'primary' if design.design_type == 'stick' else 'success' }}">
+                                    {{ design.get_design_type_label() }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if design.design_type == 'stick' and design.stitch_count %}
+                                    {{ "{:,}".format(design.stitch_count) }} Stiche<br>
+                                    <small class="text-muted">{{ design.width_mm }}x{{ design.height_mm }} mm</small>
+                                {% elif design.print_width_cm %}
+                                    {{ design.print_width_cm }}x{{ design.print_height_cm }} cm
+                                {% else %}
+                                    <small class="text-muted">Keine Details</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {{ design.get_approval_status_badge_class() }}">
+                                    {{ design.get_approval_status_label() }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-primary"
+                                            onclick="editDesignPosition({{ design.id }})" title="Bearbeiten">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    {% if design.is_personalized %}
+                                    <button type="button" class="btn btn-outline-info"
+                                            onclick="managePersonalizations({{ design.id }})" title="Namen verwalten">
+                                        <i class="bi bi-people"></i>
+                                    </button>
+                                    {% endif %}
+                                    <button type="button" class="btn btn-outline-danger"
+                                            onclick="deleteDesignPosition({{ design.id }})" title="Löschen">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4">
+                <i class="bi bi-palette2 text-muted" style="font-size: 3rem;"></i>
+                <p class="text-muted mt-2">Noch keine Design-Positionen angelegt.</p>
+                <button type="button" class="btn btn-primary" onclick="openAddDesignModal()">
+                    <i class="bi bi-plus-lg"></i> Erste Position hinzufügen
+                </button>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal: Design-Position hinzufügen/bearbeiten -->
+<div class="modal fade" id="designPositionModal" tabindex="-1" aria-labelledby="designPositionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="designPositionModalLabel">
+                    <i class="bi bi-plus-circle"></i> Design-Position hinzufügen
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <form id="designPositionForm" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="design_id" id="design_id" value="">
+                <input type="hidden" name="order_id" value="{{ order.id }}">
+
+                <div class="modal-body">
+                    <div class="row">
+                        <!-- Position -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label" for="position">Position auf dem Textil *</label>
+                                <select class="form-select" id="position" name="position" required onchange="updatePositionLabel()">
+                                    <option value="">Position wählen...</option>
+                                    <optgroup label="Vorderseite">
+                                        <option value="brust_links">Brust links</option>
+                                        <option value="brust_rechts">Brust rechts</option>
+                                        <option value="brust_mitte">Brust Mitte</option>
+                                    </optgroup>
+                                    <optgroup label="Ärmel">
+                                        <option value="aermel_links">Ärmel links</option>
+                                        <option value="aermel_rechts">Ärmel rechts</option>
+                                    </optgroup>
+                                    <optgroup label="Rückseite">
+                                        <option value="ruecken">Rücken</option>
+                                        <option value="ruecken_oben">Rücken oben</option>
+                                        <option value="ruecken_unten">Rücken unten</option>
+                                        <option value="kragen">Kragen/Nacken</option>
+                                    </optgroup>
+                                    <optgroup label="Sonstige">
+                                        <option value="bauch">Bauch</option>
+                                        <option value="hosenbein_links">Hosenbein links</option>
+                                        <option value="hosenbein_rechts">Hosenbein rechts</option>
+                                        <option value="kappe_vorne">Kappe vorne</option>
+                                        <option value="kappe_seite">Kappe Seite</option>
+                                        <option value="andere">Andere Position</option>
+                                    </optgroup>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Design-Typ -->
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label" for="design_type">Design-Typ *</label>
+                                <select class="form-select" id="design_type" name="design_type" required onchange="toggleDesignTypeFields()">
+                                    <option value="stick">Stickerei</option>
+                                    <option value="druck">Druck</option>
+                                    <option value="flex">Flex/Flock</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personalisierung -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="is_personalized" name="is_personalized"
+                                   onchange="togglePersonalizationInfo()">
+                            <label class="form-check-label" for="is_personalized">
+                                <strong>Personalisiert</strong> - Jedes Stück hat einen anderen Text (z.B. Namen)
+                            </label>
+                        </div>
+                        <div id="personalization-info" class="alert alert-info mt-2" style="display: none;">
+                            <i class="bi bi-info-circle"></i>
+                            Nach dem Speichern können Sie die individuellen Namen/Texte für jedes Stück eingeben.
+                        </div>
+                    </div>
+
+                    <!-- Design-Name -->
+                    <div class="mb-3">
+                        <label class="form-label" for="design_name">Design-Name / Beschreibung</label>
+                        <input type="text" class="form-control" id="design_name" name="design_name"
+                               placeholder="z.B. Firmenlogo, Alpentour 2025, etc.">
+                    </div>
+
+                    <!-- Design-Datei -->
+                    <div class="mb-3">
+                        <label class="form-label">Design-Datei</label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">Aus Archiv wählen</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="design_file_path" name="design_file_path"
+                                           placeholder="Pfad zur Design-Datei" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="selectDesignFileForPosition()">
+                                        <i class="bi bi-folder"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label text-muted small">Oder hochladen</label>
+                                <input type="file" class="form-control" id="design_file_upload" name="design_file"
+                                       accept=".dst,.pes,.jef,.exp,.svg,.ai,.pdf,.png,.jpg,.jpeg"
+                                       onchange="analyzeUploadedDesign(this)">
+                            </div>
+                        </div>
+                        <div id="design-analysis-result" class="mt-2"></div>
+                    </div>
+
+                    <!-- Stickerei-Details (nur bei design_type=stick) -->
+                    <div id="embroidery-details" class="border rounded p-3 mb-3">
+                        <h6 class="text-primary"><i class="bi bi-thread"></i> Stickerei-Details</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label" for="stitch_count">Stichzahl</label>
+                                    <input type="number" class="form-control" id="stitch_count" name="stitch_count"
+                                           min="0" step="100" placeholder="z.B. 5000">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label" for="width_mm">Breite (mm)</label>
+                                    <input type="number" class="form-control" id="width_mm" name="width_mm"
+                                           min="0" step="1" placeholder="z.B. 80">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label" for="height_mm">Höhe (mm)</label>
+                                    <input type="number" class="form-control" id="height_mm" name="height_mm"
+                                           min="0" step="1" placeholder="z.B. 60">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="thread_colors">Garnfarben (JSON)</label>
+                            <textarea class="form-control" id="thread_colors" name="thread_colors" rows="2"
+                                      placeholder='[{"color": "Rot", "madeira_nr": "1147"}]'></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Druck-Details (nur bei design_type != stick) -->
+                    <div id="print-details" class="border rounded p-3 mb-3" style="display: none;">
+                        <h6 class="text-success"><i class="bi bi-printer"></i> Druck-Details</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label" for="print_width_cm">Breite (cm)</label>
+                                    <input type="number" class="form-control" id="print_width_cm" name="print_width_cm"
+                                           min="0" step="0.5" placeholder="z.B. 20">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label" for="print_height_cm">Höhe (cm)</label>
+                                    <input type="number" class="form-control" id="print_height_cm" name="print_height_cm"
+                                           min="0" step="0.5" placeholder="z.B. 30">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label" for="print_colors">Anzahl Farben</label>
+                                    <input type="number" class="form-control" id="print_colors" name="print_colors"
+                                           min="1" max="10" value="1">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preise -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label" for="setup_price">Einrichtungskosten (einmalig)</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="setup_price" name="setup_price"
+                                           min="0" step="0.01" value="0">
+                                    <span class="input-group-text">EUR</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label" for="price_per_piece">Preis pro Stück</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="price_per_piece" name="price_per_piece"
+                                           min="0" step="0.01" value="0">
+                                    <span class="input-group-text">EUR</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Speichern
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Personalisierungen verwalten -->
+<div class="modal fade" id="personalizationModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-people"></i> Personalisierungen verwalten
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Geben Sie für jedes Stück den individuellen Text ein. Die Stücke werden aus den Auftrags-Positionen übernommen.
+                </div>
+
+                <div id="personalization-list">
+                    <!-- Wird dynamisch gefüllt -->
+                </div>
+
+                <div class="mt-3">
+                    <h6>Schnelleingabe (ein Name pro Zeile)</h6>
+                    <textarea class="form-control" id="bulk-names-input" rows="5"
+                              placeholder="Max Mustermann&#10;Anna Schmidt&#10;Peter Müller&#10;..."></textarea>
+                    <button type="button" class="btn btn-outline-primary mt-2" onclick="applyBulkNames()">
+                        <i class="bi bi-lightning"></i> Namen übernehmen
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+                <button type="button" class="btn btn-primary" onclick="savePersonalizations()">
+                    <i class="bi bi-check-lg"></i> Alle speichern
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Design-Position Modal Funktionen
+function openAddDesignModal() {
+    // Reset Form
+    document.getElementById('designPositionForm').reset();
+    document.getElementById('design_id').value = '';
+    document.getElementById('designPositionModalLabel').innerHTML = '<i class="bi bi-plus-circle"></i> Design-Position hinzufügen';
+
+    // Standard-Werte
+    toggleDesignTypeFields();
+    togglePersonalizationInfo();
+
+    // Modal öffnen
+    const modal = new bootstrap.Modal(document.getElementById('designPositionModal'));
+    modal.show();
+}
+
+function editDesignPosition(designId) {
+    // Lade Design-Daten via AJAX
+    fetch(`/orders/api/design/${designId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const design = data.design;
+
+                // Formular füllen
+                document.getElementById('design_id').value = design.id;
+                document.getElementById('position').value = design.position;
+                document.getElementById('design_type').value = design.design_type;
+                document.getElementById('is_personalized').checked = design.is_personalized;
+                document.getElementById('design_name').value = design.design_name || '';
+                document.getElementById('design_file_path').value = design.design_file_path || '';
+
+                // Stickerei-Details
+                document.getElementById('stitch_count').value = design.stitch_count || '';
+                document.getElementById('width_mm').value = design.width_mm || '';
+                document.getElementById('height_mm').value = design.height_mm || '';
+                document.getElementById('thread_colors').value = design.thread_colors || '';
+
+                // Druck-Details
+                document.getElementById('print_width_cm').value = design.print_width_cm || '';
+                document.getElementById('print_height_cm').value = design.print_height_cm || '';
+                document.getElementById('print_colors').value = design.print_colors || 1;
+
+                // Preise
+                document.getElementById('setup_price').value = design.setup_price || 0;
+                document.getElementById('price_per_piece').value = design.price_per_piece || 0;
+
+                // UI aktualisieren
+                toggleDesignTypeFields();
+                togglePersonalizationInfo();
+
+                // Modal-Titel ändern
+                document.getElementById('designPositionModalLabel').innerHTML = '<i class="bi bi-pencil"></i> Design-Position bearbeiten';
+
+                // Modal öffnen
+                const modal = new bootstrap.Modal(document.getElementById('designPositionModal'));
+                modal.show();
+            } else {
+                alert('Fehler beim Laden: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Fehler beim Laden der Design-Daten');
+        });
+}
+
+function deleteDesignPosition(designId) {
+    if (!confirm('Möchten Sie diese Design-Position wirklich löschen?')) {
+        return;
+    }
+
+    fetch(`/orders/api/design/${designId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Zeile aus Tabelle entfernen
+            const row = document.querySelector(`tr[data-design-id="${designId}"]`);
+            if (row) row.remove();
+
+            // Counter aktualisieren
+            updateDesignCount();
+
+            // Wenn keine Designs mehr, Platzhalter anzeigen
+            const tbody = document.querySelector('#design-positions-table tbody');
+            if (tbody && tbody.children.length === 0) {
+                location.reload(); // Einfachste Lösung
+            }
+        } else {
+            alert('Fehler beim Löschen: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Fehler beim Löschen');
+    });
+}
+
+function toggleDesignTypeFields() {
+    const designType = document.getElementById('design_type').value;
+    const embroideryDetails = document.getElementById('embroidery-details');
+    const printDetails = document.getElementById('print-details');
+
+    if (designType === 'stick') {
+        embroideryDetails.style.display = 'block';
+        printDetails.style.display = 'none';
+    } else {
+        embroideryDetails.style.display = 'none';
+        printDetails.style.display = 'block';
+    }
+}
+
+function togglePersonalizationInfo() {
+    const checkbox = document.getElementById('is_personalized');
+    const info = document.getElementById('personalization-info');
+    info.style.display = checkbox.checked ? 'block' : 'none';
+}
+
+function updatePositionLabel() {
+    const select = document.getElementById('position');
+    const selectedOption = select.options[select.selectedIndex];
+    // Position-Label wird automatisch aus der Option genommen
+}
+
+function updateDesignCount() {
+    const tbody = document.querySelector('#design-positions-table tbody');
+    const count = tbody ? tbody.children.length : 0;
+    document.getElementById('design-count').textContent = count;
+}
+
+// Personalisierungen verwalten
+let currentDesignId = null;
+
+function managePersonalizations(designId) {
+    currentDesignId = designId;
+
+    // Lade Order-Items und bestehende Personalisierungen
+    fetch(`/orders/api/design/${designId}/personalizations`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderPersonalizationList(data.order_items, data.personalizations);
+
+                const modal = new bootstrap.Modal(document.getElementById('personalizationModal'));
+                modal.show();
+            } else {
+                alert('Fehler: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Fehler beim Laden der Personalisierungen');
+        });
+}
+
+function renderPersonalizationList(orderItems, personalizations) {
+    const container = document.getElementById('personalization-list');
+
+    // Erstelle Map für schnellen Zugriff
+    const persMap = {};
+    personalizations.forEach(p => {
+        persMap[p.order_item_id] = p;
+    });
+
+    let html = '<table class="table table-sm">';
+    html += '<thead><tr><th>#</th><th>Artikel</th><th>Größe</th><th>Farbe</th><th>Text Zeile 1</th><th>Text Zeile 2</th><th>Produziert</th></tr></thead>';
+    html += '<tbody>';
+
+    let seq = 1;
+    orderItems.forEach(item => {
+        const pers = persMap[item.id] || {};
+
+        for (let i = 0; i < item.quantity; i++) {
+            html += `<tr data-item-id="${item.id}" data-seq="${seq}">
+                <td>${seq}</td>
+                <td>${item.article_name || item.article_id}</td>
+                <td>${item.textile_size || '-'}</td>
+                <td>${item.textile_color || '-'}</td>
+                <td><input type="text" class="form-control form-control-sm pers-text1" value="${pers.text_line_1 || ''}" placeholder="Name..."></td>
+                <td><input type="text" class="form-control form-control-sm pers-text2" value="${pers.text_line_2 || ''}" placeholder="Optional..."></td>
+                <td><input type="checkbox" class="form-check-input pers-produced" ${pers.is_produced ? 'checked' : ''}></td>
+            </tr>`;
+            seq++;
+        }
+    });
+
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function applyBulkNames() {
+    const textarea = document.getElementById('bulk-names-input');
+    const names = textarea.value.split('\n').filter(n => n.trim());
+
+    const inputs = document.querySelectorAll('.pers-text1');
+    names.forEach((name, index) => {
+        if (inputs[index]) {
+            inputs[index].value = name.trim();
+        }
+    });
+}
+
+function savePersonalizations() {
+    const rows = document.querySelectorAll('#personalization-list tbody tr');
+    const data = [];
+
+    rows.forEach(row => {
+        data.push({
+            order_item_id: row.dataset.itemId,
+            sequence_number: parseInt(row.dataset.seq),
+            text_line_1: row.querySelector('.pers-text1').value,
+            text_line_2: row.querySelector('.pers-text2').value,
+            is_produced: row.querySelector('.pers-produced').checked
+        });
+    });
+
+    fetch(`/orders/api/design/${currentDesignId}/personalizations`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ personalizations: data })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Personalisierungen gespeichert!');
+            bootstrap.Modal.getInstance(document.getElementById('personalizationModal')).hide();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Fehler beim Speichern');
+    });
+}
+
+// Design-Datei für Position auswählen
+function selectDesignFileForPosition() {
+    if (typeof fileBrowser !== 'undefined' && fileBrowser) {
+        fileBrowser.openModal(function(selectedFile) {
+            document.getElementById('design_file_path').value = selectedFile.path;
+            analyzeDesignFileForPosition(selectedFile.path);
+        });
+    } else {
+        alert('Datei-Browser nicht verfügbar.');
+    }
+}
+
+function analyzeDesignFileForPosition(filePath) {
+    const resultDiv = document.getElementById('design-analysis-result');
+    resultDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Analysiere...</div>';
+
+    fetch('/file_browser/get_file_info?path=' + encodeURIComponent(filePath))
+        .then(response => response.json())
+        .then(data => {
+            if (data.analysis && data.analysis.success) {
+                // Felder automatisch ausfüllen
+                if (data.analysis.stitch_count) {
+                    document.getElementById('stitch_count').value = Math.ceil(data.analysis.stitch_count / 100) * 100;
+                    document.getElementById('width_mm').value = Math.round(data.analysis.width_mm);
+                    document.getElementById('height_mm').value = Math.round(data.analysis.height_mm);
+                }
+
+                resultDiv.innerHTML = `<div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i> Datei analysiert:
+                    ${data.analysis.stitch_count ? data.analysis.stitch_count.toLocaleString() + ' Stiche' : ''}
+                </div>`;
+            } else {
+                resultDiv.innerHTML = '';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            resultDiv.innerHTML = '';
+        });
+}
+
+function analyzeUploadedDesign(input) {
+    if (!input.files || !input.files[0]) return;
+
+    const file = input.files[0];
+    const resultDiv = document.getElementById('design-analysis-result');
+
+    if (file.name.toLowerCase().endsWith('.dst')) {
+        resultDiv.innerHTML = '<div class="alert alert-info"><i class="bi bi-hourglass-split"></i> Analysiere DST...</div>';
+
+        const formData = new FormData();
+        formData.append('design_file', file);
+
+        fetch('/orders/analyze_file', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.stitch_count) {
+                document.getElementById('stitch_count').value = Math.ceil(data.stitch_count / 100) * 100;
+                if (data.width_mm) document.getElementById('width_mm').value = Math.round(data.width_mm);
+                if (data.height_mm) document.getElementById('height_mm').value = Math.round(data.height_mm);
+
+                resultDiv.innerHTML = `<div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i> DST analysiert: ${data.stitch_count.toLocaleString()} Stiche
+                </div>`;
+            } else {
+                resultDiv.innerHTML = '';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            resultDiv.innerHTML = '';
+        });
+    }
+}
+
+// Form-Submit Handler
+document.getElementById('designPositionForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const designId = document.getElementById('design_id').value;
+    const url = designId ? `/orders/api/design/${designId}` : '/orders/api/design';
+    const method = designId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Modal schließen und Seite neu laden
+            bootstrap.Modal.getInstance(document.getElementById('designPositionModal')).hide();
+            location.reload();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Fehler beim Speichern');
+    });
+});
+</script>

@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Updates & Backups - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="h3 mb-4">
+                <i class="bi bi-arrow-repeat me-2"></i>Updates & Backups
+            </h1>
+        </div>
+    </div>
+
+    <!-- Aktuelle Version -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card border-primary">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="bi bi-box-seam fs-1 text-primary"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5 class="card-title mb-1">Aktuelle Version</h5>
+                            <p class="card-text fs-3 fw-bold text-primary mb-0">{{ current_version }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-cloud-upload me-2"></i>Update installieren
+                    </h5>
+                    <p class="card-text text-muted">
+                        Laden Sie ein Update-Paket hoch, um StitchAdmin zu aktualisieren.
+                    </p>
+                    <a href="{{ url_for('updates.install') }}" class="btn btn-primary">
+                        <i class="bi bi-upload me-1"></i>Update hochladen
+                    </a>
+                    <a href="{{ url_for('updates.backup_list') }}" class="btn btn-outline-secondary ms-2">
+                        <i class="bi bi-archive me-1"></i>Backups verwalten
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Schnelles Backup -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div>
+                            <h5 class="mb-1">
+                                <i class="bi bi-shield-check me-2 text-success"></i>Backup erstellen
+                            </h5>
+                            <p class="text-muted mb-0">
+                                Erstellen Sie jetzt ein Backup Ihrer Datenbank und Konfiguration.
+                            </p>
+                        </div>
+                        <form action="{{ url_for('updates.backup_create') }}" method="post" class="d-inline">
+                            <input type="hidden" name="type" value="manual">
+                            <input type="hidden" name="description" value="Manuelles Backup">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-download me-1"></i>Jetzt Backup erstellen
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update-Historie -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-clock-history me-2"></i>Update-Historie
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if update_history %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Datum</th>
+                                    <th>Von Version</th>
+                                    <th>Auf Version</th>
+                                    <th>Backup</th>
+                                    <th>Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for entry in update_history|reverse %}
+                                <tr>
+                                    <td>{{ entry.date_formatted or entry.timestamp[:19] }}</td>
+                                    <td><span class="badge bg-secondary">{{ entry.from_version }}</span></td>
+                                    <td><span class="badge bg-primary">{{ entry.to_version }}</span></td>
+                                    <td>
+                                        {% if entry.backup_path %}
+                                        <i class="bi bi-check-circle text-success" title="Backup vorhanden"></i>
+                                        {% else %}
+                                        <i class="bi bi-x-circle text-muted" title="Kein Backup"></i>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if entry.backup_path %}
+                                        <form action="{{ url_for('updates.rollback') }}" method="post" class="d-inline"
+                                              onsubmit="return confirm('Wirklich zu dieser Version zurückkehren? Die aktuelle Version wird überschrieben!')">
+                                            <input type="hidden" name="backup_path" value="{{ entry.backup_path }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-warning">
+                                                <i class="bi bi-arrow-counterclockwise"></i> Rollback
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p class="mt-2">Noch keine Updates durchgeführt.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hinweise -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <h5 class="alert-heading">
+                    <i class="bi bi-info-circle me-2"></i>Hinweise zu Updates
+                </h5>
+                <ul class="mb-0">
+                    <li>Vor jedem Update wird automatisch ein Backup erstellt</li>
+                    <li>Bei Problemen können Sie jederzeit zu einem früheren Backup zurückkehren</li>
+                    <li>Nach einem Update muss StitchAdmin neu gestartet werden</li>
+                    <li>Update-Pakete erhalten Sie von Ihrem Administrator oder unter stitchadmin.de</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

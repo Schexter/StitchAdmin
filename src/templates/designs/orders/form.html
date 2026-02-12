@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Neue Design-Bestellung - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="mb-4">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item"><a href="{{ url_for('designs.design_orders') }}">Design-Bestellungen</a></li>
+                        <li class="breadcrumb-item active">Neu</li>
+                    </ol>
+                </nav>
+                <h1 class="h3">Neue Design-Bestellung</h1>
+                <p class="text-muted">Beauftragung für externe Puncher, Designer oder DTF-Dienstleister</p>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data">
+                <!-- Auftragsart -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Auftragsart</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Design-Typ <span class="text-danger">*</span></label>
+                                <select name="design_type" class="form-select" id="designType" required>
+                                    <option value="embroidery">🧵 Stickprogramm (DST)</option>
+                                    <option value="print">🖨️ Druckdatei</option>
+                                    <option value="dtf">🎨 DTF-Design</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Art der Bestellung</label>
+                                <select name="order_type" class="form-select">
+                                    <option value="new_design">Neuerstellung</option>
+                                    <option value="revision">Überarbeitung</option>
+                                    <option value="conversion">Konvertierung</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Priorität</label>
+                                <select name="priority" class="form-select">
+                                    <option value="low">Niedrig</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="high">Hoch</option>
+                                    <option value="urgent">Eilig (+25%)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Design-Informationen -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Design-Informationen</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Design-Name <span class="text-danger">*</span></label>
+                                <input type="text" name="design_name" class="form-control" required
+                                       placeholder="z.B. Logo XY GmbH für Poloshirts">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Lieferant/Puncher</label>
+                                <select name="supplier_id" class="form-select">
+                                    <option value="">-- Bitte wählen --</option>
+                                    {% for supplier in suppliers %}
+                                    <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Beschreibung</label>
+                                <textarea name="design_description" class="form-control" rows="2"
+                                          placeholder="Genauere Beschreibung des gewünschten Designs..."></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Kunde (für wen ist das Design)</label>
+                                <select name="customer_id" class="form-select">
+                                    <option value="">-- Eigendesign --</option>
+                                    {% for customer in customers %}
+                                    <option value="{{ customer.id }}">{{ customer.display_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Verknüpfter Auftrag</label>
+                                <select name="order_id" class="form-select">
+                                    <option value="">-- Kein Auftrag --</option>
+                                    {% for o in related_orders %}
+                                    <option value="{{ o.id }}">{{ o.order_number }} - {{ o.customer.display_name if o.customer else 'N/A' }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Stickerei-Spezifikation -->
+                <div class="card mb-4" id="embroiderySpec">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">🧵 Stickerei-Spezifikation</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Breite (mm)</label>
+                                <input type="number" name="target_width_mm" class="form-control" step="0.1"
+                                       placeholder="z.B. 80">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Höhe (mm)</label>
+                                <input type="number" name="target_height_mm" class="form-control" step="0.1"
+                                       placeholder="z.B. 60">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Max. Stichzahl</label>
+                                <input type="number" name="max_stitch_count" class="form-control"
+                                       placeholder="z.B. 12000">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Max. Farben</label>
+                                <input type="number" name="max_colors" class="form-control"
+                                       placeholder="z.B. 6">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Stichdichte</label>
+                                <select name="stitch_density" class="form-select">
+                                    <option value="locker">Locker</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="dicht">Dicht</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Unterlage</label>
+                                <select name="underlay_type" class="form-select">
+                                    <option value="keine">Keine</option>
+                                    <option value="leicht">Leicht</option>
+                                    <option value="standard" selected>Standard</option>
+                                    <option value="stark">Stark</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Stoffart</label>
+                                <input type="text" name="fabric_type" class="form-control"
+                                       placeholder="z.B. Baumwoll-Piqué, Fleece">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Druck-Spezifikation -->
+                <div class="card mb-4" id="printSpec" style="display: none;">
+                    <div class="card-header bg-light">
+                        <h6 class="mb-0">🖨️ Druck-Spezifikation</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Breite (cm)</label>
+                                <input type="number" name="target_print_width_cm" class="form-control" step="0.1">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Höhe (cm)</label>
+                                <input type="number" name="target_print_height_cm" class="form-control" step="0.1">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Min. DPI</label>
+                                <input type="number" name="min_dpi" class="form-control" value="300">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Farbmodus</label>
+                                <select name="color_mode" class="form-select">
+                                    <option value="cmyk">CMYK</option>
+                                    <option value="pantone">Pantone</option>
+                                    <option value="rgb">RGB</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Druckmethode</label>
+                                <select name="print_method" class="form-select">
+                                    <option value="">-- Beliebig --</option>
+                                    <option value="siebdruck">Siebdruck</option>
+                                    <option value="digital">Digitaldruck</option>
+                                    <option value="transfer">Transfer</option>
+                                    <option value="dtf">DTF</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check mt-4">
+                                    <input type="checkbox" name="needs_transparent_bg" class="form-check-input" id="transparentBg">
+                                    <label class="form-check-label" for="transparentBg">Transparenter Hintergrund</label>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check mt-4">
+                                    <input type="checkbox" name="needs_white_underbase" class="form-check-input" id="whiteUnderbase">
+                                    <label class="form-check-label" for="whiteUnderbase">Weiß-Unterlage (für dunkle Stoffe)</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vorlage & Anforderungen -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Vorlage & Anforderungen</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Kundenvorlage hochladen</label>
+                                <input type="file" name="source_file" class="form-control"
+                                       accept=".jpg,.jpeg,.png,.pdf,.ai,.eps,.svg">
+                                <div class="form-text">JPG, PNG, PDF, AI, EPS, SVG</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Gewünschter Liefertermin</label>
+                                <input type="date" name="expected_delivery" class="form-control">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Besondere Anforderungen</label>
+                                <textarea name="special_requirements" class="form-control" rows="3"
+                                          placeholder="- Feine Details beachten&#10;- Schrift muss lesbar bleiben&#10;- Farben wie Vorlage"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('designs.design_orders') }}" class="btn btn-secondary">
+                        <i class="bi bi-x-lg"></i> Abbrechen
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg"></i> Bestellung anlegen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const designType = document.getElementById('designType');
+    const embroiderySpec = document.getElementById('embroiderySpec');
+    const printSpec = document.getElementById('printSpec');
+    
+    function toggleSpecs() {
+        if (designType.value === 'embroidery') {
+            embroiderySpec.style.display = 'block';
+            printSpec.style.display = 'none';
+        } else {
+            embroiderySpec.style.display = 'none';
+            printSpec.style.display = 'block';
+        }
+    }
+    
+    designType.addEventListener('change', toggleSpecs);
+    toggleSpecs();
+});
+</script>
+{% endblock %}

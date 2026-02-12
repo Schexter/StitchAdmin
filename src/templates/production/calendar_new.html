@@ -1,0 +1,1038 @@
+{% extends "base.html" %}
+
+{% block title %}Produktionskalender{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ===========================================
+   PRODUKTIONSKALENDER - Ressourcenübergreifend
+   Mit CRM-Aktivitäten & mehrtägige Aufträge
+   =========================================== */
+
+:root {
+    --calendar-bg: #f8fafc;
+    --calendar-border: #e2e8f0;
+    --calendar-today: #dbeafe;
+    --slot-height: 40px;
+    --sidebar-width: 320px;
+    
+    /* Block-Farben nach Typ */
+    --color-embroidery: #3b82f6;
+    --color-dtf: #10b981;
+    --color-printing: #8b5cf6;
+    --color-pause: #94a3b8;
+    --color-maintenance: #f59e0b;
+    --color-office: #06b6d4;
+    --color-vacation: #ec4899;
+    --color-meeting: #6366f1;
+    --color-sick: #ef4444;
+    --color-training: #8b5cf6;
+    --color-rush: #ef4444;
+    
+    /* CRM-Farben */
+    --color-call-in: #22c55e;
+    --color-call-out: #14b8a6;
+    --color-customer-visit: #0ea5e9;
+    --color-site-visit: #0284c7;
+    --color-email: #64748b;
+    --color-quote: #a855f7;
+    --color-complaint: #ef4444;
+}
+
+.calendar-page {
+    display: flex;
+    height: calc(100vh - 120px);
+    gap: 0;
+    background: var(--calendar-bg);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+/* ===========================================
+   LINKE SIDEBAR
+   =========================================== */
+.calendar-sidebar {
+    width: var(--sidebar-width);
+    background: white;
+    border-right: 1px solid var(--calendar-border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.sidebar-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--calendar-border);
+}
+
+.sidebar-section h5 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Maschinen-Liste */
+.machine-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.machine-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+
+.machine-item:hover {
+    background: #f1f5f9;
+    border-color: var(--calendar-border);
+}
+
+.machine-item.selected {
+    background: #dbeafe;
+    border-color: #3b82f6;
+}
+
+.machine-color-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.machine-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.machine-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #1e293b;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.machine-type {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.machine-status {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.machine-status.free { background: #dcfce7; color: #166534; }
+.machine-status.busy { background: #fee2e2; color: #991b1b; }
+
+/* Wartende Aufträge */
+.waiting-orders {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.order-card {
+    background: white;
+    border: 1px solid var(--calendar-border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: grab;
+    transition: all 0.2s;
+    border-left: 4px solid var(--color-embroidery);
+}
+
+.order-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+.order-card.dragging { opacity: 0.5; cursor: grabbing; }
+.order-card.rush { border-left-color: var(--color-rush); background: #fef2f2; }
+.order-card.dtf { border-left-color: var(--color-dtf); }
+.order-card.printing { border-left-color: var(--color-printing); }
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+}
+
+.order-id { font-weight: 700; font-size: 0.875rem; color: #1e293b; }
+.order-badges { display: flex; gap: 4px; }
+.order-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+.order-badge.rush { background: #ef4444; color: white; }
+.order-badge.type { background: #e2e8f0; color: #475569; }
+.order-customer { font-size: 0.8rem; color: #64748b; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.order-meta { display: flex; gap: 12px; font-size: 0.75rem; color: #94a3b8; }
+.order-meta i { margin-right: 4px; }
+
+/* Block hinzufügen Buttons */
+.add-block-section {
+    padding: 12px 16px;
+    border-top: 1px solid var(--calendar-border);
+    background: #f8fafc;
+}
+
+.add-block-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.add-block-btn {
+    flex: 1;
+    padding: 10px 8px;
+    border: 2px dashed var(--calendar-border);
+    border-radius: 8px;
+    background: white;
+    color: #64748b;
+    font-weight: 500;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.add-block-btn:hover {
+    border-color: #3b82f6;
+    color: #3b82f6;
+    background: #f0f9ff;
+}
+
+.add-block-btn i { font-size: 1.2rem; }
+
+/* ===========================================
+   KALENDER-BEREICH
+   =========================================== */
+.calendar-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: white;
+    border-bottom: 1px solid var(--calendar-border);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.calendar-title { display: flex; align-items: center; gap: 12px; }
+.calendar-title h2 { font-size: 1.25rem; font-weight: 700; color: #1e293b; margin: 0; }
+.week-label { font-size: 0.875rem; color: #64748b; background: #f1f5f9; padding: 4px 12px; border-radius: 20px; }
+
+.calendar-nav { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.nav-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--calendar-border);
+    background: white;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.nav-btn:hover { background: #f8fafc; border-color: #94a3b8; color: #1e293b; }
+.nav-btn.primary { background: #3b82f6; border-color: #3b82f6; color: white; }
+.nav-btn.primary:hover { background: #2563eb; }
+
+/* Tage-Header */
+.calendar-days-header {
+    display: grid;
+    grid-template-columns: 60px repeat(7, 1fr);
+    background: white;
+    border-bottom: 1px solid var(--calendar-border);
+}
+
+.day-header { padding: 12px 8px; text-align: center; border-left: 1px solid var(--calendar-border); }
+.day-header:first-child { border-left: none; }
+.day-header.today { background: var(--calendar-today); }
+.day-name { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #64748b; margin-bottom: 4px; }
+.day-date { font-size: 1.125rem; font-weight: 700; color: #1e293b; }
+.day-header.today .day-date { background: #3b82f6; color: white; width: 32px; height: 32px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+.day-header.weekend { background: #fafafa; }
+
+/* Kalender-Grid */
+.calendar-grid-wrapper { flex: 1; overflow-y: auto; position: relative; }
+.calendar-grid { display: grid; grid-template-columns: 60px repeat(7, 1fr); min-height: 100%; }
+
+.time-column { background: white; border-right: 1px solid var(--calendar-border); }
+.time-slot-label { height: var(--slot-height); padding: 0 8px; display: flex; align-items: flex-start; justify-content: flex-end; font-size: 0.7rem; font-weight: 500; color: #94a3b8; transform: translateY(-8px); }
+
+.day-column { position: relative; border-left: 1px solid var(--calendar-border); min-height: 100%; }
+.day-column.today { background: rgba(219, 234, 254, 0.3); }
+.day-column.weekend { background: rgba(248, 250, 252, 0.8); }
+
+.hour-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--calendar-border); }
+.hour-line.half { background: #f1f5f9; }
+
+.lunch-overlay { position: absolute; left: 0; right: 0; background: repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(148, 163, 184, 0.1) 4px, rgba(148, 163, 184, 0.1) 8px); pointer-events: none; z-index: 1; }
+
+/* ===========================================
+   KALENDER-BLÖCKE
+   =========================================== */
+.calendar-block {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    border-radius: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    overflow: hidden;
+    z-index: 10;
+    transition: all 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    color: white;
+}
+
+.calendar-block.continues-right { border-top-right-radius: 0; border-bottom-right-radius: 0; right: 0; }
+.calendar-block.continues-left { border-top-left-radius: 0; border-bottom-left-radius: 0; left: 0; }
+.calendar-block.continues-both { border-radius: 0; left: 0; right: 0; }
+.calendar-block.continues-right::after { content: '→'; position: absolute; right: 4px; top: 50%; transform: translateY(-50%); font-size: 0.7rem; opacity: 0.7; }
+.calendar-block.continues-left::before { content: '→'; position: absolute; left: 4px; top: 50%; transform: translateY(-50%); font-size: 0.7rem; opacity: 0.7; }
+.calendar-block:hover { z-index: 20; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transform: scale(1.02); }
+
+/* Block-Typen - Produktion */
+.calendar-block.production { background: linear-gradient(135deg, var(--color-embroidery), #1d4ed8); }
+.calendar-block.production.dtf { background: linear-gradient(135deg, var(--color-dtf), #059669); }
+.calendar-block.production.printing { background: linear-gradient(135deg, var(--color-printing), #6d28d9); }
+.calendar-block.production.rush { background: linear-gradient(135deg, var(--color-rush), #b91c1c); animation: pulse-border 2s infinite; }
+@keyframes pulse-border { 0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); } 50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); } }
+
+/* Block-Typen - Intern */
+.calendar-block.pause { background: var(--color-pause); }
+.calendar-block.maintenance { background: linear-gradient(135deg, var(--color-maintenance), #d97706); }
+.calendar-block.office { background: linear-gradient(135deg, var(--color-office), #0891b2); }
+.calendar-block.vacation { background: linear-gradient(135deg, var(--color-vacation), #be185d); }
+.calendar-block.meeting { background: linear-gradient(135deg, var(--color-meeting), #4f46e5); }
+.calendar-block.sick { background: linear-gradient(135deg, #ef4444, #b91c1c); }
+.calendar-block.training { background: linear-gradient(135deg, #8b5cf6, #6d28d9); }
+
+/* Block-Typen - CRM */
+.calendar-block.call_in { background: linear-gradient(135deg, var(--color-call-in), #16a34a); }
+.calendar-block.call_out { background: linear-gradient(135deg, var(--color-call-out), #0d9488); }
+.calendar-block.customer_visit { background: linear-gradient(135deg, var(--color-customer-visit), #0284c7); }
+.calendar-block.site_visit { background: linear-gradient(135deg, var(--color-site-visit), #0369a1); }
+.calendar-block.email { background: linear-gradient(135deg, var(--color-email), #475569); }
+.calendar-block.quote { background: linear-gradient(135deg, var(--color-quote), #7c3aed); }
+.calendar-block.complaint { background: linear-gradient(135deg, var(--color-complaint), #dc2626); }
+
+.block-content { display: flex; flex-direction: column; height: 100%; }
+.block-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 4px; }
+.block-title { font-weight: 600; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.block-machine { font-size: 0.65rem; opacity: 0.9; background: rgba(255,255,255,0.2); padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
+.block-time { font-size: 0.65rem; opacity: 0.85; margin-top: 2px; }
+.block-details { font-size: 0.65rem; opacity: 0.8; margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.block-multiday-badge { font-size: 0.6rem; background: rgba(255,255,255,0.3); padding: 1px 4px; border-radius: 3px; margin-left: 4px; }
+
+/* Drop-Zone */
+.day-column.drag-over { background: rgba(59, 130, 246, 0.1); }
+.drop-preview { position: absolute; left: 4px; right: 4px; background: rgba(59, 130, 246, 0.3); border: 2px dashed #3b82f6; border-radius: 6px; pointer-events: none; z-index: 5; }
+
+/* Jetzt-Linie */
+.now-line { position: absolute; left: 0; right: 0; height: 2px; background: #ef4444; z-index: 30; }
+.now-line::before { content: ''; position: absolute; left: -4px; top: -4px; width: 10px; height: 10px; background: #ef4444; border-radius: 50%; }
+
+/* ===========================================
+   LEGENDE
+   =========================================== */
+.calendar-legend { display: flex; gap: 16px; padding: 12px 20px; background: white; border-top: 1px solid var(--calendar-border); flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #64748b; }
+.legend-color { width: 12px; height: 12px; border-radius: 3px; }
+
+/* ===========================================
+   MODALS - Block-Typ Auswahl
+   =========================================== */
+.block-category-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 16px;
+    border-bottom: 2px solid var(--calendar-border);
+    padding-bottom: 8px;
+}
+
+.block-category-tab {
+    padding: 8px 16px;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-weight: 500;
+    font-size: 0.85rem;
+    cursor: pointer;
+    border-radius: 6px 6px 0 0;
+    transition: all 0.2s;
+}
+
+.block-category-tab:hover { background: #f1f5f9; color: #1e293b; }
+.block-category-tab.active { background: #3b82f6; color: white; }
+
+.block-type-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.block-type-option {
+    padding: 12px;
+    border: 2px solid var(--calendar-border);
+    border-radius: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.block-type-option:hover { border-color: #94a3b8; background: #f8fafc; }
+.block-type-option.selected { border-color: #3b82f6; background: #eff6ff; }
+.block-type-option i { font-size: 1.25rem; margin-bottom: 6px; display: block; }
+.block-type-option span { font-size: 0.7rem; font-weight: 500; }
+
+/* CRM-Felder */
+.crm-fields { display: none; padding: 16px; background: #f8fafc; border-radius: 8px; margin-bottom: 16px; }
+.crm-fields.visible { display: block; }
+
+/* Responsive */
+@media (max-width: 1200px) { .calendar-sidebar { width: 280px; } }
+@media (max-width: 992px) { .calendar-page { flex-direction: column; height: auto; } .calendar-sidebar { width: 100%; max-height: 300px; } .calendar-grid-wrapper { min-height: 600px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-0">
+    <div class="calendar-page">
+        <!-- LINKE SIDEBAR -->
+        <div class="calendar-sidebar">
+            <!-- Maschinen -->
+            <div class="sidebar-section">
+                <h5><i class="fas fa-cogs"></i> Maschinen</h5>
+                <div class="machine-list">
+                    {% for machine in machines %}
+                    <div class="machine-item" data-machine-id="{{ machine.id }}" data-machine-type="{{ machine.type }}"
+                         data-machine-color="{{ machine.calendar_color or loop.cycle('#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899') }}">
+                        <div class="machine-color-dot" style="background: {{ machine.calendar_color or loop.cycle('#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899') }}"></div>
+                        <div class="machine-info">
+                            <div class="machine-name">{{ machine.name }}</div>
+                            <div class="machine-type">
+                                {% if machine.type == 'embroidery' %}🧵 Stickerei{% elif machine.type == 'dtf' %}🖨️ DTF{% else %}⚙️ {{ machine.type|title }}{% endif %}
+                            </div>
+                        </div>
+                        <span class="machine-status {% if machine_status.get(machine.id, {}).get('is_busy') %}busy{% else %}free{% endif %}">
+                            {% if machine_status.get(machine.id, {}).get('is_busy') %}Belegt{% else %}Frei{% endif %}
+                        </span>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-3"><small>Keine Maschinen vorhanden</small></div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Wartende Aufträge -->
+            <div class="sidebar-section" style="flex: 0 0 auto;">
+                <h5><i class="fas fa-hourglass-half"></i> Wartende Aufträge ({{ waiting_orders|length }})</h5>
+            </div>
+            <div class="waiting-orders" id="waiting-orders">
+                {% for order in waiting_orders %}
+                <div class="order-card {% if order.rush_order %}rush{% endif %} {{ order.order_type }}"
+                     draggable="true" data-order-id="{{ order.id }}" data-order-type="{{ order.order_type }}"
+                     data-duration="{{ (order.stitch_count / 10000)|round(1) if order.stitch_count else 2 }}"
+                     data-customer="{{ order.customer.display_name if order.customer else 'Unbekannt' }}">
+                    <div class="order-header">
+                        <span class="order-id">{{ order.id }}</span>
+                        <div class="order-badges">
+                            {% if order.rush_order %}<span class="order-badge rush">EILIG</span>{% endif %}
+                            <span class="order-badge type">{% if order.order_type == 'embroidery' %}Stickerei{% elif order.order_type == 'dtf' %}DTF{% else %}{{ order.order_type|title }}{% endif %}</span>
+                        </div>
+                    </div>
+                    <div class="order-customer">{{ order.customer.display_name if order.customer else 'Unbekannt' }}</div>
+                    <div class="order-meta">
+                        <span><i class="fas fa-clock"></i> ~{{ (order.stitch_count / 10000)|round(1) if order.stitch_count else 2 }}h</span>
+                        {% if order.stitch_count %}<span><i class="fas fa-hashtag"></i> {{ '{:,}'.format(order.stitch_count).replace(',', '.') }} St.</span>{% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-check-circle fa-2x mb-2 d-block" style="opacity: 0.3;"></i>
+                    <small>Keine wartenden Aufträge</small>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Aktionen -->
+            <div class="add-block-section">
+                <div class="add-block-buttons">
+                    <button type="button" class="add-block-btn" data-bs-toggle="modal" data-bs-target="#addBlockModal">
+                        <i class="fas fa-calendar-plus"></i>
+                        <span>Termin</span>
+                    </button>
+                    <button type="button" class="add-block-btn" data-bs-toggle="modal" data-bs-target="#addBlockModal" data-default-type="call_out">
+                        <i class="fas fa-phone"></i>
+                        <span>Anruf</span>
+                    </button>
+                    <button type="button" class="add-block-btn" data-bs-toggle="modal" data-bs-target="#scheduleModal">
+                        <i class="fas fa-industry"></i>
+                        <span>Produktion</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- KALENDER-BEREICH -->
+        <div class="calendar-main">
+            <div class="calendar-header">
+                <div class="calendar-title">
+                    <h2>📅 Produktionskalender</h2>
+                    <span class="week-label">KW {{ week_start.isocalendar()[1] }} | {{ week_start.strftime('%d.%m.') }} - {{ week_end.strftime('%d.%m.%Y') }}</span>
+                </div>
+                <div class="calendar-nav">
+                    <a href="{{ url_for('production.calendar_new', week=week_offset-1) }}" class="nav-btn"><i class="fas fa-chevron-left"></i> Vorherige</a>
+                    <a href="{{ url_for('production.calendar_new', week=0) }}" class="nav-btn">Heute</a>
+                    <a href="{{ url_for('production.calendar_new', week=week_offset+1) }}" class="nav-btn">Nächste <i class="fas fa-chevron-right"></i></a>
+                </div>
+            </div>
+            
+            <!-- Tage-Header -->
+            <div class="calendar-days-header">
+                <div class="day-header"></div>
+                {% for day_offset in range(7) %}
+                {% set current_date = week_start + timedelta(days=day_offset) %}
+                <div class="day-header {% if current_date == today %}today{% endif %} {% if current_date.weekday() >= 5 %}weekend{% endif %}">
+                    <div class="day-name">{{ ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][current_date.weekday()] }}</div>
+                    <div class="day-date">{{ current_date.strftime('%d') }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Kalender-Grid -->
+            <div class="calendar-grid-wrapper">
+                <div class="calendar-grid">
+                    <div class="time-column">
+                        {% for hour in range(settings.work_start, settings.work_end + 1) %}
+                        <div class="time-slot-label">{{ '%02d:00'|format(hour) }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    {% for day_offset in range(7) %}
+                    {% set current_date = week_start + timedelta(days=day_offset) %}
+                    <div class="day-column {% if current_date == today %}today{% endif %} {% if current_date.weekday() >= 5 %}weekend{% endif %}"
+                         data-date="{{ current_date.isoformat() }}">
+                        
+                        {% for hour in range(settings.work_start, settings.work_end + 1) %}
+                        <div class="hour-line" style="top: {{ (hour - settings.work_start) * slot_height }}px;"></div>
+                        <div class="hour-line half" style="top: {{ (hour - settings.work_start) * slot_height + slot_height/2 }}px;"></div>
+                        {% endfor %}
+                        
+                        <div class="lunch-overlay" style="top: {{ (settings.lunch_start - settings.work_start) * slot_height }}px; height: {{ slot_height }}px;"></div>
+                        
+                        {% if current_date == today %}
+                        <div class="now-line" id="now-line" style="display: none;"></div>
+                        {% endif %}
+                        
+                        {% for segment in calendar_data.get(current_date, []) %}
+                        {% set start_minutes = (segment.start_time.hour - settings.work_start) * 60 + segment.start_time.minute %}
+                        {% set end_minutes = (segment.end_time.hour - settings.work_start) * 60 + segment.end_time.minute %}
+                        {% set top_px = start_minutes * (slot_height / 60) %}
+                        {% set height_px = (end_minutes - start_minutes) * (slot_height / 60) %}
+                        
+                        {% set continuation_class = '' %}
+                        {% if segment.is_continuation %}{% set continuation_class = 'continues-both' %}
+                        {% elif not segment.is_start and segment.is_end %}{% set continuation_class = 'continues-left' %}
+                        {% elif segment.is_start and not segment.is_end %}{% set continuation_class = 'continues-right' %}{% endif %}
+                        
+                        <div class="calendar-block {{ segment.block_type }} {{ continuation_class }} {% if segment.order and segment.order.rush_order %}rush{% endif %} {% if segment.order %}{{ segment.order.order_type }}{% endif %}"
+                             data-block-id="{{ segment.id }}" data-schedule-id="{{ segment.schedule_id if segment.schedule_id else '' }}"
+                             style="top: {{ top_px }}px; height: {{ [height_px, 25]|max }}px; {% if segment.color %}background: linear-gradient(135deg, {{ segment.color }}, {{ segment.color }}dd);{% endif %}"
+                             onclick="showBlockDetails('{{ segment.id }}', '{{ segment.block_type }}')">
+                            <div class="block-content">
+                                <div class="block-header">
+                                    <span class="block-title">
+                                        {% if segment.order %}{{ segment.order.id }}{% else %}{{ segment.title }}{% endif %}
+                                        {% if segment.is_multiday and segment.is_start %}<span class="block-multiday-badge">{{ segment.total_days }}T</span>{% endif %}
+                                    </span>
+                                    {% if segment.machine %}<span class="block-machine">{{ segment.machine.name }}</span>{% endif %}
+                                </div>
+                                {% if height_px > 30 %}
+                                <div class="block-time">{% if segment.is_start %}{{ segment.start_time.strftime('%H:%M') }}{% else %}↳{% endif %} - {% if segment.is_end %}{{ segment.end_time.strftime('%H:%M') }}{% else %}→{% endif %}</div>
+                                {% endif %}
+                                {% if height_px > 50 and segment.order and segment.order.customer %}
+                                <div class="block-details">{{ segment.order.customer.display_name }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <!-- Legende -->
+            <div class="calendar-legend">
+                <div class="legend-item"><div class="legend-color" style="background: var(--color-embroidery);"></div><span>Produktion</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: var(--color-rush);"></div><span>Eilauftrag</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: var(--color-call-in);"></div><span>Anruf</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: var(--color-customer-visit);"></div><span>Kundenbesuch</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: var(--color-meeting);"></div><span>Meeting</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: var(--color-maintenance);"></div><span>Wartung</span></div>
+                <div class="legend-item"><div class="legend-color" style="background: var(--color-vacation);"></div><span>Urlaub</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Zeitblock/CRM-Aktivität hinzufügen -->
+<div class="modal fade" id="addBlockModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-calendar-plus"></i> Termin / Aktivität erfassen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('production.add_block') }}">
+                <div class="modal-body">
+                    <!-- Kategorie-Tabs -->
+                    <div class="block-category-tabs">
+                        <button type="button" class="block-category-tab active" data-category="crm">📞 CRM</button>
+                        <button type="button" class="block-category-tab" data-category="office">🏢 Büro</button>
+                        <button type="button" class="block-category-tab" data-category="production">🔧 Produktion</button>
+                        <button type="button" class="block-category-tab" data-category="personal">👤 Personal</button>
+                    </div>
+                    
+                    <!-- Block-Typ Auswahl -->
+                    <div class="block-type-grid" id="blockTypeGrid">
+                        <!-- CRM -->
+                        <div class="block-type-option" data-type="call_in" data-category="crm">
+                            <i class="fas fa-phone-alt" style="color: var(--color-call-in);"></i>
+                            <span>Anruf (ein)</span>
+                        </div>
+                        <div class="block-type-option selected" data-type="call_out" data-category="crm">
+                            <i class="fas fa-phone" style="color: var(--color-call-out);"></i>
+                            <span>Anruf (aus)</span>
+                        </div>
+                        <div class="block-type-option" data-type="customer_visit" data-category="crm">
+                            <i class="fas fa-user-tie" style="color: var(--color-customer-visit);"></i>
+                            <span>Kundenbesuch</span>
+                        </div>
+                        <div class="block-type-option" data-type="site_visit" data-category="crm">
+                            <i class="fas fa-car" style="color: var(--color-site-visit);"></i>
+                            <span>Außentermin</span>
+                        </div>
+                        <div class="block-type-option" data-type="email" data-category="crm">
+                            <i class="fas fa-envelope" style="color: var(--color-email);"></i>
+                            <span>E-Mail</span>
+                        </div>
+                        <div class="block-type-option" data-type="quote" data-category="crm">
+                            <i class="fas fa-file-invoice-dollar" style="color: var(--color-quote);"></i>
+                            <span>Angebot</span>
+                        </div>
+                        <div class="block-type-option" data-type="complaint" data-category="crm">
+                            <i class="fas fa-exclamation-triangle" style="color: var(--color-complaint);"></i>
+                            <span>Reklamation</span>
+                        </div>
+                        <!-- Büro -->
+                        <div class="block-type-option" data-type="meeting" data-category="office" style="display:none;">
+                            <i class="fas fa-users" style="color: var(--color-meeting);"></i>
+                            <span>Meeting</span>
+                        </div>
+                        <div class="block-type-option" data-type="office" data-category="office" style="display:none;">
+                            <i class="fas fa-briefcase" style="color: var(--color-office);"></i>
+                            <span>Büroarbeit</span>
+                        </div>
+                        <div class="block-type-option" data-type="training" data-category="office" style="display:none;">
+                            <i class="fas fa-graduation-cap" style="color: #8b5cf6;"></i>
+                            <span>Schulung</span>
+                        </div>
+                        <!-- Produktion -->
+                        <div class="block-type-option" data-type="pause" data-category="production" style="display:none;">
+                            <i class="fas fa-coffee" style="color: var(--color-pause);"></i>
+                            <span>Pause</span>
+                        </div>
+                        <div class="block-type-option" data-type="maintenance" data-category="production" style="display:none;">
+                            <i class="fas fa-wrench" style="color: var(--color-maintenance);"></i>
+                            <span>Wartung</span>
+                        </div>
+                        <!-- Personal -->
+                        <div class="block-type-option" data-type="vacation" data-category="personal" style="display:none;">
+                            <i class="fas fa-umbrella-beach" style="color: var(--color-vacation);"></i>
+                            <span>Urlaub</span>
+                        </div>
+                        <div class="block-type-option" data-type="sick" data-category="personal" style="display:none;">
+                            <i class="fas fa-thermometer-half" style="color: #ef4444;"></i>
+                            <span>Krankheit</span>
+                        </div>
+                        <div class="block-type-option" data-type="other" data-category="personal" style="display:none;">
+                            <i class="fas fa-bookmark" style="color: #78716c;"></i>
+                            <span>Sonstiges</span>
+                        </div>
+                    </div>
+                    <input type="hidden" name="block_type" id="block_type" value="call_out">
+                    
+                    <!-- CRM-Felder (Kunde, Kontakt, etc.) -->
+                    <div class="crm-fields visible" id="crmFields">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="customer_id" class="form-label">Kunde</label>
+                                <select class="form-select" id="customer_id" name="customer_id">
+                                    <option value="">-- Kunde wählen --</option>
+                                    {% for customer in customers|default([]) %}
+                                    <option value="{{ customer.id }}">{{ customer.display_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="contact_person" class="form-label">Ansprechpartner</label>
+                                <input type="text" class="form-control" id="contact_person" name="contact_person" placeholder="Name des Ansprechpartners">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="contact_phone" class="form-label">Telefon</label>
+                                <input type="tel" class="form-control" id="contact_phone" name="contact_phone" placeholder="Telefonnummer">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="outcome" class="form-label">Ergebnis</label>
+                                <select class="form-select" id="outcome" name="outcome">
+                                    <option value="">-- Status wählen --</option>
+                                    <option value="successful">Erfolgreich</option>
+                                    <option value="callback_needed">Rückruf erforderlich</option>
+                                    <option value="order_placed">Auftrag erteilt</option>
+                                    <option value="quote_sent">Angebot versendet</option>
+                                    <option value="no_answer">Nicht erreicht</option>
+                                    <option value="voicemail">Mailbox</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Basis-Felder -->
+                    <div class="mb-3">
+                        <label for="block_title" class="form-label">Betreff / Titel</label>
+                        <input type="text" class="form-control" id="block_title" name="title" placeholder="Kurze Beschreibung des Termins">
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label for="block_start_date" class="form-label">Startdatum</label>
+                            <input type="date" class="form-control" id="block_start_date" name="start_date" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="block_start_time" class="form-label">Startzeit</label>
+                            <input type="time" class="form-control" id="block_start_time" name="start_time" value="09:00" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="block_end_date" class="form-label">Enddatum</label>
+                            <input type="date" class="form-control" id="block_end_date" name="end_date" required>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="block_end_time" class="form-label">Endzeit</label>
+                            <input type="time" class="form-control" id="block_end_time" name="end_time" value="09:30" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="block_summary" class="form-label">Zusammenfassung / Gesprächsnotizen</label>
+                        <textarea class="form-control" id="block_summary" name="summary" rows="3" placeholder="Was wurde besprochen? Wichtige Punkte..."></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="follow_up_date" class="form-label">Wiedervorlage</label>
+                            <input type="date" class="form-control" id="follow_up_date" name="follow_up_date">
+                            <small class="text-muted">Für Erinnerung an Nachfassung</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="block_machine" class="form-label">Maschine (optional)</label>
+                            <select class="form-select" id="block_machine" name="machine_id">
+                                <option value="">-- Keine --</option>
+                                {% for machine in machines %}
+                                <option value="{{ machine.id }}">{{ machine.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Produktion planen -->
+<div class="modal fade" id="scheduleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-industry"></i> Produktion einplanen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('production.schedule_production') }}">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="order_id" class="form-label">Auftrag *</label>
+                            <select class="form-select" id="order_id" name="order_id" required>
+                                <option value="">-- Auftrag wählen --</option>
+                                {% for order in waiting_orders %}
+                                <option value="{{ order.id }}" data-stitch-count="{{ order.stitch_count or 0 }}" data-type="{{ order.order_type }}">
+                                    {{ order.id }} - {{ order.customer.display_name if order.customer else 'Unbekannt' }}{% if order.rush_order %} [EILIG]{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="machine_id" class="form-label">Maschine</label>
+                            <select class="form-select" id="machine_id" name="machine_id">
+                                <option value="">-- Auto-Vorschlag --</option>
+                                {% for machine in machines %}
+                                <option value="{{ machine.id }}">{{ machine.name }} ({{ machine.type|title }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="scheduled_date" class="form-label">Startdatum *</label>
+                            <input type="date" class="form-control" id="scheduled_date" name="scheduled_date" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="scheduled_time" class="form-label">Startzeit *</label>
+                            <input type="time" class="form-control" id="scheduled_time" name="scheduled_time" value="08:00" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="duration_minutes" class="form-label">Dauer (Min.) *</label>
+                            <input type="number" class="form-control" id="duration_minutes" name="duration_minutes" value="120" min="15" step="15" required>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-info-circle"></i> <strong>Mehrtägige Aufträge</strong> werden automatisch über mehrere Tage verteilt.
+                    </div>
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notizen</label>
+                        <textarea class="form-control" id="notes" name="notes" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Einplanen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Block-Details -->
+<div class="modal fade" id="blockDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-info-circle"></i> Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="blockDetailContent">
+                <div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>
+            </div>
+            <div class="modal-footer" id="blockDetailActions"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const SLOT_HEIGHT = {{ slot_height }};
+    const WORK_START = {{ settings.work_start }};
+    const WORK_END = {{ settings.work_end }};
+    
+    // Block-Kategorie Tabs
+    document.querySelectorAll('.block-category-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.block-category-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            const category = this.dataset.category;
+            
+            document.querySelectorAll('.block-type-option').forEach(opt => {
+                opt.style.display = opt.dataset.category === category ? 'block' : 'none';
+                opt.classList.remove('selected');
+            });
+            
+            // Erstes Element der Kategorie auswählen
+            const firstOption = document.querySelector(`.block-type-option[data-category="${category}"]`);
+            if (firstOption) {
+                firstOption.classList.add('selected');
+                document.getElementById('block_type').value = firstOption.dataset.type;
+            }
+            
+            // CRM-Felder nur bei CRM-Kategorie anzeigen
+            const crmFields = document.getElementById('crmFields');
+            crmFields.classList.toggle('visible', category === 'crm');
+        });
+    });
+    
+    // Block-Typ Auswahl
+    document.querySelectorAll('.block-type-option').forEach(opt => {
+        opt.addEventListener('click', function() {
+            document.querySelectorAll('.block-type-option').forEach(o => o.classList.remove('selected'));
+            this.classList.add('selected');
+            document.getElementById('block_type').value = this.dataset.type;
+        });
+    });
+    
+    // Default-Typ aus Button
+    document.querySelectorAll('[data-default-type]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const type = this.dataset.defaultType;
+            setTimeout(() => {
+                const opt = document.querySelector(`.block-type-option[data-type="${type}"]`);
+                if (opt) {
+                    opt.click();
+                    const category = opt.dataset.category;
+                    document.querySelector(`.block-category-tab[data-category="${category}"]`)?.click();
+                }
+            }, 100);
+        });
+    });
+    
+    // Drag & Drop
+    const orderCards = document.querySelectorAll('.order-card');
+    const dayColumns = document.querySelectorAll('.day-column');
+    
+    orderCards.forEach(card => {
+        card.addEventListener('dragstart', function(e) {
+            e.dataTransfer.setData('order-id', this.dataset.orderId);
+            e.dataTransfer.setData('duration', this.dataset.duration);
+            this.classList.add('dragging');
+        });
+        card.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.drop-preview').forEach(p => p.remove());
+            document.querySelectorAll('.drag-over').forEach(c => c.classList.remove('drag-over'));
+        });
+    });
+    
+    dayColumns.forEach(column => {
+        column.addEventListener('dragover', function(e) { e.preventDefault(); this.classList.add('drag-over'); });
+        column.addEventListener('dragleave', function(e) { if (!this.contains(e.relatedTarget)) this.classList.remove('drag-over'); });
+        column.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            const orderId = e.dataTransfer.getData('order-id');
+            const duration = parseFloat(e.dataTransfer.getData('duration')) || 2;
+            const date = this.dataset.date;
+            const rect = this.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const hour = Math.floor(WORK_START + (y / SLOT_HEIGHT));
+            const minute = Math.round(((y / SLOT_HEIGHT) % 1) * 60 / 15) * 15;
+            const startTime = `${date} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+            
+            fetch(`/production/api/suggest-machine?order_id=${orderId}&start_time=${encodeURIComponent(startTime)}&duration=${duration}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.suggested_machine && confirm(`Auftrag ${orderId} auf "${data.suggested_machine.name}" einplanen?\n\nStart: ${startTime}\nDauer: ${duration}h`)) {
+                        fetch('/production/api/order/schedule', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ order_id: orderId, machine_id: data.suggested_machine.id, start_time: startTime, duration_hours: duration })
+                        }).then(r => r.json()).then(d => { if (d.success) location.reload(); });
+                    }
+                });
+        });
+    });
+    
+    // Jetzt-Linie
+    function updateNowLine() {
+        const nowLine = document.getElementById('now-line');
+        if (!nowLine) return;
+        const now = new Date();
+        if (now.getHours() >= WORK_START && now.getHours() <= WORK_END) {
+            nowLine.style.top = ((now.getHours() - WORK_START) * 60 + now.getMinutes()) * (SLOT_HEIGHT / 60) + 'px';
+            nowLine.style.display = 'block';
+        } else { nowLine.style.display = 'none'; }
+    }
+    updateNowLine();
+    setInterval(updateNowLine, 60000);
+    
+    // Block Details
+    window.showBlockDetails = function(blockId, blockType) {
+        const modal = new bootstrap.Modal(document.getElementById('blockDetailModal'));
+        const content = document.getElementById('blockDetailContent');
+        const actions = document.getElementById('blockDetailActions');
+        content.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+        actions.innerHTML = '';
+        modal.show();
+        
+        fetch(`/production/api/block/${blockId}?type=${blockType}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) { content.innerHTML = `<div class="alert alert-danger">${data.error}</div>`; return; }
+                
+                let html = `<h6 class="mb-3"><i class="fas fa-${data.icon || 'calendar'}"></i> ${data.title || data.type_label}</h6><table class="table table-sm">`;
+                html += `<tr><th style="width:120px;">Typ:</th><td>${data.type_label || data.block_type}</td></tr>`;
+                html += `<tr><th>Zeitraum:</th><td>${data.start} - ${data.end}</td></tr>`;
+                if (data.order) html += `<tr><th>Auftrag:</th><td>${data.order.id}</td></tr>`;
+                if (data.order?.customer) html += `<tr><th>Kunde:</th><td>${data.order.customer}</td></tr>`;
+                if (data.machine) html += `<tr><th>Maschine:</th><td>${data.machine}</td></tr>`;
+                if (data.contact_person) html += `<tr><th>Kontakt:</th><td>${data.contact_person}</td></tr>`;
+                if (data.outcome) html += `<tr><th>Ergebnis:</th><td>${data.outcome}</td></tr>`;
+                if (data.summary) html += `<tr><th>Notizen:</th><td>${data.summary}</td></tr>`;
+                if (data.is_multiday) html += `<tr><th>Mehrtägig:</th><td>Ja (${data.total_days} Tage)</td></tr>`;
+                html += '</table>';
+                content.innerHTML = html;
+                
+                actions.innerHTML = `<button class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+                    <form method="POST" action="/production/block/${data.id}/delete" style="display:inline;" onsubmit="return confirm('Eintrag löschen?');">
+                        <button type="submit" class="btn btn-danger"><i class="fas fa-trash"></i> Löschen</button>
+                    </form>`;
+            });
+    };
+    
+    // Datum initialisieren
+    const today = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('input[type="date"]').forEach(input => { if (!input.value) input.value = today; });
+    
+    const startDateInput = document.getElementById('block_start_date');
+    const endDateInput = document.getElementById('block_end_date');
+    if (startDateInput && endDateInput) {
+        startDateInput.addEventListener('change', function() {
+            if (!endDateInput.value || endDateInput.value < this.value) endDateInput.value = this.value;
+            endDateInput.min = this.value;
+        });
+    }
+});
+</script>
+{% endblock %}

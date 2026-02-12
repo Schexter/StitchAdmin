@@ -1,0 +1,112 @@
+{% extends "setup/base_setup.html" %}
+{% block title %}Administrator{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+    <div class="step-number">👤</div>
+    <h3 class="mt-3">Administrator-Konto</h3>
+    <p class="text-muted">Erstellen Sie Ihr Hauptbenutzer-Konto</p>
+</div>
+
+{% if existing_admin %}
+<div class="alert alert-success">
+    <i class="fas fa-check-circle me-2"></i>
+    <strong>Administrator existiert bereits:</strong> {{ existing_admin.username }}
+    <br><small>Sie können diesen Schritt überspringen.</small>
+</div>
+
+<div class="d-flex justify-content-between mt-4">
+    <a href="{{ url_for('setup.email') }}" class="btn btn-outline-secondary btn-setup">
+        <i class="fas fa-arrow-left me-2"></i> Zurück
+    </a>
+    <a href="{{ url_for('setup.finish') }}" class="btn btn-primary btn-setup">
+        Weiter <i class="fas fa-arrow-right ms-2"></i>
+    </a>
+</div>
+
+{% else %}
+<form method="POST">
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Benutzername *</label>
+                <input type="text" name="username" class="form-control form-control-lg" 
+                       placeholder="admin" required minlength="3">
+                <small class="text-muted">Mindestens 3 Zeichen</small>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold">E-Mail-Adresse *</label>
+                <input type="email" name="email" class="form-control form-control-lg" 
+                       placeholder="admin@firma.de" required>
+            </div>
+            
+            <hr class="my-4">
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold">Passwort *</label>
+                <input type="password" name="password" class="form-control form-control-lg" 
+                       id="password" required minlength="8">
+                <div class="progress mt-2" style="height: 5px;">
+                    <div class="progress-bar" id="passwordStrength" role="progressbar" style="width: 0%"></div>
+                </div>
+                <small class="text-muted">Mindestens 8 Zeichen</small>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold">Passwort bestätigen *</label>
+                <input type="password" name="password_confirm" class="form-control form-control-lg" 
+                       id="passwordConfirm" required>
+                <div id="passwordMatch" class="invalid-feedback">Passwörter stimmen nicht überein</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>Wichtig:</strong> Notieren Sie sich Ihre Zugangsdaten! 
+        Ein Passwort-Reset ist später nur mit Datenbankzugriff möglich.
+    </div>
+    
+    <div class="d-flex justify-content-between mt-4">
+        <a href="{{ url_for('setup.email') }}" class="btn btn-outline-secondary btn-setup">
+            <i class="fas fa-arrow-left me-2"></i> Zurück
+        </a>
+        <button type="submit" class="btn btn-primary btn-setup">
+            Konto erstellen <i class="fas fa-arrow-right ms-2"></i>
+        </button>
+    </div>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Passwortstärke
+document.getElementById('password').addEventListener('input', function() {
+    const strength = this.value.length;
+    const bar = document.getElementById('passwordStrength');
+    
+    if (strength < 6) {
+        bar.style.width = '25%';
+        bar.className = 'progress-bar bg-danger';
+    } else if (strength < 8) {
+        bar.style.width = '50%';
+        bar.className = 'progress-bar bg-warning';
+    } else if (strength < 12) {
+        bar.style.width = '75%';
+        bar.className = 'progress-bar bg-info';
+    } else {
+        bar.style.width = '100%';
+        bar.className = 'progress-bar bg-success';
+    }
+});
+
+// Passwort-Übereinstimmung
+document.getElementById('passwordConfirm').addEventListener('input', function() {
+    const match = this.value === document.getElementById('password').value;
+    this.classList.toggle('is-invalid', !match && this.value.length > 0);
+    this.classList.toggle('is-valid', match && this.value.length > 0);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kassenbeleg {{ beleg.belegnummer }}</title>
+</head>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+    <div style="background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+        <!-- Header -->
+        <div style="text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #007bff;">
+            <h1 style="color: #007bff; margin: 0;">
+                {% if settings and settings.company_name %}
+                    {{ settings.company_name }}
+                {% else %}
+                    StitchAdmin
+                {% endif %}
+            </h1>
+            {% if settings %}
+            <p style="color: #666; margin: 10px 0 0 0; font-size: 14px;">
+                {% if settings.street %}{{ settings.street }}<br>{% endif %}
+                {% if settings.zip_code or settings.city %}{{ settings.zip_code }} {{ settings.city }}<br>{% endif %}
+                {% if settings.phone %}Tel: {{ settings.phone }}{% endif %}
+            </p>
+            {% endif %}
+        </div>
+
+        <!-- Beleg-Info -->
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+            <h2 style="margin: 0 0 10px 0; color: #333;">Kassenbeleg</h2>
+            <table style="width: 100%;">
+                <tr>
+                    <td style="color: #666;">Belegnummer:</td>
+                    <td style="font-weight: bold;">{{ beleg.belegnummer }}</td>
+                </tr>
+                <tr>
+                    <td style="color: #666;">Datum:</td>
+                    <td>{{ beleg.erstellt_am.strftime('%d.%m.%Y %H:%M') }}</td>
+                </tr>
+                {% if kunde %}
+                <tr>
+                    <td style="color: #666;">Kunde:</td>
+                    <td>{{ kunde.first_name }} {{ kunde.last_name }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+
+        <!-- Positionen -->
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+                <tr style="background-color: #007bff; color: white;">
+                    <th style="padding: 10px; text-align: left;">Artikel</th>
+                    <th style="padding: 10px; text-align: center;">Menge</th>
+                    <th style="padding: 10px; text-align: right;">Preis</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pos in positionen %}
+                <tr style="border-bottom: 1px solid #eee;">
+                    <td style="padding: 10px;">{{ pos.artikel_name }}</td>
+                    <td style="padding: 10px; text-align: center;">{{ pos.menge }}</td>
+                    <td style="padding: 10px; text-align: right;">{{ "%.2f"|format(pos.brutto_betrag) }} EUR</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Summen -->
+        <div style="border-top: 2px solid #007bff; padding-top: 15px;">
+            <table style="width: 100%;">
+                <tr>
+                    <td style="color: #666;">Netto:</td>
+                    <td style="text-align: right;">{{ "%.2f"|format(beleg.netto_gesamt) }} EUR</td>
+                </tr>
+                <tr>
+                    <td style="color: #666;">MwSt (19%):</td>
+                    <td style="text-align: right;">{{ "%.2f"|format(beleg.mwst_gesamt) }} EUR</td>
+                </tr>
+                <tr style="font-size: 18px; font-weight: bold;">
+                    <td style="padding-top: 10px;">Gesamtbetrag:</td>
+                    <td style="text-align: right; padding-top: 10px; color: #007bff;">{{ "%.2f"|format(beleg.brutto_gesamt) }} EUR</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Zahlungsart -->
+        <div style="background-color: #e8f5e9; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center;">
+            <strong>Zahlungsart:</strong> {{ beleg.zahlungsart.value if beleg.zahlungsart else 'Bar' }}
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px;">
+            <p style="font-size: 16px; color: #333; margin-bottom: 15px;"><strong>Vielen Dank für Ihren Einkauf!</strong></p>
+            <p>
+                {% if settings and settings.company_name %}{{ settings.company_name }}{% endif %}<br>
+                {% if settings and settings.tax_id %}USt-IdNr: {{ settings.tax_id }}{% endif %}
+            </p>
+            <p style="margin-top: 15px; font-size: 10px;">
+                Diese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht auf diese Nachricht.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

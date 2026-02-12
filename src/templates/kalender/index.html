@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+{% block title %}Kalender{% endblock %}
+
+{% block extra_css %}
+<!-- FullCalendar CSS -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.css" rel="stylesheet">
+<style>
+    #calendar {
+        max-width: 100%;
+        margin: 0 auto;
+    }
+    
+    /* Ressourcen-Spalten nebeneinander (Outlook-Style) */
+    .fc-timeline-slot-frame {
+        height: 40px !important;
+    }
+    
+    .fc-resource-timeline .fc-datagrid-cell-frame {
+        padding: 8px;
+    }
+    
+    /* Termin-Farben nach Typ */
+    .fc-event.termin-produktion {
+        background-color: #28a745 !important;
+        border-color: #28a745 !important;
+    }
+    
+    .fc-event.termin-rate {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+    }
+    
+    .fc-event.termin-kunde {
+        background-color: #17a2b8 !important;
+        border-color: #17a2b8 !important;
+    }
+    
+    .fc-event.termin-wartung {
+        background-color: #ffc107 !important;
+        border-color: #ffc107 !important;
+        color: #000 !important;
+    }
+    
+    /* Auslastungs-Anzeige */
+    .auslastung-bar {
+        height: 8px;
+        border-radius: 4px;
+        background: #e9ecef;
+        overflow: hidden;
+    }
+    
+    .auslastung-bar .fill {
+        height: 100%;
+        transition: width 0.3s;
+    }
+    
+    /* Sidebar */
+    .calendar-sidebar {
+        position: sticky;
+        top: 70px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-lg-2">
+            <div class="calendar-sidebar">
+                <!-- Ansicht-Auswahl -->
+                <div class="card mb-3">
+                    <div class="card-header py-2">
+                        <small class="fw-bold">Ansicht</small>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        <button class="list-group-item list-group-item-action btn-view" data-view="resourceTimelineDay">
+                            <i class="fas fa-calendar-day me-2"></i>Tag (Ressourcen)
+                        </button>
+                        <button class="list-group-item list-group-item-action btn-view active" data-view="resourceTimelineWeek">
+                            <i class="fas fa-calendar-week me-2"></i>Woche (Ressourcen)
+                        </button>
+                        <button class="list-group-item list-group-item-action btn-view" data-view="dayGridMonth">
+                            <i class="fas fa-calendar-alt me-2"></i>Monat
+                        </button>
+                        <button class="list-group-item list-group-item-action btn-view" data-view="listWeek">
+                            <i class="fas fa-list me-2"></i>Liste
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Filter -->
+                <div class="card mb-3">
+                    <div class="card-header py-2">
+                        <small class="fw-bold">Filter</small>
+                    </div>
+                    <div class="card-body py-2">
+                        <div class="form-check">
+                            <input class="form-check-input filter-typ" type="checkbox" value="produktion" id="filter-produktion" checked>
+                            <label class="form-check-label" for="filter-produktion">
+                                <span class="badge bg-success">●</span> Produktion
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input filter-typ" type="checkbox" value="rate" id="filter-rate" checked>
+                            <label class="form-check-label" for="filter-rate">
+                                <span class="badge bg-danger">●</span> Raten
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input filter-typ" type="checkbox" value="kunde" id="filter-kunde" checked>
+                            <label class="form-check-label" for="filter-kunde">
+                                <span class="badge bg-info">●</span> Kunden
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input filter-typ" type="checkbox" value="wartung" id="filter-wartung" checked>
+                            <label class="form-check-label" for="filter-wartung">
+                                <span class="badge bg-warning">●</span> Wartung
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Auslastung -->
+                <div class="card mb-3">
+                    <div class="card-header py-2">
+                        <small class="fw-bold">Auslastung (Woche)</small>
+                    </div>
+                    <div class="card-body py-2" id="auslastung-container">
+                        <div class="text-muted small">Lädt...</div>
+                    </div>
+                </div>
+                
+                <!-- Schnellaktionen -->
+                <div class="card">
+                    <div class="card-header py-2">
+                        <small class="fw-bold">Aktionen</small>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        <a href="{{ url_for('kalender.raten_uebersicht') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-money-bill me-2"></i>Ratentermine
+                        </a>
+                        <a href="{{ url_for('kalender.ressourcen_liste') }}" class="list-group-item list-group-item-action">
+                            <i class="fas fa-cogs me-2"></i>Ressourcen
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Kalender -->
+        <div class="col-lg-10">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div id="calendar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Neuer Termin -->
+<div class="modal fade" id="terminModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Neuer Termin</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="termin-form">
+                    <div class="mb-3">
+                        <label class="form-label">Titel</label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Start</label>
+                            <input type="datetime-local" class="form-control" name="start" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Ende</label>
+                            <input type="datetime-local" class="form-control" name="end">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Typ</label>
+                        <select class="form-select" name="typ">
+                            <option value="produktion">Produktion</option>
+                            <option value="kunde">Kundentermin</option>
+                            <option value="wartung">Wartung</option>
+                            <option value="intern">Intern</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Ressource/Maschine</label>
+                        <select class="form-select" name="resourceId">
+                            <option value="">-- Keine --</option>
+                            {% for r in ressourcen %}
+                            <option value="{{ r.id }}">{{ r.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <input type="hidden" name="color" value="#3788d8">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" id="btn-termin-speichern">Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- FullCalendar JS -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/resource@6.1.10/index.global.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@fullcalendar/resource-timeline@6.1.10/index.global.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('calendar');
+    
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        // Plugins
+        schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
+        
+        // Ansicht
+        initialView: '{{ default_ansicht }}',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: ''
+        },
+        
+        // Lokalisierung
+        locale: 'de',
+        firstDay: 1,
+        
+        // Ressourcen (Maschinen als Spalten)
+        resources: {{ ressourcen|tojson }},
+        resourceAreaHeaderContent: 'Maschinen',
+        resourceAreaWidth: '15%',
+        
+        // Termine laden
+        events: {
+            url: '{{ url_for("kalender.api_termine") }}',
+            method: 'GET',
+        },
+        
+        // Interaktion
+        editable: true,
+        selectable: true,
+        selectMirror: true,
+        
+        // Zeitraster
+        slotMinTime: '06:00:00',
+        slotMaxTime: '20:00:00',
+        slotDuration: '00:30:00',
+        
+        // Events
+        select: function(info) {
+            // Modal öffnen für neuen Termin
+            const modal = new bootstrap.Modal(document.getElementById('terminModal'));
+            document.querySelector('[name="start"]').value = info.startStr.slice(0, 16);
+            document.querySelector('[name="end"]').value = info.endStr ? info.endStr.slice(0, 16) : '';
+            if (info.resource) {
+                document.querySelector('[name="resourceId"]').value = info.resource.id;
+            }
+            modal.show();
+            calendar.unselect();
+        },
+        
+        eventDrop: function(info) {
+            // Drag & Drop
+            updateTermin(info.event);
+        },
+        
+        eventResize: function(info) {
+            // Resize
+            updateTermin(info.event);
+        },
+        
+        eventClick: function(info) {
+            // Termin-Details (später: Modal)
+            console.log('Termin geklickt:', info.event);
+        },
+        
+        // Styling
+        eventClassNames: function(arg) {
+            return ['termin-' + (arg.event.extendedProps.typ || 'intern')];
+        },
+    });
+    
+    calendar.render();
+    
+    // Ansicht wechseln
+    document.querySelectorAll('.btn-view').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.btn-view').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            calendar.changeView(this.dataset.view);
+        });
+    });
+    
+    // Filter
+    document.querySelectorAll('.filter-typ').forEach(cb => {
+        cb.addEventListener('change', function() {
+            calendar.refetchEvents();
+        });
+    });
+    
+    // Neuen Termin speichern
+    document.getElementById('btn-termin-speichern').addEventListener('click', function() {
+        const form = document.getElementById('termin-form');
+        const formData = new FormData(form);
+        const data = Object.fromEntries(formData);
+        
+        fetch('{{ url_for("kalender.api_termin_erstellen") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.success) {
+                calendar.addEvent(result.event);
+                bootstrap.Modal.getInstance(document.getElementById('terminModal')).hide();
+                form.reset();
+            } else {
+                alert('Fehler: ' + result.error);
+            }
+        });
+    });
+    
+    // Termin aktualisieren (Drag & Drop)
+    function updateTermin(event) {
+        fetch(`/kalender/api/termin/${event.id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                start: event.startStr,
+                end: event.endStr,
+                resourceId: event.getResources()[0]?.id,
+                allDay: event.allDay
+            })
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (!result.success) {
+                event.revert();
+                alert('Fehler: ' + result.error);
+            }
+        });
+    }
+    
+    // Auslastung laden
+    function loadAuslastung() {
+        fetch('{{ url_for("kalender.api_auslastung") }}')
+        .then(res => res.json())
+        .then(data => {
+            const container = document.getElementById('auslastung-container');
+            container.innerHTML = data.map(a => `
+                <div class="mb-2">
+                    <small class="d-flex justify-content-between">
+                        <span>${a.ressource_name}</span>
+                        <span>${a.auslastung_prozent}%</span>
+                    </small>
+                    <div class="auslastung-bar">
+                        <div class="fill bg-${a.auslastung_prozent > 80 ? 'danger' : a.auslastung_prozent > 50 ? 'warning' : 'success'}" 
+                             style="width: ${a.auslastung_prozent}%"></div>
+                    </div>
+                </div>
+            `).join('');
+        });
+    }
+    
+    loadAuslastung();
+});
+</script>
+{% endblock %}

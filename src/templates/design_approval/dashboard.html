@@ -1,0 +1,619 @@
+{% extends "base.html" %}
+
+{% block title %}Design-Freigaben - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="bi bi-palette-fill text-primary"></i>
+                Design-Freigaben
+            </h1>
+            <p class="text-muted mb-0">PDF-basierter Freigabe-Workflow</p>
+        </div>
+    </div>
+
+    <!-- Statistik-Kacheln -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-warning h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted">Ausstehend</h6>
+                            <h2 class="mb-0">{{ pending_orders|length }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-hourglass-split fs-1 text-warning"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-info h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted">Gesendet</h6>
+                            <h2 class="mb-0">{{ sent_orders|length }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-envelope-check fs-1 text-info"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted">Änderung gewünscht</h6>
+                            <h2 class="mb-0">{{ revision_orders|length }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-pencil-square fs-1 text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-success h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="text-muted">Freigegeben (30 Tage)</h6>
+                            <h2 class="mb-0">{{ approved_orders|length }}</h2>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-check-circle-fill fs-1 text-success"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#pending">
+                <i class="bi bi-hourglass"></i> Ausstehend
+                {% if pending_orders|length > 0 %}<span class="badge bg-warning ms-1">{{ pending_orders|length }}</span>{% endif %}
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#sent">
+                <i class="bi bi-envelope"></i> Gesendet
+                {% if sent_orders|length > 0 %}<span class="badge bg-info ms-1">{{ sent_orders|length }}</span>{% endif %}
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#revision">
+                <i class="bi bi-pencil"></i> Änderung gewünscht
+                {% if revision_orders|length > 0 %}<span class="badge bg-danger ms-1">{{ revision_orders|length }}</span>{% endif %}
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#approved">
+                <i class="bi bi-check-circle"></i> Freigegeben
+            </a>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- Tab: Ausstehend (noch nicht gesendet) -->
+        <div class="tab-pane fade show active" id="pending">
+            {% if pending_orders %}
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-list-check"></i> Aufträge mit Design - Freigabe noch nicht gesendet
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Auftrag</th>
+                                <th>Kunde</th>
+                                <th>E-Mail</th>
+                                <th>Design</th>
+                                <th>Erstellt</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in pending_orders %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}">
+                                        <strong>{{ order.order_number }}</strong>
+                                    </a>
+                                </td>
+                                <td>{{ order.customer.display_name if order.customer else '-' }}</td>
+                                <td>
+                                    {% if order.customer and order.customer.email %}
+                                    <small>{{ order.customer.email }}</small>
+                                    {% else %}
+                                    <span class="badge bg-warning">Keine E-Mail</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.design_file or order.design_file_path %}
+                                    <span class="badge bg-success"><i class="bi bi-check"></i> Vorhanden</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Fehlt</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ order.created_at.strftime('%d.%m.%Y') if order.created_at else '-' }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <!-- PDF generieren & senden -->
+                                        {% if order.customer and order.customer.email %}
+                                        <button type="button" class="btn btn-primary send-approval" 
+                                                data-order-id="{{ order.id }}"
+                                                data-order-number="{{ order.order_number }}"
+                                                title="PDF generieren & per E-Mail senden">
+                                            <i class="bi bi-send"></i> Senden
+                                        </button>
+                                        {% else %}
+                                        <button type="button" class="btn btn-secondary" disabled
+                                                title="Keine E-Mail-Adresse">
+                                            <i class="bi bi-send"></i> Senden
+                                        </button>
+                                        {% endif %}
+                                        <!-- Nur PDF generieren -->
+                                        <button type="button" class="btn btn-outline-secondary generate-pdf"
+                                                data-order-id="{{ order.id }}"
+                                                title="Nur PDF generieren (zum manuellen Versand)">
+                                            <i class="bi bi-file-pdf"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle"></i> Keine ausstehenden Freigaben.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Tab: Gesendet (warte auf Antwort) -->
+        <div class="tab-pane fade" id="sent">
+            {% if sent_orders %}
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-envelope-check"></i> Gesendet - Warte auf Kundenreaktion
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Auftrag</th>
+                                <th>Kunde</th>
+                                <th>Gesendet am</th>
+                                <th>Wartezeit</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in sent_orders %}
+                            {% set days_waiting = ((now - order.design_approval_sent_at).days) if order.design_approval_sent_at else 0 %}
+                            <tr class="{{ 'table-warning' if days_waiting > 7 else '' }}">
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}">
+                                        <strong>{{ order.order_number }}</strong>
+                                    </a>
+                                </td>
+                                <td>
+                                    {{ order.customer.display_name if order.customer else '-' }}
+                                    <br><small class="text-muted">{{ order.customer.email if order.customer else '' }}</small>
+                                </td>
+                                <td>{{ order.design_approval_sent_at.strftime('%d.%m.%Y %H:%M') if order.design_approval_sent_at else '-' }}</td>
+                                <td>
+                                    {% if days_waiting > 7 %}
+                                    <span class="badge bg-warning">{{ days_waiting }} Tage</span>
+                                    {% elif days_waiting > 0 %}
+                                    <span class="badge bg-secondary">{{ days_waiting }} Tage</span>
+                                    {% else %}
+                                    <span class="badge bg-info">Heute</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <!-- Freigabe eintragen (E-Mail-Antwort erhalten) -->
+                                        <button type="button" class="btn btn-success mark-approved"
+                                                data-order-id="{{ order.id }}"
+                                                data-order-number="{{ order.order_number }}"
+                                                title="Kunde hat per E-Mail freigegeben">
+                                            <i class="bi bi-check-lg"></i> Freigabe eintragen
+                                        </button>
+                                        <!-- Signierte PDF hochladen -->
+                                        <button type="button" class="btn btn-outline-success upload-signed"
+                                                data-order-id="{{ order.id }}"
+                                                title="Unterschriebene PDF hochladen">
+                                            <i class="bi bi-upload"></i>
+                                        </button>
+                                        <!-- Erneut senden -->
+                                        <button type="button" class="btn btn-outline-secondary resend-approval"
+                                                data-order-id="{{ order.id }}"
+                                                title="Erinnerung senden">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Keine gesendeten Freigaben, die auf Antwort warten.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Tab: Änderung gewünscht -->
+        <div class="tab-pane fade" id="revision">
+            {% if revision_orders %}
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <i class="bi bi-pencil-square"></i> Änderungswünsche - Design anpassen erforderlich
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Auftrag</th>
+                                <th>Kunde</th>
+                                <th>Änderungswunsch</th>
+                                <th>Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in revision_orders %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}">
+                                        <strong>{{ order.order_number }}</strong>
+                                    </a>
+                                </td>
+                                <td>{{ order.customer.display_name if order.customer else '-' }}</td>
+                                <td>
+                                    <div style="max-width: 400px;">
+                                        {{ (order.design_approval_notes or '-')[:150] }}
+                                        {% if order.design_approval_notes and order.design_approval_notes|length > 150 %}
+                                        <a href="#" class="show-full-notes" 
+                                           data-notes="{{ order.design_approval_notes }}">...mehr</a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('orders.show', order_id=order.id) }}" 
+                                           class="btn btn-primary">
+                                            <i class="bi bi-pencil"></i> Bearbeiten
+                                        </a>
+                                        <button type="button" class="btn btn-success resend-after-revision"
+                                                data-order-id="{{ order.id }}"
+                                                title="Nach Änderung erneut zur Freigabe senden">
+                                            <i class="bi bi-send"></i> Neu senden
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle"></i> Keine Änderungswünsche offen.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Tab: Freigegeben -->
+        <div class="tab-pane fade" id="approved">
+            {% if approved_orders %}
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-check-circle-fill"></i> Kürzlich freigegebene Designs (letzte 30 Tage)
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Auftrag</th>
+                                <th>Kunde</th>
+                                <th>Freigegeben am</th>
+                                <th>Notiz</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in approved_orders %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}">
+                                        {{ order.order_number }}
+                                    </a>
+                                </td>
+                                <td>{{ order.customer.display_name if order.customer else '-' }}</td>
+                                <td>{{ order.design_approval_date.strftime('%d.%m.%Y %H:%M') if order.design_approval_date else '-' }}</td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ (order.design_approval_notes or '-')[:80] }}
+                                    </small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Keine Freigaben in den letzten 30 Tagen.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Freigabe eintragen -->
+<div class="modal fade" id="approvalModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-check-circle"></i> Freigabe eintragen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="approvalForm">
+                <div class="modal-body">
+                    <p>Auftrag: <strong id="approvalOrderNumber"></strong></p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Freigabe-Methode</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="approval_method" 
+                                   id="methodEmail" value="email" checked>
+                            <label class="form-check-label" for="methodEmail">
+                                <i class="bi bi-envelope"></i> E-Mail-Antwort erhalten
+                                <small class="text-muted d-block">Kunde hat per E-Mail bestätigt</small>
+                            </label>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="radio" name="approval_method" 
+                                   id="methodPdf" value="pdf">
+                            <label class="form-check-label" for="methodPdf">
+                                <i class="bi bi-file-pdf"></i> Unterschriebene PDF erhalten
+                                <small class="text-muted d-block">Ausgedruckt, unterschrieben, eingescannt</small>
+                            </label>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="radio" name="approval_method" 
+                                   id="methodPhone" value="phone">
+                            <label class="form-check-label" for="methodPhone">
+                                <i class="bi bi-telephone"></i> Telefonische Freigabe
+                                <small class="text-muted d-block">Kunde hat telefonisch bestätigt</small>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="pdfUploadSection" style="display: none;">
+                        <label class="form-label">PDF-Datei hochladen</label>
+                        <input type="file" class="form-control" id="signedPdfFile" accept=".pdf">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Notiz (optional)</label>
+                        <textarea class="form-control" id="approvalNotes" rows="2" 
+                                  placeholder="z.B. Name des Ansprechpartners, Datum der Bestätigung..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg"></i> Freigabe speichern
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Änderungsdetails -->
+<div class="modal fade" id="notesModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Änderungswunsch Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre id="notesText" style="white-space: pre-wrap; font-family: inherit;"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentOrderId = null;
+    const approvalModal = new bootstrap.Modal(document.getElementById('approvalModal'));
+    
+    // PDF-Upload Section ein-/ausblenden
+    document.querySelectorAll('input[name="approval_method"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.getElementById('pdfUploadSection').style.display = 
+                this.value === 'pdf' ? 'block' : 'none';
+        });
+    });
+    
+    // Freigabe senden
+    document.querySelectorAll('.send-approval').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const orderId = this.dataset.orderId;
+            const orderNumber = this.dataset.orderNumber;
+            
+            if (!confirm(`Freigabe-PDF für Auftrag ${orderNumber} generieren und per E-Mail senden?`)) {
+                return;
+            }
+            
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            
+            fetch(`/design-approval/api/send/${orderId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                    location.reload();
+                } else {
+                    alert('❌ Fehler: ' + data.error);
+                    this.disabled = false;
+                    this.innerHTML = '<i class="bi bi-send"></i> Senden';
+                }
+            })
+            .catch(err => {
+                alert('Fehler: ' + err);
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-send"></i> Senden';
+            });
+        });
+    });
+    
+    // Nur PDF generieren
+    document.querySelectorAll('.generate-pdf').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const orderId = this.dataset.orderId;
+            
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            
+            fetch(`/design-approval/api/generate-pdf/${orderId}`, {
+                method: 'POST'
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // PDF Download starten
+                    window.open(data.download_url, '_blank');
+                } else {
+                    alert('Fehler: ' + data.error);
+                }
+                this.disabled = false;
+                this.innerHTML = '<i class="bi bi-file-pdf"></i>';
+            });
+        });
+    });
+    
+    // Freigabe eintragen Modal öffnen
+    document.querySelectorAll('.mark-approved').forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentOrderId = this.dataset.orderId;
+            document.getElementById('approvalOrderNumber').textContent = this.dataset.orderNumber;
+            document.getElementById('approvalNotes').value = '';
+            document.getElementById('signedPdfFile').value = '';
+            document.querySelector('#methodEmail').checked = true;
+            document.getElementById('pdfUploadSection').style.display = 'none';
+            approvalModal.show();
+        });
+    });
+    
+    // Freigabe speichern
+    document.getElementById('approvalForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const method = document.querySelector('input[name="approval_method"]:checked').value;
+        const notes = document.getElementById('approvalNotes').value;
+        const pdfFile = document.getElementById('signedPdfFile').files[0];
+        
+        const formData = new FormData();
+        formData.append('method', method);
+        formData.append('notes', notes);
+        if (pdfFile) {
+            formData.append('signed_pdf', pdfFile);
+        }
+        
+        fetch(`/design-approval/api/mark-approved/${currentOrderId}`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                approvalModal.hide();
+                alert('✅ Freigabe wurde eingetragen');
+                location.reload();
+            } else {
+                alert('Fehler: ' + data.error);
+            }
+        });
+    });
+    
+    // Erneut senden
+    document.querySelectorAll('.resend-approval').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!confirm('Erinnerungs-E-Mail senden?')) return;
+            
+            const orderId = this.dataset.orderId;
+            this.disabled = true;
+            
+            fetch(`/design-approval/api/resend/${orderId}`, {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                alert(data.success ? '✅ Erinnerung gesendet' : '❌ ' + data.error);
+                this.disabled = false;
+            });
+        });
+    });
+    
+    // Nach Änderung neu senden
+    document.querySelectorAll('.resend-after-revision').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!confirm('Design wurde angepasst - Neue Freigabe-Anfrage senden?')) return;
+            
+            const orderId = this.dataset.orderId;
+            this.disabled = true;
+            
+            fetch(`/design-approval/api/send/${orderId}`, {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Neue Freigabe-Anfrage gesendet');
+                    location.reload();
+                } else {
+                    alert('❌ ' + data.error);
+                    this.disabled = false;
+                }
+            });
+        });
+    });
+    
+    // Notizen anzeigen
+    document.querySelectorAll('.show-full-notes').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('notesText').textContent = this.dataset.notes;
+            new bootstrap.Modal(document.getElementById('notesModal')).show();
+        });
+    });
+});
+</script>
+{% endblock %}

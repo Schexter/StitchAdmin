@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Rechnung mit Auftrag verknüpfen{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="bi bi-link-45deg text-primary"></i>
+                Rechnung {{ rechnung.rechnungsnummer }} verknüpfen
+            </h1>
+            <p class="text-muted mb-0">
+                Kunde: <strong>{{ rechnung.kunde_name }}</strong> |
+                Betrag: <strong>{{ "%.2f"|format(rechnung.brutto_gesamt or 0) }} €</strong> |
+                Datum: {{ rechnung.rechnungsdatum.strftime('%d.%m.%Y') if rechnung.rechnungsdatum else '-' }}
+            </p>
+        </div>
+        <a href="{{ url_for('rechnung.rechnung_detail', rechnung_id=rechnung.id) }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück zur Rechnung
+        </a>
+    </div>
+
+    <!-- Aktuelle Verknüpfung -->
+    {% if aktueller_auftrag %}
+    <div class="alert alert-info d-flex align-items-center">
+        <i class="bi bi-info-circle me-2"></i>
+        <div>
+            <strong>Aktuell verknüpft mit:</strong> 
+            Auftrag {{ aktueller_auftrag.order_number }}
+            ({{ aktueller_auftrag.customer.display_name if aktueller_auftrag.customer else 'Unbekannt' }})
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('rechnung.rechnung_verknuepfen_speichern', rechnung_id=rechnung.id) }}">
+        <div class="row">
+            <!-- Passende Aufträge (gleicher Kunde) -->
+            <div class="col-lg-6 mb-4">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-check-circle"></i>
+                        Passende Aufträge (gleicher Kunde)
+                        <span class="badge bg-light text-success ms-2">{{ passende_auftraege|length }}</span>
+                    </div>
+                    <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
+                        {% if passende_auftraege %}
+                        <div class="list-group list-group-flush">
+                            {% for auftrag in passende_auftraege %}
+                            <label class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
+                                {{ 'active' if aktueller_auftrag and aktueller_auftrag.id == auftrag.id else '' }}">
+                                <div class="d-flex align-items-center">
+                                    <input type="radio" name="order_id" value="{{ auftrag.id }}" 
+                                           class="form-check-input me-3"
+                                           {{ 'checked' if aktueller_auftrag and aktueller_auftrag.id == auftrag.id else '' }}>
+                                    <div>
+                                        <strong>{{ auftrag.order_number }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            {{ auftrag.created_at.strftime('%d.%m.%Y') if auftrag.created_at else '-' }}
+                                            {% if auftrag.items %}
+                                             | {{ auftrag.items|length }} Position(en)
+                                            {% endif %}
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-{{ 'success' if auftrag.status == 'completed' else 'primary' if auftrag.status == 'in_progress' else 'secondary' }}">
+                                        {{ auftrag.status }}
+                                    </span>
+                                    {% if auftrag.total_price %}
+                                    <br><small class="text-muted">{{ "%.2f"|format(auftrag.total_price) }} €</small>
+                                    {% endif %}
+                                </div>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="p-4 text-center text-muted">
+                            <i class="bi bi-inbox display-6"></i>
+                            <p class="mt-2 mb-0">Keine passenden Aufträge vorhanden</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Andere Aufträge (andere Kunden) -->
+            <div class="col-lg-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-list-ul"></i>
+                        Andere Aufträge
+                        <span class="badge bg-secondary ms-2">{{ andere_auftraege|length }}</span>
+                    </div>
+                    <div class="card-body p-0" style="max-height: 500px; overflow-y: auto;">
+                        {% if andere_auftraege %}
+                        <div class="list-group list-group-flush">
+                            {% for auftrag in andere_auftraege[:20] %}
+                            <label class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                                <div class="d-flex align-items-center">
+                                    <input type="radio" name="order_id" value="{{ auftrag.id }}" 
+                                           class="form-check-input me-3">
+                                    <div>
+                                        <strong>{{ auftrag.order_number }}</strong>
+                                        <br>
+                                        <small class="text-muted">
+                                            {{ auftrag.customer.display_name if auftrag.customer else 'Unbekannt' }}
+                                        </small>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-secondary">{{ auftrag.status }}</span>
+                                    <br><small class="text-muted">{{ auftrag.created_at.strftime('%d.%m.%Y') if auftrag.created_at else '-' }}</small>
+                                </div>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        {% if andere_auftraege|length > 20 %}
+                        <div class="p-2 text-center text-muted small">
+                            ... und {{ andere_auftraege|length - 20 }} weitere
+                        </div>
+                        {% endif %}
+                        {% else %}
+                        <div class="p-4 text-center text-muted">
+                            <i class="bi bi-inbox display-6"></i>
+                            <p class="mt-2 mb-0">Keine weiteren Aufträge</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keine Verknüpfung Option -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <label class="d-flex align-items-center">
+                    <input type="radio" name="order_id" value="none" class="form-check-input me-3"
+                           {{ 'checked' if not aktueller_auftrag else '' }}>
+                    <div>
+                        <strong>Keine Verknüpfung</strong>
+                        <br>
+                        <small class="text-muted">Rechnung bleibt ohne Auftragsbezug (Handrechnung)</small>
+                    </div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="d-flex justify-content-end gap-2">
+            <a href="{{ url_for('rechnung.rechnung_detail', rechnung_id=rechnung.id) }}" class="btn btn-outline-secondary">
+                Abbrechen
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i> Verknüpfung speichern
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

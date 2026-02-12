@@ -1,0 +1,228 @@
+{# 
+    Kunden-Score Widget (Include)
+    Zeigt Score-Übersicht für einen Kunden
+    
+    Erforderliche Variablen:
+    - customer_id: ID des Kunden
+    
+    Erstellt von Hans Hahn - Alle Rechte vorbehalten
+#}
+
+<style>
+.customer-score-widget {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    overflow: hidden;
+}
+
+.score-header {
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.score-header h6 {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.overall-score {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.score-body {
+    padding: 16px;
+}
+
+.score-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.score-item:last-child {
+    margin-bottom: 0;
+}
+
+.score-label {
+    font-size: 0.8rem;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.score-label i {
+    width: 16px;
+    text-align: center;
+}
+
+.score-bar-container {
+    flex: 1;
+    margin: 0 12px;
+    height: 6px;
+    background: #e2e8f0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.score-bar-inner {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.score-bar-inner.excellent { background: linear-gradient(90deg, #22c55e, #16a34a); }
+.score-bar-inner.good { background: linear-gradient(90deg, #84cc16, #65a30d); }
+.score-bar-inner.average { background: linear-gradient(90deg, #eab308, #ca8a04); }
+.score-bar-inner.poor { background: linear-gradient(90deg, #f97316, #ea580c); }
+.score-bar-inner.bad { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+.score-value {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #1e293b;
+    min-width: 32px;
+    text-align: right;
+}
+
+.score-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+}
+
+.score-stat {
+    text-align: center;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 6px;
+}
+
+.score-stat-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.score-stat-label {
+    font-size: 0.7rem;
+    color: #64748b;
+}
+
+.score-loading {
+    text-align: center;
+    padding: 24px;
+    color: #94a3b8;
+}
+</style>
+
+<div class="customer-score-widget" id="customerScoreWidget">
+    <div class="score-loading">
+        <div class="spinner-border spinner-border-sm text-primary"></div>
+        <p class="mt-2 mb-0">Lade Score...</p>
+    </div>
+</div>
+
+<script>
+(function() {
+    const customerId = '{{ customer_id }}';
+    const widget = document.getElementById('customerScoreWidget');
+    
+    fetch(`/crm/api/customer/${customerId}/stats`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                widget.innerHTML = '<div class="score-loading text-danger"><i class="fas fa-exclamation-triangle"></i><p>Fehler beim Laden</p></div>';
+                return;
+            }
+            
+            const scores = data.scores;
+            const overall = scores.overall_score || 0;
+            
+            function getScoreClass(score) {
+                if (score >= 80) return 'excellent';
+                if (score >= 60) return 'good';
+                if (score >= 40) return 'average';
+                if (score >= 20) return 'poor';
+                return 'bad';
+            }
+            
+            widget.innerHTML = `
+                <div class="score-header">
+                    <h6><i class="fas fa-chart-line"></i> Kunden-Score</h6>
+                    <div class="overall-score">${Math.round(overall)}</div>
+                </div>
+                <div class="score-body">
+                    <div class="score-item">
+                        <span class="score-label"><i class="fas fa-euro-sign"></i> Umsatz</span>
+                        <div class="score-bar-container">
+                            <div class="score-bar-inner ${getScoreClass(scores.revenue_score)}" style="width: ${scores.revenue_score}%;"></div>
+                        </div>
+                        <span class="score-value">${Math.round(scores.revenue_score)}</span>
+                    </div>
+                    <div class="score-item">
+                        <span class="score-label"><i class="fas fa-credit-card"></i> Zahlung</span>
+                        <div class="score-bar-container">
+                            <div class="score-bar-inner ${getScoreClass(scores.payment_score)}" style="width: ${scores.payment_score}%;"></div>
+                        </div>
+                        <span class="score-value">${Math.round(scores.payment_score)}</span>
+                    </div>
+                    <div class="score-item">
+                        <span class="score-label"><i class="fas fa-phone"></i> Kontakt</span>
+                        <div class="score-bar-container">
+                            <div class="score-bar-inner ${getScoreClass(scores.engagement_score)}" style="width: ${scores.engagement_score}%;"></div>
+                        </div>
+                        <span class="score-value">${Math.round(scores.engagement_score)}</span>
+                    </div>
+                    <div class="score-item">
+                        <span class="score-label"><i class="fas fa-heart"></i> Treue</span>
+                        <div class="score-bar-container">
+                            <div class="score-bar-inner ${getScoreClass(scores.loyalty_score)}" style="width: ${scores.loyalty_score}%;"></div>
+                        </div>
+                        <span class="score-value">${Math.round(scores.loyalty_score)}</span>
+                    </div>
+                    
+                    <div class="score-stats">
+                        <div class="score-stat">
+                            <div class="score-stat-value">${data.revenue.total.toLocaleString('de-DE', {maximumFractionDigits: 0})}€</div>
+                            <div class="score-stat-label">Gesamtumsatz</div>
+                        </div>
+                        <div class="score-stat">
+                            <div class="score-stat-value">${data.orders.total}</div>
+                            <div class="score-stat-label">Aufträge</div>
+                        </div>
+                        <div class="score-stat">
+                            <div class="score-stat-value">${data.years_customer} J.</div>
+                            <div class="score-stat-label">Kunde seit</div>
+                        </div>
+                        <div class="score-stat">
+                            <div class="score-stat-value">${data.engagement.last_contact || '-'}</div>
+                            <div class="score-stat-label">Letzter Kontakt</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        })
+        .catch(err => {
+            widget.innerHTML = '<div class="score-loading text-muted"><i class="fas fa-info-circle"></i><p>Score nicht verfügbar</p></div>';
+        });
+})();
+</script>

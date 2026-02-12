@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Design-Erstellung Dashboard - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">
+                <i class="bi bi-palette-fill text-primary"></i>
+                Design-Erstellung
+            </h1>
+            <p class="text-muted mb-0">Übersicht Fremd- und Eigenerstellung</p>
+        </div>
+    </div>
+
+    <!-- Warnungen -->
+    {% if overdue_tasks > 0 or overdue_orders > 0 %}
+    <div class="alert alert-danger mb-4">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <strong>Achtung!</strong>
+        {% if overdue_tasks > 0 %}
+        {{ overdue_tasks }} interne Aufgabe(n) überfällig.
+        {% endif %}
+        {% if overdue_orders > 0 %}
+        {{ overdue_orders }} externe Bestellung(en) überfällig.
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Externe Bestellungen -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-truck"></i> Externe Bestellungen</span>
+                    <a href="{{ url_for('design_creation.external_orders') }}" class="btn btn-sm btn-light">
+                        Alle anzeigen
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if pending_external %}
+                    <div class="list-group list-group-flush">
+                        {% for order in pending_external %}
+                        <a href="{{ url_for('design_creation.external_order_detail', order_id=order.id) }}" 
+                           class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>{{ order.design_order_number }}</strong>
+                                    <br><small>{{ order.type_icon }} {{ order.design_name[:25] }}{% if order.design_name|length > 25 %}...{% endif %}</small>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-{{ order.status_color }}">{{ order.status_display }}</span>
+                                    {% if order.supplier %}
+                                    <br><small class="text-muted">{{ order.supplier.name }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p class="mb-0">Keine offenen externen Bestellungen</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Interne Aufgaben -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-person-workspace"></i> Interne Aufgaben</span>
+                    <a href="{{ url_for('design_creation.internal_tasks') }}" class="btn btn-sm btn-light">
+                        Alle anzeigen
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% if pending_internal %}
+                    <div class="list-group list-group-flush">
+                        {% for task in pending_internal %}
+                        {% set is_overdue = task.due_date and task.due_date < today %}
+                        <a href="{{ url_for('design_creation.internal_task_detail', task_id=task.id) }}" 
+                           class="list-group-item list-group-item-action {{ 'list-group-item-danger' if is_overdue else '' }}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>{{ task.title[:30] }}{% if task.title|length > 30 %}...{% endif %}</strong>
+                                    {% if task.order %}
+                                    <br><small>Auftrag: {{ task.order.order_number }}</small>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end">
+                                    {% if task.status == 'in_progress' %}
+                                    <span class="badge bg-primary">In Arbeit</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Offen</span>
+                                    {% endif %}
+                                    {% if task.due_date %}
+                                    <br><small class="{{ 'text-danger' if is_overdue else 'text-muted' }}">
+                                        Fällig: {{ task.due_date.strftime('%d.%m.') }}
+                                        {% if is_overdue %}<i class="bi bi-exclamation-triangle"></i>{% endif %}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p class="mb-0">Keine offenen Aufgaben</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workflow-Übersicht -->
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-diagram-3"></i> Design-Erstellungs-Workflow
+        </div>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-2">
+                    <div class="p-3 border rounded mb-2">
+                        <i class="bi bi-cart-plus fs-1 text-secondary"></i>
+                        <h6 class="mt-2 mb-0">Neuer Auftrag</h6>
+                    </div>
+                </div>
+                <div class="col-md-1 d-flex align-items-center justify-content-center">
+                    <i class="bi bi-arrow-right fs-3 text-muted"></i>
+                </div>
+                <div class="col-md-2">
+                    <div class="p-3 border rounded mb-2 border-primary">
+                        <i class="bi bi-palette fs-1 text-primary"></i>
+                        <h6 class="mt-2 mb-0">Design erstellen</h6>
+                        <small class="text-muted">Fremd / Eigen</small>
+                    </div>
+                </div>
+                <div class="col-md-1 d-flex align-items-center justify-content-center">
+                    <i class="bi bi-arrow-right fs-3 text-muted"></i>
+                </div>
+                <div class="col-md-2">
+                    <div class="p-3 border rounded mb-2">
+                        <i class="bi bi-check-circle fs-1 text-success"></i>
+                        <h6 class="mt-2 mb-0">Design erhalten</h6>
+                    </div>
+                </div>
+                <div class="col-md-1 d-flex align-items-center justify-content-center">
+                    <i class="bi bi-arrow-right fs-3 text-muted"></i>
+                </div>
+                <div class="col-md-2">
+                    <div class="p-3 border rounded mb-2">
+                        <i class="bi bi-hand-thumbs-up fs-1 text-info"></i>
+                        <h6 class="mt-2 mb-0">Kundenfreigabe</h6>
+                    </div>
+                </div>
+            </div>
+            
+            <hr class="my-4">
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <h6><i class="bi bi-truck text-primary"></i> Fremderstellung</h6>
+                    <ol class="ps-3">
+                        <li>Lieferant auswählen (Puncher/Grafiker)</li>
+                        <li>Spezifikationen angeben (Größe, Farben, etc.)</li>
+                        <li>E-Mail mit Dateien automatisch versenden</li>
+                        <li>Bestellung tracken & Lieferung empfangen</li>
+                    </ol>
+                </div>
+                <div class="col-md-6">
+                    <h6><i class="bi bi-person-workspace text-success"></i> Eigenerstellung</h6>
+                    <ol class="ps-3">
+                        <li>Auftragszettel mit Spezifikationen generieren</li>
+                        <li>TODO-Aufgabe für Grafik-Team erstellen</li>
+                        <li>Fälligkeitsdatum und Priorität setzen</li>
+                        <li>Design erstellen und hochladen</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

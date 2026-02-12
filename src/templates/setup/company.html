@@ -1,0 +1,129 @@
+{% extends "setup/base_setup.html" %}
+{% block title %}Firmendaten{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+    <div class="step-number">🏢</div>
+    <h3 class="mt-3">Firmendaten</h3>
+    <p class="text-muted">Diese Daten erscheinen auf Ihren Rechnungen und Dokumenten</p>
+</div>
+
+<form method="POST">
+    <div class="row">
+        <div class="col-md-8 mb-3">
+            <label class="form-label fw-bold">Firmenname *</label>
+            <input type="text" name="company_name" class="form-control form-control-lg" 
+                   value="{{ settings.company_name if settings.company_name != 'Ihre Firma' else '' }}" 
+                   placeholder="Mustermann Stickerei" required>
+        </div>
+        <div class="col-md-4 mb-3">
+            <label class="form-label">Rechtsform</label>
+            <select name="company_addition" class="form-select form-select-lg">
+                <option value="">-- Keine --</option>
+                <option value="GmbH" {% if settings.company_addition == 'GmbH' %}selected{% endif %}>GmbH</option>
+                <option value="UG" {% if settings.company_addition == 'UG' %}selected{% endif %}>UG (haftungsbeschr.)</option>
+                <option value="e.K." {% if settings.company_addition == 'e.K.' %}selected{% endif %}>e.K.</option>
+                <option value="GbR" {% if settings.company_addition == 'GbR' %}selected{% endif %}>GbR</option>
+                <option value="OHG" {% if settings.company_addition == 'OHG' %}selected{% endif %}>OHG</option>
+                <option value="KG" {% if settings.company_addition == 'KG' %}selected{% endif %}>KG</option>
+            </select>
+        </div>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Inhaber / Geschäftsführer</label>
+        <input type="text" name="owner_name" class="form-control" 
+               value="{{ settings.owner_name or '' }}" placeholder="Max Mustermann">
+    </div>
+    
+    <hr class="my-4">
+    <h5><i class="fas fa-map-marker-alt me-2"></i>Adresse</h5>
+    
+    <div class="row">
+        <div class="col-md-9 mb-3">
+            <label class="form-label">Straße</label>
+            <input type="text" name="street" class="form-control" 
+                   value="{{ settings.street or '' }}" placeholder="Musterstraße">
+        </div>
+        <div class="col-md-3 mb-3">
+            <label class="form-label">Hausnr.</label>
+            <input type="text" name="house_number" class="form-control" 
+                   value="{{ settings.house_number or '' }}" placeholder="123">
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-3 mb-3">
+            <label class="form-label">PLZ</label>
+            <input type="text" name="postal_code" class="form-control" 
+                   value="{{ settings.postal_code or '' }}" placeholder="12345">
+        </div>
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Ort</label>
+            <input type="text" name="city" class="form-control" 
+                   value="{{ settings.city or '' }}" placeholder="Musterstadt">
+        </div>
+        <div class="col-md-3 mb-3">
+            <label class="form-label">Land</label>
+            <input type="text" name="country" class="form-control" 
+                   value="{{ settings.country or 'Deutschland' }}">
+        </div>
+    </div>
+    
+    <hr class="my-4">
+    <h5><i class="fas fa-phone me-2"></i>Kontakt</h5>
+    
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Telefon</label>
+            <input type="tel" name="phone" class="form-control" 
+                   value="{{ settings.phone or '' }}" placeholder="+49 123 456789">
+        </div>
+        <div class="col-md-6 mb-3">
+            <label class="form-label">E-Mail</label>
+            <input type="email" name="email" class="form-control" 
+                   value="{{ settings.email or '' }}" placeholder="info@musterfirma.de">
+        </div>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Website</label>
+        <input type="url" name="website" class="form-control" 
+               value="{{ settings.website or '' }}" placeholder="https://www.musterfirma.de">
+    </div>
+    
+    <hr class="my-4">
+    <h5><i class="fas fa-file-invoice me-2"></i>Steuerdaten</h5>
+    
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label class="form-label">Steuernummer</label>
+            <input type="text" name="tax_id" class="form-control" 
+                   value="{{ settings.tax_id or '' }}" placeholder="123/456/78901">
+        </div>
+        <div class="col-md-6 mb-3">
+            <label class="form-label">USt-IdNr.</label>
+            <input type="text" name="vat_id" class="form-control" 
+                   value="{{ settings.vat_id or '' }}" placeholder="DE123456789">
+        </div>
+    </div>
+    
+    <div class="form-check mb-4">
+        <input type="checkbox" class="form-check-input" id="small_business" name="small_business"
+               {% if settings.small_business %}checked{% endif %}>
+        <label class="form-check-label" for="small_business">
+            <strong>Kleinunternehmer nach §19 UStG</strong>
+            <br><small class="text-muted">Keine Umsatzsteuer auf Rechnungen</small>
+        </label>
+    </div>
+    
+    <div class="d-flex justify-content-between">
+        <a href="{{ url_for('setup.license') }}" class="btn btn-outline-secondary btn-setup">
+            <i class="fas fa-arrow-left me-2"></i> Zurück
+        </a>
+        <button type="submit" class="btn btn-primary btn-setup">
+            Weiter <i class="fas fa-arrow-right ms-2"></i>
+        </button>
+    </div>
+</form>
+{% endblock %}

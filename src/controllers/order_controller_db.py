@@ -304,6 +304,21 @@ def show(order_id):
     # Maschinen für Produktionsplanung laden
     from src.models.models import Machine
     machines = Machine.query.filter_by(status='active').order_by(Machine.name).all()
+    
+    # CRM-Aktivitäten laden (Telefonate, Besuche, E-Mails aus ProductionBlock)
+    activities = []
+    try:
+        from src.models import ProductionBlock
+        activities = ProductionBlock.query.filter(
+            ProductionBlock.order_id == order_id,
+            ProductionBlock.is_active == True
+        ).order_by(
+            ProductionBlock.start_date.desc(),
+            ProductionBlock.start_time.desc()
+        ).limit(10).all()
+    except Exception as e:
+        # ProductionBlock noch nicht migriert - ignorieren
+        pass
 
     return render_template('orders/show.html',
                          order=order,
@@ -312,7 +327,8 @@ def show(order_id):
                          items_to_order=items_to_order,
                          items_ordered=items_ordered,
                          items_delivered=items_delivered,
-                         machines=machines)
+                         machines=machines,
+                         activities=activities)
 
 
 @order_bp.route('/<order_id>/photos')

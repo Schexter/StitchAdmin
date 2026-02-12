@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block title %}Rechnung {{ rechnung.dokument_nummer }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('rechnungen.index') }}">Rechnungen</a></li>
+                    <li class="breadcrumb-item active">{{ rechnung.dokument_nummer }}</li>
+                </ol>
+            </nav>
+            <h2 class="mb-1">
+                <i class="fas fa-file-invoice-dollar text-primary me-2"></i>
+                {% if rechnung.dokument_typ == 'anzahlung' %}Anzahlungsrechnung
+                {% elif rechnung.dokument_typ == 'gutschrift' %}Gutschrift
+                {% else %}Rechnung{% endif %}
+                {{ rechnung.dokument_nummer }}
+            </h2>
+            <div class="d-flex align-items-center gap-3">
+                {% if rechnung.status == 'offen' %}
+                <span class="badge bg-warning text-dark fs-6">📋 Offen</span>
+                {% elif rechnung.status == 'teilbezahlt' %}
+                <span class="badge bg-info fs-6">💳 Teilbezahlt</span>
+                {% elif rechnung.status == 'bezahlt' %}
+                <span class="badge bg-success fs-6">✅ Bezahlt</span>
+                {% elif rechnung.status == 'gemahnt' %}
+                <span class="badge bg-danger fs-6">⚠️ Mahnstufe {{ rechnung.mahnstufe or 1 }}</span>
+                {% elif rechnung.status == 'storniert' %}
+                <span class="badge bg-dark fs-6">🚫 Storniert</span>
+                {% endif %}
+                
+                {% if ist_ueberfaellig %}
+                <span class="badge bg-danger fs-6">🔴 {{ tage_ueberfaellig }} Tage überfällig!</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="btn-group">
+            <a href="{{ url_for('rechnungen.pdf_vorschau', id=rechnung.id) }}" class="btn btn-outline-secondary" target="_blank">
+                <i class="fas fa-file-pdf me-1"></i> PDF
+            </a>
+            <a href="{{ url_for('rechnungen.pdf_generieren', id=rechnung.id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-download me-1"></i> Download
+            </a>
+            {% if rechnung.status == 'offen' and not zahlungen %}
+            <a href="{{ url_for('rechnungen.bearbeiten', id=rechnung.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit me-1"></i> Bearbeiten
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Kunde -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-user me-2"></i>Rechnungsempfänger</h5>
+                </div>
+                <div class="card-body">
+                    {% if rechnung.rechnungsadresse %}
+                    <h5>{{ rechnung.rechnungsadresse.get('company', '') or rechnung.rechnungsadresse.get('name', '') }}</h5>
+                    <p class="mb-0 text-muted">
+                        {{ rechnung.rechnungsadresse.get('street', '') }} {{ rechnung.rechnungsadresse.get('house_number', '') }}<br>
+                        {{ rechnung.rechnungsadresse.get('postal_code', '') }} {{ rechnung.rechnungsadresse.get('city', '') }}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Positionen -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Positionen</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Pos.</th>
+                                    <th>Bezeichnung</th>
+                                    <th class="text-center">Menge</th>
+                                    <th class="text-end">Einzelpreis</th>
+                                    <th class="text-end">Gesamt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pos in rechnung.positionen %}
+                                <tr>
+                                    <td>{{ pos.position }}</td>
+                                    <td>
+                                        <strong>{{ pos.bezeichnung }}</strong>
+                                        {% if pos.beschreibung %}<br><small class="text-muted">{{ pos.beschreibung }}</small>{% endif %}
+                                    </td>
+                                    <td class="text-center">{{ pos.menge }} {{ pos.einheit }}</td>
+                                    <td class="text-end">{{ "%.2f"|format(pos.einzelpreis_netto) }} €</td>
+                                    <td class="text-end"><strong>{{ "%.2f"|format(pos.netto_gesamt) }} €</strong></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="4" class="text-end">Nettobetrag:</td>
+                                    <td class="text-end">{{ "%.2f"|format(rechnung.summe_netto or 0) }} €</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4" class="text-end">MwSt. 19%:</td>
+                                    <td class="text-end">{{ "%.2f"|format(rechnung.summe_mwst or 0) }} €</td>
+                                </tr>
+                                <tr class="fw-bold fs-5">
+                                    <td colspan="4" class="text-end">Gesamtbetrag:</td>
+                                    <td class="text-end text-success">{{ "%.2f"|format(rechnung.summe_brutto or 0) }} €</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zahlungen -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-euro-sign me-2"></i>Zahlungen</h5>
+                    {% if rechnung.status in ['offen', 'teilbezahlt', 'gemahnt'] %}
+                    <a href="{{ url_for('rechnungen.zahlung_erfassen', id=rechnung.id) }}" class="btn btn-success btn-sm">
+                        <i class="fas fa-plus me-1"></i> Zahlung erfassen
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if zahlungen %}
+                    <table class="table table-sm mb-3">
+                        <thead>
+                            <tr>
+                                <th>Datum</th>
+                                <th>Art</th>
+                                <th class="text-end">Betrag</th>
+                                <th>Referenz</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for z in zahlungen %}
+                            <tr>
+                                <td>{{ z.zahlung_datum.strftime('%d.%m.%Y') }}</td>
+                                <td>
+                                    {% if z.zahlungsart == 'ueberweisung' %}🏦 Überweisung
+                                    {% elif z.zahlungsart == 'bar' %}💵 Bar
+                                    {% elif z.zahlungsart == 'ec_karte' %}💳 EC-Karte
+                                    {% elif z.zahlungsart == 'kreditkarte' %}💳 Kreditkarte
+                                    {% elif z.zahlungsart == 'paypal' %}PayPal
+                                    {% else %}{{ z.zahlungsart }}{% endif %}
+                                </td>
+                                <td class="text-end text-success"><strong>{{ "%.2f"|format(z.betrag) }} €</strong></td>
+                                <td><small>{{ z.bank_referenz or z.transaktions_id or '-' }}</small></td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('rechnungen.zahlung_loeschen', id=rechnung.id, zahlung_id=z.id) }}"
+                                          onsubmit="return confirm('Zahlung wirklich löschen?')" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="fas fa-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p class="text-muted text-center mb-0">Noch keine Zahlungen erfasst</p>
+                    {% endif %}
+                    
+                    <!-- Offener Betrag -->
+                    <div class="alert {% if offener_betrag > 0 %}alert-warning{% else %}alert-success{% endif %} mb-0 mt-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><strong>Offener Betrag:</strong></span>
+                            <span class="fs-4 fw-bold">{{ "%.2f"|format(offener_betrag) }} €</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Aktionen -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Aktionen</h5>
+                </div>
+                <div class="card-body">
+                    {% if rechnung.status in ['offen', 'teilbezahlt'] %}
+                    <a href="{{ url_for('rechnungen.zahlung_erfassen', id=rechnung.id) }}" class="btn btn-success w-100 mb-2">
+                        <i class="fas fa-euro-sign me-1"></i> Zahlung erfassen
+                    </a>
+                    {% endif %}
+                    
+                    {% if rechnung.status in ['offen', 'teilbezahlt', 'gemahnt'] and ist_ueberfaellig %}
+                    <form method="POST" action="{{ url_for('rechnungen.mahnen', id=rechnung.id) }}" class="mb-2">
+                        <button type="submit" class="btn btn-warning w-100">
+                            <i class="fas fa-exclamation-triangle me-1"></i> Mahnung (Stufe {{ (rechnung.mahnstufe or 0) + 1 }})
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    {% if rechnung.status == 'bezahlt' %}
+                    <form method="POST" action="{{ url_for('rechnungen.gutschrift_erstellen', id=rechnung.id) }}">
+                        <button type="submit" class="btn btn-outline-danger w-100 mb-2">
+                            <i class="fas fa-undo me-1"></i> Gutschrift erstellen
+                        </button>
+                    </form>
+                    {% endif %}
+                    
+                    {% if rechnung.status not in ['bezahlt', 'storniert'] %}
+                    <hr>
+                    <form method="POST" action="{{ url_for('rechnungen.stornieren', id=rechnung.id) }}"
+                          onsubmit="return confirm('Rechnung wirklich stornieren?')">
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="fas fa-ban me-1"></i> Stornieren
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Details -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Rechnungsdatum:</td>
+                            <td>{{ rechnung.dokument_datum.strftime('%d.%m.%Y') }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Leistungsdatum:</td>
+                            <td>{{ rechnung.leistungsdatum.strftime('%d.%m.%Y') if rechnung.leistungsdatum else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Fällig bis:</td>
+                            <td class="{% if ist_ueberfaellig %}text-danger fw-bold{% endif %}">
+                                {{ rechnung.faelligkeitsdatum.strftime('%d.%m.%Y') if rechnung.faelligkeitsdatum else '-' }}
+                            </td>
+                        </tr>
+                        {% if rechnung.bezahlt_am %}
+                        <tr>
+                            <td class="text-muted">Bezahlt am:</td>
+                            <td class="text-success">{{ rechnung.bezahlt_am.strftime('%d.%m.%Y') }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if rechnung.zahlungsbedingung %}
+                        <tr>
+                            <td class="text-muted">Zahlung:</td>
+                            <td>{{ rechnung.zahlungsbedingung.bezeichnung }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if vorgaenger %}
+                        <tr>
+                            <td class="text-muted">Vorgänger:</td>
+                            <td>
+                                <a href="{{ url_for('auftraege.show', id=vorgaenger.id) if vorgaenger.dokument_typ == 'auftragsbestaetigung' else url_for('lieferscheine.show', id=vorgaenger.id) }}">
+                                    {{ vorgaenger.dokument_nummer }}
+                                </a>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            {% if rechnung.interne_notiz %}
+            <div class="card shadow-sm border-warning">
+                <div class="card-header bg-warning bg-opacity-25">
+                    <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Notiz</h5>
+                </div>
+                <div class="card-body">{{ rechnung.interne_notiz }}</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

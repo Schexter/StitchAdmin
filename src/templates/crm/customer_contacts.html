@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block title %}Kontakthistorie - {{ customer.display_name }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>
+                <i class="bi bi-clock-history"></i>
+                Kontakthistorie
+            </h1>
+            <p class="text-muted mb-0">
+                <a href="{{ url_for('customers.show', customer_id=customer.id) }}">{{ customer.display_name }}</a>
+                {% if customer.company_name %} - {{ customer.company_name }}{% endif %}
+            </p>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-plus-lg"></i> Neuer Kontakt
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                    <a class="dropdown-item" href="{{ url_for('crm.send_email', customer_id=customer.id) }}">
+                        <i class="bi bi-envelope text-primary"></i> E-Mail schreiben
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="{{ url_for('crm.phone_note', customer_id=customer.id) }}">
+                        <i class="bi bi-telephone text-success"></i> Telefon-Notiz
+                    </a>
+                </li>
+                <li>
+                    <a class="dropdown-item" href="{{ url_for('crm.new_contact', customer_id=customer.id, type='notiz') }}">
+                        <i class="bi bi-sticky text-warning"></i> Notiz hinzufuegen
+                    </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <a class="dropdown-item" href="{{ url_for('crm.new_contact', customer_id=customer.id, type='termin') }}">
+                        <i class="bi bi-calendar-event text-danger"></i> Termin eintragen
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Schnellaktionen -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card bg-light">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            {% if customer.email %}
+                            <a href="mailto:{{ customer.email }}" class="btn btn-outline-primary btn-sm me-2">
+                                <i class="bi bi-envelope"></i> {{ customer.email }}
+                            </a>
+                            {% endif %}
+                            {% if customer.phone %}
+                            <a href="tel:{{ customer.phone }}" class="btn btn-outline-success btn-sm me-2">
+                                <i class="bi bi-telephone"></i> {{ customer.phone }}
+                            </a>
+                            {% endif %}
+                            {% if customer.mobile %}
+                            <a href="tel:{{ customer.mobile }}" class="btn btn-outline-success btn-sm">
+                                <i class="bi bi-phone"></i> {{ customer.mobile }}
+                            </a>
+                            {% endif %}
+                        </div>
+                        <a href="{{ url_for('customers.show', customer_id=customer.id) }}" class="btn btn-secondary btn-sm">
+                            <i class="bi bi-arrow-left"></i> Zurueck zum Kunden
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Kontaktart</label>
+                    <select name="type" class="form-select">
+                        <option value="">Alle</option>
+                        {% for ct in contact_types %}
+                        <option value="{{ ct.value }}" {% if request.args.get('type') == ct.value %}selected{% endif %}>
+                            {{ ct.value|replace('_', ' ')|title }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Von</label>
+                    <input type="date" name="from" class="form-control" value="{{ request.args.get('from', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Bis</label>
+                    <input type="date" name="to" class="form-control" value="{{ request.args.get('to', '') }}">
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary me-2">
+                        <i class="bi bi-search"></i> Filtern
+                    </button>
+                    <a href="{{ url_for('crm.customer_contacts', customer_id=customer.id) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-x"></i> Reset
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Kontaktliste als Timeline -->
+    <div class="row">
+        <div class="col-md-12">
+            {% if contacts %}
+            <div class="timeline">
+                {% for contact in contacts %}
+                <div class="card mb-3 border-{{ contact.type_color }}">
+                    <div class="card-header bg-{{ contact.type_color }} bg-opacity-10 d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="bi {{ contact.type_icon }} text-{{ contact.type_color }}"></i>
+                            <strong>{{ contact.type_label }}</strong>
+                            {% if contact.order %}
+                            <span class="badge bg-secondary ms-2">
+                                <a href="{{ url_for('orders.show', order_id=contact.order_id) }}" class="text-white text-decoration-none">
+                                    {{ contact.order.order_number }}
+                                </a>
+                            </span>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted">
+                            {{ contact.contact_date.strftime('%d.%m.%Y %H:%M') if contact.contact_date else '-' }}
+                            {% if contact.created_by %} - {{ contact.created_by }}{% endif %}
+                        </small>
+                    </div>
+                    <div class="card-body">
+                        {% if contact.subject %}
+                        <h6 class="card-title">{{ contact.subject }}</h6>
+                        {% endif %}
+
+                        {% if contact.body_text %}
+                        <p class="card-text">{{ contact.body_text|truncate(300) }}</p>
+                        {% endif %}
+
+                        <!-- E-Mail-Details -->
+                        {% if contact.contact_type.value in ['email_ausgang', 'email_eingang'] %}
+                        <div class="small text-muted">
+                            {% if contact.email_to %}<strong>An:</strong> {{ contact.email_to }}<br>{% endif %}
+                            {% if contact.email_cc %}<strong>CC:</strong> {{ contact.email_cc }}{% endif %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Telefon-Details -->
+                        {% if contact.contact_type.value in ['telefon_ausgang', 'telefon_eingang'] %}
+                        <div class="small text-muted">
+                            {% if contact.phone_number %}<strong>Nummer:</strong> {{ contact.phone_number }}{% endif %}
+                            {% if contact.callback_required %}
+                            <span class="badge bg-warning ms-2">
+                                <i class="bi bi-telephone-forward"></i> Rueckruf erforderlich
+                                {% if contact.callback_date %} bis {{ contact.callback_date.strftime('%d.%m.%Y') }}{% endif %}
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Anhaenge -->
+                        {% set attachments = contact.get_attachments() %}
+                        {% if attachments %}
+                        <div class="mt-2">
+                            {% for att in attachments %}
+                            <span class="badge bg-light text-dark me-1">
+                                <i class="bi bi-paperclip"></i> {{ att.filename }}
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Wiedervorlage -->
+                        {% if contact.follow_up_date %}
+                        <div class="alert alert-info py-1 px-2 mt-2 mb-0 small">
+                            <i class="bi bi-bell"></i> Wiedervorlage: {{ contact.follow_up_date.strftime('%d.%m.%Y %H:%M') }}
+                            {% if contact.follow_up_note %} - {{ contact.follow_up_note }}{% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <button class="btn btn-sm btn-outline-primary" onclick="showContactDetail({{ contact.id }})">
+                            <i class="bi bi-eye"></i> Details
+                        </button>
+                        {% if contact.contact_type.value in ['email_ausgang', 'email_eingang'] %}
+                        <a href="{{ url_for('crm.send_email', customer_id=customer.id) }}" class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-reply"></i> Antworten
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> Noch keine Kontakte vorhanden.
+                <a href="{{ url_for('crm.send_email', customer_id=customer.id) }}">Erste E-Mail schreiben?</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Kontakt-Detail Modal -->
+<div class="modal fade" id="contactDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Kontaktdetails</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="contactDetailContent">
+                <!-- Wird per AJAX geladen -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showContactDetail(contactId) {
+    fetch(`/crm/api/kontakt/${contactId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                const c = data.contact;
+                let html = `
+                    <p><strong>Typ:</strong> ${c.type_label}</p>
+                    <p><strong>Datum:</strong> ${c.contact_date ? new Date(c.contact_date).toLocaleString('de-DE') : '-'}</p>
+                    <p><strong>Erstellt von:</strong> ${c.created_by || '-'}</p>
+                `;
+
+                if (c.subject) {
+                    html += `<hr><h6>${c.subject}</h6>`;
+                }
+
+                if (c.body_html) {
+                    html += `<div class="border p-3 bg-light">${c.body_html}</div>`;
+                } else if (c.body_text) {
+                    html += `<pre class="border p-3 bg-light">${c.body_text}</pre>`;
+                }
+
+                if (c.email_to) {
+                    html += `<p class="mt-3"><strong>An:</strong> ${c.email_to}</p>`;
+                }
+
+                if (c.attachments && c.attachments.length > 0) {
+                    html += '<p class="mt-3"><strong>Anhaenge:</strong></p><ul>';
+                    c.attachments.forEach(a => {
+                        html += `<li>${a.filename}</li>`;
+                    });
+                    html += '</ul>';
+                }
+
+                document.getElementById('contactDetailContent').innerHTML = html;
+                new bootstrap.Modal(document.getElementById('contactDetailModal')).show();
+            }
+        });
+}
+</script>
+{% endblock %}

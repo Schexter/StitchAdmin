@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}{{ page_title }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>
+                <i class="bi bi-file-text"></i>
+                {{ rechnung.rechnungsnummer }}
+            </h1>
+            <p class="text-muted mb-0">
+                {% if rechnung.richtung and rechnung.richtung.value == 'EINGANG' %}
+                    <span class="badge bg-secondary">Eingangsrechnung</span>
+                    von {{ rechnung.lieferant_name or 'Unbekannter Lieferant' }}
+                {% else %}
+                    <span class="badge bg-primary">Ausgangsrechnung</span>
+                    an {{ rechnung.kunde_name or 'Unbekannter Kunde' }}
+                {% endif %}
+            </p>
+        </div>
+        <div>
+            {% if rechnung.status.value == 'BEZAHLT' %}
+                <span class="badge bg-success fs-5"><i class="bi bi-check-circle"></i> Bezahlt</span>
+            {% elif rechnung.status.value == 'OFFEN' %}
+                <span class="badge bg-warning fs-5"><i class="bi bi-clock"></i> Offen</span>
+            {% elif rechnung.status.value == 'ENTWURF' %}
+                <span class="badge bg-secondary fs-5"><i class="bi bi-pencil"></i> Entwurf</span>
+            {% elif rechnung.status.value == 'UEBERFAELLIG' %}
+                <span class="badge bg-danger fs-5"><i class="bi bi-exclamation-triangle"></i> Überfällig</span>
+            {% elif rechnung.status.value == 'STORNIERT' %}
+                <span class="badge bg-dark fs-5"><i class="bi bi-x-circle"></i> Storniert</span>
+            {% else %}
+                <span class="badge bg-info fs-5">{{ rechnung.status.value }}</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Linke Spalte: Details -->
+        <div class="col-md-8">
+            <!-- Basisdaten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Rechnungsdaten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th class="text-muted" style="width: 40%;">Rechnungsnummer:</th>
+                                    <td><strong>{{ rechnung.rechnungsnummer }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Rechnungsdatum:</th>
+                                    <td>{{ rechnung.rechnungsdatum.strftime('%d.%m.%Y') if rechnung.rechnungsdatum else '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Leistungsdatum:</th>
+                                    <td>{{ rechnung.leistungsdatum.strftime('%d.%m.%Y') if rechnung.leistungsdatum else '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Fälligkeitsdatum:</th>
+                                    <td>
+                                        {% if rechnung.faelligkeitsdatum %}
+                                            {{ rechnung.faelligkeitsdatum.strftime('%d.%m.%Y') }}
+                                            {% if rechnung.status.value == 'OFFEN' and rechnung.faelligkeitsdatum < today %}
+                                                <span class="badge bg-danger ms-2">Überfällig!</span>
+                                            {% endif %}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                {% if rechnung.richtung and rechnung.richtung.value == 'EINGANG' %}
+                                <tr>
+                                    <th class="text-muted" style="width: 40%;">Lieferant:</th>
+                                    <td><strong>{{ rechnung.lieferant_name or '-' }}</strong></td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <th class="text-muted" style="width: 40%;">Kunde:</th>
+                                    <td><strong>{{ rechnung.kunde_name or '-' }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Adresse:</th>
+                                    <td>{{ rechnung.kunde_adresse|replace('\n', '<br>')|safe if rechnung.kunde_adresse else '-' }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <th class="text-muted">Erstellt am:</th>
+                                    <td>{{ rechnung.erstellt_am.strftime('%d.%m.%Y %H:%M') if rechnung.erstellt_am else '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Erstellt von:</th>
+                                    <td>{{ rechnung.erstellt_von or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-muted">Verknüpfter Auftrag:</th>
+                                    <td>
+                                        {% if rechnung.auftrag %}
+                                            <a href="{{ url_for('orders.show', order_id=rechnung.auftrag_id) }}" 
+                                               class="badge bg-primary text-decoration-none">
+                                                <i class="bi bi-box-seam"></i>
+                                                {{ rechnung.auftrag.order_number }}
+                                            </a>
+                                        {% else %}
+                                            <span class="text-muted">- Keine Verknüpfung -</span>
+                                            <a href="{{ url_for('rechnung.rechnung_verknuepfen', rechnung_id=rechnung.id) }}" 
+                                               class="btn btn-sm btn-outline-primary ms-2">
+                                                <i class="bi bi-link"></i> Verknüpfen
+                                            </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Positionen (nur für Ausgangsrechnungen) -->
+            {% if rechnung.positionen and rechnung.positionen|length > 0 %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-list-ol"></i> Positionen</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Pos.</th>
+                                    <th>Bezeichnung</th>
+                                    <th class="text-end">Menge</th>
+                                    <th class="text-end">Einzelpreis</th>
+                                    <th class="text-end">MwSt</th>
+                                    <th class="text-end">Gesamt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pos in rechnung.positionen %}
+                                <tr>
+                                    <td>{{ pos.position }}</td>
+                                    <td>
+                                        <strong>{{ pos.artikel_name }}</strong>
+                                        {% if pos.beschreibung %}
+                                            <br><small class="text-muted">{{ pos.beschreibung }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">{{ pos.menge }} {{ pos.einheit }}</td>
+                                    <td class="text-end">{{ "%.2f"|format(pos.einzelpreis_netto|float) }} EUR</td>
+                                    <td class="text-end">{{ pos.mwst_satz|int }}%</td>
+                                    <td class="text-end"><strong>{{ "%.2f"|format(pos.gesamt_brutto|float) }} EUR</strong></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Bemerkungen -->
+            {% if rechnung.bemerkungen %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-chat-text"></i> Bemerkungen</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ rechnung.bemerkungen }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Rechte Spalte: Beträge & Aktionen -->
+        <div class="col-md-4">
+            <!-- Beträge -->
+            <div class="card mb-4 border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-currency-euro"></i> Beträge</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless mb-0">
+                        <tr>
+                            <td>Netto:</td>
+                            <td class="text-end">{{ "%.2f"|format(rechnung.netto_gesamt|float) }} EUR</td>
+                        </tr>
+                        <tr>
+                            <td>MwSt:</td>
+                            <td class="text-end">{{ "%.2f"|format(rechnung.mwst_gesamt|float) }} EUR</td>
+                        </tr>
+                        {% if rechnung.rabatt_betrag and rechnung.rabatt_betrag > 0 %}
+                        <tr class="text-danger">
+                            <td>Rabatt:</td>
+                            <td class="text-end">-{{ "%.2f"|format(rechnung.rabatt_betrag|float) }} EUR</td>
+                        </tr>
+                        {% endif %}
+                        <tr class="fs-4">
+                            <td><strong>Brutto:</strong></td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(rechnung.brutto_gesamt|float) }} EUR</strong></td>
+                        </tr>
+                        {% if rechnung.status.value == 'BEZAHLT' %}
+                        <tr class="text-success">
+                            <td>Bezahlt am:</td>
+                            <td class="text-end">{{ rechnung.bezahlt_am.strftime('%d.%m.%Y') if rechnung.bezahlt_am else '-' }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- Aktionen -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Aktionen</h5>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    {% if rechnung.richtung is none or rechnung.richtung.value == 'AUSGANG' %}
+                    <a href="{{ url_for('rechnung.rechnung_pdf', rechnung_id=rechnung.id) }}"
+                       class="btn btn-primary" target="_blank">
+                        <i class="bi bi-file-pdf"></i> PDF anzeigen
+                    </a>
+                    <a href="{{ url_for('rechnung.rechnung_download', rechnung_id=rechnung.id) }}"
+                       class="btn btn-outline-primary">
+                        <i class="bi bi-download"></i> ZUGFeRD-PDF herunterladen
+                    </a>
+
+                    {% if rechnung.kunde_email %}
+                    <button class="btn btn-success" onclick="sendInvoiceEmail({{ rechnung.id }})">
+                        <i class="bi bi-envelope"></i> Per E-Mail senden
+                    </button>
+                    {% else %}
+                    <button class="btn btn-outline-secondary" disabled title="Keine E-Mail-Adresse beim Kunden hinterlegt">
+                        <i class="bi bi-envelope"></i> Per E-Mail senden
+                    </button>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if rechnung.status.value in ['ENTWURF', 'OFFEN'] %}
+                    <button class="btn btn-success" onclick="markAsPaid({{ rechnung.id }})">
+                        <i class="bi bi-check-circle"></i> Als bezahlt markieren
+                    </button>
+                    {% endif %}
+
+                    {% if rechnung.status.value == 'ENTWURF' %}
+                    <a href="{{ url_for('rechnung.rechnung_bearbeiten', rechnung_id=rechnung.id) }}"
+                       class="btn btn-outline-secondary">
+                        <i class="bi bi-pencil"></i> Bearbeiten
+                    </a>
+                    {% endif %}
+
+                    <hr>
+
+                    <!-- Archiv-Funktionen -->
+                    <div class="btn-group w-100" role="group">
+                        {% if rechnung.pdf_datei %}
+                        <a href="{{ url_for('rechnung.rechnung_archiv_oeffnen', rechnung_id=rechnung.id) }}"
+                           class="btn btn-outline-info" target="_blank" title="Archivierte PDF öffnen">
+                            <i class="bi bi-archive"></i> Archiv-PDF
+                        </a>
+                        {% else %}
+                        <form action="{{ url_for('rechnung.rechnung_archiv_speichern', rechnung_id=rechnung.id) }}" method="POST" class="d-inline w-100">
+                            <button type="submit" class="btn btn-outline-info w-100" title="PDF im Archiv speichern">
+                                <i class="bi bi-archive"></i> Archivieren
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+
+                    <!-- Storno-Button (nur wenn nicht bereits storniert) -->
+                    <!-- Auftrags-Verknüpfung -->
+                    <a href="{{ url_for('rechnung.rechnung_verknuepfen', rechnung_id=rechnung.id) }}" 
+                       class="btn btn-outline-primary">
+                        <i class="bi bi-link-45deg"></i> 
+                        {% if rechnung.auftrag_id %}Auftrag ändern{% else %}Mit Auftrag verknüpfen{% endif %}
+                    </a>
+
+                    {% if rechnung.status.value != 'STORNIERT' %}
+                    <button class="btn btn-outline-danger" onclick="stornoRechnung({{ rechnung.id }}, '{{ rechnung.rechnungsnummer }}')">
+                        <i class="bi bi-x-circle"></i> Stornieren
+                    </button>
+                    {% endif %}
+
+                    <hr>
+
+                    <a href="{{ url_for('rechnung.rechnungs_index', tab='ausgang' if rechnung.richtung is none or rechnung.richtung.value == 'AUSGANG' else 'eingang') }}"
+                       class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+                    </a>
+                </div>
+            </div>
+
+            <!-- Zahlungsinformationen -->
+            {% if rechnung.zahlungsbedingungen %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-credit-card"></i> Zahlungsbedingungen</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ rechnung.zahlungsbedingungen }}</p>
+                    {% if rechnung.skonto_prozent and rechnung.skonto_prozent > 0 %}
+                    <hr>
+                    <p class="mb-0 text-success">
+                        <i class="bi bi-piggy-bank"></i>
+                        {{ rechnung.skonto_prozent }}% Skonto bei Zahlung innerhalb von {{ rechnung.skonto_tage }} Tagen
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function markAsPaid(rechnungId) {
+    if (confirm('Rechnung als bezahlt markieren?')) {
+        fetch(`/rechnung/api/${rechnungId}/bezahlt`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Fehler: ' + data.error);
+            }
+        });
+    }
+}
+
+function sendInvoiceEmail(rechnungId) {
+    // Button deaktivieren waehrend des Sendens
+    const btn = event.target.closest('button');
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Wird vorbereitet...';
+
+    fetch(`/api/email/send-invoice/${rechnungId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({display_first: true})  // E-Mail erst anzeigen
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+
+        if (data.success) {
+            alert(data.message);
+        } else if (data.mailto_url) {
+            // mailto-Fallback
+            window.location.href = data.mailto_url;
+            alert(data.message);
+        } else {
+            alert('Fehler: ' + data.message);
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        alert('Fehler beim E-Mail-Versand: ' + error);
+    });
+}
+
+function stornoRechnung(rechnungId, rechnungsnummer) {
+    // Storno-Grund abfragen
+    const grund = prompt(`Rechnung ${rechnungsnummer} wirklich stornieren?\n\nBitte geben Sie den Storno-Grund ein:`);
+
+    if (grund === null) {
+        // Abbrechen geklickt
+        return;
+    }
+
+    if (grund.trim() === '') {
+        alert('Bitte geben Sie einen Storno-Grund ein.');
+        return;
+    }
+
+    // Bestätigung
+    if (!confirm(`Rechnung ${rechnungsnummer} wird storniert.\n\nGrund: ${grund}\n\nEs wird eine Stornorechnung erstellt. Fortfahren?`)) {
+        return;
+    }
+
+    // Storno durchführen
+    fetch(`/rechnung/api/${rechnungId}/stornieren`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({grund: grund})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Fehler: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Fehler beim Stornieren: ' + error);
+    });
+}
+</script>
+{% endblock %}

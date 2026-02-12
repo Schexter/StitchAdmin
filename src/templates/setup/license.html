@@ -1,0 +1,58 @@
+{% extends "setup/base_setup.html" %}
+{% block title %}Lizenzvereinbarung{% endblock %}
+
+{% block content %}
+<div class="step-indicator">
+    <div class="step-number">📜</div>
+    <h3 class="mt-3">Lizenzvereinbarung</h3>
+    <p class="text-muted">Bitte lesen und akzeptieren Sie die Nutzungsbedingungen</p>
+</div>
+
+<form method="POST">
+    <div class="card mb-4">
+        <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+            <h5>StitchAdmin 2.0 - Nutzungslizenz</h5>
+            <p><strong>Erstellt von Hans Hahn - Alle Rechte vorbehalten</strong></p>
+            
+            <hr>
+            
+            <h6>1. Nutzungsrechte</h6>
+            <p>Diese Software ist zur Nutzung für einen Arbeitsplatz/Installation lizenziert. Eine Weitergabe oder Vervielfältigung ist ohne ausdrückliche Genehmigung nicht gestattet.</p>
+            
+            <h6>2. Gewährleistung</h6>
+            <p>Die Software wird "wie besehen" bereitgestellt. Der Entwickler übernimmt keine Garantie für die Eignung für einen bestimmten Zweck oder die Fehlerfreiheit.</p>
+            
+            <h6>3. Haftungsausschluss</h6>
+            <p>Der Entwickler haftet nicht für direkte oder indirekte Schäden, die durch die Nutzung der Software entstehen könnten, soweit gesetzlich zulässig.</p>
+            
+            <h6>4. Datenschutz</h6>
+            <p>Alle in der Software gespeicherten Daten verbleiben auf Ihrem System. Es werden keine Daten automatisch an externe Server übertragen.</p>
+            
+            <h6>5. Updates</h6>
+            <p>Updates können zusätzlichen Lizenzbedingungen unterliegen. Es besteht kein Anspruch auf kostenlose Updates.</p>
+            
+            <h6>6. Support</h6>
+            <p>Support ist je nach Lizenzmodell kostenpflichtig oder im Rahmen eines Wartungsvertrages enthalten.</p>
+            
+            <h6>7. Kündigung</h6>
+            <p>Bei Verletzung dieser Bedingungen erlischt das Nutzungsrecht automatisch.</p>
+        </div>
+    </div>
+    
+    <div class="form-check mb-4">
+        <input type="checkbox" class="form-check-input" id="accept_license" name="accept_license" required>
+        <label class="form-check-label" for="accept_license">
+            <strong>Ich habe die Lizenzvereinbarung gelesen und akzeptiere sie.</strong>
+        </label>
+    </div>
+    
+    <div class="d-flex justify-content-between">
+        <a href="{{ url_for('setup.welcome') }}" class="btn btn-outline-secondary btn-setup">
+            <i class="fas fa-arrow-left me-2"></i> Zurück
+        </a>
+        <button type="submit" class="btn btn-primary btn-setup">
+            Weiter <i class="fas fa-arrow-right ms-2"></i>
+        </button>
+    </div>
+</form>
+{% endblock %}

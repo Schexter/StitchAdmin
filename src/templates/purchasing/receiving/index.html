@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Wareneingang - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h1><i class="bi bi-box-arrow-in-down"></i> Wareneingang</h1>
+                <p class="text-muted">Lieferungen einbuchen und prüfen</p>
+            </div>
+            <div>
+                <a href="{{ url_for('purchasing.dashboard') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistik-Karten -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-danger">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-exclamation-triangle"></i> Überfällig</h5>
+                <p class="card-text display-6">{{ overdue|length }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-calendar-event"></i> Heute erwartet</h5>
+                <p class="card-text display-6">{{ expected_today|length }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-calendar-week"></i> Diese Woche</h5>
+                <p class="card-text display-6">{{ expected_week|length }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-check-circle"></i> Kürzlich erhalten</h5>
+                <p class="card-text display-6">{{ recently_received|length }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Überfällige Lieferungen -->
+{% if overdue %}
+<div class="card mb-4 border-danger">
+    <div class="card-header bg-danger text-white">
+        <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill"></i> Überfällige Lieferungen</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Bestellung</th>
+                    <th>Lieferant</th>
+                    <th>Erwartet am</th>
+                    <th>Tage überfällig</th>
+                    <th class="text-end">Betrag</th>
+                    <th>Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in overdue %}
+                <tr>
+                    <td><strong>{{ order.purchase_order_number or order.order_number or order.id }}</strong></td>
+                    <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                    <td class="text-danger">{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</td>
+                    <td>
+                        <span class="badge bg-danger">
+                            {{ (today - order.delivery_date).days if order.delivery_date else 0 }} Tage
+                        </span>
+                    </td>
+                    <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} €</td>
+                    <td>
+                        <a href="{{ url_for('purchasing.receiving_checklist', order_id=order.id) }}"
+                           class="btn btn-sm btn-success">
+                            <i class="bi bi-clipboard-check"></i> Einbuchen
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Heute erwartete Lieferungen -->
+<div class="card mb-4">
+    <div class="card-header bg-warning text-dark">
+        <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Heute erwartet ({{ today.strftime('%d.%m.%Y') }})</h5>
+    </div>
+    <div class="card-body p-0">
+        {% if expected_today %}
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Bestellung</th>
+                    <th>Lieferant</th>
+                    <th>Status</th>
+                    <th>Positionen</th>
+                    <th class="text-end">Betrag</th>
+                    <th>Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in expected_today %}
+                <tr>
+                    <td><strong>{{ order.purchase_order_number or order.order_number or order.id }}</strong></td>
+                    <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                    <td>
+                        {% if order.status == 'shipped' %}
+                        <span class="badge bg-info">Unterwegs</span>
+                        {% elif order.status == 'confirmed' %}
+                        <span class="badge bg-primary">Bestätigt</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ order.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ order.get_items()|length }}</td>
+                    <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} €</td>
+                    <td>
+                        <a href="{{ url_for('purchasing.receiving_checklist', order_id=order.id) }}"
+                           class="btn btn-sm btn-success">
+                            <i class="bi bi-clipboard-check"></i> Einbuchen
+                        </a>
+                        <a href="{{ url_for('purchasing.print_order_checklist', order_id=order.id) }}"
+                           class="btn btn-sm btn-outline-secondary" target="_blank">
+                            <i class="bi bi-printer"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            <i class="bi bi-calendar-x display-4"></i>
+            <p class="mt-2">Keine Lieferungen für heute erwartet</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Diese Woche erwartet -->
+{% if expected_week %}
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="bi bi-calendar-week"></i> Diese Woche erwartet</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Bestellung</th>
+                    <th>Lieferant</th>
+                    <th>Erwartet am</th>
+                    <th>Status</th>
+                    <th class="text-end">Betrag</th>
+                    <th>Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in expected_week %}
+                <tr>
+                    <td><strong>{{ order.purchase_order_number or order.order_number or order.id }}</strong></td>
+                    <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                    <td>{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</td>
+                    <td>
+                        {% if order.status == 'shipped' %}
+                        <span class="badge bg-info">Unterwegs</span>
+                        {% elif order.status == 'confirmed' %}
+                        <span class="badge bg-primary">Bestätigt</span>
+                        {% else %}
+                        <span class="badge bg-secondary">{{ order.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} €</td>
+                    <td>
+                        <a href="{{ url_for('purchasing.receiving_checklist', order_id=order.id) }}"
+                           class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-clipboard-check"></i> Einbuchen
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Kürzlich erhalten -->
+{% if recently_received %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-check-circle"></i> Kürzlich erhalten (letzte 7 Tage)</h5>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Bestellung</th>
+                    <th>Lieferant</th>
+                    <th>Geliefert am</th>
+                    <th class="text-end">Betrag</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in recently_received %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}">
+                            <strong>{{ order.purchase_order_number or order.order_number or order.id }}</strong>
+                        </a>
+                    </td>
+                    <td>{{ order.supplier.name if order.supplier else '-' }}</td>
+                    <td>{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</td>
+                    <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} €</td>
+                    <td><span class="badge bg-success">Geliefert</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Update bestätigen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('updates.index') }}">Updates & Backups</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('updates.install') }}">Update installieren</a></li>
+                    <li class="breadcrumb-item active">Bestätigen</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-4">
+                <i class="bi bi-check-circle me-2"></i>Update bestätigen
+            </h1>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Update-Info -->
+            <div class="card border-primary mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-box-seam me-2"></i>Update-Paket erkannt
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th class="ps-0">Aktuelle Version:</th>
+                                    <td><span class="badge bg-secondary fs-6">{{ current_version }}</span></td>
+                                </tr>
+                                <tr>
+                                    <th class="ps-0">Neue Version:</th>
+                                    <td><span class="badge bg-success fs-6">{{ update_info.version }}</span></td>
+                                </tr>
+                                <tr>
+                                    <th class="ps-0">Veröffentlicht:</th>
+                                    <td>{{ update_info.release_date }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <th class="ps-0">Dateigröße:</th>
+                                    <td>{{ "%.1f"|format(update_info.size_bytes / 1024 / 1024) }} MB</td>
+                                </tr>
+                                <tr>
+                                    <th class="ps-0">Neustart erforderlich:</th>
+                                    <td>
+                                        {% if update_info.requires_restart %}
+                                        <span class="text-warning"><i class="bi bi-exclamation-circle"></i> Ja</span>
+                                        {% else %}
+                                        <span class="text-success"><i class="bi bi-check-circle"></i> Nein</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="ps-0">Breaking Changes:</th>
+                                    <td>
+                                        {% if update_info.breaking_changes %}
+                                        <span class="text-danger"><i class="bi bi-exclamation-triangle"></i> Ja</span>
+                                        {% else %}
+                                        <span class="text-success"><i class="bi bi-check-circle"></i> Nein</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Changelog -->
+            {% if update_info.changelog %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-check me-2"></i>Änderungen in dieser Version
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        {% for item in update_info.changelog %}
+                        <li>{{ item }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Breaking Changes Warnung -->
+            {% if update_info.breaking_changes %}
+            <div class="alert alert-danger mb-4">
+                <h5 class="alert-heading">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Achtung: Breaking Changes!
+                </h5>
+                <p class="mb-0">
+                    Dieses Update enthält Änderungen, die möglicherweise manuelle Anpassungen erfordern.
+                    Bitte lesen Sie die Dokumentation sorgfältig durch, bevor Sie fortfahren.
+                </p>
+            </div>
+            {% endif %}
+
+            <!-- Bestätigungsformular -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-shield-check me-2"></i>Installation starten
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('updates.install_confirm') }}" method="post" id="updateForm">
+                        <input type="hidden" name="temp_path" value="{{ temp_path }}">
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="create_backup" 
+                                   name="create_backup" checked>
+                            <label class="form-check-label" for="create_backup">
+                                <strong>Backup vor Update erstellen</strong> (empfohlen)
+                                <br>
+                                <small class="text-muted">
+                                    Ermöglicht Rollback bei Problemen
+                                </small>
+                            </label>
+                        </div>
+                        
+                        <div class="form-check mb-4">
+                            <input class="form-check-input" type="checkbox" id="confirm_update" required>
+                            <label class="form-check-label" for="confirm_update">
+                                <strong>Ich bestätige, dass ich das Update durchführen möchte</strong>
+                                <br>
+                                <small class="text-muted">
+                                    Ich verstehe, dass StitchAdmin während des Updates nicht verfügbar ist
+                                    und anschließend neu gestartet werden muss.
+                                </small>
+                            </label>
+                        </div>
+                        
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('updates.install') }}" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-1"></i>Abbrechen
+                            </a>
+                            <button type="submit" class="btn btn-success btn-lg flex-grow-1" id="installBtn">
+                                <i class="bi bi-cloud-download me-2"></i>Update jetzt installieren
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Fortschrittsanzeige (versteckt) -->
+            <div class="card mt-4 d-none" id="progressCard">
+                <div class="card-body text-center py-5">
+                    <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Wird installiert...</span>
+                    </div>
+                    <h5 id="progressMessage">Update wird installiert...</h5>
+                    <div class="progress mt-3" style="height: 25px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%" id="progressBar">
+                            0%
+                        </div>
+                    </div>
+                    <p class="text-muted mt-3">
+                        <i class="bi bi-exclamation-circle"></i>
+                        Bitte schließen Sie dieses Fenster nicht!
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('updateForm').addEventListener('submit', function(e) {
+    // Zeige Fortschrittsanzeige
+    document.getElementById('progressCard').classList.remove('d-none');
+    document.getElementById('installBtn').disabled = true;
+    document.getElementById('installBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Wird installiert...';
+    
+    // Simuliere Fortschritt (tatsächlicher Fortschritt kommt vom Server)
+    let progress = 0;
+    const messages = [
+        'Backup wird erstellt...',
+        'Dateien werden extrahiert...',
+        'Dateien werden installiert...',
+        'Datenbank wird aktualisiert...',
+        'Finalisierung...'
+    ];
+    
+    const interval = setInterval(function() {
+        progress += Math.random() * 15;
+        if (progress > 95) progress = 95;
+        
+        document.getElementById('progressBar').style.width = progress + '%';
+        document.getElementById('progressBar').textContent = Math.round(progress) + '%';
+        document.getElementById('progressMessage').textContent = messages[Math.floor(progress / 20)] || messages[4];
+    }, 1000);
+});
+</script>
+{% endblock %}

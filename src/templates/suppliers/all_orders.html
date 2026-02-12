@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Alle Bestellungen - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('suppliers.index') }}">Lieferanten</a></li>
+                <li class="breadcrumb-item active">Alle Bestellungen</li>
+            </ol>
+        </nav>
+
+        <h1 class="mb-4">
+            <i class="bi bi-list-ul"></i> Alle Lieferantenbestellungen
+        </h1>
+    </div>
+</div>
+
+<!-- Statistik-Karten -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h5 class="card-title">Gesamt</h5>
+                <h2>{{ total_orders }}</h2>
+                <small>Bestellungen</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <h5 class="card-title">Offen</h5>
+                <h2>{{ pending_orders }}</h2>
+                <small>Noch nicht geliefert</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h5 class="card-title">Gesamtwert</h5>
+                <h2>{{ "%.2f"|format(total_value)|replace('.', ',') }} &euro;</h2>
+                <small>Aller Bestellungen</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filter -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Status</label>
+                <select name="status" class="form-select" onchange="this.form.submit()">
+                    <option value="">Alle Status</option>
+                    <option value="draft" {{ 'selected' if status_filter == 'draft' }}>Entwurf</option>
+                    <option value="ordered" {{ 'selected' if status_filter == 'ordered' }}>Bestellt</option>
+                    <option value="confirmed" {{ 'selected' if status_filter == 'confirmed' }}>Bestätigt</option>
+                    <option value="delivered" {{ 'selected' if status_filter == 'delivered' }}>Geliefert</option>
+                    <option value="cancelled" {{ 'selected' if status_filter == 'cancelled' }}>Storniert</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Lieferant</label>
+                <select name="supplier" class="form-select" onchange="this.form.submit()">
+                    <option value="">Alle Lieferanten</option>
+                    {% for supplier in suppliers %}
+                    <option value="{{ supplier.id }}" {{ 'selected' if supplier_filter == supplier.id|string }}>
+                        {{ supplier.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+                <a href="{{ url_for('suppliers.all_orders') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Filter zurücksetzen
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Bestellungen-Tabelle -->
+<div class="card">
+    <div class="card-body">
+        {% if orders %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Bestellnummer</th>
+                        <th>Lieferant</th>
+                        <th>Datum</th>
+                        <th>Liefertermin</th>
+                        <th>Status</th>
+                        <th>Artikel</th>
+                        <th class="text-end">Betrag</th>
+                        <th class="text-end">Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td><strong>{{ order.order_number or order.id }}</strong></td>
+                        <td>
+                            {% if order.supplier %}
+                                <a href="{{ url_for('suppliers.show', supplier_id=order.supplier.id) }}">
+                                    {{ order.supplier.name }}
+                                </a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else order.created_at.strftime('%d.%m.%Y') if order.created_at else '-' }}</td>
+                        <td>{{ order.delivery_date.strftime('%d.%m.%Y') if order.delivery_date else '-' }}</td>
+                        <td>
+                            {% if order.status == 'draft' %}
+                                <span class="badge bg-secondary">Entwurf</span>
+                            {% elif order.status == 'ordered' %}
+                                <span class="badge bg-primary">Bestellt</span>
+                            {% elif order.status == 'confirmed' %}
+                                <span class="badge bg-info">Bestätigt</span>
+                            {% elif order.status == 'delivered' %}
+                                <span class="badge bg-success">Geliefert</span>
+                            {% elif order.status == 'cancelled' %}
+                                <span class="badge bg-danger">Storniert</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ order.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ order.items|length if order.items else 0 }} Artikel</td>
+                        <td class="text-end">{{ "%.2f"|format(order.total_amount or 0)|replace('.', ',') }} &euro;</td>
+                        <td class="text-end">
+                            <div class="btn-group" role="group">
+                                {% if order.supplier_id %}
+                                <a href="{{ url_for('suppliers.show_order', supplier_id=order.supplier_id, order_id=order.id) }}"
+                                   class="btn btn-sm btn-outline-primary" title="Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                {% if order.status == 'draft' %}
+                                <a href="{{ url_for('suppliers.new_order', supplier_id=order.supplier_id) }}"
+                                   class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                {% elif order.status in ['ordered', 'confirmed'] %}
+                                <a href="{{ url_for('suppliers.receive_order', supplier_id=order.supplier_id, order_id=order.id) }}"
+                                   class="btn btn-sm btn-outline-success" title="Wareneingang">
+                                    <i class="bi bi-box-arrow-in-down"></i>
+                                </a>
+                                {% endif %}
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox fa-3x text-muted mb-3"></i>
+            <p class="text-muted">Keine Bestellungen gefunden.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}

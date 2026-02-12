@@ -370,6 +370,90 @@ def company_settings():
 
     return render_template('settings/company.html', settings=settings)
 
+# ==================== SPEICHEREINSTELLUNGEN ====================
+
+@settings_bp.route('/storage', methods=['GET', 'POST'])
+@login_required
+def storage():
+    """Speicherpfad-Einstellungen"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können Speichereinstellungen ändern.', 'danger')
+        return redirect(url_for('settings.index'))
+    
+    try:
+        from src.models.storage_settings import StorageSettings
+        settings = StorageSettings.get_settings()
+    except ImportError:
+        flash('StorageSettings nicht verfügbar. Bitte Migration ausführen.', 'warning')
+        return redirect(url_for('settings.index'))
+    
+    import os
+    default_base = os.path.join(os.path.expanduser('~'), 'StitchAdmin', 'Dokumente')
+    validation_errors = []
+    
+    if request.method == 'POST':
+        # Basispfad
+        settings.base_path = request.form.get('base_path', '').strip() or default_base
+        
+        # === SEPARATE ARCHIVE (NAS/Netzlaufwerk) ===
+        # Design-Archiv
+        settings.design_archiv_aktiv = request.form.get('design_archiv_aktiv') == 'on'
+        settings.design_archiv_path = request.form.get('design_archiv_path', '').strip()
+        
+        # Stickdateien
+        settings.stickdateien_aktiv = request.form.get('stickdateien_aktiv') == 'on'
+        settings.stickdateien_path = request.form.get('stickdateien_path', '').strip()
+        
+        # Freigaben-Archiv
+        settings.freigaben_archiv_aktiv = request.form.get('freigaben_archiv_aktiv') == 'on'
+        settings.freigaben_archiv_path = request.form.get('freigaben_archiv_path', '').strip()
+        
+        # Motiv-Archiv
+        settings.motiv_archiv_aktiv = request.form.get('motiv_archiv_aktiv') == 'on'
+        settings.motiv_archiv_path = request.form.get('motiv_archiv_path', '').strip()
+        
+        # Ordnerstruktur
+        settings.folder_structure = request.form.get('folder_structure', 'year_month')
+        settings.include_customer_in_filename = request.form.get('include_customer') == 'on'
+        settings.include_date_in_filename = request.form.get('include_date') == 'on'
+        
+        # Dokumentpfade (relativ)
+        settings.angebote_path = request.form.get('angebote_path', 'Angebote')
+        settings.auftraege_path = request.form.get('auftraege_path', 'Auftragsbestätigungen')
+        settings.lieferscheine_path = request.form.get('lieferscheine_path', 'Lieferscheine')
+        settings.rechnungen_ausgang_path = request.form.get('rechnungen_ausgang_path', 'Rechnungen\\Ausgang')
+        settings.rechnungen_eingang_path = request.form.get('rechnungen_eingang_path', 'Rechnungen\\Eingang')
+        settings.gutschriften_path = request.form.get('gutschriften_path', 'Gutschriften')
+        settings.designs_path = request.form.get('designs_path', 'Designs')
+        settings.backup_path = request.form.get('backup_path', 'Backups')
+        
+        # Pfade validieren
+        validation_errors = settings.validate_paths()
+        
+        if not validation_errors:
+            # Ordner erstellen falls gewünscht
+            if request.form.get('create_folders'):
+                if settings.create_folder_structure():
+                    flash('Ordnerstruktur erfolgreich erstellt!', 'success')
+                else:
+                    flash('Ordner konnten nicht erstellt werden.', 'warning')
+            
+            try:
+                db.session.commit()
+                flash('Speichereinstellungen gespeichert.', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Fehler: {e}', 'danger')
+        else:
+            for error in validation_errors:
+                flash(error, 'danger')
+    
+    return render_template('settings/storage.html', 
+                         settings=settings, 
+                         default_base=default_base,
+                         validation_errors=validation_errors)
+
+
 @settings_bp.route('/users')
 @login_required
 def users():

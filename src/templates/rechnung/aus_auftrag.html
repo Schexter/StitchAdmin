@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Rechnung aus Auftrag erstellen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1><i class="bi bi-file-earmark-text"></i> Rechnung aus Auftrag</h1>
+            <p class="text-muted">Wählen Sie einen Auftrag aus, um eine Rechnung zu erstellen</p>
+        </div>
+        <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurück
+        </a>
+    </div>
+
+    {% if auftraege %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-list-check"></i> Abrechenbare Aufträge</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Auftragsnummer</th>
+                            <th>Kunde</th>
+                            <th>Datum</th>
+                            <th>Status</th>
+                            <th class="text-end">Betrag</th>
+                            <th class="text-center">Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for auftrag in auftraege %}
+                        <tr>
+                            <td>
+                                <strong>{{ auftrag.order_number or auftrag.id }}</strong>
+                            </td>
+                            <td>
+                                {% if auftrag.customer %}
+                                    {{ auftrag.customer.display_name }}
+                                {% else %}
+                                    <span class="text-muted">Kein Kunde</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ auftrag.created_at.strftime('%d.%m.%Y') if auftrag.created_at else '-' }}
+                            </td>
+                            <td>
+                                {% if auftrag.status == 'completed' %}
+                                    <span class="badge bg-success">Abgeschlossen</span>
+                                {% elif auftrag.status == 'delivered' %}
+                                    <span class="badge bg-info">Geliefert</span>
+                                {% elif auftrag.status == 'ready' %}
+                                    <span class="badge bg-primary">Bereit</span>
+                                {% elif auftrag.status == 'in_production' %}
+                                    <span class="badge bg-warning">In Produktion</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ auftrag.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if auftrag.total_amount %}
+                                    {{ "%.2f"|format(auftrag.total_amount) }} €
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('rechnung.rechnung_aus_auftrag_erstellen', order_id=auftrag.id) }}"
+                                   class="btn btn-sm btn-primary">
+                                    <i class="bi bi-file-plus"></i> Rechnung erstellen
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        Keine abrechenbaren Aufträge gefunden. Aufträge mit Status "Abgeschlossen", "Geliefert", "Bereit" oder "In Produktion" werden hier angezeigt.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

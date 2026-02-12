@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Produktionszeit-Statistik - StitchAdmin{% endblock %}
+
+{% block content %}
+<!-- Bootstrap Icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="row">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('production.index') }}">Produktion</a></li>
+                <li class="breadcrumb-item active">Zeitstatistik</li>
+            </ol>
+        </nav>
+
+        <h1><i class="bi bi-graph-up"></i> Produktionszeit-Statistik</h1>
+        <p class="text-muted">Auswertung der erfassten Produktionszeiten für lernende Kalkulation</p>
+    </div>
+</div>
+
+<!-- Gesamt-KPIs -->
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-clipboard-data"></i></h5>
+                <h2>{{ total_logs }}</h2>
+                <small>Erfasste Produktionen</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white" id="today-stats">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-clock-history"></i></h5>
+                <h2 id="today-hours">--</h2>
+                <small>Stunden heute</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white" id="week-stats">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-calendar-week"></i></h5>
+                <h2 id="week-hours">--</h2>
+                <small>Stunden diese Woche</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark" id="active-stats">
+            <div class="card-body text-center">
+                <h5 class="card-title"><i class="bi bi-play-circle"></i></h5>
+                <h2 id="active-jobs">--</h2>
+                <small>Aktive Aufträge</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistik nach Arbeitstyp -->
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Durchschnitt nach Arbeitstyp</h5>
+            </div>
+            <div class="card-body">
+                {% if work_type_stats %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Arbeitstyp</th>
+                                <th class="text-end">Anzahl</th>
+                                <th class="text-end">Avg. Min.</th>
+                                <th class="text-end">Gesamt Stk.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in work_type_stats %}
+                            <tr>
+                                <td>
+                                    {% if stat.work_type == 'embroidery_setup' %}Stickerei Einrichtung
+                                    {% elif stat.work_type == 'embroidery_run' %}Stickerei Produktion
+                                    {% elif stat.work_type == 'print_setup' %}Druck Einrichtung
+                                    {% elif stat.work_type == 'print_run' %}Druck Produktion
+                                    {% elif stat.work_type == 'dtf_setup' %}DTF Einrichtung
+                                    {% elif stat.work_type == 'dtf_run' %}DTF Produktion
+                                    {% elif stat.work_type == 'quality_check' %}Qualitätskontrolle
+                                    {% elif stat.work_type == 'packing' %}Verpackung
+                                    {% else %}{{ stat.work_type }}{% endif %}
+                                </td>
+                                <td class="text-end">{{ stat.count }}</td>
+                                <td class="text-end">{{ "%.1f"|format(stat.avg_duration or 0) }}</td>
+                                <td class="text-end">{{ stat.total_quantity or 0 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">Noch keine Daten verfügbar</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-pin-map"></i> Durchschnitt nach Position</h5>
+            </div>
+            <div class="card-body">
+                {% if position_stats %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Position</th>
+                                <th class="text-end">Anzahl</th>
+                                <th class="text-end">Avg. Min.</th>
+                                <th class="text-end">Avg. Stiche</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in position_stats %}
+                            <tr>
+                                <td>
+                                    {% if stat.embroidery_position == 'brust_links' %}Brust links
+                                    {% elif stat.embroidery_position == 'brust_rechts' %}Brust rechts
+                                    {% elif stat.embroidery_position == 'brust_mitte' %}Brust Mitte
+                                    {% elif stat.embroidery_position == 'ruecken_gross' %}Rücken groß
+                                    {% elif stat.embroidery_position == 'ruecken_klein' %}Rücken klein
+                                    {% elif stat.embroidery_position == 'aermel_links' %}Ärmel links
+                                    {% elif stat.embroidery_position == 'aermel_rechts' %}Ärmel rechts
+                                    {% elif stat.embroidery_position == 'kragen' %}Kragen
+                                    {% elif stat.embroidery_position == 'kappe_vorne' %}Kappe vorne
+                                    {% elif stat.embroidery_position == 'kappe_seite' %}Kappe Seite
+                                    {% else %}{{ stat.embroidery_position }}{% endif %}
+                                </td>
+                                <td class="text-end">{{ stat.count }}</td>
+                                <td class="text-end">{{ "%.1f"|format(stat.avg_duration or 0) }}</td>
+                                <td class="text-end">{{ "%.0f"|format(stat.avg_stitches or 0) }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">Noch keine Positions-Daten verfügbar</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Positions-Schätzungen konfigurieren -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Basis-Zeitschätzungen pro Position</h5>
+                <button class="btn btn-sm btn-light" id="updateEstimatesBtn">
+                    <i class="bi bi-arrow-clockwise"></i> Aus Daten aktualisieren
+                </button>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">Diese Werte werden für die Kalkulation verwendet und automatisch aus den erfassten Daten verbessert.</p>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Position</th>
+                                <th class="text-end">Typ. Stiche</th>
+                                <th class="text-end">Einrichtung (Min)</th>
+                                <th class="text-end">Zeit/Stück (Min)</th>
+                                <th class="text-end">Datenpunkte</th>
+                                <th class="text-end">Aktualisiert</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pos in positions %}
+                            <tr>
+                                <td><strong>{{ pos.display_name }}</strong></td>
+                                <td class="text-end">{{ pos.typical_stitch_count or '-' }}</td>
+                                <td class="text-end">{{ "%.1f"|format(pos.setup_time_minutes or 5) }}</td>
+                                <td class="text-end">{{ "%.2f"|format(pos.time_per_piece_minutes or 0) }}</td>
+                                <td class="text-end">
+                                    {% if pos.sample_count >= 20 %}
+                                        <span class="badge bg-success">{{ pos.sample_count }}</span>
+                                    {% elif pos.sample_count >= 10 %}
+                                        <span class="badge bg-warning">{{ pos.sample_count }}</span>
+                                    {% elif pos.sample_count > 0 %}
+                                        <span class="badge bg-secondary">{{ pos.sample_count }}</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">0</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end text-muted">
+                                    {{ pos.updated_at.strftime('%d.%m.%Y') if pos.updated_at else '-' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Letzte Einträge -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history"></i> Letzte Zeiteinträge (7 Tage)</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_logs %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped">
+                        <thead>
+                            <tr>
+                                <th>Auftrag</th>
+                                <th>Typ</th>
+                                <th>Position</th>
+                                <th>Beginn</th>
+                                <th class="text-end">Dauer</th>
+                                <th class="text-end">Stückzahl</th>
+                                <th class="text-end">Stiche</th>
+                                <th>Bearbeiter</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in recent_logs %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=log.order_id) }}">
+                                        {{ log.order_id[:8] }}...
+                                    </a>
+                                </td>
+                                <td>{{ log.work_type_display }}</td>
+                                <td>
+                                    {% if log.embroidery_position %}
+                                        {{ log.embroidery_position|replace('_', ' ')|title }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{{ log.started_at.strftime('%d.%m. %H:%M') }}</td>
+                                <td class="text-end">
+                                    {% if log.duration_minutes %}
+                                        {{ "%.1f"|format(log.duration_minutes) }} Min
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">{{ log.quantity_produced or '-' }}</td>
+                                <td class="text-end">{{ log.stitch_count or '-' }}</td>
+                                <td>{{ log.started_by or '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">Keine Einträge in den letzten 7 Tagen</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4">
+    <a href="{{ url_for('production.index') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Zurück zur Produktion
+    </a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Lade Dashboard-Statistiken
+    loadDashboardStats();
+
+    async function loadDashboardStats() {
+        try {
+            const response = await fetch('/production/time/api/dashboard-stats');
+            const data = await response.json();
+
+            document.getElementById('today-hours').textContent = data.today.total_hours + 'h';
+            document.getElementById('week-hours').textContent = data.week.total_hours + 'h';
+            document.getElementById('active-jobs').textContent = data.active_jobs;
+        } catch (error) {
+            console.error('Fehler beim Laden der Statistiken:', error);
+        }
+    }
+
+    // Schätzungen aktualisieren
+    document.getElementById('updateEstimatesBtn').addEventListener('click', async function() {
+        this.disabled = true;
+        this.innerHTML = '<i class="bi bi-hourglass-split"></i> Aktualisiere...';
+
+        try {
+            const response = await fetch('/production/time/update-estimates', {
+                method: 'POST'
+            });
+            const result = await response.json();
+
+            if (result.success) {
+                alert(`${result.updated_positions} Positionen wurden aktualisiert`);
+                location.reload();
+            } else {
+                alert('Fehler: ' + (result.error || 'Unbekannter Fehler'));
+            }
+        } catch (error) {
+            console.error('Fehler:', error);
+            alert('Fehler beim Aktualisieren');
+        }
+
+        this.disabled = false;
+        this.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Aus Daten aktualisieren';
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Farbe bearbeiten' if mode == 'edit' else 'Neue Garnfarbe' }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="mb-4">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item"><a href="{{ url_for('designs.colors') }}">Garnfarben</a></li>
+                        <li class="breadcrumb-item active">{{ 'Bearbeiten' if mode == 'edit' else 'Neu' }}</li>
+                    </ol>
+                </nav>
+                <h1 class="h3">{{ 'Garnfarbe bearbeiten' if mode == 'edit' else 'Neue Garnfarbe' }}</h1>
+            </div>
+
+            <form method="POST">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Farb-Informationen</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Marke <span class="text-danger">*</span></label>
+                                <select name="brand_id" class="form-select" required>
+                                    {% for brand in brands %}
+                                    <option value="{{ brand.id }}" {{ 'selected' if color and color.brand_id == brand.id }}>
+                                        {{ brand.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Farb-Code <span class="text-danger">*</span></label>
+                                <input type="text" name="color_code" class="form-control" required
+                                       value="{{ color.color_code if color else '' }}"
+                                       placeholder="z.B. 1147">
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Farbname</label>
+                                <input type="text" name="color_name" class="form-control"
+                                       value="{{ color.color_name if color else '' }}"
+                                       placeholder="z.B. Weihnachtsrot">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">RGB (Hex)</label>
+                                <div class="input-group">
+                                    <input type="color" id="colorPicker" class="form-control form-control-color"
+                                           value="{{ color.rgb_hex if color and color.rgb_hex else '#CC0000' }}">
+                                    <input type="text" name="rgb_hex" id="rgbHex" class="form-control"
+                                           value="{{ color.rgb_hex if color else '' }}"
+                                           placeholder="#FF0000" pattern="^#[0-9A-Fa-f]{6}$">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Farbfamilie</label>
+                                <select name="color_family" class="form-select">
+                                    <option value="">-- Nicht zugeordnet --</option>
+                                    <option value="weiss" {{ 'selected' if color and color.color_family == 'weiss' }}>Weiß</option>
+                                    <option value="schwarz" {{ 'selected' if color and color.color_family == 'schwarz' }}>Schwarz</option>
+                                    <option value="grau" {{ 'selected' if color and color.color_family == 'grau' }}>Grau</option>
+                                    <option value="rot" {{ 'selected' if color and color.color_family == 'rot' }}>Rot</option>
+                                    <option value="orange" {{ 'selected' if color and color.color_family == 'orange' }}>Orange</option>
+                                    <option value="gelb" {{ 'selected' if color and color.color_family == 'gelb' }}>Gelb</option>
+                                    <option value="gruen" {{ 'selected' if color and color.color_family == 'gruen' }}>Grün</option>
+                                    <option value="blau" {{ 'selected' if color and color.color_family == 'blau' }}>Blau</option>
+                                    <option value="lila" {{ 'selected' if color and color.color_family == 'lila' }}>Lila/Violett</option>
+                                    <option value="rosa" {{ 'selected' if color and color.color_family == 'rosa' }}>Rosa/Pink</option>
+                                    <option value="braun" {{ 'selected' if color and color.color_family == 'braun' }}>Braun/Beige</option>
+                                    <option value="metallic" {{ 'selected' if color and color.color_family == 'metallic' }}>Metallic</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Spezial-Eigenschaften</label>
+                                <div class="d-flex gap-3 mt-2">
+                                    <div class="form-check">
+                                        <input type="checkbox" name="is_metallic" class="form-check-input" id="isMetallic"
+                                               {{ 'checked' if color and color.is_metallic }}>
+                                        <label class="form-check-label" for="isMetallic">Metallic</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="is_glow" class="form-check-input" id="isGlow"
+                                               {{ 'checked' if color and color.is_glow }}>
+                                        <label class="form-check-label" for="isGlow">Glow</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input type="checkbox" name="is_neon" class="form-check-input" id="isNeon"
+                                               {{ 'checked' if color and color.is_neon }}>
+                                        <label class="form-check-label" for="isNeon">Neon</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lagerbestand -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Lagerbestand</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Aktueller Bestand</label>
+                                <input type="number" name="stock_quantity" class="form-control"
+                                       value="{{ color.stock_quantity if color else 0 }}" min="0">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Mindestbestand</label>
+                                <input type="number" name="min_stock" class="form-control"
+                                       value="{{ color.min_stock if color else 1 }}" min="0">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Lagerort</label>
+                                <input type="text" name="location" class="form-control"
+                                       value="{{ color.location if color else '' }}"
+                                       placeholder="z.B. Regal A3">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vorschau -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Vorschau</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div id="colorPreview" 
+                                 style="width: 100px; height: 100px; background: {{ color.rgb_hex if color else '#CC0000' }}; border-radius: 8px; border: 2px solid #ddd;">
+                            </div>
+                            <div class="ms-4">
+                                <h5 id="previewName">{{ color.full_name if color else 'Neue Farbe' }}</h5>
+                                <p class="text-muted mb-0" id="previewCode">{{ color.color_name if color else '' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('designs.colors') }}" class="btn btn-secondary">
+                        <i class="bi bi-x-lg"></i> Abbrechen
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg"></i> {{ 'Speichern' if mode == 'edit' else 'Farbe anlegen' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const colorPicker = document.getElementById('colorPicker');
+    const rgbHex = document.getElementById('rgbHex');
+    const colorPreview = document.getElementById('colorPreview');
+    
+    colorPicker.addEventListener('input', function() {
+        rgbHex.value = this.value.toUpperCase();
+        colorPreview.style.background = this.value;
+    });
+    
+    rgbHex.addEventListener('input', function() {
+        if (/^#[0-9A-Fa-f]{6}$/.test(this.value)) {
+            colorPicker.value = this.value;
+            colorPreview.style.background = this.value;
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block title %}Ausstehende Design-Freigaben - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="bi bi-check2-square"></i> Ausstehende Design-Freigaben</h1>
+            <p class="text-muted">Aufträge mit Designs, die noch vom Kunden freigegeben werden müssen</p>
+        </div>
+    </div>
+
+    {% if orders_by_customer %}
+    <!-- Gebündelter Versand -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-envelope-check"></i> Gebündelter Versand</h5>
+        </div>
+        <div class="card-body">
+            <p>Wählen Sie Aufträge aus und senden Sie gebündelte Freigabe-Anfragen an Kunden mit mehreren offenen Aufträgen.</p>
+
+            <form action="{{ url_for('design_approval.send_batch_approval_request') }}" method="POST" id="batchForm">
+                {% for customer_id, data in orders_by_customer.items() %}
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ data.customer.display_name }}</strong>
+                            {% if data.customer.email %}
+                            <span class="text-muted ms-2">
+                                <i class="bi bi-envelope"></i> {{ data.customer.email }}
+                            </span>
+                            {% else %}
+                            <span class="badge bg-warning ms-2">Keine E-Mail</span>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <span class="badge bg-info">{{ data.orders|length }} Auftrag/Aufträge</span>
+                            {% if data.customer.email %}
+                            <button type="button" class="btn btn-sm btn-outline-primary ms-2 select-customer"
+                                    data-customer="{{ customer_id }}">
+                                Alle auswählen
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px;"></th>
+                                        <th>Auftrag</th>
+                                        <th>Beschreibung</th>
+                                        <th>Design-Status</th>
+                                        <th>Freigabe-Status</th>
+                                        <th>Gesendet am</th>
+                                        <th>Aktionen</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for order in data.orders %}
+                                    <tr>
+                                        <td>
+                                            {% if data.customer.email %}
+                                            <input type="checkbox" class="form-check-input order-checkbox"
+                                                   name="order_ids[]" value="{{ order.id }}"
+                                                   data-customer="{{ customer_id }}">
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('orders.show', order_id=order.id) }}">
+                                                {{ order.order_number }}
+                                            </a>
+                                        </td>
+                                        <td>{{ (order.description or '-')[:50] }}{% if order.description and order.description|length > 50 %}...{% endif %}</td>
+                                        <td>
+                                            {% if order.design_file or order.design_file_path %}
+                                            <span class="badge bg-success"><i class="bi bi-check"></i> Vorhanden</span>
+                                            {% else %}
+                                            <span class="badge bg-warning">Fehlt</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if order.design_approval_status == 'approved' %}
+                                            <span class="badge bg-success">Freigegeben</span>
+                                            {% elif order.design_approval_status == 'sent' %}
+                                            <span class="badge bg-info">Gesendet</span>
+                                            {% elif order.design_approval_status == 'revision_requested' %}
+                                            <span class="badge bg-warning">Änderung gewünscht</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">Ausstehend</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if order.design_approval_sent_at %}
+                                            {{ order.design_approval_sent_at.strftime('%d.%m.%Y %H:%M') }}
+                                            {% else %}
+                                            -
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if order.design_approval_token %}
+                                            <a href="{{ url_for('design_approval.public_approval_page', token=order.design_approval_token) }}"
+                                               class="btn btn-sm btn-outline-secondary" target="_blank"
+                                               title="Freigabe-Seite öffnen">
+                                                <i class="bi bi-box-arrow-up-right"></i>
+                                            </a>
+                                            {% endif %}
+                                            {% if data.customer.email %}
+                                            <form action="{{ url_for('design_approval.send_approval_request', order_id=order.id) }}"
+                                                  method="POST" style="display: inline;">
+                                                <button type="submit" class="btn btn-sm btn-primary"
+                                                        title="Einzeln senden">
+                                                    <i class="bi bi-send"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div>
+                        <span id="selectedCount">0</span> Aufträge ausgewählt
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg" id="batchSendBtn" disabled>
+                        <i class="bi bi-send"></i> Ausgewählte Freigaben senden
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Keine ausstehenden Design-Freigaben gefunden.
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const checkboxes = document.querySelectorAll('.order-checkbox');
+    const selectedCount = document.getElementById('selectedCount');
+    const batchSendBtn = document.getElementById('batchSendBtn');
+
+    function updateCount() {
+        const checked = document.querySelectorAll('.order-checkbox:checked').length;
+        selectedCount.textContent = checked;
+        batchSendBtn.disabled = checked === 0;
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateCount);
+    });
+
+    // Alle Aufträge eines Kunden auswählen
+    document.querySelectorAll('.select-customer').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const customerId = this.dataset.customer;
+            const customerCheckboxes = document.querySelectorAll(`.order-checkbox[data-customer="${customerId}"]`);
+            const allChecked = Array.from(customerCheckboxes).every(cb => cb.checked);
+
+            customerCheckboxes.forEach(cb => {
+                cb.checked = !allChecked;
+            });
+
+            this.textContent = allChecked ? 'Alle auswählen' : 'Auswahl aufheben';
+            updateCount();
+        });
+    });
+});
+</script>
+{% endblock %}

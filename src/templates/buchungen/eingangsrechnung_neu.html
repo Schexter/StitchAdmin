@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Eingangsrechnung buchen{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-receipt"></i> Eingangsrechnung buchen
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('buchungen.eingangsrechnung_neu') }}" id="eingangsrechnungForm">
+
+                        <!-- Lieferant -->
+                        <div class="mb-3">
+                            <label for="lieferant" class="form-label">Lieferant <span class="text-danger">*</span></label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="lieferant"
+                                   name="lieferant"
+                                   required
+                                   placeholder="z.B. L-Shop, Kleen-Tex, etc.">
+                        </div>
+
+                        <!-- Rechnungsnummer -->
+                        <div class="mb-3">
+                            <label for="rechnungsnummer" class="form-label">Rechnungsnummer <span class="text-danger">*</span></label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="rechnungsnummer"
+                                   name="rechnungsnummer"
+                                   required
+                                   placeholder="z.B. RE-2025-001">
+                        </div>
+
+                        <!-- Rechnungsdatum -->
+                        <div class="mb-3">
+                            <label for="rechnungsdatum" class="form-label">Rechnungsdatum <span class="text-danger">*</span></label>
+                            <input type="date"
+                                   class="form-control"
+                                   id="rechnungsdatum"
+                                   name="rechnungsdatum"
+                                   required
+                                   value="{{ today }}">
+                        </div>
+
+                        <!-- Nettobetrag -->
+                        <div class="mb-3">
+                            <label for="netto_betrag" class="form-label">Nettobetrag <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="number"
+                                       class="form-control"
+                                       id="netto_betrag"
+                                       name="netto_betrag"
+                                       step="0.01"
+                                       min="0"
+                                       required
+                                       placeholder="0.00"
+                                       onchange="berechneGesamtbetrag()">
+                                <span class="input-group-text">€</span>
+                            </div>
+                        </div>
+
+                        <!-- MwSt-Satz -->
+                        <div class="mb-3">
+                            <label for="mwst_satz" class="form-label">MwSt-Satz <span class="text-danger">*</span></label>
+                            <select class="form-select"
+                                    id="mwst_satz"
+                                    name="mwst_satz"
+                                    required
+                                    onchange="berechneGesamtbetrag()">
+                                <option value="19" selected>19% (Normalsteuersatz)</option>
+                                <option value="7">7% (Ermäßigter Steuersatz)</option>
+                                <option value="0">0% (Steuerfrei)</option>
+                            </select>
+                        </div>
+
+                        <!-- Berechnung Anzeige -->
+                        <div class="mb-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <strong>Nettobetrag:</strong>
+                                        </div>
+                                        <div class="col-6 text-end">
+                                            <span id="anzeige_netto">0,00 €</span>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <strong>MwSt (<span id="anzeige_mwst_satz">19</span>%):</strong>
+                                        </div>
+                                        <div class="col-6 text-end">
+                                            <span id="anzeige_mwst">0,00 €</span>
+                                        </div>
+                                    </div>
+                                    <hr>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <h5><strong>Bruttobetrag:</strong></h5>
+                                        </div>
+                                        <div class="col-6 text-end">
+                                            <h5><strong><span id="anzeige_brutto">0,00 €</span></strong></h5>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Beschreibung -->
+                        <div class="mb-3">
+                            <label for="beschreibung" class="form-label">Beschreibung (optional)</label>
+                            <textarea class="form-control"
+                                      id="beschreibung"
+                                      name="beschreibung"
+                                      rows="3"
+                                      placeholder="z.B. Wareneinkauf für Auftrag A2025-001"></textarea>
+                        </div>
+
+                        <!-- Info-Box -->
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Automatische Buchung nach SKR03:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li><strong>19% MwSt:</strong> Konto 3400 (Wareneingang) / 1576 (Vorsteuer) an 1600 (Verbindlichkeiten)</li>
+                                <li><strong>7% MwSt:</strong> Konto 3800 (Wareneingang) / 1571 (Vorsteuer) an 1600 (Verbindlichkeiten)</li>
+                                <li><strong>0% MwSt:</strong> Konto 4980 (Sonstige Aufwendungen) an 1600 (Verbindlichkeiten)</li>
+                            </ul>
+                        </div>
+
+                        <!-- Buttons -->
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('buchungen.index') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Zurück
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i> Rechnung buchen
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Setze heutiges Datum als Standard
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('rechnungsdatum').value = today;
+});
+
+// Berechne und zeige Gesamtbetrag
+function berechneGesamtbetrag() {
+    const nettoBetrag = parseFloat(document.getElementById('netto_betrag').value) || 0;
+    const mwstSatz = parseInt(document.getElementById('mwst_satz').value) || 19;
+
+    const mwstBetrag = nettoBetrag * (mwstSatz / 100);
+    const bruttoBetrag = nettoBetrag + mwstBetrag;
+
+    // Formatiere deutsche Währung
+    const formatCurrency = (value) => {
+        return value.toLocaleString('de-DE', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }) + ' €';
+    };
+
+    document.getElementById('anzeige_netto').textContent = formatCurrency(nettoBetrag);
+    document.getElementById('anzeige_mwst_satz').textContent = mwstSatz;
+    document.getElementById('anzeige_mwst').textContent = formatCurrency(mwstBetrag);
+    document.getElementById('anzeige_brutto').textContent = formatCurrency(bruttoBetrag);
+}
+
+// Initiale Berechnung
+berechneGesamtbetrag();
+</script>
+{% endblock %}

@@ -65,6 +65,15 @@
                         </ul>
                     </li>
                     <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">CRM</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('crm.dashboard') }}"><i class="bi bi-graph-up"></i> Dashboard & Rankings</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('crm.activities_search') }}"><i class="bi bi-search"></i> Aktivitäten suchen</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('production.calendar_new') }}"><i class="bi bi-calendar-plus"></i> Kalender / Neuer Termin</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Einkauf</a>
                         <ul class="dropdown-menu">
                             <li><a class="dropdown-item" href="{{ url_for('suppliers.order_suggestions') }}"><i class="bi bi-cart3"></i> Bestellvorschläge</a></li>

@@ -4,6 +4,123 @@
 
 Dieses Dokument protokolliert alle wesentlichen Änderungen am StitchAdmin 2.0 Projekt.
 
+---
+
+## [2.0.3-beta.7] - 2025-01-07
+
+### 📊 Buchhaltung & Controlling Modul
+
+#### Added - Buchhaltungsmodul
+- **Buchungsjournal** mit Kontenrahmen (SKR03)
+- **BWA** (Betriebswirtschaftliche Auswertung)
+  - Monats-/Quartals-/Jahresauswertung
+  - Vorjahresvergleich
+  - Rohertrag-Marge
+- **USt-Voranmeldung**
+  - Automatische Berechnung
+  - ELSTER-kompatibler CSV-Export
+- **Liquiditätsplanung**
+  - Offene Forderungen
+  - Cashflow-Berechnung
+  - Prognose
+
+#### Added - Export-Funktionen
+- **DATEV-Export** - Buchungsstapel für Steuerberater
+- **GoBD-Export** - Revisionssicheres ZIP-Archiv mit Prüfsummen
+- **ELSTER-CSV** - USt-Voranmeldung
+- **Excel-Export** - BWA, Journal
+
+#### Added - Kalkulationen (Stickerei-spezifisch)
+- **Stundensatz-Kalkulation** - Vollkostenbasis
+- **Stickpreis-Kalkulation** - Pro 1000 Stiche, Farbwechsel, Mindestpreis
+- **Deckungsbeitragsrechnung** - DB I, DB II, Break-Even
+
+### 👕 Textildruck-Kalkulation (NEU)
+
+#### Added - Verfahrens-Kalkulationen
+- **Siebdruck**
+  - Sieb-/Film-/Einrichtekosten
+  - Farbkosten pro Druck
+  - Staffelrabatte (5-30%)
+  - Reserve/Ausschuss
+
+- **DTG-Druck** (Direct-to-Garment)
+  - Tintenkosten pro cm²
+  - Vorbehandlung (dunkle Textilien)
+  - Keine Mindestmenge
+
+- **Flex/Flock-Druck**
+  - Materialkosten pro cm²
+  - Schnittdaten-Kosten
+  - Entgitterung
+
+#### Added - Wettbewerbsvergleich
+- Manuelle Preiseingabe von Wettbewerbern
+- Referenzpreise (Marktdurchschnitt)
+- Automatischer Vergleich bei Kalkulation
+- Preispositions-Empfehlung
+
+### 📋 Kontenrahmen-Auswahl
+
+#### Added - Automatische Kontenrahmen-Initialisierung
+- **SKR03** vollständig (Standard)
+- **SKR04** vorbereitet
+- **Branchen-Vorlagen**:
+  - Textildruck & Stickerei (mit speziellen Konten)
+  - Handel
+  - Handwerk
+  - Dienstleistung
+
+#### Branchenspezifische Konten (Textil)
+- 0410-0440: Maschinen (Stick, Druck, Presse, Plotter)
+- 3200-3240: Wareneingang Textilien
+- 3500-3560: Material (Garne, Folien, Farben)
+- 8500-8570: Erlöse nach Verfahren
+
+#### Neue Dateien
+- `src/services/textildruck_kalkulation.py`
+- `src/services/wettbewerb_preise.py`
+- `src/services/kontenrahmen_service.py`
+- `src/templates/buchhaltung/kalkulation_textildruck.html`
+- `src/templates/buchhaltung/kontenplan_setup.html`
+
+### 📅 Kalender-System (Outlook-Style) - NEU
+
+#### Neuer Produktionskalender
+- **Ressourcen-Timeline** - Maschinen als Spalten nebeneinander
+- **Ansichten**: Tag/Woche/Monat + Listenansicht
+- **Drag & Drop** Terminplanung
+- **Echtzeit-Auslastung** pro Maschine
+- **FullCalendar 6** Integration
+
+#### Termin-Typen
+- 🟢 Produktion | 🔴 Ratenzahlung | 🔵 Kundentermin | 🟡 Wartung
+
+#### Ratenzahlungen
+- Automatische Kalendertermine für jede Rate
+- Übersicht fälliger/überfälliger Raten
+- 3-Tage-Vorab-Erinnerung
+
+#### Ressourcen-Verwaltung
+- Standard-Maschinen (Stick, Druck, Presse, Plotter)
+- Verfügbarkeitszeiten & Auslastung
+
+### 👥 CRM-Finanz-Verknüpfung - NEU
+
+#### Kunden-Finanzdaten
+- Umsatz gesamt & aktuelles Jahr
+- Offene Posten & Überfällige
+- Zahlungsmoral-Score (0-100)
+- Top-Kunden nach Umsatz
+
+#### Neue Dateien
+- `src/models/kalender.py`
+- `src/services/crm_finanz_service.py`
+- `src/controllers/kalender_controller.py`
+- `src/templates/kalender/*.html`
+
+---
+
 Format basierend auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/)  
 Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/)
 
@@ -15,6 +132,448 @@ Versionierung folgt [Semantic Versioning](https://semver.org/lang/de/)
 - Testing-Framework mit Pytest
 - Legacy-Controller-Bereinigung
 - Flask-Migrate Integration
+
+---
+
+## [2.0.3] - 2025-01-07
+
+### 📋 Dokument-Workflow & Auftrags-Wizard (Phase 1 + 2)
+
+#### Added - Phase 1: Basis-Implementation
+- **Nummernkreise (GoBD-konform)**
+  - Automatische Belegnummern-Generierung
+  - Jahreswechsel-Reset
+  - Konfigurierbares Format (Präfix, Stellen, Trennzeichen)
+  - Admin-Interface unter `/admin/dokumente/nummernkreise`
+
+- **Zahlungsbedingungen**
+  - Verwaltung unter `/admin/dokumente/zahlungsbedingungen`
+  - Skonto-Berechnung
+  - Anzahlungs-Optionen (% oder Festbetrag)
+  - Standard-Bedingung für neue Kunden
+
+- **Document-Workflow Models**
+  - `BusinessDocument` - Einheitliches Dokumenten-Model
+  - `DocumentPosition` - Positionen mit automatischer MwSt-Berechnung
+  - `DocumentPayment` - Zahlungsverfolgung
+  - Enums für DokumentTyp, DokumentStatus, PositionsTyp
+
+#### Added - Phase 2: Auftrags-Wizard
+- **5-Step Wizard für Auftragserfassung**
+  - Step 1: Kunde & Grunddaten (Kundensuche, Dokumenttyp, Auftragsart)
+  - Step 2: Textilien auswählen (Artikelsuche, Größenstaffel)
+  - Step 3: Veredelung definieren (Stickerei/Druck, DST-Upload-Analyse)
+  - Step 4: Kalkulation (automatische Preisberechnung, Mengenrabatt)
+  - Step 5: Zusammenfassung & Abschluss
+
+- **API-Endpoints für AJAX**
+  - `/wizard/api/kunden/suche` - Kundensuche
+  - `/wizard/api/artikel/suche` - Artikelsuche mit Filter
+  - `/wizard/api/artikel/<id>/varianten` - Varianten laden
+  - `/wizard/api/design/analyse` - DST-Datei analysieren (pyembroidery)
+  - `/wizard/api/kalkulation/berechnen` - Live-Kalkulation
+
+- **Kalkulations-Engine**
+  - Automatische Textil-Preisberechnung
+  - Stickerei-Kalkulation (Stiche × Preis/1000)
+  - Druck-Kalkulation (Fläche × Preis/cm²)
+  - Einrichtungspauschalen
+  - Mengenrabatt-Staffel (5-20%)
+
+#### Neue Dateien
+- `src/controllers/order_wizard_controller.py` - Wizard-Controller
+- `src/templates/wizard/step1.html` - Kunde & Grunddaten
+- `src/templates/wizard/step2.html` - Textilien auswählen
+- `src/templates/wizard/step3.html` - Veredelung definieren
+- `src/templates/wizard/step4.html` - Kalkulation
+- `src/templates/wizard/step5.html` - Zusammenfassung
+
+#### Geänderte Dateien
+- `app.py` - Wizard-Blueprint und Angebote-Workflow-Blueprint registriert
+
+---
+
+## [2.0.3-beta.2] - 2025-01-07
+
+### 📄 Phase 3: Angebote-Modul (Document-Workflow Integration)
+
+#### Added - Angebote CRUD
+- **Angebote-Übersicht** (`/angebote-v2/`)
+  - Filterfunktion nach Status und Kunde
+  - Statistik-Karten (Gesamt, Entwurf, Versendet, Angenommen, Abgelehnt, Überfällig)
+  - Tabellen-Ansicht mit Schnellaktionen
+
+- **Angebot erstellen** (`/angebote-v2/neu`)
+  - Kundenauswahl mit Details
+  - Betreff & Texte (Einleitung, Schlussbemerkung)
+  - Dynamische Positionseingabe mit Artikelsuche
+  - Zahlungsbedingungen & Gültigkeit
+  - Live-Summenberechnung
+
+- **Angebot bearbeiten** (`/angebote-v2/<id>/bearbeiten`)
+  - Nur für Entwürfe möglich
+  - Positionen hinzufügen/ändern/löschen
+  - Rabatt anpassen
+
+- **Status-Workflow**
+  - Versenden (als versendet markieren)
+  - Annehmen (Kunde hat angenommen)
+  - Ablehnen (mit Begründung)
+  - Stornieren
+  - In Auftragsbestätigung umwandeln
+
+#### Added - PDF-Generierung
+- **ReportLab Integration**
+  - Professionelles PDF-Layout mit Kopfbereich
+  - Empfänger-Adressblock
+  - Dokumentinfo (Nummer, Datum, Gültigkeit)
+  - Positionen-Tabelle mit Formatierung
+  - Summen-Block (Netto, MwSt, Brutto)
+  - Fußbereich mit Zahlungsbedingungen
+
+- **PDF-Routen**
+  - `/angebote-v2/<id>/pdf` - Download
+  - `/angebote-v2/<id>/pdf/vorschau` - Browser-Vorschau
+
+#### Added - E-Mail-Versand
+- **E-Mail-Formular** (`/angebote-v2/<id>/email`)
+  - Empfänger (vorausgefüllt aus Kundendaten)
+  - Betreff (automatisch generiert)
+  - Nachrichtentext (editierbar)
+  - PDF automatisch als Anhang
+
+- **SMTP-Integration**
+  - Konfiguration über Umgebungsvariablen
+  - Status-Update nach Versand
+
+#### Neue Dateien
+- `src/controllers/angebote_workflow_controller.py` - Controller mit CRUD, PDF, E-Mail
+- `src/templates/angebote_v2/index.html` - Übersicht
+- `src/templates/angebote_v2/show.html` - Detailansicht
+- `src/templates/angebote_v2/neu.html` - Neues Angebot
+- `src/templates/angebote_v2/bearbeiten.html` - Bearbeiten
+- `src/templates/angebote_v2/email.html` - E-Mail senden
+
+---
+
+## [2.0.3-beta.3] - 2025-01-07
+
+### 📝 Phase 4: Auftragsbestätigungen (Document-Workflow Integration)
+
+#### Added - AB CRUD
+- **AB-Übersicht** (`/auftraege/`)
+  - Filterfunktion nach Status und Kunde
+  - Statistik-Karten (Gesamt, Entwurf, Versendet, In Bearbeitung, Geliefert)
+  - Tabellen-Ansicht mit Schnellaktionen
+
+- **AB erstellen** (`/auftraege/neu`)
+  - Manuelle Erstellung mit Kundenauswahl
+  - Kundenreferenz & Bestellnummer
+  - Dynamische Positionseingabe
+  - Lieferdatum & Zahlungsbedingungen
+
+- **AB aus Angebot** (`/auftraege/aus-angebot/<id>`)
+  - Automatische Konvertierung angenommener Angebote
+  - Übernahme aller Positionen und Daten
+  - Verknüpfung zum Vorgänger-Angebot
+
+- **AB bearbeiten** (`/auftraege/<id>/bearbeiten`)
+  - Nur für Entwürfe möglich
+  - Positionen hinzufügen/ändern/löschen
+
+#### Added - Status-Workflow
+- `Entwurf` → `Versendet` → `In Bearbeitung` → `Geliefert`
+- Stornieren möglich
+- Verknüpfte Dokumente anzeigen (Lieferscheine, Rechnungen)
+
+#### Added - Folgedokumente
+- **Lieferschein erstellen** (`/auftraege/<id>/lieferschein`)
+  - Automatische Positionskopie (ohne Dienstleistungen)
+  - Auftrag wird als "Geliefert" markiert
+  - Verweis auf Vorgänger-AB
+
+- **Rechnung erstellen** (`/auftraege/<id>/rechnung`)
+  - Unterstützt: Rechnung, Anzahlung, Teilrechnung
+  - Automatische Fälligkeitsberechnung
+  - Zahlungstext aus Zahlungsbedingung
+
+#### Added - PDF-Generierung
+- **ReportLab Integration**
+  - Professionelles AB-Layout
+  - Dokumentinfo inkl. Lieferdatum, Kundenreferenz
+  - Positionstabelle mit Formatierung
+  - Summenblock
+
+- **PDF-Routen**
+  - `/auftraege/<id>/pdf` - Download
+  - `/auftraege/<id>/pdf/vorschau` - Browser-Vorschau
+
+#### Neue Dateien
+- `src/controllers/auftraege_controller.py` - Controller mit CRUD, PDF, Folgedokumente
+- `src/templates/auftraege/index.html` - Übersicht
+- `src/templates/auftraege/show.html` - Detailansicht mit Aktionen
+- `src/templates/auftraege/neu.html` - Neuer Auftrag
+- `src/templates/auftraege/bearbeiten.html` - Bearbeiten
+
+#### Geänderte Dateien
+- `app.py` - auftraege_bp Blueprint registriert
+
+---
+
+## [2.0.3-beta.4] - 2025-01-07
+
+### 🚚 Phase 5: Lieferscheine (Document-Workflow Integration)
+
+#### Added - Lieferschein CRUD
+- **Lieferschein-Übersicht** (`/lieferscheine/`)
+  - Filterfunktion nach Status und Kunde
+  - Statistik-Karten (Gesamt, Offen, Heute zu liefern, Ausgeliefert)
+  - Tabellen-Ansicht mit Schnellaktionen
+
+- **Lieferschein manuell erstellen** (`/lieferscheine/neu`)
+  - Kundenauswahl mit Lieferadresse
+  - Versandart (Versand, Abholung, Spedition)
+  - Sendungsnummer/Tracking
+  - Dynamische Positionseingabe
+
+- **Lieferschein aus Auftrag** (`/lieferscheine/aus-auftrag/<id>`)
+  - Positionsauswahl mit Liefermengen
+  - Teillieferung unterstützt
+  - Auftrag wird entsprechend aktualisiert
+
+- **Lieferschein bearbeiten** (`/lieferscheine/<id>/bearbeiten`)
+  - Nur für offene Lieferscheine
+  - Positionen ändern
+
+#### Added - Status-Workflow
+- `Entwurf/Offen` → `Ausgeliefert`
+- Teillieferung: Auftrag wird "Teilgeliefert"
+- Volllieferung: Auftrag wird "Geliefert"
+- Stornieren möglich
+
+#### Added - Folgedokumente
+- **Rechnung aus Lieferschein** (`/lieferscheine/<id>/rechnung`)
+  - Preise werden aus Vorgänger-Auftrag geholt
+  - Automatische Verknüpfung
+
+#### Added - PDF-Generierung
+- **Lieferschein-PDF ohne Preise!**
+  - Lieferadresse prominent
+  - Versandart & Tracking
+  - Positionen mit Artikelnummer & Menge
+  - Empfangsbestätigung (Unterschriftsfeld)
+
+#### Neue Dateien
+- `src/controllers/lieferscheine_controller.py` - Controller mit CRUD, PDF
+- `src/templates/lieferscheine/index.html` - Übersicht
+- `src/templates/lieferscheine/show.html` - Detailansicht
+- `src/templates/lieferscheine/neu.html` - Neuer Lieferschein
+- `src/templates/lieferscheine/aus_auftrag.html` - Aus Auftrag erstellen
+- `src/templates/lieferscheine/bearbeiten.html` - Bearbeiten
+
+#### Geänderte Dateien
+- `app.py` - lieferscheine_bp Blueprint registriert
+
+---
+
+## [2.0.3-beta.5] - 2025-01-07
+
+### 💰 Phase 6: Rechnungen & Zahlungen (Document-Workflow Integration)
+
+#### Added - Rechnungs-CRUD
+- **Rechnungs-Übersicht** (`/rechnungen/`)
+  - Filterfunktion nach Status und Kunde
+  - Statistik-Karten (Gesamt, Offen, Teilbezahlt, Überfällig, Bezahlt, Offene Summe)
+  - Farbliche Markierung überfälliger Rechnungen
+
+- **Rechnung erstellen** (`/rechnungen/neu`)
+  - Manuell mit Kundenauswahl
+  - Rechnungstyp: Normal, Anzahlung, Teilrechnung
+  - Zahlungsbedingung mit automatischer Fälligkeitsberechnung
+  - Dynamische Positionseingabe
+
+- **Rechnung bearbeiten** (`/rechnungen/<id>/bearbeiten`)
+  - Nur wenn noch offen und keine Zahlungen
+
+#### Added - Zahlungsverwaltung
+- **Zahlung erfassen** (`/rechnungen/<id>/zahlung`)
+  - Zahlungsarten: Überweisung, Bar, EC-Karte, Kreditkarte, PayPal, Lastschrift
+  - Transaktions-ID und Bank-Referenz
+  - Automatische Status-Aktualisierung (Offen → Teilbezahlt → Bezahlt)
+  - Schnellauswahl für Vollbetrag und Skonto
+
+- **Zahlung löschen** (`/rechnungen/<id>/zahlung/<zahlung_id>/loeschen`)
+  - Status wird automatisch neu berechnet
+
+#### Added - Status-Workflow
+- `Offen` → `Teilbezahlt` → `Bezahlt`
+- Überfälligkeits-Tracking mit Tageberechnung
+- Mahnstufen (1, 2, 3, ...)
+- Stornieren möglich (außer bezahlte Rechnungen)
+
+#### Added - Gutschriften
+- **Gutschrift erstellen** (`/rechnungen/<id>/gutschrift`)
+  - Automatische Kopie aller Positionen mit negativen Beträgen
+  - Verknüpfung zur Original-Rechnung
+
+#### Added - PDF-Generierung
+- **Professionelles Rechnungs-PDF**
+  - Rechnungsadresse
+  - Leistungsdatum und Fälligkeitsdatum
+  - Positionstabelle mit Summen
+  - Zahlungstext aus Zahlungsbedingung
+  - Bankverbindung
+
+#### Neue Dateien
+- `src/controllers/rechnungen_controller.py` - Controller mit CRUD, Zahlungen, PDF
+- `src/templates/rechnungen/index.html` - Übersicht mit Statistiken
+- `src/templates/rechnungen/show.html` - Detailansicht mit Zahlungen
+- `src/templates/rechnungen/neu.html` - Neue Rechnung
+- `src/templates/rechnungen/bearbeiten.html` - Bearbeiten
+- `src/templates/rechnungen/zahlung.html` - Zahlung erfassen
+
+#### Geänderte Dateien
+- `app.py` - rechnungen_bp Blueprint registriert
+
+---
+
+## [2.0.3-beta.6] - 2025-01-07
+
+### 🛠️ Setup-Wizard & Speicherpfad-Konfiguration
+
+#### Added - Installations-Assistent
+- **8-Schritte Setup-Wizard** (`/setup/`)
+  1. Willkommen & Feature-Übersicht
+  2. Lizenzvereinbarung
+  3. Firmendaten (Name, Adresse, Steuern)
+  4. Logo & Branding (Farben)
+  5. Speicherpfade konfigurieren
+  6. Bankverbindung
+  7. E-Mail-Einstellungen
+  8. Administrator-Konto & Abschluss
+
+- **Automatische Erkennung** ob Setup bereits abgeschlossen
+- **Demo-Modus** zum Überspringen (nur im Debug)
+
+#### Added - StorageSettings Model
+- **Konfigurierbare Speicherpfade** für:
+  - Angebote, Auftragsbestätigungen, Lieferscheine
+  - Rechnungen (Ausgang + Eingang)
+  - Gutschriften, Mahnungen
+  - Designs, Design-Freigaben
+  - Backups, Importe, Exporte
+
+- **Ordnerstruktur-Optionen:**
+  - Jahr/Monat (empfohlen)
+  - Nur Jahr
+  - Nach Kunde
+  - Flach
+
+- **Dateinamen-Optionen:**
+  - Kundenname in Dateinamen
+  - Datum in Dateinamen
+
+- **Hilfsfunktionen:**
+  - `get_full_path()` - Vollständiger Pfad für Dokumenttyp
+  - `get_filename()` - Dateiname nach Einstellungen
+  - `ensure_path_exists()` - Ordner erstellen
+  - `validate_paths()` - Pfade prüfen
+  - `create_folder_structure()` - Alle Ordner anlegen
+
+#### Neue Dateien
+- `src/models/storage_settings.py` - Speicherpfad-Model
+- `src/controllers/setup_wizard_controller.py` - Setup-Controller
+- `src/templates/setup/base_setup.html` - Basis-Template
+- `src/templates/setup/welcome.html` - Willkommen
+- `src/templates/setup/license.html` - Lizenz
+- `src/templates/setup/company.html` - Firmendaten
+- `src/templates/setup/branding.html` - Logo & Farben
+- `src/templates/setup/storage.html` - Speicherpfade
+- `src/templates/setup/bank.html` - Bankverbindung
+- `src/templates/setup/email.html` - E-Mail
+- `src/templates/setup/admin.html` - Administrator
+- `src/templates/setup/finish.html` - Abschluss
+
+#### Geänderte Dateien
+- `app.py` - setup_bp Blueprint registriert, Setup-Check bei Root-Route
+
+### 🔗 ZugPferd-Integration & PDF-Service
+
+#### Added - Document PDF Service
+- **Zentraler PDF-Service** (`src/services/document_pdf_service.py`)
+  - Einheitliche PDF-Generierung für alle Dokumenttypen
+  - Automatische Speicherpfad-Ermittlung via StorageSettings
+  - ZugPferd-Integration für Rechnungen
+  - Firmenlogo aus CompanySettings
+  - Deutsche Zahlenformatierung
+
+- **Methoden:**
+  - `get_save_path()` - Ermittelt Speicherpfad basierend auf Einstellungen
+  - `save_pdf()` - Speichert PDF am konfigurierten Ort
+  - `generate_document_pdf()` - Generisches PDF für alle Dokumenttypen
+  - `generate_rechnung_pdf()` - Rechnung mit optionalem ZugPferd-XML
+  - `get_company_header_data()` - Lädt Firmendaten für PDF-Header
+
+#### Changed - Rechnungs-Controller
+- PDF-Generierung nutzt jetzt neuen DocumentPDFService
+- Automatische ZugPferd-XML-Einbettung (PDF/A-3)
+- Konfigurierbare Speicherpfade
+- Neue Route `/rechnungen/<id>/pdf/zugpferd` für explizite E-Rechnung
+
+#### Added - Master-Migrations-Script
+- `migrations/run_all_migrations.py`
+  - Prüft und erstellt storage_settings
+  - Erweitert business_documents um PDF/XML-Felder
+  - Erstellt nummernkreis und zahlungsbedingung falls fehlend
+  - Erweitert company_settings
+  - Kann mehrfach ausgeführt werden (idempotent)
+
+#### Neue/Geänderte Dateien
+- `src/services/document_pdf_service.py` - Zentraler PDF-Service
+- `src/controllers/rechnungen_controller.py` - ZugPferd-Integration
+- `migrations/run_all_migrations.py` - Master-Migration
+
+### 📂 NAS/Netzlaufwerk-Unterstützung für Archive
+
+#### Added - Separate Archive auf NAS
+- **Design-Archiv** - DST, EMB, PES Stickdateien
+  - Separates Verzeichnis aktivierbar
+  - UNC-Pfade unterstützt: `\\NAS\Designs`
+  - Netzlaufwerke: `Z:\Stickdateien`
+
+- **Stickdateien-Archiv** - Produktionsfertige Dateien
+  - Für Maschinen-Output
+  - Separater Speicherort möglich
+
+- **Freigaben-Archiv** - Kundenfreigabe-PDFs
+  - Bestätigungen und Genehmigungen
+  - Kann auf NAS liegen
+
+- **Motiv-Archiv** - Grafiken & Vorlagen
+  - AI, PSD, Vektor-Dateien
+  - Separates Verzeichnis
+
+#### Changed - StorageSettings Model
+- Neue Felder für separate Archive:
+  - `design_archiv_path`, `design_archiv_aktiv`
+  - `stickdateien_path`, `stickdateien_aktiv`
+  - `freigaben_archiv_path`, `freigaben_archiv_aktiv`
+  - `motiv_archiv_path`, `motiv_archiv_aktiv`
+
+- Erweiterte Pfad-Validierung:
+  - UNC-Pfade (\\\server\share)
+  - Netzlaufwerke (Z:\)
+  - Schreibrechte-Prüfung
+  - Erreichbarkeits-Test
+
+- Neue Hilfsmethode `_apply_subfolders()`
+- Erweiterte `_check_path_access()` für Netzlaufwerke
+
+#### Changed - UI
+- Neue Sektion "Separate Archive (NAS/Netzlaufwerk)"
+- Toggle-Switches zum Aktivieren/Deaktivieren
+- NAS-Hinweise und Beispiel-Pfade
+- Pfad-Test-Funktion
 
 ---
 

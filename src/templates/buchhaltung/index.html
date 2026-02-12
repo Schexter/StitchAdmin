@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Buchhaltung - Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-calculator me-2"></i>Buchhaltung & Controlling</h2>
+        <div class="btn-group">
+            <a href="{{ url_for('buchhaltung.export_uebersicht') }}" class="btn btn-outline-primary">
+                <i class="fas fa-download me-1"></i> Exporte
+            </a>
+            <a href="{{ url_for('buchhaltung.kalkulation') }}" class="btn btn-outline-success">
+                <i class="fas fa-calculator me-1"></i> Kalkulationen
+            </a>
+        </div>
+    </div>
+    
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2">Umsatz {{ aktuelles_jahr }}</h6>
+                    <h3 class="mb-0">
+                        {% if bwa_jahr %}
+                            {{ "%.2f"|format(bwa_jahr.summe_erloese|float) }} €
+                        {% else %}
+                            - €
+                        {% endif %}
+                    </h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2">Betriebsergebnis {{ aktuelles_jahr }}</h6>
+                    <h3 class="mb-0">
+                        {% if bwa_jahr %}
+                            {{ "%.2f"|format(bwa_jahr.betriebsergebnis|float) }} €
+                        {% else %}
+                            - €
+                        {% endif %}
+                    </h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2">Offene Forderungen</h6>
+                    <h3 class="mb-0">
+                        {% if liquiditaet %}
+                            {{ "%.2f"|format(liquiditaet.forderungen_offen|float) }} €
+                        {% else %}
+                            - €
+                        {% endif %}
+                    </h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2">Überfällig</h6>
+                    <h3 class="mb-0">
+                        {% if liquiditaet %}
+                            {{ "%.2f"|format(liquiditaet.forderungen_ueberfaellig|float) }} €
+                        {% else %}
+                            - €
+                        {% endif %}
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- BWA Monat -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>BWA {{ aktueller_monat }}/{{ aktuelles_jahr }}</h5>
+                    <a href="{{ url_for('buchhaltung.bwa') }}" class="btn btn-sm btn-outline-primary">Details</a>
+                </div>
+                <div class="card-body">
+                    {% if bwa_monat %}
+                    <table class="table table-sm">
+                        <tr>
+                            <td>Erlöse</td>
+                            <td class="text-end text-success">{{ "%.2f"|format(bwa_monat.summe_erloese|float) }} €</td>
+                        </tr>
+                        <tr>
+                            <td>Aufwendungen</td>
+                            <td class="text-end text-danger">{{ "%.2f"|format(bwa_monat.summe_aufwendungen|float) }} €</td>
+                        </tr>
+                        <tr class="table-active fw-bold">
+                            <td>Betriebsergebnis</td>
+                            <td class="text-end {% if bwa_monat.betriebsergebnis|float >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ "%.2f"|format(bwa_monat.betriebsergebnis|float) }} €
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Rohertrag-Marge</td>
+                            <td class="text-end">{{ bwa_monat.rohertrag_marge }} %</td>
+                        </tr>
+                    </table>
+                    {% else %}
+                    <p class="text-muted">Keine Daten vorhanden.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Schnellzugriff -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Schnellzugriff</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <a href="{{ url_for('buchhaltung.journal') }}" class="btn btn-outline-primary w-100 py-3">
+                                <i class="fas fa-book fa-2x d-block mb-2"></i>
+                                Buchungsjournal
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('buchhaltung.bwa') }}" class="btn btn-outline-success w-100 py-3">
+                                <i class="fas fa-chart-pie fa-2x d-block mb-2"></i>
+                                BWA
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('buchhaltung.ust_voranmeldung') }}" class="btn btn-outline-warning w-100 py-3">
+                                <i class="fas fa-file-invoice fa-2x d-block mb-2"></i>
+                                USt-VA
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('buchhaltung.liquiditaet') }}" class="btn btn-outline-info w-100 py-3">
+                                <i class="fas fa-water fa-2x d-block mb-2"></i>
+                                Liquidität
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('buchhaltung.kalkulation_stickpreis') }}" class="btn btn-outline-danger w-100 py-3">
+                                <i class="fas fa-tag fa-2x d-block mb-2"></i>
+                                Stickpreis
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <a href="{{ url_for('buchhaltung.kontenplan') }}" class="btn btn-outline-secondary w-100 py-3">
+                                <i class="fas fa-list-ol fa-2x d-block mb-2"></i>
+                                Kontenplan
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Export-Info -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="fas fa-file-export me-2"></i>Verfügbare Exporte</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="border rounded p-3 text-center">
+                        <i class="fas fa-file-csv fa-3x text-primary mb-2"></i>
+                        <h6>DATEV-Export</h6>
+                        <p class="small text-muted">Buchungsstapel für Steuerberater</p>
+                        <a href="{{ url_for('buchhaltung.export_uebersicht') }}" class="btn btn-sm btn-primary">Exportieren</a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="border rounded p-3 text-center">
+                        <i class="fas fa-file-archive fa-3x text-success mb-2"></i>
+                        <h6>GoBD-Export</h6>
+                        <p class="small text-muted">Revisionssicheres Archiv</p>
+                        <a href="{{ url_for('buchhaltung.export_uebersicht') }}" class="btn btn-sm btn-success">Exportieren</a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="border rounded p-3 text-center">
+                        <i class="fas fa-file-excel fa-3x text-warning mb-2"></i>
+                        <h6>ELSTER-CSV</h6>
+                        <p class="small text-muted">USt-Voranmeldung</p>
+                        <a href="{{ url_for('buchhaltung.ust_voranmeldung') }}" class="btn btn-sm btn-warning">Erstellen</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

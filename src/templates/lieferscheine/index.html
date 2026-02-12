@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Lieferscheine - Übersicht{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-truck text-primary me-2"></i>Lieferscheine</h2>
+            <p class="text-muted mb-0">Verwaltung aller Lieferungen</p>
+        </div>
+        <div>
+            <a href="{{ url_for('lieferscheine.neu') }}" class="btn btn-success">
+                <i class="fas fa-plus me-1"></i> Neuer Lieferschein
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Statistik-Karten -->
+        <div class="col-12 mb-4">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="card bg-light h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.gesamt }}</h3>
+                            <small class="text-muted">Gesamt</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.entwurf }}</h3>
+                            <small>Offen</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.heute }}</h3>
+                            <small>Heute zu liefern</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white h-100">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">{{ stats.geliefert }}</h3>
+                            <small>Ausgeliefert</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="col-12 mb-4">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <form method="GET" class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="alle" {% if status_filter == 'alle' %}selected{% endif %}>Alle Status</option>
+                                <option value="entwurf" {% if status_filter == 'entwurf' %}selected{% endif %}>📦 Offen</option>
+                                <option value="geliefert" {% if status_filter == 'geliefert' %}selected{% endif %}>✅ Ausgeliefert</option>
+                                <option value="teilgeliefert" {% if status_filter == 'teilgeliefert' %}selected{% endif %}>📬 Teilgeliefert</option>
+                                <option value="storniert" {% if status_filter == 'storniert' %}selected{% endif %}>🚫 Storniert</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Kunde suchen</label>
+                            <input type="text" name="kunde" class="form-control" value="{{ kunde_filter }}" placeholder="Name, Firma...">
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="fas fa-search me-1"></i> Filtern
+                            </button>
+                        </div>
+                        <div class="col-md-2">
+                            <a href="{{ url_for('lieferscheine.index') }}" class="btn btn-outline-secondary w-100">Reset</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liste -->
+        <div class="col-12">
+            <div class="card shadow-sm">
+                <div class="card-body p-0">
+                    {% if lieferscheine %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>LS-Nummer</th>
+                                    <th>Kunde</th>
+                                    <th class="text-center">Datum</th>
+                                    <th class="text-center">Lieferdatum</th>
+                                    <th class="text-center">Positionen</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="text-end">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ls in lieferscheine %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('lieferscheine.show', id=ls.id) }}" class="fw-bold text-decoration-none">
+                                            {{ ls.dokument_nummer }}
+                                        </a>
+                                        {% if ls.vorgaenger_id %}
+                                        <br><small class="text-muted">aus Auftrag</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ ls.kunde.display_name if ls.kunde else '-' }}</td>
+                                    <td class="text-center">{{ ls.dokument_datum.strftime('%d.%m.%Y') }}</td>
+                                    <td class="text-center">
+                                        {% if ls.lieferdatum %}
+                                        {{ ls.lieferdatum.strftime('%d.%m.%Y') }}
+                                        {% else %}
+                                        <span class="text-muted">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ ls.positionen|length }}</td>
+                                    <td class="text-center">
+                                        {% if ls.status == 'entwurf' %}
+                                        <span class="badge bg-warning text-dark">📦 Offen</span>
+                                        {% elif ls.status == 'geliefert' %}
+                                        <span class="badge bg-success">✅ Ausgeliefert</span>
+                                        {% elif ls.status == 'teilgeliefert' %}
+                                        <span class="badge bg-info">📬 Teilgeliefert</span>
+                                        {% elif ls.status == 'storniert' %}
+                                        <span class="badge bg-dark">🚫 Storniert</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="{{ url_for('lieferscheine.show', id=ls.id) }}" class="btn btn-outline-primary" title="Anzeigen">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <a href="{{ url_for('lieferscheine.pdf_vorschau', id=ls.id) }}" class="btn btn-outline-secondary" title="PDF" target="_blank">
+                                                <i class="fas fa-file-pdf"></i>
+                                            </a>
+                                            {% if ls.status == 'entwurf' %}
+                                            <a href="{{ url_for('lieferscheine.bearbeiten', id=ls.id) }}" class="btn btn-outline-warning" title="Bearbeiten">
+                                                <i class="fas fa-edit"></i>
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-truck fa-4x text-muted mb-3"></i>
+                        <h5>Keine Lieferscheine gefunden</h5>
+                        <a href="{{ url_for('lieferscheine.neu') }}" class="btn btn-success mt-2">
+                            <i class="fas fa-plus me-1"></i> Neuer Lieferschein
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

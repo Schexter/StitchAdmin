@@ -1,0 +1,378 @@
+{#
+    Karton-Pack-UI für Aufträge
+    Ermöglicht Drag&Drop Zuweisung von Artikeln zu Kartons
+
+    Verwendung: {% include 'orders/includes/packing_ui.html' %}
+    Voraussetzung: order Objekt muss verfügbar sein
+#}
+
+<div class="card mb-4" id="packing-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">
+            <i class="bi bi-box-seam"></i> Verpackung
+            {% if order.packing_lists.count() > 0 %}
+            <span class="badge bg-info ms-2">{{ order.packing_lists.count() }} Packliste(n)</span>
+            {% endif %}
+        </h6>
+        <div>
+            <button type="button" class="btn btn-sm btn-success" onclick="createPackingList()">
+                <i class="bi bi-plus-lg"></i> Neue Packliste
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        {% if order.workflow_status == 'packing' or order.workflow_status == 'ready_to_ship' %}
+
+        <div class="row">
+            <!-- Linke Seite: Zu verpackende Artikel -->
+            <div class="col-md-5">
+                <h6 class="text-muted mb-3">
+                    <i class="bi bi-inbox"></i> Zu verpacken
+                </h6>
+                <div id="unpacked-items" class="packing-zone border rounded p-2" style="min-height: 300px;">
+                    {% for item in order.items %}
+                    {% for i in range(item.quantity) %}
+                    <div class="packing-item mb-2 p-2 border rounded bg-white"
+                         draggable="true"
+                         data-item-id="{{ item.id }}"
+                         data-index="{{ i + 1 }}"
+                         ondragstart="dragStart(event)"
+                         ondragend="dragEnd(event)">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ item.article.name if item.article else 'Artikel' }}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    {{ item.textile_size or '-' }} | {{ item.textile_color or '-' }}
+                                </small>
+                            </div>
+                            <span class="badge bg-secondary">{{ i + 1 }}/{{ item.quantity }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Rechte Seite: Kartons -->
+            <div class="col-md-7">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="text-muted mb-0">
+                        <i class="bi bi-box"></i> Kartons
+                    </h6>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addCarton()">
+                        <i class="bi bi-plus"></i> Karton hinzufügen
+                    </button>
+                </div>
+
+                <div id="cartons-container">
+                    <!-- Karton 1 -->
+                    <div class="carton-box mb-3" data-carton="1">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-box-fill"></i> Karton 1</span>
+                                <span class="badge bg-light text-dark carton-count">0 Stück</span>
+                            </div>
+                            <div class="card-body carton-dropzone p-2"
+                                 style="min-height: 150px;"
+                                 ondragover="dragOver(event)"
+                                 ondragleave="dragLeave(event)"
+                                 ondrop="drop(event)">
+                                <p class="text-muted text-center mb-0 empty-hint">
+                                    <i class="bi bi-arrow-down-circle"></i> Artikel hierher ziehen
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Versandart -->
+                <div class="card bg-light mt-3">
+                    <div class="card-body p-3">
+                        <div class="row align-items-center">
+                            <div class="col-md-6">
+                                <label class="form-label mb-0">Versandart:</label>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="btn-group w-100" role="group">
+                                    <input type="radio" class="btn-check" name="deliveryType" id="pickup" value="pickup"
+                                           {% if order.delivery_type == 'pickup' %}checked{% endif %}>
+                                    <label class="btn btn-outline-success" for="pickup">
+                                        <i class="bi bi-shop"></i> Abholung
+                                    </label>
+
+                                    <input type="radio" class="btn-check" name="deliveryType" id="shipping" value="shipping"
+                                           {% if order.delivery_type == 'shipping' %}checked{% endif %}>
+                                    <label class="btn btn-outline-primary" for="shipping">
+                                        <i class="bi bi-truck"></i> Versand
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Aktions-Buttons -->
+        <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+            <button type="button" class="btn btn-outline-secondary" onclick="printPackingList()">
+                <i class="bi bi-printer"></i> Packliste drucken
+            </button>
+            <div>
+                <button type="button" class="btn btn-primary" onclick="savePackingState()">
+                    <i class="bi bi-save"></i> Speichern
+                </button>
+                <button type="button" class="btn btn-success" onclick="completePackaging()">
+                    <i class="bi bi-check2-all"></i> Verpackung abschließen
+                </button>
+            </div>
+        </div>
+
+        {% elif order.packing_lists.count() > 0 %}
+        <!-- Bestehende Packlisten anzeigen -->
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>Packliste</th>
+                    <th>Karton</th>
+                    <th>Status</th>
+                    <th>Erstellt</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pl in order.packing_lists %}
+                <tr>
+                    <td><a href="{{ url_for('packing_lists.show', packing_list_id=pl.id) }}">{{ pl.packing_list_number }}</a></td>
+                    <td>{{ pl.carton_label or 'Karton ' + pl.carton_number|string }}</td>
+                    <td>
+                        <span class="badge bg-{{ pl.get_status_color() }}">
+                            {{ pl.get_status_label() }}
+                        </span>
+                    </td>
+                    <td>{{ pl.created_at.strftime('%d.%m.%Y') if pl.created_at else '-' }}</td>
+                    <td>
+                        <a href="{{ url_for('packing_lists.print', packing_list_id=pl.id) }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                            <i class="bi bi-printer"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            <i class="bi bi-box-seam fs-1"></i>
+            <p class="mt-2">Verpackung noch nicht gestartet.</p>
+            {% if order.workflow_status == 'in_production' %}
+            <p class="small">Verpackung kann nach Abschluss der Produktion erfolgen.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.packing-zone {
+    background: #f8f9fa;
+}
+.packing-item {
+    cursor: move;
+    transition: all 0.2s;
+}
+.packing-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.packing-item.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+.carton-dropzone {
+    background: #fff;
+    transition: all 0.2s;
+}
+.carton-dropzone.drag-over {
+    background: #e7f3ff;
+    border: 2px dashed #0d6efd !important;
+}
+.carton-dropzone .empty-hint {
+    color: #adb5bd;
+}
+.carton-dropzone:not(:empty) .empty-hint {
+    display: none;
+}
+</style>
+
+<script>
+let cartonCount = 1;
+
+function dragStart(e) {
+    e.target.classList.add('dragging');
+    e.dataTransfer.setData('text/plain', e.target.outerHTML);
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function dragEnd(e) {
+    e.target.classList.remove('dragging');
+}
+
+function dragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+}
+
+function dragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+}
+
+function drop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+
+    const itemHtml = e.dataTransfer.getData('text/plain');
+
+    // Entferne das ursprüngliche Element
+    const dragging = document.querySelector('.dragging');
+    if (dragging) {
+        dragging.remove();
+    }
+
+    // Füge zum Karton hinzu
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = itemHtml;
+    const newItem = tempDiv.firstElementChild;
+    newItem.classList.remove('dragging');
+
+    e.currentTarget.appendChild(newItem);
+
+    // Aktualisiere Karton-Zähler
+    updateCartonCounts();
+}
+
+function addCarton() {
+    cartonCount++;
+    const container = document.getElementById('cartons-container');
+
+    const cartonHtml = `
+        <div class="carton-box mb-3" data-carton="${cartonCount}">
+            <div class="card">
+                <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-box-fill"></i> Karton ${cartonCount}</span>
+                    <div>
+                        <span class="badge bg-light text-dark carton-count">0 Stück</span>
+                        <button type="button" class="btn btn-sm btn-outline-light ms-2" onclick="removeCarton(this)">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body carton-dropzone p-2"
+                     style="min-height: 150px;"
+                     ondragover="dragOver(event)"
+                     ondragleave="dragLeave(event)"
+                     ondrop="drop(event)">
+                    <p class="text-muted text-center mb-0 empty-hint">
+                        <i class="bi bi-arrow-down-circle"></i> Artikel hierher ziehen
+                    </p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', cartonHtml);
+}
+
+function removeCarton(btn) {
+    const cartonBox = btn.closest('.carton-box');
+    const items = cartonBox.querySelectorAll('.packing-item');
+
+    // Verschiebe Items zurück zu "Zu verpacken"
+    const unpacked = document.getElementById('unpacked-items');
+    items.forEach(item => unpacked.appendChild(item));
+
+    cartonBox.remove();
+    updateCartonCounts();
+}
+
+function updateCartonCounts() {
+    document.querySelectorAll('.carton-box').forEach(carton => {
+        const count = carton.querySelectorAll('.packing-item').length;
+        carton.querySelector('.carton-count').textContent = count + ' Stück';
+    });
+}
+
+function savePackingState() {
+    const cartons = [];
+
+    document.querySelectorAll('.carton-box').forEach(carton => {
+        const items = [];
+        carton.querySelectorAll('.packing-item').forEach(item => {
+            items.push({
+                item_id: item.dataset.itemId,
+                index: item.dataset.index
+            });
+        });
+
+        if (items.length > 0) {
+            cartons.push({
+                carton_number: carton.dataset.carton,
+                items: items
+            });
+        }
+    });
+
+    const deliveryType = document.querySelector('input[name="deliveryType"]:checked')?.value || 'pickup';
+
+    fetch('/orders/{{ order.id }}/save-packing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            cartons: cartons,
+            delivery_type: deliveryType
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Verpackung gespeichert!');
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+function completePackaging() {
+    const unpacked = document.getElementById('unpacked-items');
+    if (unpacked.querySelectorAll('.packing-item').length > 0) {
+        alert('Es sind noch Artikel unverpackt!');
+        return;
+    }
+
+    if (!confirm('Verpackung abschließen? Der Status wird auf "Versandbereit" gesetzt.')) {
+        return;
+    }
+
+    savePackingState();
+
+    fetch('/orders/{{ order.id }}/complete-packing', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+function printPackingList() {
+    window.open('/orders/{{ order.id }}/print-packing-list', '_blank');
+}
+
+function createPackingList() {
+    window.location.href = '/packing_lists/new?order_id={{ order.id }}';
+}
+</script>

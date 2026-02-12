@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Design bearbeiten' if mode == 'edit' else 'Neues Design' }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <!-- Header -->
+            <div class="mb-4">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item"><a href="{{ url_for('designs.index') }}">Design-Archiv</a></li>
+                        <li class="breadcrumb-item active">{{ 'Bearbeiten' if mode == 'edit' else 'Neu' }}</li>
+                    </ol>
+                </nav>
+                <h1 class="h3">{{ 'Design bearbeiten' if mode == 'edit' else 'Neues Design anlegen' }}</h1>
+            </div>
+
+            <form method="POST" enctype="multipart/form-data">
+                <!-- Basis-Informationen -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Basis-Informationen</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <label class="form-label">Name <span class="text-danger">*</span></label>
+                                <input type="text" name="name" class="form-control" required
+                                       value="{{ design.name if design else '' }}"
+                                       placeholder="z.B. Firmenlogo XY GmbH">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Design-Typ <span class="text-danger">*</span></label>
+                                <select name="design_type" class="form-select" id="designType" 
+                                        {{ 'disabled' if mode == 'edit' }}>
+                                    <option value="embroidery" {{ 'selected' if not design or design.design_type == 'embroidery' }}>🧵 Stickerei</option>
+                                    <option value="print" {{ 'selected' if design and design.design_type == 'print' }}>🖨️ Druck</option>
+                                    <option value="dtf" {{ 'selected' if design and design.design_type == 'dtf' }}>🎨 DTF</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Beschreibung</label>
+                                <textarea name="description" class="form-control" rows="2"
+                                          placeholder="Kurze Beschreibung des Designs...">{{ design.description if design else '' }}</textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Kategorie</label>
+                                <input type="text" name="category" class="form-control"
+                                       value="{{ design.category if design else '' }}"
+                                       placeholder="z.B. Logo, Schriftzug, Motiv">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Tags (kommagetrennt)</label>
+                                <input type="text" name="tags" class="form-control"
+                                       value="{{ design.get_tags()|join(', ') if design else '' }}"
+                                       placeholder="z.B. Logo, Firma, Brust">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kunde & Quelle -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Kunde & Herkunft</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Kunde</label>
+                                <select name="customer_id" class="form-select">
+                                    <option value="">-- Kein Kunde (Eigendesign) --</option>
+                                    {% for customer in customers %}
+                                    <option value="{{ customer.id }}" 
+                                            {{ 'selected' if design and design.customer_id == customer.id }}>
+                                        {{ customer.display_name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Quelle</label>
+                                <select name="source" class="form-select">
+                                    <option value="customer" {{ 'selected' if not design or design.source == 'customer' }}>Kundenvorlage</option>
+                                    <option value="internal" {{ 'selected' if design and design.source == 'internal' }}>Eigendesign</option>
+                                    <option value="external_order" {{ 'selected' if design and design.source == 'external_order' }}>Extern erstellt</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input type="checkbox" name="is_customer_design" class="form-check-input" id="isCustomerDesign"
+                                           {{ 'checked' if not design or design.is_customer_design }}>
+                                    <label class="form-check-label" for="isCustomerDesign">
+                                        Kundenspezifisches Design (nur für diesen Kunden verwendbar)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Datei-Upload (nur bei Neuanlage) -->
+                {% if mode == 'new' %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Design-Datei</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Datei hochladen</label>
+                            <input type="file" name="design_file" class="form-control"
+                                   accept=".dst,.emb,.pes,.jef,.exp,.vp3,.hus,.pdf,.ai,.eps,.svg,.png,.jpg,.jpeg,.tiff">
+                            <div class="form-text">
+                                Stickerei: DST, EMB, PES, JEF, EXP, VP3, HUS<br>
+                                Druck/DTF: PDF, AI, EPS, SVG, PNG, JPG, TIFF
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Stickerei-Spezifikationen -->
+                <div class="card mb-4" id="embroiderySpecs">
+                    <div class="card-header">
+                        <h6 class="mb-0">🧵 Stickerei-Spezifikationen</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Breite (mm)</label>
+                                <input type="number" name="width_mm" class="form-control" step="0.1"
+                                       value="{{ design.width_mm if design else '' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Höhe (mm)</label>
+                                <input type="number" name="height_mm" class="form-control" step="0.1"
+                                       value="{{ design.height_mm if design else '' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Stichzahl</label>
+                                <input type="number" name="stitch_count" class="form-control"
+                                       value="{{ design.stitch_count if design else '' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Farbwechsel</label>
+                                <input type="number" name="color_changes" class="form-control"
+                                       value="{{ design.color_changes if design else '' }}">
+                            </div>
+                        </div>
+                        <div class="alert alert-info mt-3 mb-0">
+                            <i class="bi bi-info-circle"></i> 
+                            Bei DST-Dateien werden diese Werte automatisch aus der Datei ausgelesen.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Druck-Spezifikationen -->
+                <div class="card mb-4" id="printSpecs" style="display: none;">
+                    <div class="card-header">
+                        <h6 class="mb-0">🖨️ Druck-Spezifikationen</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Breite (cm)</label>
+                                <input type="number" name="print_width_cm" class="form-control" step="0.1"
+                                       value="{{ design.print_width_cm if design else '' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Höhe (cm)</label>
+                                <input type="number" name="print_height_cm" class="form-control" step="0.1"
+                                       value="{{ design.print_height_cm if design else '' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">DPI</label>
+                                <input type="number" name="dpi" class="form-control"
+                                       value="{{ design.dpi if design else '300' }}">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Farbmodus</label>
+                                <select name="color_mode" class="form-select">
+                                    <option value="cmyk" {{ 'selected' if not design or design.color_mode == 'cmyk' }}>CMYK</option>
+                                    <option value="rgb" {{ 'selected' if design and design.color_mode == 'rgb' }}>RGB</option>
+                                    <option value="pantone" {{ 'selected' if design and design.color_mode == 'pantone' }}>Pantone</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Druckmethode</label>
+                                <select name="print_method" class="form-select">
+                                    <option value="">-- Nicht festgelegt --</option>
+                                    <option value="siebdruck" {{ 'selected' if design and design.print_method == 'siebdruck' }}>Siebdruck</option>
+                                    <option value="digital" {{ 'selected' if design and design.print_method == 'digital' }}>Digitaldruck</option>
+                                    <option value="transfer" {{ 'selected' if design and design.print_method == 'transfer' }}>Transfer</option>
+                                    <option value="dtf" {{ 'selected' if design and design.print_method == 'dtf' }}>DTF</option>
+                                    <option value="sublimation" {{ 'selected' if design and design.print_method == 'sublimation' }}>Sublimation</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status & Qualität (nur bei Bearbeitung) -->
+                {% if mode == 'edit' %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h6 class="mb-0">Status & Qualität</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Status</label>
+                                <select name="status" class="form-select">
+                                    <option value="active" {{ 'selected' if design.status == 'active' }}>Aktiv</option>
+                                    <option value="draft" {{ 'selected' if design.status == 'draft' }}>Entwurf</option>
+                                    <option value="archived" {{ 'selected' if design.status == 'archived' }}>Archiviert</option>
+                                    <option value="needs_revision" {{ 'selected' if design.status == 'needs_revision' }}>Überarbeitung nötig</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Qualitätsbewertung</label>
+                                <select name="quality_rating" class="form-select">
+                                    <option value="">-- Nicht bewertet --</option>
+                                    <option value="5" {{ 'selected' if design.quality_rating == 5 }}>⭐⭐⭐⭐⭐ Ausgezeichnet</option>
+                                    <option value="4" {{ 'selected' if design.quality_rating == 4 }}>⭐⭐⭐⭐ Gut</option>
+                                    <option value="3" {{ 'selected' if design.quality_rating == 3 }}>⭐⭐⭐ Mittel</option>
+                                    <option value="2" {{ 'selected' if design.quality_rating == 2 }}>⭐⭐ Verbesserungswürdig</option>
+                                    <option value="1" {{ 'selected' if design.quality_rating == 1 }}>⭐ Mangelhaft</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Notizen zur Qualität</label>
+                                <input type="text" name="quality_notes" class="form-control"
+                                       value="{{ design.quality_notes or '' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Buttons -->
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('designs.index') }}" class="btn btn-secondary">
+                        <i class="bi bi-x-lg"></i> Abbrechen
+                    </a>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg"></i> {{ 'Speichern' if mode == 'edit' else 'Design anlegen' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const designType = document.getElementById('designType');
+    const embroiderySpecs = document.getElementById('embroiderySpecs');
+    const printSpecs = document.getElementById('printSpecs');
+    
+    function toggleSpecs() {
+        const type = designType.value;
+        if (type === 'embroidery') {
+            embroiderySpecs.style.display = 'block';
+            printSpecs.style.display = 'none';
+        } else {
+            embroiderySpecs.style.display = 'none';
+            printSpecs.style.display = 'block';
+        }
+    }
+    
+    designType.addEventListener('change', toggleSpecs);
+    toggleSpecs();
+});
+</script>
+{% endblock %}

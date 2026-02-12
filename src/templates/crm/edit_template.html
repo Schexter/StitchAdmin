@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}{% if is_new %}Neue Vorlage{% else %}Vorlage bearbeiten{% endif %} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1>
+                <i class="bi bi-file-earmark-text"></i>
+                {% if is_new %}Neue E-Mail-Vorlage{% else %}Vorlage bearbeiten{% endif %}
+            </h1>
+        </div>
+        <a href="{{ url_for('crm.email_templates') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Zurueck
+        </a>
+    </div>
+
+    <form method="POST">
+        <div class="row">
+            <div class="col-md-8">
+                <!-- Basis-Einstellungen -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-gear"></i> Basis-Einstellungen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label for="name" class="form-label">Name der Vorlage *</label>
+                                    <input type="text" class="form-control" id="name" name="name"
+                                           value="{{ template.name if template else '' }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="category" class="form-label">Kategorie *</label>
+                                    <select class="form-select" id="category" name="category" required>
+                                        {% for cat in categories %}
+                                        <option value="{{ cat.value }}"
+                                                {% if template and template.category == cat %}selected{% endif %}>
+                                            {{ cat.value|replace('_', ' ')|title }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Beschreibung</label>
+                            <input type="text" class="form-control" id="description" name="description"
+                                   value="{{ template.description if template else '' }}"
+                                   placeholder="Kurze Beschreibung wofuer diese Vorlage verwendet wird">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="is_active" name="is_active"
+                                           {% if not template or template.is_active %}checked{% endif %}>
+                                    <label class="form-check-label" for="is_active">
+                                        Vorlage ist aktiv
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="is_default" name="is_default"
+                                           {% if template and template.is_default %}checked{% endif %}>
+                                    <label class="form-check-label" for="is_default">
+                                        Standard fuer diese Kategorie
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- E-Mail-Inhalt -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-envelope-paper"></i> E-Mail-Inhalt</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">Betreff *</label>
+                            <input type="text" class="form-control" id="subject" name="subject"
+                                   value="{{ template.subject if template else '' }}" required
+                                   placeholder="z.B. Auftragsbestaetigung - {auftragsnummer}">
+                            <small class="text-muted">Platzhalter wie {auftragsnummer} werden automatisch ersetzt</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="body_html" class="form-label">E-Mail-Text (HTML)</label>
+                            <textarea class="form-control" id="body_html" name="body_html" rows="15"
+                                      style="font-family: monospace; font-size: 13px;">{{ template.body_html if template else '' }}</textarea>
+                            <small class="text-muted">HTML-Format fuer formatierte E-Mails</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="body_text" class="form-label">E-Mail-Text (Plain Text)</label>
+                            <textarea class="form-control" id="body_text" name="body_text" rows="8"
+                                      style="font-family: monospace;">{{ template.body_text if template else '' }}</textarea>
+                            <small class="text-muted">Optional: Wird verwendet wenn HTML nicht unterstuetzt wird</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rechte Spalte -->
+            <div class="col-md-4">
+                <!-- Platzhalter -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-braces"></i> Platzhalter</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="placeholders" class="form-label">Verfuegbare Platzhalter</label>
+                            <input type="text" class="form-control" id="placeholders" name="placeholders"
+                                   value="{{ template.get_placeholders()|join(', ') if template else '' }}"
+                                   placeholder="anrede, kunde_name, firma, ...">
+                            <small class="text-muted">Komma-getrennt</small>
+                        </div>
+
+                        <hr>
+
+                        <p class="small mb-2"><strong>Standard-Platzhalter:</strong></p>
+                        <div class="small">
+                            <p class="mb-1"><strong>Kunde:</strong></p>
+                            <ul class="list-unstyled ms-3 mb-2">
+                                <li><code>{anrede}</code> - Herr/Frau</li>
+                                <li><code>{kunde_name}</code> - Vollstaendiger Name</li>
+                                <li><code>{firma}</code> - Firmenname</li>
+                            </ul>
+
+                            <p class="mb-1"><strong>Auftrag:</strong></p>
+                            <ul class="list-unstyled ms-3 mb-2">
+                                <li><code>{auftragsnummer}</code></li>
+                                <li><code>{auftragsdatum}</code></li>
+                                <li><code>{gesamtbetrag}</code></li>
+                            </ul>
+
+                            <p class="mb-1"><strong>Versand:</strong></p>
+                            <ul class="list-unstyled ms-3 mb-2">
+                                <li><code>{versanddienstleister}</code></li>
+                                <li><code>{sendungsnummer}</code></li>
+                                <li><code>{tracking_link}</code></li>
+                            </ul>
+
+                            <p class="mb-1"><strong>Rechnung:</strong></p>
+                            <ul class="list-unstyled ms-3 mb-0">
+                                <li><code>{rechnungsnummer}</code></li>
+                                <li><code>{betrag}</code></li>
+                                <li><code>{faelligkeitsdatum}</code></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vorschau -->
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-eye"></i> Vorschau</h5>
+                    </div>
+                    <div class="card-body">
+                        <button type="button" class="btn btn-outline-primary w-100" onclick="previewTemplate()">
+                            <i class="bi bi-play"></i> Vorschau anzeigen
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Speichern -->
+        <div class="row">
+            <div class="col-md-8">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-lg"></i> Speichern
+                    </button>
+                    <a href="{{ url_for('crm.email_templates') }}" class="btn btn-outline-secondary btn-lg">
+                        Abbrechen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function previewTemplate() {
+    const subject = document.getElementById('subject').value;
+    const body = document.getElementById('body_html').value || document.getElementById('body_text').value;
+
+    // Beispiel-Platzhalter ersetzen
+    const examples = {
+        anrede: 'Herr',
+        kunde_name: 'Max Mustermann',
+        firma: 'Muster GmbH',
+        auftragsnummer: 'A2025-001',
+        auftragsdatum: '15.01.2025',
+        gesamtbetrag: '150,00 EUR',
+        versanddienstleister: 'DHL',
+        sendungsnummer: '123456789',
+        tracking_link: 'https://tracking.dhl.de/123456789',
+        rechnungsnummer: 'RE-202501-0001',
+        betrag: '150,00 EUR',
+        faelligkeitsdatum: '29.01.2025'
+    };
+
+    let previewSubject = subject;
+    let previewBody = body;
+
+    for (const [key, value] of Object.entries(examples)) {
+        previewSubject = previewSubject.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+        previewBody = previewBody.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    }
+
+    const previewWindow = window.open('', 'Vorschau', 'width=700,height=600');
+    previewWindow.document.write(`
+        <html>
+        <head>
+            <title>E-Mail Vorschau</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+                .email-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto; }
+                .subject { font-size: 18px; font-weight: bold; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+            </style>
+        </head>
+        <body>
+            <div class="email-container">
+                <div class="subject">${previewSubject}</div>
+                <div class="body">${previewBody}</div>
+            </div>
+        </body>
+        </html>
+    `);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Lieferschein {{ lieferschein.dokument_nummer }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('lieferscheine.index') }}">Lieferscheine</a></li>
+                    <li class="breadcrumb-item active">{{ lieferschein.dokument_nummer }}</li>
+                </ol>
+            </nav>
+            <h2 class="mb-1">
+                <i class="fas fa-truck text-primary me-2"></i>
+                Lieferschein {{ lieferschein.dokument_nummer }}
+            </h2>
+            <div class="d-flex align-items-center gap-3">
+                {% if lieferschein.status == 'entwurf' %}
+                <span class="badge bg-warning text-dark fs-6">📦 Offen</span>
+                {% elif lieferschein.status == 'geliefert' %}
+                <span class="badge bg-success fs-6">✅ Ausgeliefert</span>
+                {% elif lieferschein.status == 'teilgeliefert' %}
+                <span class="badge bg-info fs-6">📬 Teilgeliefert</span>
+                {% elif lieferschein.status == 'storniert' %}
+                <span class="badge bg-dark fs-6">🚫 Storniert</span>
+                {% endif %}
+                
+                {% if vorgaenger_auftrag %}
+                <small class="text-muted">
+                    aus Auftrag: <a href="{{ url_for('auftraege.show', id=vorgaenger_auftrag.id) }}">{{ vorgaenger_auftrag.dokument_nummer }}</a>
+                </small>
+                {% endif %}
+            </div>
+        </div>
+        <div class="btn-group">
+            <a href="{{ url_for('lieferscheine.pdf_vorschau', id=lieferschein.id) }}" class="btn btn-outline-secondary" target="_blank">
+                <i class="fas fa-file-pdf me-1"></i> PDF
+            </a>
+            <a href="{{ url_for('lieferscheine.pdf_generieren', id=lieferschein.id) }}" class="btn btn-outline-secondary">
+                <i class="fas fa-download me-1"></i> Download
+            </a>
+            {% if lieferschein.status == 'entwurf' %}
+            <a href="{{ url_for('lieferscheine.bearbeiten', id=lieferschein.id) }}" class="btn btn-warning">
+                <i class="fas fa-edit me-1"></i> Bearbeiten
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Lieferadresse -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Lieferadresse</h5>
+                </div>
+                <div class="card-body">
+                    {% if lieferschein.lieferadresse %}
+                    <h5>{{ lieferschein.lieferadresse.get('company', '') or lieferschein.lieferadresse.get('name', '') }}</h5>
+                    {% if lieferschein.lieferadresse.get('contact') %}
+                    <p class="mb-1">{{ lieferschein.lieferadresse.get('contact') }}</p>
+                    {% endif %}
+                    <p class="mb-0 text-muted">
+                        {{ lieferschein.lieferadresse.get('street', '') }} {{ lieferschein.lieferadresse.get('house_number', '') }}<br>
+                        {{ lieferschein.lieferadresse.get('postal_code', '') }} {{ lieferschein.lieferadresse.get('city', '') }}
+                    </p>
+                    {% elif lieferschein.kunde %}
+                    <h5>{{ lieferschein.kunde.display_name }}</h5>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Positionen -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-boxes me-2"></i>Lieferpositionen</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">Pos.</th>
+                                    <th>Artikelnr.</th>
+                                    <th>Bezeichnung</th>
+                                    <th class="text-center" style="width: 100px;">Menge</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pos in lieferschein.positionen %}
+                                <tr>
+                                    <td class="text-muted">{{ pos.position }}</td>
+                                    <td><code>{{ pos.artikelnummer or '-' }}</code></td>
+                                    <td>
+                                        <strong>{{ pos.bezeichnung }}</strong>
+                                        {% if pos.beschreibung %}
+                                        <br><small class="text-muted">{{ pos.beschreibung }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <strong>{{ pos.menge|int }}</strong> {{ pos.einheit }}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4">Keine Positionen</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verknüpfte Rechnungen -->
+            {% if rechnungen %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Rechnungen</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        {% for re in rechnungen %}
+                        <li>
+                            <a href="{{ url_for('rechnungen.show', id=re.id) }}">
+                                <i class="fas fa-file-invoice-dollar me-1"></i> {{ re.dokument_nummer }}
+                            </a>
+                            <small class="text-muted ms-2">({{ "%.2f"|format(re.summe_brutto or 0) }} €)</small>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Aktionen -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Aktionen</h5>
+                </div>
+                <div class="card-body">
+                    {% if lieferschein.status == 'entwurf' %}
+                    <form method="POST" action="{{ url_for('lieferscheine.ausliefern', id=lieferschein.id) }}" class="mb-2">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-check me-1"></i> Als ausgeliefert markieren
+                        </button>
+                    </form>
+                    <hr>
+                    <form method="POST" action="{{ url_for('lieferscheine.stornieren', id=lieferschein.id) }}"
+                          onsubmit="return confirm('Lieferschein wirklich stornieren?')">
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="fas fa-ban me-1"></i> Stornieren
+                        </button>
+                    </form>
+                    
+                    {% elif lieferschein.status == 'geliefert' %}
+                    {% if not rechnungen %}
+                    <form method="POST" action="{{ url_for('lieferscheine.rechnung_erstellen', id=lieferschein.id) }}">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-file-invoice-dollar me-1"></i> Rechnung erstellen
+                        </button>
+                    </form>
+                    {% else %}
+                    <p class="text-success text-center mb-0">
+                        <i class="fas fa-check-circle me-1"></i> Rechnung erstellt
+                    </p>
+                    {% endif %}
+                    
+                    {% else %}
+                    <p class="text-muted text-center mb-0">Keine Aktionen verfügbar</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Info -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Erstellt am:</td>
+                            <td>{{ lieferschein.dokument_datum.strftime('%d.%m.%Y') }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Lieferdatum:</td>
+                            <td>{{ lieferschein.lieferdatum.strftime('%d.%m.%Y') if lieferschein.lieferdatum else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Versandart:</td>
+                            <td>
+                                {% if lieferschein.versandart == 'versand' %}📦 Versand
+                                {% elif lieferschein.versandart == 'abholung' %}🏃 Abholung
+                                {% elif lieferschein.versandart == 'spedition' %}🚛 Spedition
+                                {% else %}{{ lieferschein.versandart or '-' }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if lieferschein.tracking_nummer %}
+                        <tr>
+                            <td class="text-muted">Sendungsnr.:</td>
+                            <td><code>{{ lieferschein.tracking_nummer }}</code></td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">Erstellt von:</td>
+                            <td>{{ lieferschein.erstellt_von or '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            {% if lieferschein.interne_notiz %}
+            <div class="card shadow-sm border-warning">
+                <div class="card-header bg-warning bg-opacity-25">
+                    <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Interne Notiz</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ lieferschein.interne_notiz }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

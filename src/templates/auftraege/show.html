@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+{% block title %}Auftragsbestätigung {{ auftrag.dokument_nummer }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-2">
+                    <li class="breadcrumb-item"><a href="{{ url_for('auftraege.index') }}">Auftragsbestätigungen</a></li>
+                    <li class="breadcrumb-item active">{{ auftrag.dokument_nummer }}</li>
+                </ol>
+            </nav>
+            <h2 class="mb-1">
+                <i class="fas fa-file-contract text-primary me-2"></i>
+                AB {{ auftrag.dokument_nummer }}
+            </h2>
+            <div class="d-flex align-items-center gap-3">
+                {% if auftrag.status == 'entwurf' %}
+                <span class="badge bg-secondary fs-6">📝 Entwurf</span>
+                {% elif auftrag.status == 'versendet' %}
+                <span class="badge bg-info fs-6">📤 Versendet</span>
+                {% elif auftrag.status == 'in_bearbeitung' %}
+                <span class="badge bg-warning text-dark fs-6">⚙️ In Bearbeitung</span>
+                {% elif auftrag.status == 'geliefert' %}
+                <span class="badge bg-success fs-6">✅ Geliefert</span>
+                {% elif auftrag.status == 'storniert' %}
+                <span class="badge bg-dark fs-6">🚫 Storniert</span>
+                {% endif %}
+                
+                {% if vorgaenger_angebot %}
+                <small class="text-muted">
+                    aus Angebot: <a href="{{ url_for('angebote_workflow.show', id=vorgaenger_angebot.id) }}">{{ vorgaenger_angebot.dokument_nummer }}</a>
+                </small>
+                {% endif %}
+            </div>
+        </div>
+        <div class="btn-group">
+            <a href="{{ url_for('auftraege.pdf_vorschau', id=auftrag.id) }}" 
+               class="btn btn-outline-secondary" target="_blank">
+                <i class="fas fa-file-pdf me-1"></i> PDF
+            </a>
+            <a href="{{ url_for('auftraege.pdf_generieren', id=auftrag.id) }}" 
+               class="btn btn-outline-secondary">
+                <i class="fas fa-download me-1"></i> Download
+            </a>
+            {% if auftrag.status == 'entwurf' %}
+            <a href="{{ url_for('auftraege.bearbeiten', id=auftrag.id) }}" 
+               class="btn btn-warning">
+                <i class="fas fa-edit me-1"></i> Bearbeiten
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Hauptbereich -->
+        <div class="col-lg-8">
+            <!-- Kundendaten -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-user me-2"></i>Kunde</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            {% if auftrag.kunde %}
+                            <h5>{{ auftrag.kunde.display_name }}</h5>
+                            {% if auftrag.rechnungsadresse %}
+                            <p class="mb-0">
+                                {{ auftrag.rechnungsadresse.get('street', '') }} {{ auftrag.rechnungsadresse.get('house_number', '') }}<br>
+                                {{ auftrag.rechnungsadresse.get('postal_code', '') }} {{ auftrag.rechnungsadresse.get('city', '') }}
+                            </p>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            {% if auftrag.kunde %}
+                            <table class="table table-sm table-borderless mb-0">
+                                <tr>
+                                    <td class="text-muted" style="width: 100px;">E-Mail:</td>
+                                    <td>{{ auftrag.kunde.email or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Telefon:</td>
+                                    <td>{{ auftrag.kunde.phone or '-' }}</td>
+                                </tr>
+                                {% if auftrag.kunden_referenz %}
+                                <tr>
+                                    <td class="text-muted">Referenz:</td>
+                                    <td>{{ auftrag.kunden_referenz }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if auftrag.kunden_bestellnummer %}
+                                <tr>
+                                    <td class="text-muted">Bestellung:</td>
+                                    <td>{{ auftrag.kunden_bestellnummer }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Positionen -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Positionen</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">Pos.</th>
+                                    <th>Bezeichnung</th>
+                                    <th class="text-center" style="width: 80px;">Menge</th>
+                                    <th class="text-end" style="width: 100px;">Einzelpreis</th>
+                                    <th class="text-end" style="width: 100px;">Gesamt</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pos in auftrag.positionen %}
+                                <tr>
+                                    <td class="text-muted">{{ pos.position }}</td>
+                                    <td>
+                                        <strong>{{ pos.bezeichnung }}</strong>
+                                        {% if pos.beschreibung %}
+                                        <br><small class="text-muted">{{ pos.beschreibung }}</small>
+                                        {% endif %}
+                                        {% if pos.artikelnummer %}
+                                        <br><small class="text-muted">Art.-Nr.: {{ pos.artikelnummer }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">{{ pos.menge }} {{ pos.einheit }}</td>
+                                    <td class="text-end">{{ "%.2f"|format(pos.einzelpreis_netto) }} €</td>
+                                    <td class="text-end"><strong>{{ "%.2f"|format(pos.netto_gesamt) }} €</strong></td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        Keine Positionen vorhanden
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="4" class="text-end">Zwischensumme (netto):</td>
+                                    <td class="text-end">{{ "%.2f"|format(auftrag.summe_netto or 0) }} €</td>
+                                </tr>
+                                {% if auftrag.rabatt_betrag and auftrag.rabatt_betrag > 0 %}
+                                <tr class="text-danger">
+                                    <td colspan="4" class="text-end">Rabatt ({{ auftrag.rabatt_prozent }}%):</td>
+                                    <td class="text-end">- {{ "%.2f"|format(auftrag.rabatt_betrag) }} €</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td colspan="4" class="text-end">MwSt. (19%):</td>
+                                    <td class="text-end">{{ "%.2f"|format(auftrag.summe_mwst or 0) }} €</td>
+                                </tr>
+                                <tr class="fw-bold fs-5">
+                                    <td colspan="4" class="text-end">Gesamtsumme:</td>
+                                    <td class="text-end text-success">{{ "%.2f"|format(auftrag.summe_brutto or 0) }} €</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verknüpfte Dokumente -->
+            {% if lieferscheine or rechnungen %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-link me-2"></i>Verknüpfte Dokumente</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% if lieferscheine %}
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Lieferscheine</h6>
+                            <ul class="list-unstyled mb-0">
+                                {% for ls in lieferscheine %}
+                                <li>
+                                    <a href="{{ url_for('lieferscheine.show', id=ls.id) }}">
+                                        <i class="fas fa-truck me-1"></i> {{ ls.dokument_nummer }}
+                                    </a>
+                                    <small class="text-muted">({{ ls.dokument_datum.strftime('%d.%m.%Y') }})</small>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                        {% if rechnungen %}
+                        <div class="col-md-6">
+                            <h6 class="text-muted">Rechnungen</h6>
+                            <ul class="list-unstyled mb-0">
+                                {% for re in rechnungen %}
+                                <li>
+                                    <a href="{{ url_for('rechnungen.show', id=re.id) }}">
+                                        <i class="fas fa-file-invoice-dollar me-1"></i> {{ re.dokument_nummer }}
+                                    </a>
+                                    <small class="text-muted">({{ "%.2f"|format(re.summe_brutto or 0) }} €)</small>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Seitenleiste -->
+        <div class="col-lg-4">
+            <!-- Aktionen -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-bolt me-2"></i>Aktionen</h5>
+                </div>
+                <div class="card-body">
+                    {% if auftrag.status == 'entwurf' %}
+                    <!-- Entwurf: Versenden -->
+                    <form method="POST" action="{{ url_for('auftraege.versenden', id=auftrag.id) }}" class="mb-2">
+                        <button type="submit" class="btn btn-info w-100">
+                            <i class="fas fa-paper-plane me-1"></i> Als versendet markieren
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('auftraege.in_bearbeitung', id=auftrag.id) }}" class="mb-3">
+                        <button type="submit" class="btn btn-warning w-100">
+                            <i class="fas fa-cogs me-1"></i> In Bearbeitung setzen
+                        </button>
+                    </form>
+                    <hr>
+                    <form method="POST" action="{{ url_for('auftraege.stornieren', id=auftrag.id) }}"
+                          onsubmit="return confirm('Auftrag wirklich stornieren?')">
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="fas fa-ban me-1"></i> Stornieren
+                        </button>
+                    </form>
+                    
+                    {% elif auftrag.status == 'versendet' %}
+                    <!-- Versendet: In Bearbeitung oder Folgedokumente -->
+                    <form method="POST" action="{{ url_for('auftraege.in_bearbeitung', id=auftrag.id) }}" class="mb-2">
+                        <button type="submit" class="btn btn-warning w-100">
+                            <i class="fas fa-cogs me-1"></i> In Bearbeitung setzen
+                        </button>
+                    </form>
+                    <hr>
+                    <h6 class="text-muted">Folgedokumente</h6>
+                    <form method="POST" action="{{ url_for('auftraege.lieferschein_erstellen', id=auftrag.id) }}" class="mb-2">
+                        <button type="submit" class="btn btn-outline-success w-100">
+                            <i class="fas fa-truck me-1"></i> Lieferschein erstellen
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('auftraege.rechnung_erstellen', id=auftrag.id) }}" class="mb-2">
+                        <input type="hidden" name="typ" value="rechnung">
+                        <button type="submit" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-file-invoice-dollar me-1"></i> Rechnung erstellen
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('auftraege.rechnung_erstellen', id=auftrag.id) }}">
+                        <input type="hidden" name="typ" value="anzahlung">
+                        <button type="submit" class="btn btn-outline-secondary w-100">
+                            <i class="fas fa-hand-holding-usd me-1"></i> Anzahlungsrechnung
+                        </button>
+                    </form>
+                    
+                    {% elif auftrag.status == 'in_bearbeitung' %}
+                    <!-- In Bearbeitung: Folgedokumente -->
+                    <h6 class="text-muted">Folgedokumente</h6>
+                    <form method="POST" action="{{ url_for('auftraege.lieferschein_erstellen', id=auftrag.id) }}" class="mb-2">
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-truck me-1"></i> Lieferschein erstellen
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('auftraege.rechnung_erstellen', id=auftrag.id) }}" class="mb-2">
+                        <input type="hidden" name="typ" value="rechnung">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-file-invoice-dollar me-1"></i> Rechnung erstellen
+                        </button>
+                    </form>
+                    
+                    {% elif auftrag.status == 'geliefert' %}
+                    <!-- Geliefert: Rechnung -->
+                    {% if not rechnungen %}
+                    <form method="POST" action="{{ url_for('auftraege.rechnung_erstellen', id=auftrag.id) }}">
+                        <input type="hidden" name="typ" value="rechnung">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-file-invoice-dollar me-1"></i> Rechnung erstellen
+                        </button>
+                    </form>
+                    {% else %}
+                    <p class="text-success mb-0 text-center">
+                        <i class="fas fa-check-circle me-1"></i> Rechnung erstellt
+                    </p>
+                    {% endif %}
+                    
+                    {% else %}
+                    <p class="text-muted text-center mb-0">Keine Aktionen verfügbar</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Info-Box -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Details</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Erstellt am:</td>
+                            <td>{{ auftrag.dokument_datum.strftime('%d.%m.%Y') }}</td>
+                        </tr>
+                        {% if auftrag.lieferdatum %}
+                        <tr>
+                            <td class="text-muted">Lieferdatum:</td>
+                            <td>{{ auftrag.lieferdatum.strftime('%d.%m.%Y') }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if auftrag.versendet_am %}
+                        <tr>
+                            <td class="text-muted">Versendet am:</td>
+                            <td>{{ auftrag.versendet_am.strftime('%d.%m.%Y %H:%M') }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">Erstellt von:</td>
+                            <td>{{ auftrag.erstellt_von or '-' }}</td>
+                        </tr>
+                        {% if auftrag.zahlungsbedingung %}
+                        <tr>
+                            <td class="text-muted">Zahlung:</td>
+                            <td>{{ auftrag.zahlungsbedingung.bezeichnung }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- Interne Notiz -->
+            {% if auftrag.interne_notiz %}
+            <div class="card shadow-sm border-warning">
+                <div class="card-header bg-warning bg-opacity-25">
+                    <h5 class="mb-0"><i class="fas fa-sticky-note me-2"></i>Interne Notiz</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-0">{{ auftrag.interne_notiz }}</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

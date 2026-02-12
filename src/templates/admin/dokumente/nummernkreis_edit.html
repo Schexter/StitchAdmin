@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Nummernkreis bearbeiten - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-hash"></i> Nummernkreis bearbeiten</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('settings.index') }}">Einstellungen</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('document_admin.nummernkreise_index') }}">Nummernkreise</a></li>
+                    <li class="breadcrumb-item active">{{ nk.bezeichnung or nk.belegart }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <span class="badge bg-secondary me-2">{{ nk.praefix }}</span>
+                        {{ nk.bezeichnung or nk.belegart }}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Belegart <small class="text-muted">(nicht änderbar)</small></label>
+                                    <input type="text" class="form-control" value="{{ nk.belegart }}" disabled>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label" for="bezeichnung">Bezeichnung</label>
+                                    <input type="text" class="form-control" id="bezeichnung" name="bezeichnung" 
+                                           value="{{ nk.bezeichnung or '' }}" placeholder="z.B. Rechnungen">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        <h6 class="text-muted mb-3">Format</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label" for="praefix">Präfix *</label>
+                                    <input type="text" class="form-control" id="praefix" name="praefix" 
+                                           value="{{ nk.praefix }}" maxlength="10" required
+                                           oninput="updatePreview()">
+                                    <small class="text-muted">z.B. RE, AN, LS</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label" for="trennzeichen">Trennzeichen</label>
+                                    <select class="form-select" id="trennzeichen" name="trennzeichen" onchange="updatePreview()">
+                                        <option value="-" {% if nk.trennzeichen == '-' %}selected{% endif %}>Bindestrich (-)</option>
+                                        <option value="/" {% if nk.trennzeichen == '/' %}selected{% endif %}>Schrägstrich (/)</option>
+                                        <option value="_" {% if nk.trennzeichen == '_' %}selected{% endif %}>Unterstrich (_)</option>
+                                        <option value="" {% if nk.trennzeichen == '' %}selected{% endif %}>Keines</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label" for="jahr_format">Jahr-Format</label>
+                                    <select class="form-select" id="jahr_format" name="jahr_format" onchange="updatePreview()">
+                                        <option value="YYYY" {% if nk.jahr_format == 'YYYY' %}selected{% endif %}>4-stellig (2025)</option>
+                                        <option value="YY" {% if nk.jahr_format == 'YY' %}selected{% endif %}>2-stellig (25)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label class="form-label" for="stellen">Stellen (Nummer)</label>
+                                    <select class="form-select" id="stellen" name="stellen" onchange="updatePreview()">
+                                        <option value="3" {% if nk.stellen == 3 %}selected{% endif %}>3 (001)</option>
+                                        <option value="4" {% if nk.stellen == 4 %}selected{% endif %}>4 (0001)</option>
+                                        <option value="5" {% if nk.stellen == 5 %}selected{% endif %}>5 (00001)</option>
+                                        <option value="6" {% if nk.stellen == 6 %}selected{% endif %}>6 (000001)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Vorschau -->
+                        <div class="alert alert-secondary">
+                            <strong>Vorschau:</strong>
+                            <code id="nummer-vorschau" class="fs-4 ms-2">{{ nk.vorschau_naechste() }}</code>
+                        </div>
+                        
+                        <hr>
+                        <h6 class="text-muted mb-3">Optionen</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="jahreswechsel_reset" 
+                                               name="jahreswechsel_reset" {% if nk.jahreswechsel_reset %}checked{% endif %}>
+                                        <label class="form-check-label" for="jahreswechsel_reset">
+                                            Bei Jahreswechsel auf 1 zurücksetzen
+                                        </label>
+                                    </div>
+                                    <small class="text-muted">
+                                        Empfohlen für die meisten Belegarten
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="aktiv" 
+                                               name="aktiv" {% if nk.aktiv %}checked{% endif %}>
+                                        <label class="form-check-label" for="aktiv">
+                                            Nummernkreis aktiv
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        <h6 class="text-muted mb-3">Aktuelle Nummer</h6>
+                        
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Aktuelles Jahr</label>
+                                    <input type="text" class="form-control" value="{{ nk.aktuelles_jahr }}" disabled>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Zuletzt vergeben</label>
+                                    <input type="text" class="form-control" value="{{ nk.aktuelle_nummer }}" disabled>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label" for="aktuelle_nummer">
+                                        Manuell erhöhen
+                                        <i class="bi bi-exclamation-triangle text-warning" 
+                                           title="Nur bei Bedarf - Nummer kann nur erhöht werden!"></i>
+                                    </label>
+                                    <input type="number" class="form-control" id="aktuelle_nummer" name="aktuelle_nummer" 
+                                           min="{{ nk.aktuelle_nummer + 1 }}" placeholder="Neue Nummer (höher als {{ nk.aktuelle_nummer }})">
+                                    <small class="text-muted">
+                                        GoBD: Kann nur erhöht werden, nicht verringert!
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('document_admin.nummernkreise_index') }}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Zurück
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg"></i> Speichern
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Info-Sidebar -->
+        <div class="col-lg-4">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6><i class="bi bi-info-circle"></i> Hinweise</h6>
+                    <ul class="small mb-0">
+                        <li>Die <strong>Belegart</strong> kann nicht geändert werden</li>
+                        <li>Das <strong>Präfix</strong> wird automatisch in Großbuchstaben umgewandelt</li>
+                        <li>Die <strong>aktuelle Nummer</strong> kann nur erhöht werden (GoBD)</li>
+                        <li>Bei <strong>Jahreswechsel</strong> startet die Nummerierung bei 1</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h6><i class="bi bi-clock-history"></i> Historie</h6>
+                    <small class="text-muted">
+                        <strong>Erstellt:</strong> {{ nk.erstellt_am.strftime('%d.%m.%Y %H:%M') if nk.erstellt_am else '-' }}<br>
+                        <strong>Geändert:</strong> {{ nk.geaendert_am.strftime('%d.%m.%Y %H:%M') if nk.geaendert_am else '-' }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function updatePreview() {
+    const praefix = document.getElementById('praefix').value.toUpperCase();
+    const trennzeichen = document.getElementById('trennzeichen').value;
+    const jahrFormat = document.getElementById('jahr_format').value;
+    const stellen = parseInt(document.getElementById('stellen').value);
+    
+    const jahr = jahrFormat === 'YYYY' ? '2025' : '25';
+    const nummer = '1'.padStart(stellen, '0');
+    
+    const vorschau = praefix + trennzeichen + jahr + trennzeichen + nummer;
+    document.getElementById('nummer-vorschau').textContent = vorschau;
+}
+</script>
+{% endblock %}
