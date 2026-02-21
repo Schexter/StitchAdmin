@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Automation-Logs - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-journal-text me-2"></i>Automation-Logs</h2>
+        <a href="{{ url_for('email_automation.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurueck
+        </a>
+    </div>
+
+    <!-- Filter -->
+    <div class="card mb-4">
+        <div class="card-body py-2">
+            <form method="GET" class="d-flex gap-2 align-items-center">
+                <select name="status" class="form-select form-select-sm" style="width: auto;">
+                    <option value="">Alle Status</option>
+                    <option value="sent" {% if status_filter == 'sent' %}selected{% endif %}>Gesendet</option>
+                    <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Fehler</option>
+                    <option value="skipped" {% if status_filter == 'skipped' %}selected{% endif %}>Uebersprungen</option>
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary">Filtern</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            {% if logs %}
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Regel</th>
+                            <th>Trigger</th>
+                            <th>Empfaenger</th>
+                            <th>Betreff</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td class="small text-nowrap">{{ log.sent_at.strftime('%d.%m.%Y %H:%M') if log.sent_at else '' }}</td>
+                            <td>{{ log.rule.name if log.rule else '-' }}</td>
+                            <td>
+                                <span class="badge bg-info">{{ log.trigger_event }}</span>
+                                <span class="badge bg-dark">{{ log.trigger_value }}</span>
+                            </td>
+                            <td class="small">{{ log.to_email }}</td>
+                            <td class="small">{{ log.subject|truncate(50) if log.subject else '-' }}</td>
+                            <td>
+                                {% if log.status == 'sent' %}
+                                <span class="badge bg-success">Gesendet</span>
+                                {% elif log.status == 'failed' %}
+                                <span class="badge bg-danger" title="{{ log.error_message }}">Fehler</span>
+                                {% elif log.status == 'skipped' %}
+                                <span class="badge bg-warning" title="{{ log.error_message }}">Uebersprungen</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ log.status }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-journal-text fs-1"></i>
+                <p class="mt-2">Noch keine Log-Eintraege</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

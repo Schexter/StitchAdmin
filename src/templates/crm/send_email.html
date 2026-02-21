@@ -2,6 +2,12 @@
 
 {% block title %}E-Mail an {{ customer.display_name }} - StitchAdmin{% endblock %}
 
+{% block extra_css %}
+<style>
+    .tox-tinymce { border-radius: var(--sa-radius-sm) !important; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <!-- Header -->
@@ -46,7 +52,7 @@
                         <!-- Inhalt -->
                         <div class="mb-3">
                             <label for="body" class="form-label">Nachricht</label>
-                            <textarea class="form-control" id="body" name="body" rows="12">{{ prefilled_body or '' }}</textarea>
+                            <textarea class="form-control" id="body" name="body">{{ prefilled_body or '' }}</textarea>
                             <small class="text-muted">
                                 Bei Outlook wird Ihre E-Mail-Signatur automatisch angehaengt.
                             </small>
@@ -148,15 +154,38 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block scripts %}
+<!-- TinyMCE Editor -->
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
+let emailEditor;
+
+tinymce.init({
+    selector: '#body',
+    height: 350,
+    language: 'de',
+    language_url: 'https://cdn.jsdelivr.net/npm/tinymce-i18n@24/langs6/de.min.js',
+    menubar: false,
+    plugins: 'lists link image table code',
+    toolbar: 'undo redo | bold italic underline | forecolor backcolor | alignleft aligncenter alignright | bullist numlist | link image | code',
+    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; }',
+    branding: false,
+    promotion: false,
+    resize: true,
+    convert_urls: false,
+    setup: function(editor) {
+        emailEditor = editor;
+    }
+});
+
 function loadTemplate() {
     const select = document.getElementById('templateSelect');
     const templateId = select.value;
 
     if (!templateId) return;
 
-    // Kontext-Daten sammeln
     const context = {
         anrede: '{{ "Frau" if customer.gender == "female" else "Herr" if customer.gender == "male" else "" }}',
         kunde_name: '{{ customer.display_name }}',
@@ -167,7 +196,6 @@ function loadTemplate() {
         {% endif %}
     };
 
-    // Vorlage rendern
     fetch(`/crm/api/template/${templateId}/render`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -177,14 +205,19 @@ function loadTemplate() {
     .then(data => {
         if (data.success) {
             document.getElementById('subject').value = data.subject;
-            document.getElementById('body').value = data.body_html || data.body_text;
+            const content = data.body_html || data.body_text;
+            if (emailEditor) {
+                emailEditor.setContent(content);
+            } else {
+                document.getElementById('body').value = content;
+            }
         }
     });
 }
 
 function previewEmail() {
     const subject = document.getElementById('subject').value;
-    const body = document.getElementById('body').value;
+    const body = emailEditor ? emailEditor.getContent() : document.getElementById('body').value;
 
     const previewWindow = window.open('', 'Vorschau', 'width=600,height=500');
     previewWindow.document.write(`
@@ -201,14 +234,10 @@ function previewEmail() {
     `);
 }
 
-// Vorlage beim Laden anwenden falls ausgewaehlt
 document.addEventListener('DOMContentLoaded', function() {
     const select = document.getElementById('templateSelect');
-    if (select.value) {
-        // Nur laden wenn keine prefilled-Daten
-        if (!document.getElementById('subject').value) {
-            loadTemplate();
-        }
+    if (select.value && !document.getElementById('subject').value) {
+        loadTemplate();
     }
 });
 </script>

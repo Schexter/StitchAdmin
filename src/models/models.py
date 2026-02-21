@@ -20,6 +20,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     is_active = db.Column(db.Boolean, default=True)
     is_admin = db.Column(db.Boolean, default=False)
+    is_system_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
     
@@ -69,6 +70,9 @@ class Customer(db.Model):
     postal_code = db.Column(db.String(20))
     city = db.Column(db.String(100))
     country = db.Column(db.String(100), default='Deutschland')
+
+    # Status
+    is_active = db.Column(db.Boolean, default=True)
 
     # Sonstiges
     customer_number = db.Column(db.String(50), index=True)
@@ -120,7 +124,7 @@ class Article(db.Model):
     # Produktdetails
     material = db.Column(db.String(100))
     weight = db.Column(db.Float, default=0)
-    color = db.Column(db.String(50))
+    color = db.Column(db.String(200))
     size = db.Column(db.String(50))
     
     # L-Shop Preise (Einkauf)
@@ -144,13 +148,21 @@ class Article(db.Model):
 
     # Status
     active = db.Column(db.Boolean, default=True, index=True)
-    
+
+    # Shop-Felder (öffentlicher Webshop)
+    show_in_shop = db.Column(db.Boolean, default=False, index=True)
+    shop_description = db.Column(db.Text)
+    shop_image_path = db.Column(db.String(255))
+    shop_category_id = db.Column(db.Integer, db.ForeignKey('shop_categories.id'))
+    shop_sort_order = db.Column(db.Integer, default=0)
+    shop_min_quantity = db.Column(db.Integer, default=1)
+
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(80))
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
     updated_by = db.Column(db.String(80))
-    
+
     # L-Shop spezifische Felder
     product_type = db.Column(db.String(100))
     manufacturer_number = db.Column(db.String(100))
@@ -163,6 +175,7 @@ class Article(db.Model):
     # Relationships
     order_items = db.relationship('OrderItem', backref='article', lazy='dynamic')
     variants = db.relationship('ArticleVariant', back_populates='article', lazy='dynamic', cascade='all, delete-orphan')
+    shop_category = db.relationship('ShopCategory', backref='articles')
     # article_suppliers = db.relationship('ArticleSupplier', back_populates='article', lazy='dynamic', cascade='all, delete-orphan')  # Deaktiviert - wird durch article_supplier.py definiert
     
     def get(self, key, default=None):
@@ -440,6 +453,11 @@ class Order(db.Model):
     pickup_confirmed_at = db.Column(db.DateTime)  # Wann wurde Abholung bestätigt
     pickup_signature = db.Column(db.Text)  # Base64 Signatur bei Abholung
     pickup_signature_name = db.Column(db.String(100))  # Name des Abholers
+
+    # Shop-Integration
+    source = db.Column(db.String(20), default='admin')  # admin, shop, phone
+    tracking_token = db.Column(db.String(64), unique=True, index=True)
+    customer_email_for_tracking = db.Column(db.String(255))
 
     # Archivierung
     archived_at = db.Column(db.DateTime)  # Wann wurde archiviert
@@ -1473,6 +1491,8 @@ class SupplierOrder(db.Model):
     # Bestellinformationen
     order_number = db.Column(db.String(100))
     supplier_order_number = db.Column(db.String(100))  # Bestellnummer des Lieferanten
+    purchase_order_number = db.Column(db.String(50))  # Einkaufs-Bestellnummer
+    linked_customer_orders = db.Column(db.Text)  # Verknüpfte Kundenaufträge (JSON)
     order_date = db.Column(db.Date)
     delivery_date = db.Column(db.Date)
     
@@ -1509,12 +1529,17 @@ class SupplierOrder(db.Model):
     delivery_city = db.Column(db.String(100))
     delivery_country = db.Column(db.String(100))
     
+    # Druck-Tracking
+    print_count = db.Column(db.Integer, default=0)
+    last_printed_at = db.Column(db.DateTime)
+    last_printed_by = db.Column(db.String(80))
+
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(80))
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
     updated_by = db.Column(db.String(80))
-    
+
     def get_items(self):
         """Gibt die Bestellpositionen als Liste zurück"""
         if self.items:

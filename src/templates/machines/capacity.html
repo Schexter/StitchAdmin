@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block title %}Maschinenauslastung - StitchAdmin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .heatmap-cell {
+        width: 100%;
+        height: 50px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 0.85rem;
+        transition: transform 0.15s;
+        cursor: default;
+    }
+    .heatmap-cell:hover { transform: scale(1.05); }
+    .heat-0 { background: var(--bs-light); color: var(--bs-secondary); }
+    .heat-low { background: #d4edda; color: #155724; }
+    .heat-med { background: #fff3cd; color: #856404; }
+    .heat-high { background: #f8d7da; color: #721c24; }
+    .heat-over { background: #dc3545; color: white; }
+    .progress-thin { height: 8px; border-radius: 4px; }
+    .utilization-bar { position: relative; height: 24px; border-radius: 4px; background: var(--bs-light); overflow: hidden; }
+    .utilization-fill { height: 100%; border-radius: 4px; transition: width 0.5s; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-speedometer2 me-2"></i>Maschinenauslastung</h2>
+            <p class="text-muted mb-0">Kapazitaet und Performance-Uebersicht</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('machines.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-gear me-1"></i>Maschinen
+            </a>
+            <a href="{{ url_for('production.calendar_new') }}" class="btn btn-outline-primary">
+                <i class="bi bi-calendar-week me-1"></i>Kalender
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistik-Karten -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-2">
+            <div class="card border-0 bg-primary bg-opacity-10">
+                <div class="card-body text-center py-3">
+                    <div class="fs-3 fw-bold text-primary">{{ stats.active_machines }}</div>
+                    <div class="text-muted small">Maschinen</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 bg-success bg-opacity-10">
+                <div class="card-body text-center py-3">
+                    <div class="fs-3 fw-bold text-success">{{ stats.avg_utilization }}%</div>
+                    <div class="text-muted small">Ø Auslastung</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 bg-info bg-opacity-10">
+                <div class="card-body text-center py-3">
+                    <div class="fs-3 fw-bold text-info">{{ stats.active_jobs }}</div>
+                    <div class="text-muted small">Aktive Jobs</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 bg-warning bg-opacity-10">
+                <div class="card-body text-center py-3">
+                    <div class="fs-3 fw-bold text-warning">{{ stats.pending_jobs }}</div>
+                    <div class="text-muted small">Warteschlange</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 bg-{% if stats.max_utilization > 90 %}danger{% else %}light{% endif %} bg-opacity-10">
+                <div class="card-body text-center py-3">
+                    <div class="fs-3 fw-bold">{{ stats.max_utilization }}%</div>
+                    <div class="text-muted small">Max. Auslastung</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-0 {% if stats.overbooked_slots > 0 %}bg-danger bg-opacity-10{% else %}bg-light{% endif %}">
+                <div class="card-body text-center py-3">
+                    <div class="fs-3 fw-bold {% if stats.overbooked_slots > 0 %}text-danger{% endif %}">{{ stats.overbooked_slots }}</div>
+                    <div class="text-muted small">Ueberbuchungen</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Linke Spalte: Heatmap + Auslastung -->
+        <div class="col-lg-8">
+            <!-- Wochen-Heatmap -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-grid-3x3 me-2"></i>Kapazitaets-Heatmap</h5>
+                    <div class="btn-group btn-group-sm">
+                        <a href="{{ url_for('machines.capacity', week=week_offset - 1) }}"
+                           class="btn btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+                        <a href="{{ url_for('machines.capacity', week=0) }}"
+                           class="btn btn-outline-secondary">Heute</a>
+                        <a href="{{ url_for('machines.capacity', week=week_offset + 1) }}"
+                           class="btn btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        KW {{ week_start.isocalendar()[1] }}: {{ week_start.strftime('%d.%m.') }} - {{ (week_start + timedelta(days=4)).strftime('%d.%m.%Y') }}
+                    </p>
+
+                    {% if capacity %}
+                    <div class="table-responsive">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 150px;">Maschine</th>
+                                    {% for day in weekdays %}
+                                    <th class="text-center" style="width: 16%;">
+                                        {{ day }}<br>
+                                        <small class="text-muted">{{ (week_start + timedelta(days=loop.index0)).strftime('%d.%m.') }}</small>
+                                    </th>
+                                    {% endfor %}
+                                    <th class="text-center" style="width: 80px;">Woche</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for machine_id, data in capacity.items() %}
+                                <tr>
+                                    <td class="fw-bold small">{{ data.machine.name }}</td>
+                                    {% for day_idx in range(5) %}
+                                    {% set d = data.days[day_idx] %}
+                                    <td>
+                                        <div class="heatmap-cell {% if d.overbooked %}heat-over{% elif d.pct > 80 %}heat-high{% elif d.pct > 40 %}heat-med{% elif d.pct > 0 %}heat-low{% else %}heat-0{% endif %}"
+                                             title="{{ d.scheduled_hours }}h / {{ d.available_hours }}h{% if d.jobs %} ({{ d.jobs }} Jobs){% endif %}">
+                                            {% if d.pct > 0 %}{{ d.pct }}%{% else %}-{% endif %}
+                                        </div>
+                                    </td>
+                                    {% endfor %}
+                                    <td class="text-center align-middle">
+                                        <strong>{{ data.week_pct }}%</strong>
+                                        <br><small class="text-muted">{{ data.week_total }}h</small>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-3 d-flex gap-3 small text-muted">
+                        <span><span class="badge heat-0">&nbsp;&nbsp;</span> Frei</span>
+                        <span><span class="badge heat-low">&nbsp;&nbsp;</span> &lt;40%</span>
+                        <span><span class="badge heat-med">&nbsp;&nbsp;</span> 40-80%</span>
+                        <span><span class="badge heat-high">&nbsp;&nbsp;</span> &gt;80%</span>
+                        <span><span class="badge heat-over">&nbsp;&nbsp;</span> Ueberbucht</span>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p>Keine aktiven Maschinen gefunden</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Auslastungs-Balken -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Auslastung diese Woche</h5>
+                </div>
+                <div class="card-body">
+                    {% for u in utilization %}
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold small">{{ u.machine.name }}</span>
+                            <span class="small">
+                                {{ u.scheduled_hours }}h / {{ u.available_hours }}h
+                                <strong class="ms-1 {% if u.utilization_pct > 90 %}text-danger{% elif u.utilization_pct > 70 %}text-warning{% else %}text-success{% endif %}">
+                                    {{ u.utilization_pct }}%
+                                </strong>
+                            </span>
+                        </div>
+                        <div class="utilization-bar">
+                            <div class="utilization-fill bg-{% if u.utilization_pct > 90 %}danger{% elif u.utilization_pct > 70 %}warning{% elif u.utilization_pct > 30 %}success{% else %}info{% endif %}"
+                                 style="width: {{ u.utilization_pct }}%"></div>
+                        </div>
+                        {% if u.idle_hours > 0 %}
+                        <small class="text-muted">{{ u.idle_hours }}h Leerlauf</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Rechte Spalte -->
+        <div class="col-lg-4">
+            <!-- Aktive Jobs -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-play-circle me-2"></i>Aktive Produktion</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% if current_jobs %}
+                    {% for job in current_jobs %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong class="small">{{ job.machine.name if job.machine else 'Unbekannt' }}</strong>
+                            <span class="badge bg-primary">{{ job.progress_pct }}%</span>
+                        </div>
+                        <div class="progress progress-thin mb-1">
+                            <div class="progress-bar bg-primary" style="width: {{ job.progress_pct }}%"></div>
+                        </div>
+                        <small class="text-muted">
+                            {% if job.schedule.order %}
+                            Auftrag: {{ job.schedule.order_id }}
+                            {% endif %}
+                            &middot; noch {{ job.remaining_hours }}h
+                        </small>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="list-group-item text-center text-muted py-3">
+                        <i class="bi bi-pause-circle fs-4"></i>
+                        <p class="small mt-1 mb-0">Keine aktive Produktion</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Warteschlange -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-list-ol me-2"></i>Warteschlange</h5>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% set has_queue = false %}
+                    {% for machine_id, jobs in queues.items() %}
+                    {% if jobs %}
+                    {% set has_queue = true %}
+                    <div class="list-group-item">
+                        <strong class="small text-primary">{{ jobs[0].machine.name if jobs[0].machine else machine_id }}</strong>
+                        <span class="badge bg-secondary float-end">{{ jobs|length }}</span>
+                        {% for job in jobs[:3] %}
+                        <div class="small text-muted mt-1">
+                            <i class="bi bi-clock me-1"></i>
+                            {{ job.scheduled_start.strftime('%d.%m. %H:%M') }}
+                            {% if job.order_id %} - {{ job.order_id }}{% endif %}
+                        </div>
+                        {% endfor %}
+                        {% if jobs|length > 3 %}
+                        <small class="text-muted">+{{ jobs|length - 3 }} weitere</small>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                    {% if not has_queue %}
+                    <div class="list-group-item text-center text-muted py-3">
+                        <i class="bi bi-check-circle fs-4"></i>
+                        <p class="small mt-1 mb-0">Warteschlange leer</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Schnellzugriff -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightning me-2"></i>Schnellzugriff</h5>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    <a href="{{ url_for('production.calendar_new') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-calendar-plus me-1"></i>Neuen Job planen
+                    </a>
+                    <a href="{{ url_for('machines.index') }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-gear me-1"></i>Maschinen verwalten
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

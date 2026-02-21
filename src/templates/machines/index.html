@@ -7,10 +7,15 @@
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3 mb-0">🔧 Maschinenverwaltung</h1>
-                <a href="{{ url_for('machines.new') }}" class="btn btn-success btn-touch">
-                    <i class="fas fa-plus"></i> Neue Maschine
-                </a>
+                <h1 class="h3 mb-0"><i class="bi bi-gear-wide-connected me-2"></i>Maschinenverwaltung</h1>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('machines.capacity') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-speedometer2"></i> Auslastung
+                    </a>
+                    <a href="{{ url_for('machines.new') }}" class="btn btn-success">
+                        <i class="bi bi-plus-lg"></i> Neue Maschine
+                    </a>
+                </div>
             </div>
 
             {% if machines %}

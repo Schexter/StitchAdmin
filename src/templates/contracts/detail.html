@@ -1,0 +1,406 @@
+{% extends "base.html" %}
+{% block title %}{{ contract.name }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2>
+                <i class="bi {{ contract.type_icon }} text-{{ contract.type_color }} me-2"></i>
+                {{ contract.name }}
+            </h2>
+            <p class="text-muted mb-0">
+                {{ contract.type_label }}
+                {% if contract.contract_number %} &middot; {{ contract.contract_number }}{% endif %}
+                {% if contract.provider_name %} &middot; {{ contract.provider_name }}{% endif %}
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('contracts.edit', contract_id=contract.id) }}" class="btn btn-primary">
+                <i class="bi bi-pencil me-1"></i>Bearbeiten
+            </a>
+            <a href="{{ url_for('contracts.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Zurueck
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Linke Spalte -->
+        <div class="col-lg-8">
+            <!-- Vertragsdetails -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Vertragsdetails</h5>
+                    <span class="badge bg-{% if contract.status == 'active' %}success{% elif contract.status == 'cancelled' %}danger{% elif contract.status == 'expired' %}secondary{% else %}info{% endif %} fs-6">
+                        {{ contract.status_label }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <table class="table table-borderless table-sm mb-0">
+                                <tr>
+                                    <td class="text-muted" style="width: 140px;">Typ</td>
+                                    <td><span class="badge bg-{{ contract.type_color }}">{{ contract.type_label }}</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Vertragsnr.</td>
+                                    <td>{{ contract.contract_number or '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Anbieter</td>
+                                    <td>
+                                        {{ contract.provider_name or '-' }}
+                                        {% if contract.provider_website %}
+                                        <a href="{{ contract.provider_website }}" target="_blank" class="ms-1">
+                                            <i class="bi bi-box-arrow-up-right small"></i>
+                                        </a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if contract.provider_phone %}
+                                <tr>
+                                    <td class="text-muted">Telefon</td>
+                                    <td><a href="tel:{{ contract.provider_phone }}">{{ contract.provider_phone }}</a></td>
+                                </tr>
+                                {% endif %}
+                                {% if contract.provider_email %}
+                                <tr>
+                                    <td class="text-muted">E-Mail</td>
+                                    <td><a href="mailto:{{ contract.provider_email }}">{{ contract.provider_email }}</a></td>
+                                </tr>
+                                {% endif %}
+                                {% if contract.machine %}
+                                <tr>
+                                    <td class="text-muted">Maschine</td>
+                                    <td>{{ contract.machine.name }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-borderless table-sm mb-0">
+                                <tr>
+                                    <td class="text-muted" style="width: 140px;">Beginn</td>
+                                    <td>{{ contract.start_date.strftime('%d.%m.%Y') if contract.start_date else '-' }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Ende</td>
+                                    <td>
+                                        {{ contract.end_date.strftime('%d.%m.%Y') if contract.end_date else 'Unbefristet' }}
+                                        {% if contract.days_until_end is not none and contract.days_until_end >= 0 %}
+                                        <span class="badge bg-{% if contract.days_until_end <= 30 %}warning{% else %}light text-dark{% endif %} ms-1">
+                                            {{ contract.days_until_end }} Tage
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Kuendigungsfrist</td>
+                                    <td>
+                                        {{ contract.renewal_date.strftime('%d.%m.%Y') if contract.renewal_date else '-' }}
+                                        {% if contract.is_renewal_due %}
+                                        <span class="badge bg-danger ms-1">Frist laeuft!</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Auto-Verlaengerung</td>
+                                    <td>{{ 'Ja' if contract.auto_renew else 'Nein' }}</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Betrag</td>
+                                    <td>
+                                        {% if contract.amount %}
+                                        <strong>{{ "%.2f"|format(contract.amount) }} &euro;</strong>
+                                        <span class="text-muted">{{ contract.interval_label }}</span>
+                                        {% else %}-{% endif %}
+                                    </td>
+                                </tr>
+                                {% if contract.amount %}
+                                <tr>
+                                    <td class="text-muted">Monatlich</td>
+                                    <td>{{ "%.2f"|format(contract.monthly_cost) }} &euro;</td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Jaehrlich</td>
+                                    <td>{{ "%.2f"|format(contract.yearly_cost) }} &euro;</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                    </div>
+
+                    {% if contract.contract_type == 'insurance' and (contract.coverage_amount or contract.deductible or contract.insurance_type) %}
+                    <hr>
+                    <h6 class="mb-3"><i class="bi bi-shield-check me-1"></i>Versicherungsdetails</h6>
+                    <div class="row">
+                        {% if contract.insurance_type %}
+                        <div class="col-md-4">
+                            <small class="text-muted">Versicherungsart</small>
+                            <div>{{ contract.insurance_type|capitalize }}</div>
+                        </div>
+                        {% endif %}
+                        {% if contract.coverage_amount %}
+                        <div class="col-md-4">
+                            <small class="text-muted">Deckungssumme</small>
+                            <div class="fw-bold">{{ "%.2f"|format(contract.coverage_amount) }} &euro;</div>
+                        </div>
+                        {% endif %}
+                        {% if contract.deductible %}
+                        <div class="col-md-4">
+                            <small class="text-muted">Selbstbeteiligung</small>
+                            <div>{{ "%.2f"|format(contract.deductible) }} &euro;</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    {% if contract.description %}
+                    <hr>
+                    <p class="mb-0">{{ contract.description }}</p>
+                    {% endif %}
+
+                    {% if contract.notes %}
+                    <hr>
+                    <h6 class="text-muted">Notizen</h6>
+                    <p class="mb-0">{{ contract.notes }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Kommunikationshistorie -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-chat-dots me-2"></i>Kommunikation</h5>
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#addCommForm">
+                        <i class="bi bi-plus-lg"></i> Neu
+                    </button>
+                </div>
+
+                <!-- Neuer Eintrag Formular -->
+                <div class="collapse" id="addCommForm">
+                    <div class="card-body border-bottom bg-light">
+                        <form method="POST" action="{{ url_for('contracts.add_communication', contract_id=contract.id) }}">
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Typ</label>
+                                    <select name="comm_type" class="form-select form-select-sm">
+                                        <option value="call">Telefonat</option>
+                                        <option value="email">E-Mail</option>
+                                        <option value="letter">Brief/Post</option>
+                                        <option value="meeting">Termin</option>
+                                        <option value="note" selected>Notiz</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Datum</label>
+                                    <input type="datetime-local" name="comm_date" class="form-control form-control-sm"
+                                           value="{{ now().strftime('%Y-%m-%dT%H:%M') if now is defined else '' }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Kontaktperson</label>
+                                    <select name="comm_contact_id" class="form-select form-select-sm">
+                                        <option value="">-- Keine --</option>
+                                        {% for c in contacts %}
+                                        <option value="{{ c.id }}">{{ c.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Betreff</label>
+                                    <input type="text" name="comm_subject" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Inhalt</label>
+                                    <textarea name="comm_content" class="form-control form-control-sm" rows="3"></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        <i class="bi bi-check-lg"></i> Speichern
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Liste -->
+                <div class="card-body p-0">
+                    {% if communications %}
+                    <div class="list-group list-group-flush">
+                        {% for comm in communications %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <i class="bi {{ comm.type_icon }} text-primary"></i>
+                                        <strong>{{ comm.type_label }}</strong>
+                                        {% if comm.subject %}
+                                        <span class="text-muted">&middot; {{ comm.subject }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% if comm.content %}
+                                    <p class="mb-1 small">{{ comm.content }}</p>
+                                    {% endif %}
+                                    <small class="text-muted">
+                                        {{ comm.date.strftime('%d.%m.%Y %H:%M') if comm.date else '' }}
+                                        {% if comm.contact_person %} &middot; {{ comm.contact_person.name }}{% endif %}
+                                        {% if comm.created_by %} &middot; {{ comm.created_by }}{% endif %}
+                                    </small>
+                                </div>
+                                <form method="POST" action="{{ url_for('contracts.delete_communication', comm_id=comm.id) }}"
+                                      onsubmit="return confirm('Eintrag loeschen?')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted small">
+                        <i class="bi bi-chat-dots fs-4"></i>
+                        <p class="mt-1 mb-0">Noch keine Kommunikation erfasst</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Rechte Spalte -->
+        <div class="col-lg-4">
+            <!-- Warnungen -->
+            {% if contract.is_expiring_soon or contract.is_renewal_due %}
+            <div class="alert alert-warning mb-4">
+                <h6 class="alert-heading"><i class="bi bi-exclamation-triangle me-1"></i>Achtung</h6>
+                {% if contract.is_renewal_due %}
+                <p class="mb-1">Kuendigungsfrist: <strong>{{ contract.renewal_date.strftime('%d.%m.%Y') }}</strong>
+                (noch {{ contract.days_until_renewal }} Tage)</p>
+                {% endif %}
+                {% if contract.is_expiring_soon %}
+                <p class="mb-0">Vertragsende: <strong>{{ contract.end_date.strftime('%d.%m.%Y') }}</strong>
+                (noch {{ contract.days_until_end }} Tage)</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- Ansprechpartner -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-person-lines-fill me-2"></i>Ansprechpartner</h5>
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="collapse" data-bs-target="#addContactForm">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
+
+                <!-- Neuer Kontakt Formular -->
+                <div class="collapse" id="addContactForm">
+                    <div class="card-body border-bottom bg-light">
+                        <form method="POST" action="{{ url_for('contracts.add_contact', contract_id=contract.id) }}">
+                            <div class="mb-2">
+                                <input type="text" name="contact_name" class="form-control form-control-sm"
+                                       placeholder="Name *" required>
+                            </div>
+                            <div class="mb-2">
+                                <input type="text" name="contact_position" class="form-control form-control-sm"
+                                       placeholder="Position / Abteilung">
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <input type="tel" name="contact_phone" class="form-control form-control-sm"
+                                           placeholder="Telefon">
+                                </div>
+                                <div class="col-6">
+                                    <input type="tel" name="contact_mobile" class="form-control form-control-sm"
+                                           placeholder="Mobil">
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <input type="email" name="contact_email" class="form-control form-control-sm"
+                                       placeholder="E-Mail">
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="contact_primary" id="contactPrimary">
+                                <label class="form-check-label small" for="contactPrimary">Hauptansprechpartner</label>
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-success w-100">
+                                <i class="bi bi-check-lg"></i> Hinzufuegen
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Kontakt-Liste -->
+                <div class="list-group list-group-flush">
+                    {% for contact in contacts %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ contact.name }}</strong>
+                                {% if contact.is_primary %}
+                                <span class="badge bg-primary ms-1">Haupt</span>
+                                {% endif %}
+                                {% if contact.position %}
+                                <br><small class="text-muted">{{ contact.position }}</small>
+                                {% endif %}
+                                {% if contact.phone %}
+                                <br><small><i class="bi bi-telephone me-1"></i><a href="tel:{{ contact.phone }}">{{ contact.phone }}</a></small>
+                                {% endif %}
+                                {% if contact.mobile %}
+                                <br><small><i class="bi bi-phone me-1"></i><a href="tel:{{ contact.mobile }}">{{ contact.mobile }}</a></small>
+                                {% endif %}
+                                {% if contact.email %}
+                                <br><small><i class="bi bi-envelope me-1"></i><a href="mailto:{{ contact.email }}">{{ contact.email }}</a></small>
+                                {% endif %}
+                            </div>
+                            <form method="POST" action="{{ url_for('contracts.delete_contact', contact_id=contact.id) }}"
+                                  onsubmit="return confirm('Ansprechpartner entfernen?')">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="list-group-item text-muted small text-center py-3">
+                        Keine Ansprechpartner
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Aktionen -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Aktionen</h5>
+                </div>
+                <div class="card-body d-grid gap-2">
+                    <a href="{{ url_for('contracts.edit', contract_id=contract.id) }}" class="btn btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i>Bearbeiten
+                    </a>
+                    {% if contract.provider_email %}
+                    <a href="mailto:{{ contract.provider_email }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-envelope me-1"></i>E-Mail senden
+                    </a>
+                    {% endif %}
+                    {% if contract.provider_phone %}
+                    <a href="tel:{{ contract.provider_phone }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-telephone me-1"></i>Anrufen
+                    </a>
+                    {% endif %}
+                    <form method="POST" action="{{ url_for('contracts.delete', contract_id=contract.id) }}"
+                          onsubmit="return confirm('Vertrag endgueltig loeschen? Alle Ansprechpartner und Kommunikation werden ebenfalls geloescht.')">
+                        <button type="submit" class="btn btn-outline-danger w-100">
+                            <i class="bi bi-trash me-1"></i>Loeschen
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

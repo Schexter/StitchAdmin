@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}CSV-Import{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-upload me-2"></i>CSV-Import</h2>
+    </div>
+
+    <div class="row g-4">
+        <!-- Upload-Formular -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-arrow-up me-2"></i>Datei hochladen</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('csv_import.upload') }}" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label">Import-Typ</label>
+                            <select name="import_type" class="form-select" required>
+                                <option value="">-- Bitte waehlen --</option>
+                                {% for key, label in import_types.items() %}
+                                <option value="{{ key }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">CSV-Datei</label>
+                            <input type="file" name="file" class="form-control" accept=".csv,.txt,.tsv" required>
+                            <div class="form-text">Unterstuetzte Formate: CSV, TXT, TSV (Semikolon, Komma oder Tab getrennt)</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-upload me-1"></i>Hochladen
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Info-Karten -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h6 class="fw-bold mb-3">Unterstuetzte Import-Typen</h6>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-people fs-4 text-primary me-2"></i>
+                                <div>
+                                    <strong>Kunden</strong>
+                                    <div class="small text-muted">Name, Adresse, Kontakt</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-box-seam fs-4 text-success me-2"></i>
+                                <div>
+                                    <strong>Artikel</strong>
+                                    <div class="small text-muted">Nr, Name, Preis</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-journal-text fs-4 text-warning me-2"></i>
+                                <div>
+                                    <strong>Buchungen</strong>
+                                    <div class="small text-muted">Datum, Konto, Betrag</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-bank fs-4 text-info me-2"></i>
+                                <div>
+                                    <strong>Bankauszug</strong>
+                                    <div class="small text-muted">CSV oder MT940</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import-Historie -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Letzte Imports</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if history %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Datei</th>
+                                    <th>Typ</th>
+                                    <th>Status</th>
+                                    <th>Ergebnis</th>
+                                    <th>Datum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for job in history %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('csv_import.result', job_id=job.id) }}">
+                                            {{ job.filename }}
+                                        </a>
+                                    </td>
+                                    <td>{{ import_types.get(job.import_type, job.import_type) }}</td>
+                                    <td>
+                                        {% if job.status == 'imported' %}
+                                        <span class="badge bg-success">Importiert</span>
+                                        {% elif job.status == 'error' %}
+                                        <span class="badge bg-danger">Fehler</span>
+                                        {% elif job.status == 'validated' %}
+                                        <span class="badge bg-info">Validiert</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ job.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if job.imported_rows is not none %}
+                                        {{ job.imported_rows }}/{{ job.total_rows }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ job.created_at.strftime('%d.%m.%Y %H:%M') if job.created_at else '' }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-inbox fs-1"></i>
+                        <p class="mt-2">Noch keine Imports durchgefuehrt</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

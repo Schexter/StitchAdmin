@@ -453,6 +453,14 @@
                                          class="img-thumbnail"
                                          style="max-height: 200px;">
                                 </div>
+                                {% elif order.design_file_path %}
+                                <div class="mb-3 text-center">
+                                    <img src="{{ url_for('static', filename=order.design_file_path) }}"
+                                         alt="Design"
+                                         class="img-thumbnail"
+                                         style="max-height: 200px;"
+                                         onerror="this.parentElement.style.display='none';">
+                                </div>
                                 {% endif %}
 
                                 <div class="list-group list-group-flush">

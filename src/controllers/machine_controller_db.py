@@ -467,6 +467,42 @@ def api_machine_status():
     
     return jsonify(status_data)
 
+
+@machine_bp.route('/capacity')
+@login_required
+def capacity():
+    """Kapazitaets- und Auslastungs-Dashboard"""
+    from src.services.machine_analytics_service import MachineAnalyticsService
+    analytics = MachineAnalyticsService()
+
+    # Woche bestimmen (Standard: aktuelle Woche)
+    week_offset = request.args.get('week', 0, type=int)
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday()) + timedelta(weeks=week_offset)
+
+    # Daten laden
+    stats = analytics.get_summary_stats()
+    capacity_data = analytics.get_weekly_capacity(week_start)
+    current_jobs = analytics.get_current_jobs()
+
+    # Auslastung diese Woche
+    week_end = week_start + timedelta(days=5)
+    utilization = analytics.get_all_machines_utilization(week_start, week_end)
+
+    # Warteschlange
+    queues = analytics.get_queue_by_machine()
+
+    return render_template('machines/capacity.html',
+                         stats=stats,
+                         capacity=capacity_data,
+                         current_jobs=current_jobs,
+                         utilization=utilization,
+                         queues=queues,
+                         week_start=week_start,
+                         week_offset=week_offset,
+                         weekdays=['Mo', 'Di', 'Mi', 'Do', 'Fr'])
+
+
 # Hilfsfunktionen
 def get_machine_by_id(machine_id):
     """Maschine nach ID abrufen"""

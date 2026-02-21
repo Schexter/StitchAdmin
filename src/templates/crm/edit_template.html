@@ -2,6 +2,14 @@
 
 {% block title %}{% if is_new %}Neue Vorlage{% else %}Vorlage bearbeiten{% endif %} - StitchAdmin{% endblock %}
 
+{% block extra_css %}
+<style>
+    .tox-tinymce { border-radius: var(--sa-radius-sm) !important; }
+    .placeholder-btn { cursor: pointer; font-size: 0.8rem; }
+    .placeholder-btn:hover { background-color: var(--sa-primary-light) !important; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <!-- Header -->
@@ -95,15 +103,13 @@
 
                         <div class="mb-3">
                             <label for="body_html" class="form-label">E-Mail-Text (HTML)</label>
-                            <textarea class="form-control" id="body_html" name="body_html" rows="15"
-                                      style="font-family: monospace; font-size: 13px;">{{ template.body_html if template else '' }}</textarea>
-                            <small class="text-muted">HTML-Format fuer formatierte E-Mails</small>
+                            <textarea class="form-control" id="body_html" name="body_html">{{ template.body_html if template else '' }}</textarea>
                         </div>
 
                         <div class="mb-3">
                             <label for="body_text" class="form-label">E-Mail-Text (Plain Text)</label>
-                            <textarea class="form-control" id="body_text" name="body_text" rows="8"
-                                      style="font-family: monospace;">{{ template.body_text if template else '' }}</textarea>
+                            <textarea class="form-control" id="body_text" name="body_text" rows="6"
+                                      style="font-family: monospace; font-size: 13px;">{{ template.body_text if template else '' }}</textarea>
                             <small class="text-muted">Optional: Wird verwendet wenn HTML nicht unterstuetzt wird</small>
                         </div>
                     </div>
@@ -115,7 +121,7 @@
                 <!-- Platzhalter -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-braces"></i> Platzhalter</h5>
+                        <h5 class="mb-0"><i class="bi bi-braces"></i> Platzhalter einfuegen</h5>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
@@ -128,35 +134,34 @@
 
                         <hr>
 
-                        <p class="small mb-2"><strong>Standard-Platzhalter:</strong></p>
-                        <div class="small">
-                            <p class="mb-1"><strong>Kunde:</strong></p>
-                            <ul class="list-unstyled ms-3 mb-2">
-                                <li><code>{anrede}</code> - Herr/Frau</li>
-                                <li><code>{kunde_name}</code> - Vollstaendiger Name</li>
-                                <li><code>{firma}</code> - Firmenname</li>
-                            </ul>
+                        <p class="small mb-2"><strong>Klicken zum Einfuegen:</strong></p>
 
-                            <p class="mb-1"><strong>Auftrag:</strong></p>
-                            <ul class="list-unstyled ms-3 mb-2">
-                                <li><code>{auftragsnummer}</code></li>
-                                <li><code>{auftragsdatum}</code></li>
-                                <li><code>{gesamtbetrag}</code></li>
-                            </ul>
+                        <p class="small mb-1"><strong>Kunde:</strong></p>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{anrede}')">{anrede}</span>
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{kunde_name}')">{kunde_name}</span>
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{firma}')">{firma}</span>
+                        </div>
 
-                            <p class="mb-1"><strong>Versand:</strong></p>
-                            <ul class="list-unstyled ms-3 mb-2">
-                                <li><code>{versanddienstleister}</code></li>
-                                <li><code>{sendungsnummer}</code></li>
-                                <li><code>{tracking_link}</code></li>
-                            </ul>
+                        <p class="small mb-1"><strong>Auftrag:</strong></p>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{auftragsnummer}')">{auftragsnummer}</span>
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{auftragsdatum}')">{auftragsdatum}</span>
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{gesamtbetrag}')">{gesamtbetrag}</span>
+                        </div>
 
-                            <p class="mb-1"><strong>Rechnung:</strong></p>
-                            <ul class="list-unstyled ms-3 mb-0">
-                                <li><code>{rechnungsnummer}</code></li>
-                                <li><code>{betrag}</code></li>
-                                <li><code>{faelligkeitsdatum}</code></li>
-                            </ul>
+                        <p class="small mb-1"><strong>Versand:</strong></p>
+                        <div class="d-flex flex-wrap gap-1 mb-2">
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{versanddienstleister}')">{versanddienstleister}</span>
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{sendungsnummer}')">{sendungsnummer}</span>
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{tracking_link}')">{tracking_link}</span>
+                        </div>
+
+                        <p class="small mb-1"><strong>Rechnung:</strong></p>
+                        <div class="d-flex flex-wrap gap-1 mb-0">
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{rechnungsnummer}')">{rechnungsnummer}</span>
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{betrag}')">{betrag}</span>
+                            <span class="badge bg-light text-dark border placeholder-btn" onclick="insertPlaceholder('{faelligkeitsdatum}')">{faelligkeitsdatum}</span>
                         </div>
                     </div>
                 </div>
@@ -190,13 +195,43 @@
         </div>
     </form>
 </div>
+{% endblock %}
 
+{% block scripts %}
+<!-- TinyMCE Editor -->
+<script src="https://cdn.jsdelivr.net/npm/tinymce@6/tinymce.min.js" referrerpolicy="origin"></script>
 <script>
+let htmlEditor;
+
+tinymce.init({
+    selector: '#body_html',
+    height: 400,
+    language: 'de',
+    language_url: 'https://cdn.jsdelivr.net/npm/tinymce-i18n@24/langs6/de.min.js',
+    menubar: false,
+    plugins: 'lists link image table code fullscreen preview',
+    toolbar: 'undo redo | blocks fontfamily fontsize | bold italic underline forecolor backcolor | alignleft aligncenter alignright | bullist numlist | link image table | code fullscreen',
+    content_style: 'body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; }',
+    branding: false,
+    promotion: false,
+    resize: true,
+    convert_urls: false,
+    setup: function(editor) {
+        htmlEditor = editor;
+    }
+});
+
+function insertPlaceholder(placeholder) {
+    if (htmlEditor) {
+        htmlEditor.execCommand('mceInsertContent', false, placeholder);
+        htmlEditor.focus();
+    }
+}
+
 function previewTemplate() {
     const subject = document.getElementById('subject').value;
-    const body = document.getElementById('body_html').value || document.getElementById('body_text').value;
+    const body = htmlEditor ? htmlEditor.getContent() : document.getElementById('body_html').value;
 
-    // Beispiel-Platzhalter ersetzen
     const examples = {
         anrede: 'Herr',
         kunde_name: 'Max Mustermann',

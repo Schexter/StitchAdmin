@@ -466,13 +466,22 @@ def update_status(order_id):
         db.session.add(history)
         
         db.session.commit()
-        
+
+        # E-Mail Automation pruefen und ausfuehren
+        try:
+            from src.services.email_automation_service import EmailAutomationService
+            automation = EmailAutomationService()
+            automation.check_and_send(order, 'order_status', new_status, old_status)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f'Email-Automation Fehler: {e}')
+
         # Aktivität protokollieren
-        log_activity('order_status_changed', 
+        log_activity('order_status_changed',
                     f'Auftrag {order.id}: Status von {old_status} auf {new_status} geändert')
-        
+
         flash(f'Status wurde auf {new_status} geändert!', 'success')
-    
+
     return redirect(url_for('orders.show', order_id=order_id))
 
 @order_bp.route('/<order_id>/delete', methods=['POST'])

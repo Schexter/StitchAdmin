@@ -13,7 +13,6 @@
     .module-card-wrapper {
         display: flex;
         height: 100%;
-        min-height: 350px;
     }
     
     .module-card-wrapper > a {
@@ -181,13 +180,63 @@
         border-color: var(--bs-btn-hover-border-color) !important;
     }
     
-    /* Responsive Grid */
-    @media (max-width: 768px) {
+    /* Responsive Grid - Tablet */
+    @media (max-width: 991px) {
         .module-card-wrapper {
-            min-height: 280px;
+            min-height: auto;
+        }
+        .module-card .card-body {
+            padding: 1.25rem;
         }
         .module-icon {
-            font-size: 2rem;
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            margin-bottom: 0.75rem;
+        }
+        .module-icon i {
+            font-size: 1.3rem;
+        }
+        .module-card h3 {
+            font-size: 1.1rem;
+        }
+        .module-card p {
+            font-size: 0.8rem;
+            margin-bottom: 0.75rem;
+        }
+        .module-stats {
+            min-height: auto;
+            padding-top: 0.75rem;
+        }
+        .stat-item .value {
+            font-size: 1rem;
+        }
+        .module-card:hover {
+            transform: translateY(-3px);
+        }
+    }
+
+    /* Responsive Grid - Mobile */
+    @media (max-width: 767px) {
+        .module-card-wrapper {
+            min-height: auto;
+        }
+        .module-card .card-body {
+            padding: 1rem;
+        }
+        .module-icon {
+            width: 40px;
+            height: 40px;
+            margin-bottom: 0.5rem;
+        }
+        .module-icon i {
+            font-size: 1.2rem;
+        }
+        .module-card h3 {
+            font-size: 1rem;
+        }
+        .module-card:hover {
+            transform: none;
         }
     }
     
@@ -225,22 +274,22 @@
 {% endblock %}
 
 {% block content %}
-<div class="row mb-4">
-    <div class="col-md-8">
-        <h1>
+<div class="d-flex flex-wrap justify-content-between align-items-start mb-4 gap-2">
+    <div>
+        <h1 class="mb-1">
             {% if branding and branding.company_name %}
                 {{ branding.company_name }}'s Dashboard
             {% else %}
                 Dashboard
             {% endif %}
         </h1>
-        <p class="text-muted">Willkommen {{ current_user.username }}</p>
+        <p class="text-muted mb-0">Willkommen {{ current_user.username }}</p>
     </div>
-    <div class="col-md-4 text-end">
-        <button id="btn-edit-dashboard" class="btn btn-primary">
+    <div class="d-flex gap-2">
+        <button id="btn-edit-dashboard" class="btn btn-primary btn-sm">
             <i class="bi bi-gear"></i> Dashboard anpassen
         </button>
-        <button id="btn-reset-dashboard" class="btn btn-outline-secondary ms-2" style="display:none;">
+        <button id="btn-reset-dashboard" class="btn btn-outline-secondary btn-sm" style="display:none;">
             <i class="bi bi-arrow-clockwise"></i> Zurücksetzen
         </button>
     </div>
@@ -321,6 +370,21 @@
                                     <span class="label">Zu bestellen</span>
                                     <span class="value">{{ stats.get('items_to_order', 0) }}</span>
                                 </div>
+                            {% elif module.name == 'website_cms' %}
+                                <div class="stat-item">
+                                    <span class="label">CMS-Inhalte</span>
+                                    <span class="value">{{ stats.get('website_content_count', 0) }}</span>
+                                </div>
+                            {% elif module.name == 'shop_admin' %}
+                                <div class="stat-item">
+                                    <span class="label">Shop-Bestellungen</span>
+                                    <span class="value">{{ stats.get('shop_orders', 0) }}</span>
+                                </div>
+                            {% elif module.name == 'inquiry_admin' %}
+                                <div class="stat-item">
+                                    <span class="label">Neue Anfragen</span>
+                                    <span class="value">{{ stats.get('new_inquiries', 0) }}</span>
+                                </div>
                             {% endif %}
                         </div>
                     </div>
@@ -362,30 +426,39 @@
         onerror="this.onerror=null; var s=document.createElement('script'); s.src='{{ url_for('static', filename='vendor/sortablejs/Sortable.min.js') }}'; document.head.appendChild(s);"></script>
 
 <script>
-// WICHTIG: Kacheln gleich groß machen
+// WICHTIG: Kacheln gleich groß machen - pro visuelle Zeile
 function equalizeCardHeights() {
-    const rows = document.querySelectorAll('.row.g-4');
-    
-    rows.forEach(row => {
-        const cards = row.querySelectorAll('.module-card');
+    const grid = document.getElementById('module-grid');
+    if (!grid) return;
+
+    const wrappers = Array.from(grid.querySelectorAll('.module-card-wrapper:not(.hidden-module)'));
+
+    // Erst alle Höhen zurücksetzen
+    wrappers.forEach(w => {
+        const card = w.querySelector('.module-card');
+        if (card) card.style.minHeight = '';
+    });
+
+    // Kacheln nach visueller Zeile gruppieren (gleiche offsetTop)
+    const rowGroups = {};
+    wrappers.forEach(w => {
+        const top = w.offsetTop;
+        if (!rowGroups[top]) rowGroups[top] = [];
+        rowGroups[top].push(w);
+    });
+
+    // Pro Zeile gleiche Höhe setzen
+    Object.values(rowGroups).forEach(group => {
         let maxHeight = 0;
-        
-        // Erst alle Höhen zurücksetzen
-        cards.forEach(card => {
-            card.style.minHeight = '';
-        });
-        
-        // Finde maximale Höhe
-        cards.forEach(card => {
-            const height = card.offsetHeight;
-            if (height > maxHeight) {
-                maxHeight = height;
+        group.forEach(w => {
+            const card = w.querySelector('.module-card');
+            if (card && card.offsetHeight > maxHeight) {
+                maxHeight = card.offsetHeight;
             }
         });
-        
-        // Setze alle auf maximale Höhe
-        cards.forEach(card => {
-            card.style.minHeight = maxHeight + 'px';
+        group.forEach(w => {
+            const card = w.querySelector('.module-card');
+            if (card) card.style.minHeight = maxHeight + 'px';
         });
     });
 }

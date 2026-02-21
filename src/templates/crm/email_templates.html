@@ -19,6 +19,9 @@
             <a href="{{ url_for('crm.new_email_template') }}" class="btn btn-success">
                 <i class="bi bi-plus-lg"></i> Neue Vorlage
             </a>
+            <a href="{{ url_for('email_automation.index') }}" class="btn btn-outline-warning">
+                <i class="bi bi-lightning-charge"></i> Automation
+            </a>
             <a href="{{ url_for('crm.init_default_templates') }}" class="btn btn-outline-primary"
                onclick="return confirm('Standard-Vorlagen erstellen? Existierende werden nicht ueberschrieben.')">
                 <i class="bi bi-magic"></i> Standard-Vorlagen erstellen

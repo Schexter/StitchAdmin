@@ -9,7 +9,7 @@ Hauptanwendung mit Flask Application Factory Pattern
 import os
 import sys
 from datetime import timedelta
-from flask import Flask, render_template, redirect, url_for, flash, request, send_from_directory
+from flask import Flask, render_template, redirect, url_for, flash, request, send_from_directory, g
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 
 # UTF-8 Encoding für Windows
@@ -98,6 +98,9 @@ def create_app():
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
     app.config['UPLOAD_FOLDER'] = upload_dir
 
+    # Multi-Tenant (Phase 1: deaktiviert, wird in Phase 2 aktiviert)
+    app.config['MULTI_TENANT_ENABLED'] = os.environ.get('MULTI_TENANT_ENABLED', 'False') == 'True'
+
     # ==========================================
     # DATENBANK INITIALISIERUNG
     # ==========================================
@@ -105,6 +108,19 @@ def create_app():
         from src.models.models import db, User, Customer, Article, Order, Machine, Thread, ActivityLog, Supplier
         db.init_app(app)
         print("[OK] Datenbank-Models erfolgreich importiert")
+
+        # Flask-Migrate fuer Schema-Migrationen
+        try:
+            from flask_migrate import Migrate
+            migrate = Migrate(app, db)
+            print("[OK] Flask-Migrate initialisiert")
+        except ImportError:
+            print("[INFO] Flask-Migrate nicht installiert - nutze db.create_all()")
+
+        # Tenant-Filtering (nur aktiv wenn MULTI_TENANT_ENABLED=True)
+        from src.models.tenant_filter import init_tenant_filtering
+        init_tenant_filtering(app)
+
     except ImportError as e:
         print(f"[FEHLER] FEHLER beim Importieren der Models: {e}")
         import traceback
@@ -137,11 +153,24 @@ def create_app():
             request.endpoint == 'auth.login' or
             request.endpoint == 'static' or
             request.endpoint == 'root' or
-            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('setup.'))
+            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('setup.')) or
+            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('website.')) or
+            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('shop.')) or
+            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('inquiry.')) or
+            request.endpoint == 'calendar_sync.callback_microsoft' or
+            request.endpoint == 'social_media.callback_facebook'
         ):
             return
         if not current_user.is_authenticated:
             return redirect(url_for('auth.login'))
+
+        # Tenant-Kontext setzen (Phase 1: Default-Tenant fuer alle User)
+        if app.config.get('MULTI_TENANT_ENABLED'):
+            from src.models.tenant import Tenant
+            default_tenant = Tenant.query.filter_by(slug='default').first()
+            if default_tenant:
+                g.current_tenant_id = default_tenant.id
+                g.current_tenant = default_tenant
 
     # ==========================================
     # BLUEPRINT REGISTRIERUNG
@@ -275,12 +304,51 @@ def create_app():
     # Kalender (Outlook-Style)
     register_blueprint_safe('src.controllers.kalender_controller', 'kalender_bp', 'Kalender')
 
+    # Oeffentliche Website (Startseite ohne Login)
+    register_blueprint_safe('src.controllers.website_controller', 'website_bp', 'Website')
+
+    # Oeffentlicher Shop (Konfigurator, Warenkorb, Checkout - ohne Login)
+    register_blueprint_safe('src.controllers.shop_controller', 'shop_bp', 'Shop')
+
+    # Shop-Verwaltung (Admin-Bereich, Login erforderlich)
+    register_blueprint_safe('src.controllers.shop_admin_controller', 'shop_admin_bp', 'Shop-Verwaltung')
+
+    # Oeffentliches Anfrage-Formular (ohne Login)
+    register_blueprint_safe('src.controllers.inquiry_controller', 'inquiry_bp', 'Anfragen (öffentlich)')
+
+    # Anfragen-Verwaltung (Admin-Bereich, Login erforderlich)
+    register_blueprint_safe('src.controllers.inquiry_admin_controller', 'inquiry_admin_bp', 'Anfragen-Verwaltung')
+
+    # Website-CMS (Admin-Bereich, Login erforderlich)
+    register_blueprint_safe('src.controllers.website_admin_controller', 'website_admin_bp', 'Website-CMS')
+
+    # CSV-Import
+    register_blueprint_safe('src.controllers.csv_import_controller', 'csv_import_bp', 'CSV-Import')
+
+    # Vertraege & Policen
+    register_blueprint_safe('src.controllers.contracts_controller', 'contracts_bp', 'Vertraege')
+
+    # E-Mail Automation
+    register_blueprint_safe('src.controllers.email_automation_controller', 'email_automation_bp', 'E-Mail-Automation')
+
+    # Banking
+    register_blueprint_safe('src.controllers.banking_controller', 'banking_bp', 'Bankkonten')
+
+    # E-Mail-Sync
+    register_blueprint_safe('src.controllers.email_sync_controller', 'email_sync_bp', 'E-Mail-Sync')
+
+    # Kalender-Sync
+    register_blueprint_safe('src.controllers.calendar_sync_controller', 'calendar_sync_bp', 'Kalender-Sync')
+
+    # Social Media
+    register_blueprint_safe('src.controllers.social_media_controller', 'social_media_bp', 'Social Media')
+
     # ==========================================
     # HAUPT-ROUTEN
     # ==========================================
-    @app.route('/')
+    @app.route('/app')
     def root():
-        """Root-Route - Redirect zum Dashboard, Login oder Setup"""
+        """App-Einstieg - Redirect zum Dashboard, Login oder Setup"""
         # Setup-Check: Erstinstallation?
         try:
             from src.controllers.setup_wizard_controller import is_setup_complete
@@ -288,7 +356,7 @@ def create_app():
                 return redirect(url_for('setup.welcome'))
         except Exception as e:
             print(f"[WARNUNG] Setup-Check fehlgeschlagen: {e}")
-        
+
         if current_user.is_authenticated:
             return redirect(url_for('dashboard'))
         return redirect(url_for('auth.login'))
@@ -394,6 +462,22 @@ def create_app():
             stats['open_post'] = PostEntry.query.filter_by(status='open').count()
             stats['unread_emails'] = ArchivedEmail.query.filter_by(is_read=False).count()
         except (ImportError, Exception):
+            pass
+
+        # Online-Statistiken (Website-CMS, Shop, Anfragen)
+        try:
+            from src.models.website_content import WebsiteContent
+            stats['website_content_count'] = WebsiteContent.query.count()
+        except (ImportError, Exception):
+            pass
+        try:
+            from src.models.inquiry import Inquiry
+            stats['new_inquiries'] = Inquiry.query.filter_by(status='NEU').count()
+        except (ImportError, Exception):
+            pass
+        try:
+            stats['shop_orders'] = Order.query.filter_by(source='shop').count()
+        except Exception:
             pass
 
         return render_template('dashboard_personalized.html',
@@ -533,21 +617,74 @@ def create_app():
     # ==========================================
     # ... (unverändert)
 
-    return app
-
-
-# ==========================================
-# HAUPTPROGRAMM
-# ==========================================
-if __name__ == '__main__':
-    app = create_app()
-    if app is None:
-        sys.exit(1)
-    
+    # ==========================================
+    # DATENBANK-TABELLEN ERSTELLEN (auch für Gunicorn)
+    # ==========================================
     with app.app_context():
-        from src.models.models import db, User
-        db.create_all()
-        
+        from src.models.models import db as _db, User
+        # Tenant-Models importieren damit create_all() die Tabellen kennt
+        from src.models.tenant import Tenant, UserTenant  # noqa: F401
+        from src.models.csv_import import CSVImportJob  # noqa: F401
+        from src.models.contracts import Contract, ContractContact, ContractCommunication  # noqa: F401
+        from src.models.email_automation import EmailAutomationRule, EmailAutomationLog  # noqa: F401
+        from src.models.banking import BankAccount, BankTransaction  # noqa: F401
+        from src.models.calendar_sync import CalendarConnection, CalendarSyncMapping  # noqa: F401
+        from src.models.social_media import SocialMediaAccount, SocialMediaPost  # noqa: F401
+        try:
+            _db.create_all()
+        except Exception as e:
+            _db.session.rollback()
+            print(f"[WARN] create_all() Worker-Race-Condition: {e}")
+
+        # APScheduler fuer Hintergrund-Jobs (Social Media, E-Mail, Bank-Sync)
+        try:
+            from src.services.scheduler_service import init_scheduler
+            init_scheduler(app)
+        except ImportError:
+            print("[INFO] APScheduler nicht installiert - Hintergrund-Jobs deaktiviert")
+
+        # Migriere neue Spalte: customers.is_active
+        try:
+            _db.session.execute(_db.text(
+                "ALTER TABLE customers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"
+            ))
+            _db.session.commit()
+            logger.info("customers.is_active Spalte hinzugefuegt")
+        except Exception:
+            _db.session.rollback()
+
+        # Migriere neue Spalte: users.is_system_admin
+        try:
+            _db.session.execute(_db.text(
+                "ALTER TABLE users ADD COLUMN is_system_admin BOOLEAN DEFAULT FALSE"
+            ))
+            _db.session.commit()
+            print("[OK] users.is_system_admin Spalte hinzugefuegt")
+        except Exception:
+            _db.session.rollback()  # Spalte existiert bereits
+
+        # Migriere neue Spalten fuer Shop + Anfragen
+        shop_columns = [
+            ("orders", "source", "VARCHAR(20)"),
+            ("orders", "tracking_token", "VARCHAR(64)"),
+            ("orders", "customer_email_for_tracking", "VARCHAR(200)"),
+            ("orders", "archived_at", "DATETIME"),
+            ("orders", "archived_by", "VARCHAR(80)"),
+            ("orders", "archive_reason", "VARCHAR(200)"),
+            ("articles", "show_in_shop", "BOOLEAN DEFAULT FALSE"),
+            ("articles", "shop_description", "TEXT"),
+            ("articles", "shop_image_path", "VARCHAR(255)"),
+            ("articles", "shop_category_id", "INTEGER"),
+            ("articles", "shop_sort_order", "INTEGER DEFAULT 0"),
+            ("articles", "shop_min_quantity", "INTEGER DEFAULT 1"),
+        ]
+        for table, col, col_type in shop_columns:
+            try:
+                _db.session.execute(_db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                _db.session.commit()
+            except Exception:
+                _db.session.rollback()
+
         # Migriere Modul-Icons von Emojis/Text auf Bootstrap Icons
         try:
             from src.models.user_permissions import Module
@@ -573,16 +710,161 @@ if __name__ == '__main__':
                     m.icon = 'bi-grid-fill'
                     updated = True
             if updated:
-                db.session.commit()
+                _db.session.commit()
         except Exception:
             pass
+
+        # Online-Module (Website-CMS, Shop, Anfragen) anlegen
+        try:
+            from src.models.user_permissions import Module
+            online_modules = [
+                {
+                    'name': 'website_cms',
+                    'display_name': 'Website-CMS',
+                    'description': 'Website-Inhalte bearbeiten',
+                    'icon': 'bi-globe',
+                    'color': 'info',
+                    'route': 'website_admin.dashboard',
+                    'category': 'online',
+                    'requires_admin': True,
+                    'default_enabled': True,
+                    'sort_order': 10,
+                },
+                {
+                    'name': 'shop_admin',
+                    'display_name': 'Online-Shop',
+                    'description': 'Shop & Konfigurator verwalten',
+                    'icon': 'bi-shop',
+                    'color': 'success',
+                    'route': 'shop_admin.dashboard',
+                    'category': 'online',
+                    'requires_admin': True,
+                    'default_enabled': True,
+                    'sort_order': 11,
+                },
+                {
+                    'name': 'inquiry_admin',
+                    'display_name': 'Anfragen',
+                    'description': 'Website-Anfragen bearbeiten',
+                    'icon': 'bi-envelope-paper-fill',
+                    'color': 'warning',
+                    'route': 'inquiry_admin.list',
+                    'category': 'online',
+                    'requires_admin': True,
+                    'default_enabled': True,
+                    'sort_order': 12,
+                },
+            ]
+            for mod_data in online_modules:
+                if not Module.query.filter_by(name=mod_data['name']).first():
+                    _db.session.add(Module(**mod_data))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # CSV-Import Modul anlegen
+        try:
+            from src.models.user_permissions import Module
+            if not Module.query.filter_by(name='csv_import').first():
+                _db.session.add(Module(
+                    name='csv_import',
+                    display_name='CSV-Import',
+                    description='Kunden, Artikel & Buchungen importieren',
+                    icon='bi-file-earmark-arrow-up',
+                    color='secondary',
+                    route='csv_import.index',
+                    category='admin',
+                    requires_admin=True,
+                    default_enabled=True,
+                    sort_order=15,
+                ))
+                _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Vertraege-Modul anlegen
+        try:
+            from src.models.user_permissions import Module
+            if not Module.query.filter_by(name='contracts').first():
+                _db.session.add(Module(
+                    name='contracts',
+                    display_name='Vertraege & Policen',
+                    description='Vertraege, Versicherungen & Wartung verwalten',
+                    icon='bi-file-earmark-text',
+                    color='primary',
+                    route='contracts.index',
+                    category='admin',
+                    requires_admin=False,
+                    default_enabled=True,
+                    sort_order=14,
+                ))
+                _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Website-CMS Standard-Inhalte setzen (nur bei leerer Tabelle)
+        try:
+            from src.models.website_content import WebsiteContent
+            if WebsiteContent.query.count() == 0:
+                WebsiteContent.seed_defaults()
+                print("[OK] Website Standard-Inhalte erstellt")
+        except Exception:
+            _db.session.rollback()
 
         # Erstelle Admin-User falls nicht vorhanden
         if not User.query.filter_by(username='admin').first():
             admin = User(username='admin', email='admin@example.com', is_admin=True)
             admin.set_password('admin')
-            db.session.add(admin)
-            db.session.commit()
-            print("[OK] Admin-User erstellt (admin/admin)")
+            _db.session.add(admin)
+            _db.session.commit()
+
+        # Default-Tenant erstellen falls nicht vorhanden
+        try:
+            if not Tenant.query.filter_by(slug='default').first():
+                default_tenant = Tenant(
+                    slug='default',
+                    name='StitchAdmin',
+                    subdomain='app',
+                    contact_email='admin@example.com',
+                    is_active=True,
+                    plan_tier='enterprise',
+                )
+                _db.session.add(default_tenant)
+                _db.session.flush()
+
+                # Alle bestehenden User dem Default-Tenant zuweisen
+                users = User.query.all()
+                for user in users:
+                    if not UserTenant.query.filter_by(user_id=user.id, tenant_id=default_tenant.id).first():
+                        ut = UserTenant(
+                            user_id=user.id,
+                            tenant_id=default_tenant.id,
+                            role='tenant_admin' if user.is_admin else 'user',
+                            is_active=True,
+                            is_primary=True,
+                        )
+                        _db.session.add(ut)
+
+                # Admin als System-Admin markieren
+                admin_user = User.query.filter_by(username='admin').first()
+                if admin_user and hasattr(admin_user, 'is_system_admin'):
+                    admin_user.is_system_admin = True
+
+                _db.session.commit()
+                print(f"[OK] Default-Tenant erstellt, {len(users)} User zugewiesen")
+        except Exception as e:
+            print(f"[INFO] Default-Tenant Setup: {e}")
+            _db.session.rollback()
+
+    return app
+
+
+# ==========================================
+# HAUPTPROGRAMM
+# ==========================================
+if __name__ == '__main__':
+    app = create_app()
+    if app is None:
+        sys.exit(1)
 
     app.run(host='0.0.0.0', port=5000, debug=True)

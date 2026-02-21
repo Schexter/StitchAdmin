@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}E-Mail Automation - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-lightning-charge me-2"></i>E-Mail Automation</h2>
+            <p class="text-muted mb-0">Automatische E-Mails bei Status-Aenderungen</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('email_automation.logs') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-journal-text me-1"></i>Logs
+            </a>
+            <a href="{{ url_for('email_automation.new_rule') }}" class="btn btn-success">
+                <i class="bi bi-plus-lg me-1"></i>Neue Regel
+            </a>
+        </div>
+    </div>
+
+    <!-- Statistiken -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 bg-primary bg-opacity-10">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold text-primary">{{ stats.active_rules }}</div>
+                    <div class="text-muted small">Aktive Regeln</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 bg-success bg-opacity-10">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold text-success">{{ stats.total_sent }}</div>
+                    <div class="text-muted small">E-Mails gesendet</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 {% if stats.recent_errors > 0 %}bg-danger{% else %}bg-light{% endif %} bg-opacity-10">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold {% if stats.recent_errors > 0 %}text-danger{% endif %}">{{ stats.recent_errors }}</div>
+                    <div class="text-muted small">Letzte Fehler</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Regeln -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Automation-Regeln</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if rules %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Regel</th>
+                            <th>Trigger</th>
+                            <th>Template</th>
+                            <th class="text-center">Gesendet</th>
+                            <th class="text-center">Status</th>
+                            <th style="width: 140px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for rule in rules %}
+                        <tr class="{% if not rule.is_enabled %}text-muted{% endif %}">
+                            <td>
+                                <strong>{{ rule.name }}</strong>
+                                {% if rule.description %}
+                                <br><small class="text-muted">{{ rule.description|truncate(60) }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ rule.trigger_event_label }}</span>
+                                <i class="bi bi-arrow-right mx-1"></i>
+                                <span class="badge bg-dark">{{ rule.trigger_value_label }}</span>
+                            </td>
+                            <td>
+                                {% if rule.template %}
+                                <i class="bi bi-file-earmark-text me-1"></i>{{ rule.template.name }}
+                                {% else %}
+                                <span class="text-danger">Kein Template</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ rule.send_count or 0 }}</td>
+                            <td class="text-center">
+                                <form method="POST" action="{{ url_for('email_automation.toggle_rule', rule_id=rule.id) }}" class="d-inline">
+                                    {% if rule.is_enabled %}
+                                    <button type="submit" class="btn btn-sm btn-success" title="Deaktivieren">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                    {% else %}
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" title="Aktivieren">
+                                        <i class="bi bi-circle"></i>
+                                    </button>
+                                    {% endif %}
+                                </form>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('email_automation.edit_rule', rule_id=rule.id) }}"
+                                       class="btn btn-outline-primary" title="Bearbeiten">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="POST" action="{{ url_for('email_automation.delete_rule', rule_id=rule.id) }}"
+                                          onsubmit="return confirm('Regel loeschen?')" class="d-inline">
+                                        <button type="submit" class="btn btn-outline-danger" title="Loeschen">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-lightning-charge fs-1"></i>
+                <p class="mt-2">Noch keine Automation-Regeln</p>
+                <a href="{{ url_for('email_automation.new_rule') }}" class="btn btn-primary">
+                    <i class="bi bi-plus-lg"></i> Erste Regel erstellen
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Letzte Logs -->
+    {% if recent_logs %}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Letzte Aktivitaet</h5>
+            <a href="{{ url_for('email_automation.logs') }}" class="btn btn-sm btn-outline-primary">Alle Logs</a>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Datum</th>
+                            <th>Regel</th>
+                            <th>Empfaenger</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in recent_logs[:10] %}
+                        <tr>
+                            <td class="small">{{ log.sent_at.strftime('%d.%m. %H:%M') if log.sent_at else '' }}</td>
+                            <td>{{ log.rule.name if log.rule else log.template_name }}</td>
+                            <td class="small">{{ log.to_email }}</td>
+                            <td>
+                                {% if log.status == 'sent' %}
+                                <span class="badge bg-success">Gesendet</span>
+                                {% elif log.status == 'failed' %}
+                                <span class="badge bg-danger" title="{{ log.error_message }}">Fehler</span>
+                                {% elif log.status == 'skipped' %}
+                                <span class="badge bg-warning">Uebersprungen</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ log.status }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Vertrag bearbeiten' if contract else 'Neuer Vertrag' }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-{{ 'pencil' if contract else 'plus-lg' }} me-2"></i>
+            {{ 'Vertrag bearbeiten' if contract else 'Neuer Vertrag' }}
+        </h2>
+        <a href="{{ url_for('contracts.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurueck
+        </a>
+    </div>
+
+    <form method="POST">
+        <div class="row g-4">
+            <!-- Linke Spalte: Grunddaten -->
+            <div class="col-lg-8">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Grunddaten</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Vertragstyp</label>
+                                <select name="contract_type" class="form-select" id="contractType" onchange="toggleInsuranceFields()">
+                                    {% for key, label in type_labels.items() %}
+                                    <option value="{{ key }}"
+                                        {% if contract and contract.contract_type == key %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Status</label>
+                                <select name="status" class="form-select">
+                                    <option value="active" {% if not contract or contract.status == 'active' %}selected{% endif %}>Aktiv</option>
+                                    <option value="pending" {% if contract and contract.status == 'pending' %}selected{% endif %}>In Vorbereitung</option>
+                                    <option value="cancelled" {% if contract and contract.status == 'cancelled' %}selected{% endif %}>Gekuendigt</option>
+                                    <option value="expired" {% if contract and contract.status == 'expired' %}selected{% endif %}>Abgelaufen</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Bezeichnung *</label>
+                                <input type="text" name="name" class="form-control" required
+                                       value="{{ contract.name if contract else '' }}"
+                                       placeholder="z.B. Betriebshaftpflicht, Wartungsvertrag Tajima">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Vertragsnummer</label>
+                                <input type="text" name="contract_number" class="form-control"
+                                       value="{{ contract.contract_number if contract else '' }}">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Beschreibung</label>
+                                <textarea name="description" class="form-control" rows="2">{{ contract.description if contract else '' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Anbieter -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-building me-2"></i>Anbieter / Vertragspartner</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Firma / Anbieter</label>
+                                <input type="text" name="provider_name" class="form-control"
+                                       value="{{ contract.provider_name if contract else '' }}"
+                                       placeholder="z.B. Allianz, Brother, Tajima">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Allg. Kontakt</label>
+                                <input type="text" name="provider_contact" class="form-control"
+                                       value="{{ contract.provider_contact if contract else '' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Telefon</label>
+                                <input type="tel" name="provider_phone" class="form-control"
+                                       value="{{ contract.provider_phone if contract else '' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">E-Mail</label>
+                                <input type="email" name="provider_email" class="form-control"
+                                       value="{{ contract.provider_email if contract else '' }}">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Website</label>
+                                <input type="url" name="provider_website" class="form-control"
+                                       value="{{ contract.provider_website if contract else '' }}"
+                                       placeholder="https://...">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Versicherungs-Felder (nur bei insurance sichtbar) -->
+                <div class="card mb-4" id="insuranceFields" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-shield-check me-2"></i>Versicherungsdetails</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Versicherungsart</label>
+                                <select name="insurance_type" class="form-select">
+                                    <option value="">-- Waehlen --</option>
+                                    {% for val, label in [('haftpflicht', 'Betriebshaftpflicht'), ('gebaude', 'Gebaeudeversicherung'), ('inventar', 'Inventarversicherung'), ('elektronik', 'Elektronikversicherung'), ('kfz', 'KFZ-Versicherung'), ('rechtsschutz', 'Rechtsschutz'), ('transport', 'Transportversicherung'), ('cyber', 'Cyberversicherung'), ('sonstige', 'Sonstige')] %}
+                                    <option value="{{ val }}" {% if contract and contract.insurance_type == val %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Deckungssumme</label>
+                                <div class="input-group">
+                                    <input type="text" name="coverage_amount" class="form-control"
+                                           value="{{ '%.2f'|format(contract.coverage_amount) if contract and contract.coverage_amount else '' }}">
+                                    <span class="input-group-text">&euro;</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Selbstbeteiligung</label>
+                                <div class="input-group">
+                                    <input type="text" name="deductible" class="form-control"
+                                           value="{{ '%.2f'|format(contract.deductible) if contract and contract.deductible else '' }}">
+                                    <span class="input-group-text">&euro;</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notizen -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <label class="form-label">Notizen</label>
+                        <textarea name="notes" class="form-control" rows="3">{{ contract.notes if contract else '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rechte Spalte: Kosten & Laufzeit -->
+            <div class="col-lg-4">
+                <!-- Kosten -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-currency-euro me-2"></i>Kosten</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Betrag</label>
+                            <div class="input-group">
+                                <input type="text" name="amount" class="form-control"
+                                       value="{{ '%.2f'|format(contract.amount) if contract and contract.amount else '' }}">
+                                <span class="input-group-text">&euro;</span>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Zahlungsintervall</label>
+                            <select name="payment_interval" class="form-select">
+                                {% for key, label in interval_labels.items() %}
+                                <option value="{{ key }}"
+                                    {% if contract and contract.payment_interval == key %}selected{% endif %}>
+                                    {{ label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Laufzeit -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-calendar-range me-2"></i>Laufzeit</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Vertragsbeginn</label>
+                            <input type="date" name="start_date" class="form-control"
+                                   value="{{ contract.start_date.strftime('%Y-%m-%d') if contract and contract.start_date else '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Vertragsende</label>
+                            <input type="date" name="end_date" class="form-control"
+                                   value="{{ contract.end_date.strftime('%Y-%m-%d') if contract and contract.end_date else '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Kuendigungsfrist</label>
+                            <input type="date" name="renewal_date" class="form-control"
+                                   value="{{ contract.renewal_date.strftime('%Y-%m-%d') if contract and contract.renewal_date else '' }}">
+                            <div class="form-text">Datum, bis zu dem gekuendigt werden muss</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Kuendigungsfrist (Tage)</label>
+                            <input type="number" name="notice_period_days" class="form-control"
+                                   value="{{ contract.notice_period_days if contract else 90 }}">
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="auto_renew" id="autoRenew"
+                                   {% if contract and contract.auto_renew %}checked{% endif %}>
+                            <label class="form-check-label" for="autoRenew">
+                                Automatische Verlaengerung
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Maschine -->
+                {% if machines %}
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Maschine</h5>
+                    </div>
+                    <div class="card-body">
+                        <select name="machine_id" class="form-select">
+                            <option value="">-- Keine Zuordnung --</option>
+                            {% for m in machines %}
+                            <option value="{{ m.id }}"
+                                {% if contract and contract.machine_id == m.id %}selected{% endif %}>
+                                {{ m.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Speichern -->
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-lg me-1"></i>{{ 'Speichern' if contract else 'Erstellen' }}
+                    </button>
+                    <a href="{{ url_for('contracts.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleInsuranceFields() {
+    const type = document.getElementById('contractType').value;
+    const fields = document.getElementById('insuranceFields');
+    fields.style.display = type === 'insurance' ? 'block' : 'none';
+}
+document.addEventListener('DOMContentLoaded', toggleInsuranceFields);
+</script>
+{% endblock %}

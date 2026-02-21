@@ -183,6 +183,15 @@
                                              alt="{{ design.get_position_label() }}"
                                              class="design-thumbnail mb-3"
                                              onclick="showDesignPreview({{ design.id }})">
+                                        {% elif design.design_file_path %}
+                                        <img src="{{ url_for('order_designs.get_design_image', design_id=design.id) }}"
+                                             alt="{{ design.get_position_label() }}"
+                                             class="design-thumbnail mb-3"
+                                             onclick="showDesignPreview({{ design.id }})"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                        <div class="design-thumbnail-placeholder mb-3" style="display: none;">
+                                            <i class="bi bi-image text-muted fs-1"></i>
+                                        </div>
                                         {% else %}
                                         <div class="design-thumbnail-placeholder mb-3">
                                             <i class="bi bi-image text-muted fs-1"></i>

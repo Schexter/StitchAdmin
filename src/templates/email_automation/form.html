@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Regel bearbeiten' if rule else 'Neue Regel' }} - E-Mail Automation{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-lightning-charge me-2"></i>
+            {{ 'Regel bearbeiten' if rule else 'Neue Automation-Regel' }}
+        </h2>
+        <a href="{{ url_for('email_automation.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurueck
+        </a>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <form method="POST">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Grundeinstellungen</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Regelname *</label>
+                            <input type="text" name="name" class="form-control" required
+                                   value="{{ rule.name if rule else '' }}"
+                                   placeholder="z.B. Versandbenachrichtigung senden">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung</label>
+                            <textarea name="description" class="form-control" rows="2">{{ rule.description if rule else '' }}</textarea>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="is_enabled" id="isEnabled"
+                                   {% if not rule or rule.is_enabled %}checked{% endif %}>
+                            <label class="form-check-label" for="isEnabled">
+                                <strong>Regel aktiv</strong>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-bullseye me-2"></i>Trigger</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Wenn dieses Feld sich aendert *</label>
+                                <select name="trigger_event" class="form-select" id="triggerEvent" onchange="updateTriggerValues()" required>
+                                    <option value="">-- Bitte waehlen --</option>
+                                    {% for key, label in trigger_events.items() %}
+                                    <option value="{{ key }}"
+                                        {% if rule and rule.trigger_event == key %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Auf diesen Wert *</label>
+                                <select name="trigger_value" class="form-select" id="triggerValue" required>
+                                    <option value="">-- Erst Trigger waehlen --</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="alert alert-info mt-3 py-2 small">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Die E-Mail wird automatisch gesendet, sobald der gewaehlte Status bei einem Auftrag gesetzt wird.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-envelope me-2"></i>E-Mail</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">E-Mail-Vorlage *</label>
+                            <select name="template_id" class="form-select" required>
+                                <option value="">-- Vorlage waehlen --</option>
+                                {% for t in templates %}
+                                <option value="{{ t.id }}"
+                                    {% if rule and rule.template_id == t.id %}selected{% endif %}>
+                                    {{ t.category_label }}: {{ t.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">
+                                <a href="{{ url_for('crm.email_templates') }}" target="_blank">
+                                    <i class="bi bi-gear"></i> Vorlagen verwalten
+                                </a>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">CC (Kopie an)</label>
+                            <input type="text" name="send_copy_to" class="form-control"
+                                   value="{{ rule.send_copy_to if rule else '' }}"
+                                   placeholder="z.B. info@firma.de">
+                            <div class="form-text">Optional: Kopie der E-Mail an diese Adresse(n)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-lg me-1"></i>{{ 'Speichern' if rule else 'Erstellen' }}
+                    </button>
+                    <a href="{{ url_for('email_automation.index') }}" class="btn btn-outline-secondary btn-lg">Abbrechen</a>
+                </div>
+            </form>
+        </div>
+
+        <!-- Rechte Spalte: Hilfe -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-question-circle me-2"></i>Hilfe</h5>
+                </div>
+                <div class="card-body small">
+                    <h6>So funktioniert es:</h6>
+                    <ol class="mb-3">
+                        <li>Waehlen Sie den <strong>Trigger</strong> (Status-Aenderung)</li>
+                        <li>Waehlen Sie die <strong>E-Mail-Vorlage</strong></li>
+                        <li>Aktivieren Sie die Regel</li>
+                    </ol>
+                    <p>Sobald ein Auftrag den gewaehlten Status erreicht, wird automatisch die E-Mail an den Kunden gesendet.</p>
+
+                    <h6 class="mt-3">Verfuegbare Platzhalter:</h6>
+                    <ul class="list-unstyled">
+                        <li><code>{anrede}</code> - Herr/Frau</li>
+                        <li><code>{kunde_name}</code> - Kundenname</li>
+                        <li><code>{firma}</code> - Firmenname</li>
+                        <li><code>{auftragsnummer}</code> - Auftragsnr.</li>
+                        <li><code>{auftragsdatum}</code> - Datum</li>
+                        <li><code>{gesamtbetrag}</code> - Betrag</li>
+                        <li><code>{sendungsnummer}</code> - Tracking</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const triggerValues = {{ trigger_values|tojson }};
+const currentValue = '{{ rule.trigger_value if rule else '' }}';
+
+function updateTriggerValues() {
+    const event = document.getElementById('triggerEvent').value;
+    const select = document.getElementById('triggerValue');
+    select.innerHTML = '<option value="">-- Bitte waehlen --</option>';
+
+    if (event && triggerValues[event]) {
+        Object.entries(triggerValues[event]).forEach(([key, label]) => {
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = label;
+            if (key === currentValue) opt.selected = true;
+            select.appendChild(opt);
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('triggerEvent').value) {
+        updateTriggerValues();
+    }
+});
+</script>
+{% endblock %}
