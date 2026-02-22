@@ -364,6 +364,50 @@
 
         <!-- Rechte Spalte: Schnellzugriff -->
         <div class="col-lg-4">
+            <!-- Custom Domain -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-globe2 me-1"></i>Eigene Domain</h6></div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('website_admin.save_custom_domain') }}">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Website-URL</label>
+                            <div class="input-group input-group-sm mb-1">
+                                <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                                <input type="text" class="form-control" name="custom_domain"
+                                       value="{{ custom_domain or '' }}"
+                                       placeholder="www.meine-stickerei.de">
+                            </div>
+                            <div class="form-text">Ihre Website unter eigener Domain erreichbar machen.</div>
+                        </div>
+                        {% if custom_domain %}
+                        <div class="alert alert-info py-2 small mb-3">
+                            <i class="bi bi-check-circle me-1"></i>
+                            Aktiv: <strong>{{ custom_domain }}</strong>
+                        </div>
+                        {% endif %}
+                        <div class="alert alert-warning py-2 small mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <strong>DNS-Einrichtung:</strong> Erstellen Sie bei Ihrem Domain-Anbieter einen <strong>A-Eintrag</strong> fuer Ihre Domain:
+                            <div class="mt-1 font-monospace bg-white rounded p-1 px-2" style="font-size: 0.78rem;">
+                                Typ: <strong>A</strong><br>
+                                Host: <strong>@</strong> (oder <strong>www</strong>)<br>
+                                Ziel: <strong>138.199.223.167</strong>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm w-100">
+                            <i class="bi bi-save me-1"></i>Domain speichern
+                        </button>
+                        {% if custom_domain %}
+                        <a href="{{ url_for('website_admin.remove_custom_domain') }}"
+                           class="btn btn-outline-danger btn-sm w-100 mt-1"
+                           onclick="return confirm('Domain-Zuordnung entfernen?')">
+                            <i class="bi bi-x-lg me-1"></i>Domain entfernen
+                        </a>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+
             <div class="card border-0 shadow-sm mb-3">
                 <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-lightning me-1"></i>Schnellzugriff</h6></div>
                 <div class="list-group list-group-flush">

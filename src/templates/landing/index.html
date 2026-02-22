@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StitchAdmin - Die ERP-Loesung fuer Stickerei-Betriebe</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <style>
+        :root {
+            --sa-primary: #1a6b5a;
+            --sa-primary-dark: #145346;
+            --sa-primary-light: #e8f5f1;
+            --sa-accent: #f59e0b;
+        }
+        * { font-family: 'Inter', sans-serif; }
+        body { overflow-x: hidden; }
+
+        /* ========== NAVBAR ========== */
+        .landing-nav {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            padding: 0.75rem 0;
+            position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+        }
+        .landing-nav .nav-brand {
+            font-weight: 800; font-size: 1.4rem; color: var(--sa-primary);
+            text-decoration: none; display: flex; align-items: center; gap: 0.5rem;
+        }
+        .landing-nav .nav-brand i { font-size: 1.6rem; }
+
+        /* ========== HERO ========== */
+        .hero-section {
+            padding: 8rem 0 5rem;
+            background: linear-gradient(135deg, #f0fdf4 0%, #e8f5f1 30%, #dbeafe 70%, #ede9fe 100%);
+            position: relative; overflow: hidden;
+        }
+        .hero-section::before {
+            content: ''; position: absolute; top: -50%; right: -20%;
+            width: 600px; height: 600px; border-radius: 50%;
+            background: radial-gradient(circle, rgba(26,107,90,0.08) 0%, transparent 70%);
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            background: rgba(26,107,90,0.1); color: var(--sa-primary);
+            padding: 0.4rem 1rem; border-radius: 50px; font-size: 0.85rem;
+            font-weight: 600; margin-bottom: 1.5rem;
+        }
+        .hero-title {
+            font-size: 3.2rem; font-weight: 800; line-height: 1.15;
+            color: #1a1a2e; margin-bottom: 1.5rem;
+        }
+        .hero-title span { color: var(--sa-primary); }
+        .hero-subtitle {
+            font-size: 1.2rem; color: #6b7280; line-height: 1.7;
+            max-width: 500px; margin-bottom: 2rem;
+        }
+        .hero-cta { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .btn-hero-primary {
+            background: var(--sa-primary); color: white; border: none;
+            padding: 0.85rem 2rem; border-radius: 12px; font-weight: 600;
+            font-size: 1.05rem; transition: all 0.2s;
+            text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;
+        }
+        .btn-hero-primary:hover { background: var(--sa-primary-dark); color: white; transform: translateY(-2px); box-shadow: 0 8px 25px rgba(26,107,90,0.3); }
+        .btn-hero-secondary {
+            background: white; color: #374151; border: 1.5px solid #d1d5db;
+            padding: 0.85rem 2rem; border-radius: 12px; font-weight: 600;
+            font-size: 1.05rem; transition: all 0.2s;
+            text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;
+        }
+        .btn-hero-secondary:hover { border-color: var(--sa-primary); color: var(--sa-primary); }
+
+        /* Screenshot-Mockup */
+        .hero-screenshot {
+            position: relative; margin-top: 1rem;
+        }
+        .screenshot-window {
+            background: white; border-radius: 16px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+        .screenshot-titlebar {
+            background: #f3f4f6; padding: 0.6rem 1rem;
+            display: flex; align-items: center; gap: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .screenshot-dot { width: 10px; height: 10px; border-radius: 50%; }
+        .screenshot-dot.red { background: #ef4444; }
+        .screenshot-dot.yellow { background: #f59e0b; }
+        .screenshot-dot.green { background: #22c55e; }
+        .screenshot-body {
+            padding: 0; min-height: 300px; position: relative; overflow: hidden;
+        }
+        .screenshot-body img {
+            width: 100%; height: auto; display: block;
+        }
+        .screenshot-placeholder {
+            background: linear-gradient(135deg, var(--sa-primary-light), #dbeafe);
+            min-height: 350px; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 1rem;
+            padding: 2rem;
+        }
+        .screenshot-placeholder i { font-size: 3rem; color: var(--sa-primary); opacity: 0.5; }
+
+        /* Floating Badges around Screenshot */
+        .float-badge {
+            position: absolute; background: white; border-radius: 12px;
+            padding: 0.6rem 1rem; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex; align-items: center; gap: 0.5rem;
+            font-size: 0.85rem; font-weight: 600; z-index: 10;
+            animation: float 3s ease-in-out infinite;
+        }
+        .float-badge:nth-child(2) { animation-delay: 0.5s; }
+        .float-badge:nth-child(3) { animation-delay: 1s; }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        /* ========== STATS BAR ========== */
+        .stats-bar {
+            background: white; padding: 2.5rem 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .stat-item { text-align: center; }
+        .stat-number { font-size: 2rem; font-weight: 800; color: var(--sa-primary); }
+        .stat-label { font-size: 0.85rem; color: #9ca3af; margin-top: 0.25rem; }
+
+        /* ========== FEATURES ========== */
+        .features-section { padding: 5rem 0; background: #fafbfc; }
+        .section-badge {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            background: var(--sa-primary-light); color: var(--sa-primary);
+            padding: 0.35rem 0.9rem; border-radius: 50px; font-size: 0.8rem;
+            font-weight: 600; margin-bottom: 1rem;
+        }
+        .section-title { font-size: 2.2rem; font-weight: 800; color: #1a1a2e; margin-bottom: 0.75rem; }
+        .section-subtitle { font-size: 1.05rem; color: #6b7280; max-width: 600px; margin: 0 auto 3rem; }
+
+        .feature-card {
+            background: white; border-radius: 16px; padding: 2rem;
+            border: 1px solid #f0f0f0; transition: all 0.3s;
+            height: 100%;
+        }
+        .feature-card:hover { transform: translateY(-4px); box-shadow: 0 12px 30px rgba(0,0,0,0.08); border-color: var(--sa-primary-light); }
+        .feature-icon {
+            width: 52px; height: 52px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; margin-bottom: 1.25rem;
+        }
+        .feature-card h5 { font-weight: 700; font-size: 1.05rem; color: #1a1a2e; margin-bottom: 0.5rem; }
+        .feature-card p { font-size: 0.9rem; color: #6b7280; line-height: 1.6; margin: 0; }
+
+        /* ========== SCREENSHOTS SECTION ========== */
+        .screenshots-section { padding: 5rem 0; background: white; }
+        .screenshot-showcase {
+            background: linear-gradient(135deg, #f8fafc, #f0fdf4);
+            border-radius: 20px; padding: 2.5rem;
+            border: 1px solid #e2e8f0;
+        }
+        .screenshot-tab {
+            cursor: pointer; padding: 1rem 1.25rem; border-radius: 12px;
+            border: 1px solid transparent; transition: all 0.2s;
+            margin-bottom: 0.5rem;
+        }
+        .screenshot-tab:hover, .screenshot-tab.active {
+            background: white; border-color: #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .screenshot-tab.active { border-color: var(--sa-primary); }
+        .screenshot-tab h6 { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.2rem; }
+        .screenshot-tab p { font-size: 0.8rem; color: #9ca3af; margin: 0; }
+        .screenshot-preview {
+            background: white; border-radius: 16px; overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+            border: 1px solid #e2e8f0;
+        }
+
+        /* ========== PRICING ========== */
+        .pricing-section { padding: 5rem 0; background: #fafbfc; }
+        .pricing-card {
+            background: white; border-radius: 20px; padding: 2.5rem;
+            border: 1px solid #e5e7eb; transition: all 0.3s;
+            position: relative; height: 100%;
+        }
+        .pricing-card.featured {
+            border-color: var(--sa-primary);
+            box-shadow: 0 12px 40px rgba(26,107,90,0.15);
+            transform: scale(1.03);
+        }
+        .pricing-card.featured::before {
+            content: 'Beliebt'; position: absolute; top: -12px; right: 24px;
+            background: var(--sa-accent); color: white; padding: 0.25rem 1rem;
+            border-radius: 50px; font-size: 0.8rem; font-weight: 700;
+        }
+        .pricing-tier { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin-bottom: 0.5rem; }
+        .pricing-price { font-size: 2.8rem; font-weight: 800; color: #1a1a2e; }
+        .pricing-price span { font-size: 1rem; font-weight: 500; color: #9ca3af; }
+        .pricing-desc { font-size: 0.9rem; color: #6b7280; margin: 0.75rem 0 1.5rem; }
+        .pricing-features { list-style: none; padding: 0; margin: 0 0 2rem; }
+        .pricing-features li {
+            padding: 0.4rem 0; font-size: 0.9rem; color: #374151;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .pricing-features li i { color: var(--sa-primary); font-size: 0.9rem; }
+        .btn-pricing {
+            width: 100%; padding: 0.75rem; border-radius: 12px;
+            font-weight: 600; font-size: 0.95rem; border: 2px solid;
+            transition: all 0.2s; text-decoration: none; display: block; text-align: center;
+        }
+        .btn-pricing-outline { border-color: #d1d5db; color: #374151; background: white; }
+        .btn-pricing-outline:hover { border-color: var(--sa-primary); color: var(--sa-primary); }
+        .btn-pricing-filled { border-color: var(--sa-primary); background: var(--sa-primary); color: white; }
+        .btn-pricing-filled:hover { background: var(--sa-primary-dark); border-color: var(--sa-primary-dark); color: white; }
+
+        /* ========== REGISTER / CTA ========== */
+        .register-section {
+            padding: 5rem 0; background: linear-gradient(135deg, var(--sa-primary-dark), var(--sa-primary));
+            color: white;
+        }
+        .register-card {
+            background: rgba(255,255,255,0.1); backdrop-filter: blur(10px);
+            border-radius: 20px; padding: 2.5rem;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+        .register-card .form-control {
+            background: rgba(255,255,255,0.95); border: none;
+            padding: 0.75rem 1rem; border-radius: 10px; font-size: 0.95rem;
+        }
+        .register-card .form-label { color: rgba(255,255,255,0.85); font-weight: 500; font-size: 0.9rem; }
+        .btn-register {
+            background: var(--sa-accent); color: #1a1a2e; border: none;
+            padding: 0.85rem 2rem; border-radius: 12px; font-weight: 700;
+            font-size: 1.05rem; width: 100%; transition: all 0.2s;
+        }
+        .btn-register:hover { background: #d97706; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(245,158,11,0.3); }
+
+        /* ========== FOOTER ========== */
+        .landing-footer {
+            background: #111827; color: #9ca3af; padding: 3rem 0 2rem;
+        }
+        .landing-footer a { color: #d1d5db; text-decoration: none; }
+        .landing-footer a:hover { color: white; }
+
+        /* ========== RESPONSIVE ========== */
+        @media (max-width: 768px) {
+            .hero-title { font-size: 2.2rem; }
+            .hero-section { padding: 6rem 0 3rem; }
+            .pricing-card.featured { transform: scale(1); }
+            .float-badge { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ========== NAVIGATION ========== -->
+<nav class="landing-nav">
+    <div class="container d-flex justify-content-between align-items-center">
+        <a href="/" class="nav-brand">
+            <i class="bi bi-tsunami"></i> StitchAdmin
+        </a>
+        <div class="d-flex align-items-center gap-3">
+            <a href="#features" class="text-decoration-none text-muted d-none d-md-inline fw-500">Features</a>
+            <a href="#preise" class="text-decoration-none text-muted d-none d-md-inline fw-500">Preise</a>
+            <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary btn-sm px-3">
+                <i class="bi bi-box-arrow-in-right me-1"></i>Login
+            </a>
+            <a href="#registrierung" class="btn btn-sm px-3" style="background: var(--sa-primary); color: white; border-radius: 8px;">
+                Kostenlos testen
+            </a>
+        </div>
+    </div>
+</nav>
+
+<!-- ========== HERO ========== -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <div class="hero-badge">
+                    <i class="bi bi-stars"></i> Speziell fuer Stickerei-Betriebe
+                </div>
+                <h1 class="hero-title">
+                    Ihr Betrieb.<br>
+                    <span>Komplett digital.</span>
+                </h1>
+                <p class="hero-subtitle">
+                    StitchAdmin ist die All-in-One ERP-Loesung fuer Stickerei-Betriebe.
+                    Auftraege, Produktion, CRM, Buchhaltung und Online-Shop -
+                    alles in einer modernen Oberflaeche.
+                </p>
+                <div class="hero-cta">
+                    <a href="#registrierung" class="btn-hero-primary">
+                        <i class="bi bi-rocket-takeoff"></i> 14 Tage kostenlos testen
+                    </a>
+                    <a href="#features" class="btn-hero-secondary">
+                        <i class="bi bi-play-circle"></i> Features ansehen
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="hero-screenshot">
+                    <!-- Floating Badges -->
+                    <div class="float-badge" style="top: 10%; left: -5%; background: #ecfdf5;">
+                        <i class="bi bi-check-circle-fill text-success"></i>
+                        <span>12 Auftraege heute</span>
+                    </div>
+                    <div class="float-badge" style="bottom: 25%; right: -3%; background: #fef3c7;">
+                        <i class="bi bi-cpu text-warning"></i>
+                        <span>3 Maschinen aktiv</span>
+                    </div>
+                    <div class="float-badge" style="bottom: 5%; left: 5%; background: #ede9fe;">
+                        <i class="bi bi-graph-up-arrow text-primary"></i>
+                        <span>+23% Umsatz</span>
+                    </div>
+
+                    <!-- App Window Mockup -->
+                    <div class="screenshot-window">
+                        <div class="screenshot-titlebar">
+                            <span class="screenshot-dot red"></span>
+                            <span class="screenshot-dot yellow"></span>
+                            <span class="screenshot-dot green"></span>
+                            <span class="ms-2 text-muted" style="font-size: 0.8rem;">stitchadmin.hahn-it-wuppertal.de/dashboard</span>
+                        </div>
+                        <div class="screenshot-body">
+                            {% if screenshot_dashboard %}
+                            <img src="{{ url_for('static', filename='img/screenshots/dashboard.png') }}" alt="StitchAdmin Dashboard">
+                            {% else %}
+                            <div class="screenshot-placeholder">
+                                <!-- CSS Dashboard Mockup -->
+                                <div class="w-100 px-3">
+                                    <div class="d-flex gap-2 mb-3">
+                                        <div style="height: 12px; width: 80px; background: #e2e8f0; border-radius: 6px;"></div>
+                                        <div class="ms-auto" style="height: 12px; width: 40px; background: var(--sa-primary-light); border-radius: 6px;"></div>
+                                    </div>
+                                    <div class="row g-2 mb-3">
+                                        <div class="col-3"><div style="height: 60px; background: #ecfdf5; border-radius: 8px;" class="d-flex align-items-center justify-content-center"><i class="bi bi-clipboard-check text-success"></i></div></div>
+                                        <div class="col-3"><div style="height: 60px; background: #fef3c7; border-radius: 8px;" class="d-flex align-items-center justify-content-center"><i class="bi bi-gear-wide-connected text-warning"></i></div></div>
+                                        <div class="col-3"><div style="height: 60px; background: #dbeafe; border-radius: 8px;" class="d-flex align-items-center justify-content-center"><i class="bi bi-people text-primary"></i></div></div>
+                                        <div class="col-3"><div style="height: 60px; background: #ede9fe; border-radius: 8px;" class="d-flex align-items-center justify-content-center"><i class="bi bi-cash-stack text-info"></i></div></div>
+                                    </div>
+                                    <div class="row g-2">
+                                        <div class="col-8">
+                                            <div style="height: 120px; background: white; border-radius: 8px; border: 1px solid #e5e7eb; padding: 0.75rem;">
+                                                <div style="height: 8px; width: 60px; background: #e2e8f0; border-radius: 4px; margin-bottom: 0.5rem;"></div>
+                                                <div class="d-flex gap-1 align-items-end" style="height: 70px;">
+                                                    <div style="width: 14%; height: 40%; background: var(--sa-primary); opacity: 0.3; border-radius: 3px;"></div>
+                                                    <div style="width: 14%; height: 60%; background: var(--sa-primary); opacity: 0.5; border-radius: 3px;"></div>
+                                                    <div style="width: 14%; height: 45%; background: var(--sa-primary); opacity: 0.4; border-radius: 3px;"></div>
+                                                    <div style="width: 14%; height: 80%; background: var(--sa-primary); opacity: 0.7; border-radius: 3px;"></div>
+                                                    <div style="width: 14%; height: 65%; background: var(--sa-primary); opacity: 0.6; border-radius: 3px;"></div>
+                                                    <div style="width: 14%; height: 90%; background: var(--sa-primary); border-radius: 3px;"></div>
+                                                    <div style="width: 14%; height: 70%; background: var(--sa-primary); opacity: 0.5; border-radius: 3px;"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div style="height: 120px; background: white; border-radius: 8px; border: 1px solid #e5e7eb; padding: 0.75rem;">
+                                                <div style="height: 8px; width: 50px; background: #e2e8f0; border-radius: 4px; margin-bottom: 0.75rem;"></div>
+                                                <div class="d-flex flex-column gap-1">
+                                                    <div class="d-flex gap-1"><div style="height: 8px; width: 60%; background: #22c55e; border-radius: 4px; opacity: 0.6;"></div><span style="font-size:0.55rem;color:#9ca3af;">72%</span></div>
+                                                    <div class="d-flex gap-1"><div style="height: 8px; width: 45%; background: #f59e0b; border-radius: 4px; opacity: 0.6;"></div><span style="font-size:0.55rem;color:#9ca3af;">54%</span></div>
+                                                    <div class="d-flex gap-1"><div style="height: 8px; width: 85%; background: #ef4444; border-radius: 4px; opacity: 0.6;"></div><span style="font-size:0.55rem;color:#9ca3af;">91%</span></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ========== STATS ========== -->
+<section class="stats-bar">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-6 col-md-3">
+                <div class="stat-item">
+                    <div class="stat-number">30+</div>
+                    <div class="stat-label">Module integriert</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-item">
+                    <div class="stat-number">100%</div>
+                    <div class="stat-label">Cloud-basiert</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-item">
+                    <div class="stat-number">DSGVO</div>
+                    <div class="stat-label">Konform (Server in DE)</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="stat-item">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">Zugriff von ueberall</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ========== FEATURES ========== -->
+<section class="features-section" id="features">
+    <div class="container">
+        <div class="text-center mb-5">
+            <div class="section-badge"><i class="bi bi-grid-3x3-gap"></i> Alles was Sie brauchen</div>
+            <h2 class="section-title">Ein System fuer Ihren gesamten Betrieb</h2>
+            <p class="section-subtitle">Von der Auftragserfassung bis zur Rechnung - StitchAdmin deckt alle Prozesse ab.</p>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background: #ecfdf5; color: #16a34a;">
+                        <i class="bi bi-clipboard-check"></i>
+                    </div>
+                    <h5>Auftragsmanagement</h5>
+                    <p>Auftraege erfassen, verfolgen und verwalten. Vom Angebot ueber die Auftragsbestaetigung bis zum Lieferschein und Rechnung.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background: #fef3c7; color: #d97706;">
+                        <i class="bi bi-cpu"></i>
+                    </div>
+                    <h5>Maschinenplanung</h5>
+                    <p>Kapazitaeten planen, Maschinenauslastung als Heatmap visualisieren und Produktionszeiten automatisch tracken.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background: #dbeafe; color: #2563eb;">
+                        <i class="bi bi-people"></i>
+                    </div>
+                    <h5>CRM & Kundenverwaltung</h5>
+                    <p>360-Grad-Kundenansicht mit Kontakthistorie, Rankings, E-Mail-Vorlagen und automatisierter Kommunikation.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background: #ede9fe; color: #7c3aed;">
+                        <i class="bi bi-receipt"></i>
+                    </div>
+                    <h5>Buchhaltung & Kasse</h5>
+                    <p>Rechnungen, Kassenbelege, Buchungsjournal und Kontenplan. Alles GoBD-konform und mit ZUGFeRD-Export.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background: #fce7f3; color: #db2777;">
+                        <i class="bi bi-palette"></i>
+                    </div>
+                    <h5>Design-Workflow</h5>
+                    <p>Stickdesigns verwalten, Kundenfreigaben einholen und Multi-Positions-Auftraege mit Vorschau bearbeiten.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background: #ffedd5; color: #ea580c;">
+                        <i class="bi bi-shop-window"></i>
+                    </div>
+                    <h5>Online-Shop & Website</h5>
+                    <p>Eigener Konfigurator-Shop und Firmen-Website. Produkte veroeffentlichen, Bestellungen automatisch als Auftraege erfassen.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background: #e0f2fe; color: #0284c7;">
+                        <i class="bi bi-envelope-paper"></i>
+                    </div>
+                    <h5>E-Mail Automation</h5>
+                    <p>Automatische E-Mails bei Statusaenderungen senden. Auftragsbestaetigung, Versandinfo - alles ohne manuellen Aufwand.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background: #f0fdf4; color: #16a34a;">
+                        <i class="bi bi-box-seam"></i>
+                    </div>
+                    <h5>Lager & Einkauf</h5>
+                    <p>Garnbestaende, Artikel-Lager, Bestellvorschlaege und Lieferanten-Bestellungen mit automatischer Nachbestellung.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="feature-card">
+                    <div class="feature-icon" style="background: #fef9c3; color: #a16207;">
+                        <i class="bi bi-file-earmark-text"></i>
+                    </div>
+                    <h5>Vertraege & Dokumente</h5>
+                    <p>Vertraege, Versicherungen und Wartungsvertraege verwalten. Posteingang digitalisieren und archivieren.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ========== SCREENSHOT SHOWCASE ========== -->
+<section class="screenshots-section" id="screenshots">
+    <div class="container">
+        <div class="text-center mb-5">
+            <div class="section-badge"><i class="bi bi-image"></i> So sieht's aus</div>
+            <h2 class="section-title">Modernes Design, intuitive Bedienung</h2>
+            <p class="section-subtitle">Entwickelt fuer den Arbeitsalltag - schnell, uebersichtlich und auf jedem Geraet nutzbar.</p>
+        </div>
+        <div class="screenshot-showcase">
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="screenshot-tab active" data-tab="dashboard" onclick="showScreenshot(this, 'dashboard')">
+                        <h6><i class="bi bi-grid-1x2 me-2 text-success"></i>Dashboard</h6>
+                        <p>Alle KPIs auf einen Blick - Auftraege, Umsatz, Produktion</p>
+                    </div>
+                    <div class="screenshot-tab" data-tab="orders" onclick="showScreenshot(this, 'orders')">
+                        <h6><i class="bi bi-clipboard-check me-2 text-primary"></i>Auftraege</h6>
+                        <p>Auftraege erfassen, bearbeiten und verfolgen</p>
+                    </div>
+                    <div class="screenshot-tab" data-tab="machines" onclick="showScreenshot(this, 'machines')">
+                        <h6><i class="bi bi-cpu me-2 text-warning"></i>Maschinenplanung</h6>
+                        <p>Heatmap-Ansicht der Maschinenauslastung</p>
+                    </div>
+                    <div class="screenshot-tab" data-tab="invoices" onclick="showScreenshot(this, 'invoices')">
+                        <h6><i class="bi bi-receipt me-2 text-danger"></i>Rechnungen</h6>
+                        <p>Professionelle Rechnungen mit ZUGFeRD</p>
+                    </div>
+                    <div class="screenshot-tab" data-tab="crm" onclick="showScreenshot(this, 'crm')">
+                        <h6><i class="bi bi-people me-2 text-info"></i>CRM</h6>
+                        <p>Kundenhistorie und Umsatz-Rankings</p>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <div class="screenshot-preview">
+                        <div class="screenshot-titlebar">
+                            <span class="screenshot-dot red"></span>
+                            <span class="screenshot-dot yellow"></span>
+                            <span class="screenshot-dot green"></span>
+                        </div>
+                        <div id="screenshotContent" class="screenshot-placeholder" style="min-height: 400px;">
+                            <i class="bi bi-grid-1x2"></i>
+                            <div class="text-center">
+                                <p class="fw-bold mb-1" style="color: var(--sa-primary);">Dashboard-Ansicht</p>
+                                <p style="font-size: 0.85rem; color: #9ca3af;">Platzieren Sie hier Ihre Screenshots unter<br><code>static/img/screenshots/</code></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ========== PRICING ========== -->
+<section class="pricing-section" id="preise">
+    <div class="container">
+        <div class="text-center mb-5">
+            <div class="section-badge"><i class="bi bi-tag"></i> Faire Preise</div>
+            <h2 class="section-title">Waehlen Sie Ihren Plan</h2>
+            <p class="section-subtitle">Starten Sie mit einer 14-taegigen kostenlosen Testphase. Keine Kreditkarte erforderlich.</p>
+        </div>
+        <div class="row g-4 justify-content-center">
+            <!-- Starter -->
+            <div class="col-md-6 col-lg-4">
+                <div class="pricing-card">
+                    <div class="pricing-tier">Starter</div>
+                    <div class="pricing-price">49<span> EUR/Monat</span></div>
+                    <p class="pricing-desc">Ideal fuer kleine Betriebe und Einsteiger</p>
+                    <ul class="pricing-features">
+                        <li><i class="bi bi-check-circle-fill"></i> 2 Benutzer</li>
+                        <li><i class="bi bi-check-circle-fill"></i> 3 Maschinen</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Auftraege & Produktion</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Kundenverwaltung</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Kasse & Rechnungen</li>
+                        <li><i class="bi bi-check-circle-fill"></i> 5 GB Speicher</li>
+                        <li><i class="bi bi-check-circle-fill"></i> E-Mail Support</li>
+                    </ul>
+                    <a href="#registrierung" class="btn-pricing btn-pricing-outline" onclick="selectPlan('starter')">
+                        Kostenlos testen
+                    </a>
+                </div>
+            </div>
+            <!-- Professional -->
+            <div class="col-md-6 col-lg-4">
+                <div class="pricing-card featured">
+                    <div class="pricing-tier">Professional</div>
+                    <div class="pricing-price">99<span> EUR/Monat</span></div>
+                    <p class="pricing-desc">Fuer wachsende Betriebe mit mehr Anforderungen</p>
+                    <ul class="pricing-features">
+                        <li><i class="bi bi-check-circle-fill"></i> 5 Benutzer</li>
+                        <li><i class="bi bi-check-circle-fill"></i> 10 Maschinen</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Alles aus Starter</li>
+                        <li><i class="bi bi-check-circle-fill"></i> CRM & E-Mail Automation</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Online-Shop & Website</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Buchhaltung & Export</li>
+                        <li><i class="bi bi-check-circle-fill"></i> 25 GB Speicher</li>
+                        <li><i class="bi bi-check-circle-fill"></i> E-Mail & Chat Support</li>
+                    </ul>
+                    <a href="#registrierung" class="btn-pricing btn-pricing-filled" onclick="selectPlan('professional')">
+                        Kostenlos testen
+                    </a>
+                </div>
+            </div>
+            <!-- Enterprise -->
+            <div class="col-md-6 col-lg-4">
+                <div class="pricing-card">
+                    <div class="pricing-tier">Enterprise</div>
+                    <div class="pricing-price">199<span> EUR/Monat</span></div>
+                    <p class="pricing-desc">Fuer grosse Betriebe und Multi-Standort</p>
+                    <ul class="pricing-features">
+                        <li><i class="bi bi-check-circle-fill"></i> Unbegrenzt Benutzer</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Unbegrenzt Maschinen</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Alles aus Professional</li>
+                        <li><i class="bi bi-check-circle-fill"></i> API-Zugriff</li>
+                        <li><i class="bi bi-check-circle-fill"></i> eBay & Marktplatz-Integration</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Eigene Domain</li>
+                        <li><i class="bi bi-check-circle-fill"></i> 100 GB Speicher</li>
+                        <li><i class="bi bi-check-circle-fill"></i> Telefon-Support & Onboarding</li>
+                    </ul>
+                    <a href="#registrierung" class="btn-pricing btn-pricing-outline" onclick="selectPlan('enterprise')">
+                        Kostenlos testen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ========== REGISTRIERUNG ========== -->
+<section class="register-section" id="registrierung">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-10">
+                <div class="row align-items-center g-5">
+                    <div class="col-lg-5">
+                        <h2 style="font-size: 2.2rem; font-weight: 800;">Jetzt starten -<br>14 Tage kostenlos!</h2>
+                        <p style="color: rgba(255,255,255,0.8); font-size: 1.05rem; line-height: 1.7; margin: 1.5rem 0;">
+                            Erstellen Sie Ihren Account in unter 2 Minuten. Keine Kreditkarte noetig, keine versteckten Kosten.
+                        </p>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="color: rgba(255,255,255,0.85); padding: 0.3rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="bi bi-check-circle-fill" style="color: var(--sa-accent);"></i> Sofort einsatzbereit
+                            </li>
+                            <li style="color: rgba(255,255,255,0.85); padding: 0.3rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="bi bi-check-circle-fill" style="color: var(--sa-accent);"></i> Eigene Subdomain (firma.stitchadmin.de)
+                            </li>
+                            <li style="color: rgba(255,255,255,0.85); padding: 0.3rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="bi bi-check-circle-fill" style="color: var(--sa-accent);"></i> Alle Features 14 Tage testen
+                            </li>
+                            <li style="color: rgba(255,255,255,0.85); padding: 0.3rem 0; display: flex; align-items: center; gap: 0.5rem;">
+                                <i class="bi bi-check-circle-fill" style="color: var(--sa-accent);"></i> Jederzeit kuendbar
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-lg-7">
+                        <div class="register-card">
+                            {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show mb-3">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                                {% endfor %}
+                            {% endif %}
+                            {% endwith %}
+
+                            <form method="POST" action="{{ url_for('landing.register') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="plan" id="selectedPlan" value="professional">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Firmenname *</label>
+                                        <input type="text" name="company_name" class="form-control" required
+                                               placeholder="Meine Stickerei GmbH">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Gewuenschte Subdomain *</label>
+                                        <div class="input-group">
+                                            <input type="text" name="subdomain" class="form-control" required
+                                                   placeholder="meine-firma" pattern="[a-z0-9\-]+"
+                                                   title="Nur Kleinbuchstaben, Zahlen und Bindestriche">
+                                            <span class="input-group-text" style="background: rgba(255,255,255,0.7); font-size: 0.8rem;">.stitchadmin.de</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Ihr Name *</label>
+                                        <input type="text" name="full_name" class="form-control" required
+                                               placeholder="Max Mustermann">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">E-Mail *</label>
+                                        <input type="email" name="email" class="form-control" required
+                                               placeholder="info@meine-stickerei.de">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Passwort *</label>
+                                        <input type="password" name="password" class="form-control" required
+                                               minlength="8" placeholder="Mind. 8 Zeichen">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Passwort wiederholen *</label>
+                                        <input type="password" name="password_confirm" class="form-control" required
+                                               minlength="8" placeholder="Passwort bestaetigen">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Telefon</label>
+                                        <input type="tel" name="phone" class="form-control"
+                                               placeholder="+49 123 456789">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Gewaehlter Plan</label>
+                                        <select name="plan_display" class="form-control" onchange="document.getElementById('selectedPlan').value=this.value;">
+                                            <option value="starter">Starter (49 EUR/Monat)</option>
+                                            <option value="professional" selected>Professional (99 EUR/Monat)</option>
+                                            <option value="enterprise">Enterprise (199 EUR/Monat)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check" style="color: rgba(255,255,255,0.8);">
+                                            <input class="form-check-input" type="checkbox" id="agbCheck" required>
+                                            <label class="form-check-label small" for="agbCheck">
+                                                Ich akzeptiere die <a href="#" style="color: var(--sa-accent);">AGB</a>
+                                                und <a href="#" style="color: var(--sa-accent);">Datenschutzerklaerung</a>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 mt-2">
+                                        <button type="submit" class="btn-register">
+                                            <i class="bi bi-rocket-takeoff me-2"></i>Kostenlos registrieren
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer class="landing-footer">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <h6 class="text-white mb-3"><i class="bi bi-tsunami me-2"></i>StitchAdmin</h6>
+                <p class="small">Die All-in-One ERP-Loesung fuer Stickerei-Betriebe. Entwickelt in Deutschland, gehostet in Deutschland.</p>
+            </div>
+            <div class="col-md-2">
+                <h6 class="text-white mb-3">Produkt</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-1"><a href="#features">Features</a></li>
+                    <li class="mb-1"><a href="#preise">Preise</a></li>
+                    <li class="mb-1"><a href="#registrierung">Registrierung</a></li>
+                </ul>
+            </div>
+            <div class="col-md-3">
+                <h6 class="text-white mb-3">Rechtliches</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-1"><a href="#">Impressum</a></li>
+                    <li class="mb-1"><a href="#">Datenschutz</a></li>
+                    <li class="mb-1"><a href="#">AGB</a></li>
+                </ul>
+            </div>
+            <div class="col-md-3">
+                <h6 class="text-white mb-3">Kontakt</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-1"><i class="bi bi-envelope me-2"></i>info@hahn-it-wuppertal.de</li>
+                    <li class="mb-1"><i class="bi bi-geo-alt me-2"></i>Wuppertal, Deutschland</li>
+                </ul>
+            </div>
+        </div>
+        <hr style="border-color: rgba(255,255,255,0.1); margin: 2rem 0 1rem;">
+        <div class="text-center small">
+            &copy; {{ today.year if today is defined else '2026' }} Hans Hahn / Hahn IT - Alle Rechte vorbehalten
+        </div>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function selectPlan(plan) {
+    document.getElementById('selectedPlan').value = plan;
+    var select = document.querySelector('select[name="plan_display"]');
+    if (select) select.value = plan;
+}
+
+function showScreenshot(el, tab) {
+    document.querySelectorAll('.screenshot-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+
+    var icons = {
+        'dashboard': 'bi-grid-1x2',
+        'orders': 'bi-clipboard-check',
+        'machines': 'bi-cpu',
+        'invoices': 'bi-receipt',
+        'crm': 'bi-people'
+    };
+    var labels = {
+        'dashboard': 'Dashboard-Ansicht',
+        'orders': 'Auftragsmanagement',
+        'machines': 'Maschinenplanung & Heatmap',
+        'invoices': 'Rechnungswesen',
+        'crm': 'CRM & Kundenmanagement'
+    };
+
+    var content = document.getElementById('screenshotContent');
+    // Try to load real screenshot image
+    var img = new Image();
+    img.src = '/static/img/screenshots/' + tab + '.png';
+    img.onload = function() {
+        content.innerHTML = '';
+        content.className = '';
+        content.style.minHeight = '';
+        content.appendChild(img);
+        img.style.width = '100%';
+        img.style.display = 'block';
+    };
+    img.onerror = function() {
+        content.className = 'screenshot-placeholder';
+        content.style.minHeight = '400px';
+        content.innerHTML = '<i class="bi ' + icons[tab] + '"></i>' +
+            '<div class="text-center"><p class="fw-bold mb-1" style="color: var(--sa-primary);">' + labels[tab] + '</p>' +
+            '<p style="font-size: 0.85rem; color: #9ca3af;">Screenshot: <code>static/img/screenshots/' + tab + '.png</code></p></div>';
+    };
+}
+
+// Smooth scroll for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(function(a) {
+    a.addEventListener('click', function(e) {
+        var target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+            e.preventDefault();
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    });
+});
+</script>
+</body>
+</html>

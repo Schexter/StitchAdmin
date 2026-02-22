@@ -46,7 +46,39 @@ def dashboard():
         'shop': WebsiteContent.get_section('shop'),
         'meta': {**WebsiteContent.get_section('meta'), **WebsiteContent.get_section('footer')},
     }
-    return render_template('website_admin/dashboard.html', sections=sections)
+    # Custom Domain aus WebsiteContent laden
+    custom_domain = WebsiteContent.get('domain', 'custom_domain')
+    return render_template('website_admin/dashboard.html', sections=sections, custom_domain=custom_domain)
+
+
+@website_admin_bp.route('/custom-domain', methods=['POST'])
+@login_required
+def save_custom_domain():
+    """Eigene Domain fuer Website speichern"""
+    domain = request.form.get('custom_domain', '').strip().lower()
+    # Domain bereinigen (https://, trailing slash entfernen)
+    domain = domain.replace('https://', '').replace('http://', '').rstrip('/')
+
+    if domain:
+        WebsiteContent.set('domain', 'custom_domain', domain,
+                          updated_by=current_user.username)
+        flash(f'Domain "{domain}" gespeichert. Bitte richten Sie den A-Eintrag bei Ihrem Domain-Anbieter ein.', 'success')
+    else:
+        flash('Bitte geben Sie eine Domain ein.', 'warning')
+
+    return redirect(url_for('website_admin.dashboard'))
+
+
+@website_admin_bp.route('/custom-domain/remove')
+@login_required
+def remove_custom_domain():
+    """Eigene Domain entfernen"""
+    entry = WebsiteContent.query.filter_by(section='domain', key='custom_domain').first()
+    if entry:
+        db.session.delete(entry)
+        db.session.commit()
+        flash('Domain-Zuordnung entfernt.', 'info')
+    return redirect(url_for('website_admin.dashboard'))
 
 
 @website_admin_bp.route('/hero', methods=['GET', 'POST'])

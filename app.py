@@ -173,6 +173,7 @@ def create_app():
             request.endpoint == 'static' or
             request.endpoint == 'root' or
             (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('setup.')) or
+            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('landing.')) or
             (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('website.')) or
             (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('shop.')) or
             (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('inquiry.')) or
@@ -350,6 +351,9 @@ def create_app():
     # E-Mail Automation
     register_blueprint_safe('src.controllers.email_automation_controller', 'email_automation_bp', 'E-Mail-Automation')
 
+    # Landing Page & Registrierung (oeffentlich)
+    register_blueprint_safe('src.controllers.landing_controller', 'landing_bp', 'Landing Page')
+
     # Banking
     register_blueprint_safe('src.controllers.banking_controller', 'banking_bp', 'Bankkonten')
 
@@ -373,18 +377,10 @@ def create_app():
     # ==========================================
     @app.route('/app')
     def root():
-        """App-Einstieg - Redirect zum Dashboard, Login oder Setup"""
-        # Setup-Check: Erstinstallation?
-        try:
-            from src.controllers.setup_wizard_controller import is_setup_complete
-            if not is_setup_complete():
-                return redirect(url_for('setup.welcome'))
-        except Exception as e:
-            print(f"[WARNUNG] Setup-Check fehlgeschlagen: {e}")
-
+        """App-Einstieg - Redirect zum Dashboard oder Landing"""
         if current_user.is_authenticated:
             return redirect(url_for('dashboard'))
-        return redirect(url_for('auth.login'))
+        return redirect(url_for('landing.index'))
 
     @app.route('/dashboard')
     @login_required
