@@ -225,66 +225,48 @@
     </div>
 </div>
 
-<!-- Manuelles Zahlungs-Modal (Bar/EC über SumUp TSE) -->
-<div class="modal fade" id="manualPaymentModal" tabindex="-1" data-bs-backdrop="static">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+<!-- EC-Kartenzahlung Modal (SumUp manuell) -->
+<div class="modal fade" id="ecPaymentModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-info text-white">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">
-                    <i class="bi bi-credit-card"></i>
-                    Zahlung über SumUp Terminal
+                    <i class="bi bi-credit-card-2-front"></i>
+                    EC / Kartenzahlung
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
-                <div class="alert alert-info">
-                    <h5><i class="bi bi-info-circle"></i> Bitte am SumUp Terminal eingeben:</h5>
-                </div>
+            <div class="modal-body text-center">
+                <p class="text-muted mb-2">Bitte diesen Betrag im SumUp Terminal eingeben:</p>
 
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="card border-primary">
-                            <div class="card-body text-center">
-                                <h6 class="text-muted">Belegnummer</h6>
-                                <h2 class="text-primary" id="manual-beleg-nummer">-</h2>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card border-success">
-                            <div class="card-body text-center">
-                                <h6 class="text-muted">Betrag</h6>
-                                <h2 class="text-success" id="manual-betrag">0,00 €</h2>
-                            </div>
-                        </div>
+                <div class="card border-primary mb-4">
+                    <div class="card-body py-4">
+                        <h1 class="display-3 text-primary fw-bold mb-0" id="ec-betrag">0,00 €</h1>
                     </div>
                 </div>
 
-                <div class="alert alert-warning">
+                <div class="alert alert-light border text-start">
                     <ol class="mb-0">
-                        <li>Geben Sie den <strong>Betrag</strong> im SumUp Terminal ein</li>
-                        <li>Verwenden Sie die <strong>Belegnummer</strong> als Referenz</li>
-                        <li>Führen Sie die Zahlung am Terminal durch</li>
-                        <li>Bestätigen Sie unten nach erfolgreicher Zahlung</li>
+                        <li>Betrag im <strong>SumUp Terminal</strong> eingeben</li>
+                        <li>Kunde zahlt mit <strong>EC-Karte</strong></li>
+                        <li>Nach erfolgreicher Zahlung <strong>unten bestätigen</strong></li>
                     </ol>
                 </div>
 
-                <div class="form-check mt-3">
-                    <input class="form-check-input" type="checkbox" id="payment-confirmed-check">
-                    <label class="form-check-label" for="payment-confirmed-check">
-                        <strong>Zahlung wurde am Terminal erfolgreich durchgeführt</strong>
+                <div class="form-check mt-3 text-start">
+                    <input class="form-check-input" type="checkbox" id="ec-payment-confirmed">
+                    <label class="form-check-label" for="ec-payment-confirmed">
+                        <strong>Kartenzahlung wurde erfolgreich durchgeführt</strong>
                     </label>
                 </div>
-
-                <input type="hidden" id="manual-payment-type" value="">
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                     <i class="bi bi-x"></i> Abbrechen
                 </button>
-                <button type="button" class="btn btn-success btn-lg" id="confirm-manual-payment-btn"
-                        onclick="confirmManualPayment()" disabled>
-                    <i class="bi bi-check-circle"></i> Verkauf abschließen
+                <button type="button" class="btn btn-primary btn-lg" id="confirm-ec-btn"
+                        onclick="completeECPayment()" disabled>
+                    <i class="bi bi-check-circle"></i> EC-Zahlung abschließen
                 </button>
             </div>
         </div>
@@ -355,25 +337,6 @@
     </div>
 </div>
 
-<!-- NEU: SumUp "Warten" Modal -->
-<div class="modal fade" id="sumupWaitingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Warte auf Kartenzahlung...</h5>
-            </div>
-            <div class="modal-body text-center">
-                <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p class="mt-3">Bitte den Anweisungen auf dem SumUp-Terminal folgen.</p>
-                <p><strong>Betrag: <span id="sumupAmount"></span></strong></p>
-                <hr>
-                <button class="btn btn-secondary" onclick="cancelSumUpPayment()">Zahlung am Terminal abbrechen</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Artikel-Liste Modal (unverändert) -->
 <div class="modal fade" id="articleListModal" tabindex="-1">
@@ -382,18 +345,13 @@
 
 <script>
 // Globale Variablen
-let cart = []; // Wird jetzt vom Backend über `get_warenkorb` befüllt
+let cart = [];
 let articles = [];
-let sumupWaitingModal = null;
-let sumupCheckoutId = null;
-let sumupPollingInterval = null;
-let searchType = 'artikel'; // 'artikel' oder 'auftrag'
+let searchType = 'artikel';
 let searchTimeout = null;
 
 // Initialisierung
 document.addEventListener('DOMContentLoaded', function() {
-    sumupWaitingModal = new bootstrap.Modal(document.getElementById('sumupWaitingModal'));
-
     // Lade initialen Warenkorb und aktualisiere die Anzeige
     fetchWarenkorb();
 
@@ -654,13 +612,12 @@ function startPayment(method) {
 
     switch(method) {
         case 'BAR':
-        case 'EC':
-        case 'SUMUP':
-            // Manuelles Zahlungs-Modal (über SumUp TSE)
-            openManualPaymentModal(method);
+            openCashModal();
+            break;
+        case 'EC_KARTE':
+            openECModal();
             break;
         case 'RECHNUNG':
-            // Auf Rechnung (Logik bleibt ähnlich)
             paymentInvoice();
             break;
     }
@@ -669,81 +626,60 @@ function startPayment(method) {
 // Globale Variablen für Modals
 let cashModal = null;
 let invoiceModal = null;
-let manualPaymentModal = null;
+let ecPaymentModal = null;
 let saleSuccessModal = null;
 let emailReceiptModal = null;
-let lastSaleResult = null;  // Speichert das letzte Verkaufsergebnis
+let lastSaleResult = null;
 
 // Initialisiere Modals
 document.addEventListener('DOMContentLoaded', function() {
     cashModal = new bootstrap.Modal(document.getElementById('cashModal'));
     invoiceModal = new bootstrap.Modal(document.getElementById('invoiceModal'));
-    manualPaymentModal = new bootstrap.Modal(document.getElementById('manualPaymentModal'));
+    ecPaymentModal = new bootstrap.Modal(document.getElementById('ecPaymentModal'));
     saleSuccessModal = new bootstrap.Modal(document.getElementById('saleSuccessModal'));
     emailReceiptModal = new bootstrap.Modal(document.getElementById('emailReceiptModal'));
 
     // Event-Listener für Rückgeld-Berechnung
     document.getElementById('cash-given').addEventListener('input', calculateChange);
 
-    // Event-Listener für Zahlungs-Bestätigung Checkbox
-    document.getElementById('payment-confirmed-check').addEventListener('change', function() {
-        document.getElementById('confirm-manual-payment-btn').disabled = !this.checked;
+    // Event-Listener für EC-Bestätigung Checkbox
+    document.getElementById('ec-payment-confirmed').addEventListener('change', function() {
+        document.getElementById('confirm-ec-btn').disabled = !this.checked;
     });
 });
 
-// Manuelles Zahlungs-Modal öffnen (Bar/EC)
-function openManualPaymentModal(paymentType) {
+// EC-Zahlung Modal öffnen
+function openECModal() {
     const total = cart.reduce((sum, item) => sum + (item.brutto_betrag || 0), 0);
-
-    // Generiere Belegnummer
-    const now = new Date();
-    const belegnummer = `B-${now.getFullYear()}${(now.getMonth()+1).toString().padStart(2,'0')}${now.getDate().toString().padStart(2,'0')}${now.getHours().toString().padStart(2,'0')}${now.getMinutes().toString().padStart(2,'0')}${now.getSeconds().toString().padStart(2,'0')}`;
-
-    // Setze Werte im Modal
-    document.getElementById('manual-beleg-nummer').textContent = belegnummer;
-    document.getElementById('manual-betrag').textContent = formatCurrency(total);
-    document.getElementById('manual-payment-type').value = paymentType;
-    document.getElementById('payment-confirmed-check').checked = false;
-    document.getElementById('confirm-manual-payment-btn').disabled = true;
-
-    // Öffne Modal
-    manualPaymentModal.show();
+    document.getElementById('ec-betrag').textContent = formatCurrency(total);
+    document.getElementById('ec-payment-confirmed').checked = false;
+    document.getElementById('confirm-ec-btn').disabled = true;
+    ecPaymentModal.show();
 }
 
-// Verkauf nach manueller Bestätigung abschließen
-function confirmManualPayment() {
-    const paymentType = document.getElementById('manual-payment-type').value;
-    const confirmed = document.getElementById('payment-confirmed-check').checked;
-
-    if (!confirmed) {
-        alert('Bitte bestätigen Sie die Zahlung!');
+// EC-Zahlung abschließen
+function completeECPayment() {
+    if (!document.getElementById('ec-payment-confirmed').checked) {
+        alert('Bitte bestätigen Sie die Kartenzahlung!');
         return;
     }
 
-    // Verkauf abschließen
-    fetch('/kasse/verkauf/abschliessen', {
+    document.getElementById('confirm-ec-btn').disabled = true;
+
+    fetch("{{ url_for('kasse.verkauf_abschliessen') }}", {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            zahlungsart: paymentType
-        })
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ zahlungsart: 'EC_KARTE' })
     })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            manualPaymentModal.hide();
-            alert(`Verkauf erfolgreich! Beleg-Nr.: ${data.beleg_nummer}`);
-            // Seite neu laden (Warenkorb ist bereits serverseitig geleert)
-            window.location.reload();
-        } else {
-            alert('Fehler: ' + data.error);
-        }
+    .then(res => res.json())
+    .then(result => {
+        ecPaymentModal.hide();
+        handleSaleCompletion(result);
     })
     .catch(error => {
-        console.error('Fehler beim Abschließen:', error);
-        alert('Ein Fehler ist aufgetreten!');
+        console.error('Fehler:', error);
+        alert('Fehler beim Abschluss der Zahlung: ' + error);
+        document.getElementById('confirm-ec-btn').disabled = false;
     });
 }
 
@@ -880,69 +816,9 @@ function completeInvoicePayment() {
     });
 }
 
-function startSumUpPayment() {
-    document.getElementById('payment-buttons').querySelectorAll('button').forEach(b => b.disabled = true);
-
-    fetch("{{ url_for('kasse.start_sumup_payment') }}", { method: 'POST' })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            sumupCheckoutId = data.checkout_id;
-            document.getElementById('sumupAmount').textContent = formatCurrency(data.amount);
-            sumupWaitingModal.show();
-            
-            // Starte Polling als Fallback zum Webhook
-            startSumUpPolling(sumupCheckoutId);
-
-            // HIER würde die Logik zur Aktivierung des Terminals via SumUp SDK/API kommen
-            // z.B. sumup.pay(data.checkout_id);
-            console.log("Starte SumUp-Zahlung mit Checkout-ID:", data.checkout_id);
-            alert("Bitte Zahlung am SumUp Terminal durchführen. Dies ist eine Demo.");
-
-        } else {
-            alert('Fehler beim Starten der SumUp-Zahlung: ' + data.error);
-            document.getElementById('payment-buttons').querySelectorAll('button').forEach(b => b.disabled = false);
-        }
-    });
-}
-
-function startSumUpPolling(checkoutId) {
-    // Stoppe vorheriges Polling, falls vorhanden
-    if (sumupPollingInterval) clearInterval(sumupPollingInterval);
-
-    sumupPollingInterval = setInterval(() => {
-        // Diese Route muss noch erstellt werden:
-        fetch(`/kasse/zahlung/status/${checkoutId}`)
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'PAID') {
-                console.log("Polling: Zahlung erfolgreich!");
-                handleSaleCompletion({success: true, message: "Zahlung via SumUp erfolgreich."});
-            }
-        });
-    }, 3000); // Alle 3 Sekunden prüfen
-}
-
-function cancelSumUpPayment() {
-    // Stoppe das Polling
-    if (sumupPollingInterval) clearInterval(sumupPollingInterval);
-    sumupPollingInterval = null;
-    
-    sumupWaitingModal.hide();
-    document.getElementById('payment-buttons').querySelectorAll('button').forEach(b => b.disabled = false);
-    
-    // Optional: Sende eine Storno-Anfrage an SumUp
-    console.log("SumUp-Zahlung abgebrochen für Checkout-ID:", sumupCheckoutId);
-}
-
 function handleSaleCompletion(result) {
-    // Stoppe jegliches Polling
-    if (sumupPollingInterval) clearInterval(sumupPollingInterval);
-    sumupPollingInterval = null;
-
     // Schließe alle Zahlungs-Modals
-    sumupWaitingModal.hide();
-    if (manualPaymentModal) manualPaymentModal.hide();
+    if (ecPaymentModal) ecPaymentModal.hide();
     if (cashModal) cashModal.hide();
     if (invoiceModal) invoiceModal.hide();
 

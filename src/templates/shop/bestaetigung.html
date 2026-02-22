@@ -1,0 +1,115 @@
+{% extends "shop/base_shop.html" %}
+{% block title %}Bestellung bestätigt{% endblock %}
+{% block content %}
+<div style="padding-top: 80px;">
+    <section class="ws-section">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="text-center mb-4">
+                        <div class="ws-feature-icon mx-auto mb-3" style="width: 80px; height: 80px; font-size: 2.5rem;">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                        <h1 style="font-size: 2rem; font-weight: 800; color: var(--ws-text);">Vielen Dank für Ihre Bestellung!</h1>
+                        <p style="color: var(--ws-text-muted); font-size: 1.1rem;">Ihre Bestellung wurde erfolgreich aufgenommen.</p>
+                    </div>
+
+                    <div class="ws-feature-card mb-4" style="padding: 2rem;">
+                        <div class="row text-center">
+                            <div class="col-md-4 mb-3">
+                                <small style="color: var(--ws-text-muted); display: block;">Bestellnummer</small>
+                                <span style="font-weight: 700; font-size: 1.15rem; color: var(--ws-text);">{{ order.order_number }}</span>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <small style="color: var(--ws-text-muted); display: block;">Status</small>
+                                <span class="badge {{ order.get_workflow_status_badge_class() }}" style="font-size: 0.85rem;">
+                                    {{ order.get_workflow_status_display() }}
+                                </span>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <small style="color: var(--ws-text-muted); display: block;">Betrag</small>
+                                <span class="ws-shop-price" style="font-size: 1.15rem;">{{ "%.2f"|format(order.total_price or 0) }} &euro;</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Details -->
+                    <div class="ws-feature-card mb-4" style="padding: 0; overflow: hidden;">
+                        <div style="padding: 1rem 1.5rem; border-bottom: 1px solid var(--ws-border);">
+                            <h5 style="font-weight: 700; color: var(--ws-text); margin: 0;">Bestelldetails</h5>
+                        </div>
+                        <div style="padding: 1.5rem;">
+                            {% if order.customer %}
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong style="color: var(--ws-text);">Kunde:</strong><br>
+                                    <span style="color: var(--ws-text-muted);">
+                                        {{ order.customer.display_name }}<br>
+                                        {% if order.customer.street %}
+                                        {{ order.customer.street }} {{ order.customer.house_number }}<br>
+                                        {{ order.customer.postal_code }} {{ order.customer.city }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong style="color: var(--ws-text);">Kontakt:</strong><br>
+                                    <span style="color: var(--ws-text-muted);">
+                                        {{ order.customer_email_for_tracking or order.customer.email }}<br>
+                                        {{ order.customer.phone or '' }}
+                                    </span>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            {% if order.items.count() > 0 %}
+                            <table class="table table-sm" style="color: var(--ws-text);">
+                                <thead>
+                                    <tr>
+                                        <th>Artikel</th>
+                                        <th>Menge</th>
+                                        <th class="text-end">Preis</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in order.items %}
+                                    <tr>
+                                        <td>
+                                            {{ item.article.name if item.article else 'Artikel' }}
+                                            {% if item.textile_size %}<br><small style="color: var(--ws-text-muted);">{{ item.textile_size }}</small>{% endif %}
+                                        </td>
+                                        <td>{{ item.quantity }}</td>
+                                        <td class="text-end">{{ "%.2f"|format(item.unit_price * item.quantity) }} &euro;</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Tracking Link -->
+                    <div class="ws-feature-card mb-4" style="padding: 2rem; background: var(--ws-primary-light); border-color: transparent;">
+                        <div class="text-center">
+                            <h5 style="font-weight: 700; color: var(--ws-text); margin-bottom: 0.5rem;">Bestellstatus verfolgen</h5>
+                            <p style="color: var(--ws-text-muted); margin-bottom: 1rem;">Speichern Sie diesen Link, um den Status Ihrer Bestellung jederzeit zu prüfen:</p>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="trackingUrl"
+                                       value="{{ request.host_url }}shop/status/{{ order.tracking_token }}" readonly style="border-radius: 10px 0 0 10px; border-color: var(--ws-border);">
+                                <button class="ws-btn ws-btn-primary" style="border-radius: 0 10px 10px 0;" onclick="navigator.clipboard.writeText(document.getElementById('trackingUrl').value); this.textContent='Kopiert!'">
+                                    <i class="bi bi-clipboard me-1"></i>Kopieren
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <a href="{{ url_for('shop.index') }}" class="ws-btn ws-btn-primary ws-btn-lg">
+                            <i class="bi bi-arrow-left"></i>Zurück zum Shop
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

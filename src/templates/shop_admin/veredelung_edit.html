@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Veredelungsart bearbeiten' if finishing else 'Neue Veredelungsart' }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="bi bi-brush me-2"></i>
+            {{ 'Veredelungsart bearbeiten' if finishing else 'Neue Veredelungsart' }}
+        </h2>
+        <a href="{{ url_for('shop_admin.veredelung_list') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurück
+        </a>
+    </div>
+
+    <form method="POST">
+        <div class="row">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0">Grunddaten</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Name</label>
+                                <input type="text" class="form-control" name="name"
+                                       value="{{ finishing.name if finishing else '' }}" required
+                                       placeholder="z.B. Stickerei">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Typ</label>
+                                <select class="form-select" name="finishing_type" required>
+                                    {% set types = [('stick', 'Stickerei'), ('druck', 'Siebdruck'), ('flex', 'Flex-Folie'), ('flock', 'Flock-Folie'), ('dtf', 'DTF-Druck'), ('sublimation', 'Sublimation'), ('tassendruck', 'Tassendruck')] %}
+                                    {% for val, label in types %}
+                                    <option value="{{ val }}" {{ 'selected' if finishing and finishing.finishing_type == val }}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung</label>
+                            <textarea class="form-control" name="description" rows="3"
+                                      placeholder="Beschreibung für den Shop...">{{ finishing.description if finishing else '' }}</textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Icon (Bootstrap Icons)</label>
+                                <input type="text" class="form-control" name="icon"
+                                       value="{{ finishing.icon if finishing else 'bi-brush' }}"
+                                       placeholder="bi-brush">
+                                <small class="text-muted">z.B. bi-brush, bi-printer, bi-cup-hot</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Sortierung</label>
+                                <input type="number" class="form-control" name="sort_order"
+                                       value="{{ finishing.sort_order if finishing else 0 }}">
+                            </div>
+                        </div>
+                        {% if finishing %}
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="is_active" {{ 'checked' if finishing.is_active }}>
+                            <label class="form-check-label">Aktiv</label>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Positionen -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0">Verfügbare Positionen</h6>
+                    </div>
+                    <div class="card-body">
+                        {% set all_positions = [
+                            ('brust_links', 'Brust links'), ('brust_rechts', 'Brust rechts'),
+                            ('brust_mitte', 'Brust Mitte'), ('ruecken', 'Rücken'),
+                            ('ruecken_oben', 'Rücken oben'), ('aermel_links', 'Ärmel links'),
+                            ('aermel_rechts', 'Ärmel rechts'), ('kragen', 'Kragen'),
+                            ('cap_front', 'Cap vorne'), ('cap_seite', 'Cap Seite'),
+                            ('cap_ruecken', 'Cap Rücken'), ('tasse', 'Tasse')
+                        ] %}
+                        {% set selected = finishing.get_available_positions() if finishing else [] %}
+                        <div class="row">
+                            {% for val, label in all_positions %}
+                            <div class="col-md-4 col-6 mb-2">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="positions" value="{{ val }}"
+                                           {{ 'checked' if val in selected }}>
+                                    <label class="form-check-label">{{ label }}</label>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <!-- Preise -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0"><i class="bi bi-currency-euro me-1"></i>Preise</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Einrichtungskosten (€)</label>
+                            <input type="number" class="form-control" name="setup_price" step="0.01"
+                                   value="{{ finishing.setup_price if finishing else 0 }}">
+                            <small class="text-muted">Einmalig pro Auftrag</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Preis pro Stück (€)</label>
+                            <input type="number" class="form-control" name="price_per_piece" step="0.01"
+                                   value="{{ finishing.price_per_piece if finishing else 0 }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Preis pro 1000 Stiche (€)</label>
+                            <input type="number" class="form-control" name="price_per_1000_stitches" step="0.01"
+                                   value="{{ finishing.price_per_1000_stitches if finishing else 0 }}">
+                            <small class="text-muted">Nur für Stickerei relevant</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Mindestmenge</label>
+                            <input type="number" class="form-control" name="min_quantity"
+                                   value="{{ finishing.min_quantity if finishing else 1 }}" min="1">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Einschränkungen -->
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0"><i class="bi bi-sliders me-1"></i>Einschränkungen</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Max. Farben</label>
+                            <input type="number" class="form-control" name="max_colors"
+                                   value="{{ finishing.max_colors if finishing else '' }}" placeholder="Unbegrenzt">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Max. Breite (mm)</label>
+                            <input type="number" class="form-control" name="max_width_mm"
+                                   value="{{ finishing.max_width_mm if finishing else '' }}" placeholder="Unbegrenzt">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Max. Höhe (mm)</label>
+                            <input type="number" class="form-control" name="max_height_mm"
+                                   value="{{ finishing.max_height_mm if finishing else '' }}" placeholder="Unbegrenzt">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg w-100">
+                    <i class="bi bi-check-lg me-1"></i>Speichern
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

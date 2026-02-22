@@ -48,6 +48,17 @@ class ZugpferdService:
     PROFILE_BASIC = "urn:ferd:CrossIndustryDocument:invoice:1p0:basic"
     PROFILE_COMFORT = "urn:ferd:CrossIndustryDocument:invoice:1p0:comfort"
     PROFILE_EXTENDED = "urn:ferd:CrossIndustryDocument:invoice:1p0:extended"
+    # XRechnung (EN 16931 CIUS für Deutschland)
+    PROFILE_XRECHNUNG = "urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0"
+
+    # Mapping von Kurzname zu Profil-URN
+    PROFILE_MAP = {
+        'MINIMUM': PROFILE_MINIMUM,
+        'BASIC': PROFILE_BASIC,
+        'COMFORT': PROFILE_COMFORT,
+        'EXTENDED': PROFILE_EXTENDED,
+        'XRECHNUNG': PROFILE_XRECHNUNG,
+    }
     
     # Namespaces
     NAMESPACES = {
@@ -228,13 +239,33 @@ class ZugpferdService:
         country = ET.SubElement(address, '{%s}CountryID' % self.NAMESPACES['ram'])
         country.text = self._safe_str(self._safe_get(seller_data, 'country', 'DE'))
 
-        # Tax Registration
-        tax_number = self._safe_get(seller_data, 'tax_number', '')
-        if tax_number:
+        # E-Mail und Telefon (für XRechnung relevant)
+        email = self._safe_get(seller_data, 'email', '')
+        if email:
+            contact = ET.SubElement(seller, '{%s}DefinedTradeContact' % self.NAMESPACES['ram'])
+            email_comm = ET.SubElement(contact, '{%s}EmailURIUniversalCommunication' % self.NAMESPACES['ram'])
+            email_uri = ET.SubElement(email_comm, '{%s}URIID' % self.NAMESPACES['ram'])
+            email_uri.text = self._safe_str(email)
+            phone = self._safe_get(seller_data, 'phone', '')
+            if phone:
+                phone_comm = ET.SubElement(contact, '{%s}TelephoneUniversalCommunication' % self.NAMESPACES['ram'])
+                phone_num = ET.SubElement(phone_comm, '{%s}CompleteNumber' % self.NAMESPACES['ram'])
+                phone_num.text = self._safe_str(phone)
+
+        # Tax Registration - USt-ID (VA) und/oder Steuernummer (FC)
+        vat_id = self._safe_get(seller_data, 'vat_id', '')
+        if vat_id:
             tax_reg = ET.SubElement(seller, '{%s}SpecifiedTaxRegistration' % self.NAMESPACES['ram'])
-            tax_id = ET.SubElement(tax_reg, '{%s}ID' % self.NAMESPACES['ram'])
-            tax_id.set('schemeID', 'VA')
-            tax_id.text = self._safe_str(tax_number)
+            tax_id_elem = ET.SubElement(tax_reg, '{%s}ID' % self.NAMESPACES['ram'])
+            tax_id_elem.set('schemeID', 'VA')
+            tax_id_elem.text = self._safe_str(vat_id)
+
+        tax_number = self._safe_get(seller_data, 'tax_number', '')
+        if tax_number and tax_number != vat_id:
+            tax_reg2 = ET.SubElement(seller, '{%s}SpecifiedTaxRegistration' % self.NAMESPACES['ram'])
+            tax_id_elem2 = ET.SubElement(tax_reg2, '{%s}ID' % self.NAMESPACES['ram'])
+            tax_id_elem2.set('schemeID', 'FC')
+            tax_id_elem2.text = self._safe_str(tax_number)
             
     def _add_buyer(self, agreement: ET.Element, buyer_data: Dict):
         """Füge Käufer-Informationen hinzu"""
@@ -258,6 +289,14 @@ class ZugpferdService:
 
         country = ET.SubElement(address, '{%s}CountryID' % self.NAMESPACES['ram'])
         country.text = self._safe_str(self._safe_get(buyer_data, 'country', 'DE'))
+
+        # Käufer USt-ID (falls Firmenkunde)
+        buyer_vat = self._safe_get(buyer_data, 'vat_id', '')
+        if buyer_vat:
+            tax_reg = ET.SubElement(buyer, '{%s}SpecifiedTaxRegistration' % self.NAMESPACES['ram'])
+            tax_id_elem = ET.SubElement(tax_reg, '{%s}ID' % self.NAMESPACES['ram'])
+            tax_id_elem.set('schemeID', 'VA')
+            tax_id_elem.text = self._safe_str(buyer_vat)
         
     def _add_delivery(self, delivery: ET.Element, invoice_data: Dict):
         """Füge Lieferinformationen hinzu"""
@@ -273,13 +312,47 @@ class ZugpferdService:
             date_elem.text = delivery_date
             
     def _add_payment_terms(self, settlement: ET.Element, invoice_data: Dict):
-        """Füge Zahlungsbedingungen hinzu"""
+        """Füge Zahlungsbedingungen und Bankdaten hinzu"""
         payment_ref = ET.SubElement(settlement, '{%s}PaymentReference' % self.NAMESPACES['ram'])
         payment_ref.text = self._safe_str(self._safe_get(invoice_data, 'payment_reference', ''))
 
         # Currency
         currency = ET.SubElement(settlement, '{%s}InvoiceCurrencyCode' % self.NAMESPACES['ram'])
         currency.text = self._safe_str(self._safe_get(invoice_data, 'currency', 'EUR'))
+
+        # Bankdaten als Zahlungsmittel (SpecifiedTradeSettlementPaymentMeans)
+        bank_details = invoice_data.get('bank_details', {})
+        iban = self._safe_get(bank_details, 'iban', '')
+        if iban:
+            payment_means = ET.SubElement(settlement, '{%s}SpecifiedTradeSettlementPaymentMeans' % self.NAMESPACES['ram'])
+            # TypeCode 58 = SEPA Überweisung
+            type_code = ET.SubElement(payment_means, '{%s}TypeCode' % self.NAMESPACES['ram'])
+            type_code.text = '58'
+            # Empfänger-Konto (Verkäufer)
+            payee_account = ET.SubElement(payment_means, '{%s}PayeePartyCreditorFinancialAccount' % self.NAMESPACES['ram'])
+            iban_elem = ET.SubElement(payee_account, '{%s}IBANID' % self.NAMESPACES['ram'])
+            iban_elem.text = self._safe_str(iban).replace(' ', '')
+            # BIC
+            bic = self._safe_get(bank_details, 'bic', '')
+            if bic:
+                institution = ET.SubElement(payment_means, '{%s}PayeeSpecifiedCreditorFinancialInstitution' % self.NAMESPACES['ram'])
+                bic_elem = ET.SubElement(institution, '{%s}BICID' % self.NAMESPACES['ram'])
+                bic_elem.text = self._safe_str(bic)
+
+        # MwSt-Aufschlüsselung (ApplicableTradeTax)
+        taxes = invoice_data.get('taxes', [])
+        for tax_info in taxes:
+            trade_tax = ET.SubElement(settlement, '{%s}ApplicableTradeTax' % self.NAMESPACES['ram'])
+            calc_amount = ET.SubElement(trade_tax, '{%s}CalculatedAmount' % self.NAMESPACES['ram'])
+            calc_amount.text = self._safe_str(tax_info.get('amount', 0))
+            tax_type = ET.SubElement(trade_tax, '{%s}TypeCode' % self.NAMESPACES['ram'])
+            tax_type.text = 'VAT'
+            # Bemessungsgrundlage
+            basis_amount = ET.SubElement(trade_tax, '{%s}BasisAmount' % self.NAMESPACES['ram'])
+            basis_amount.text = self._safe_str(tax_info.get('basis', tax_info.get('amount', 0)))
+            # Steuersatz
+            rate_percent = ET.SubElement(trade_tax, '{%s}RateApplicablePercent' % self.NAMESPACES['ram'])
+            rate_percent.text = self._safe_str(tax_info.get('rate', 19))
 
         # Payment Terms
         terms = ET.SubElement(settlement, '{%s}SpecifiedTradePaymentTerms' % self.NAMESPACES['ram'])
@@ -490,6 +563,18 @@ class ZugpferdService:
             logger.error("Fallback: Gebe Original-PDF ohne XML zurück")
             return pdf_content
 
+    def _get_conformance_level(self) -> str:
+        """Gibt ConformanceLevel passend zum aktiven Profil zurück"""
+        if self.profile == self.PROFILE_XRECHNUNG:
+            return 'XRECHNUNG'
+        elif self.profile == self.PROFILE_EXTENDED:
+            return 'EXTENDED'
+        elif self.profile == self.PROFILE_COMFORT:
+            return 'COMFORT'
+        elif self.profile == self.PROFILE_MINIMUM:
+            return 'MINIMUM'
+        return 'BASIC'
+
     def _set_pdfa3_metadata(self, pdf: 'pikepdf.Pdf'):
         """
         Setze PDF/A-3 Metadaten
@@ -526,7 +611,7 @@ class ZugpferdService:
       <zf:DocumentType>INVOICE</zf:DocumentType>
       <zf:DocumentFileName>factur-x.xml</zf:DocumentFileName>
       <zf:Version>1.0</zf:Version>
-      <zf:ConformanceLevel>BASIC</zf:ConformanceLevel>
+      <zf:ConformanceLevel>{self._get_conformance_level()}</zf:ConformanceLevel>
     </rdf:Description>
   </rdf:RDF>
 </x:xmpmeta>
@@ -560,8 +645,11 @@ class ZugpferdService:
             # Rechnungsdaten aufbereiten
             invoice_data = self._convert_rechnung_to_invoice_data(rechnung)
 
-            # 1. XML generieren
-            xml_string = self.create_invoice_xml(invoice_data, rechnung.zugpferd_profil.value)
+            # 1. XML generieren - Profil aus String- oder Enum-Feld auflösen
+            profil_raw = rechnung.zugpferd_profil or 'BASIC'
+            profil_name = profil_raw.value if hasattr(profil_raw, 'value') else str(profil_raw)
+            profil_urn = self.PROFILE_MAP.get(profil_name.upper(), self.PROFILE_BASIC)
+            xml_string = self.create_invoice_xml(invoice_data, profil_urn)
 
             # 2. XML validieren
             validation_result = self.validate_xml(xml_string)
@@ -596,89 +684,166 @@ class ZugpferdService:
         # Positionen aufbereiten
         items = []
         for pos in rechnung.positionen:
+            # MwSt-Satz: Kann Numeric-Feld oder FK zu MwStSatz sein
+            if hasattr(pos, 'mwst_satz') and pos.mwst_satz is not None:
+                if hasattr(pos.mwst_satz, 'satz'):
+                    # Altes Model: FK zu MwStSatz-Objekt
+                    mwst_rate = float(pos.mwst_satz.satz)
+                else:
+                    # Neues Model: Numeric-Feld direkt
+                    mwst_rate = float(pos.mwst_satz)
+            else:
+                mwst_rate = 19.0
+
+            # Bezeichnung: neues Model nutzt artikel_name
+            bezeichnung = getattr(pos, 'bezeichnung', None) or getattr(pos, 'artikel_name', '') or ''
+            # Netto-Gesamt: neues Model nutzt netto_betrag
+            netto = getattr(pos, 'netto_gesamt', None) or getattr(pos, 'netto_betrag', 0) or 0
+            # Brutto-Gesamt: neues Model nutzt brutto_betrag
+            brutto = getattr(pos, 'brutto_gesamt', None) or getattr(pos, 'brutto_betrag', 0) or 0
+            # MwSt-Betrag
+            mwst_betrag = getattr(pos, 'mwst_betrag', 0) or 0
+
             items.append({
                 'position': pos.position,
-                'description': f"{pos.artikel_name}\n{pos.beschreibung or ''}".strip(),
+                'description': bezeichnung,
                 'quantity': float(pos.menge),
-                'unit': pos.einheit,
+                'unit': pos.einheit or 'Stk.',
                 'unit_price': float(pos.einzelpreis),
-                'tax_rate': float(pos.mwst_satz),
-                'total_net': float(pos.netto_betrag),
-                'total': float(pos.brutto_betrag)
+                'tax_rate': mwst_rate,
+                'total_net': float(netto),
+                'total': float(brutto)
             })
 
         # Verkäufer-Daten aus CompanySettings laden
+        settings = None
         try:
             from src.models.company_settings import CompanySettings
             settings = CompanySettings.get_settings()
+
+            # Land-Code: "Deutschland" -> "DE", "Österreich" -> "AT", etc.
+            country_code = 'DE'
+            if settings.country:
+                country_map = {
+                    'deutschland': 'DE', 'österreich': 'AT', 'schweiz': 'CH',
+                    'austria': 'AT', 'germany': 'DE', 'switzerland': 'CH'
+                }
+                country_code = country_map.get(settings.country.lower(), settings.country[:2].upper())
 
             seller_data = {
                 'name': settings.display_name,
                 'street': f"{settings.street or ''} {settings.house_number or ''}".strip(),
                 'postcode': settings.postal_code or '',
                 'city': settings.city or '',
-                'country': settings.country[:2].upper() if settings.country else 'DE',  # ISO-Code
-                'tax_number': settings.vat_id or settings.tax_id or ''
+                'country': country_code,
+                'vat_id': settings.vat_id or '',
+                'tax_number': settings.tax_id or '',
+                'email': settings.email or '',
+                'phone': settings.phone or '',
             }
         except Exception as e:
             logger.warning(f"Konnte CompanySettings nicht laden: {e}, verwende Fallback-Daten")
             seller_data = {
                 'name': 'StitchAdmin GmbH',
-                'street': 'Musterstraße 1',
+                'street': 'Musterstrasse 1',
                 'postcode': '12345',
                 'city': 'Musterstadt',
                 'country': 'DE',
-                'tax_number': 'DE123456789'
+                'vat_id': '',
+                'tax_number': '',
+                'email': '',
+                'phone': '',
             }
 
-        # Käufer-Daten
-        buyer_data = {
-            'name': rechnung.kunde_name,
-            'street': rechnung.kunde_adresse.split('\n')[0] if rechnung.kunde_adresse else '',
-            'postcode': '',  # TODO: Adresse parsen
-            'city': '',
-            'country': 'DE'
-        }
+        # Käufer-Daten direkt aus dem Customer-Objekt
+        kunde = rechnung.kunde
+        if kunde:
+            buyer_street = f"{kunde.street or ''} {kunde.house_number or ''}".strip()
+            buyer_country = 'DE'
+            if kunde.country:
+                country_map = {
+                    'deutschland': 'DE', 'österreich': 'AT', 'schweiz': 'CH',
+                    'austria': 'AT', 'germany': 'DE', 'switzerland': 'CH'
+                }
+                buyer_country = country_map.get(kunde.country.lower(), kunde.country[:2].upper())
 
-        # Steuern aggregieren
-        taxes = []
-        # Gruppiere nach MwSt-Satz
-        tax_dict = {}
+            buyer_data = {
+                'name': kunde.display_name,
+                'street': buyer_street,
+                'postcode': kunde.postal_code or '',
+                'city': kunde.city or '',
+                'country': buyer_country,
+                'vat_id': kunde.vat_id or '',
+                'email': kunde.email or '',
+            }
+        else:
+            buyer_data = {
+                'name': 'Unbekannter Kunde',
+                'street': '',
+                'postcode': '',
+                'city': '',
+                'country': 'DE',
+                'vat_id': '',
+                'email': '',
+            }
+
+        # Steuern aggregieren - gruppiere nach MwSt-Satz
+        tax_dict = {}  # rate -> {'amount': X, 'basis': Y}
         for pos in rechnung.positionen:
-            rate = float(pos.mwst_satz)
+            if hasattr(pos, 'mwst_satz') and pos.mwst_satz is not None:
+                if hasattr(pos.mwst_satz, 'satz'):
+                    rate = float(pos.mwst_satz.satz)
+                else:
+                    rate = float(pos.mwst_satz)
+            else:
+                rate = 19.0
             if rate not in tax_dict:
-                tax_dict[rate] = 0
-            tax_dict[rate] += float(pos.mwst_betrag)
+                tax_dict[rate] = {'amount': 0, 'basis': 0}
+            mwst_betrag = getattr(pos, 'mwst_betrag', 0) or 0
+            netto = getattr(pos, 'netto_gesamt', None) or getattr(pos, 'netto_betrag', 0) or 0
+            tax_dict[rate]['amount'] += float(mwst_betrag)
+            tax_dict[rate]['basis'] += float(netto)
 
-        for rate, amount in tax_dict.items():
-            taxes.append({'rate': rate, 'amount': amount})
+        taxes = []
+        for rate, data in tax_dict.items():
+            taxes.append({'rate': rate, 'amount': round(data['amount'], 2), 'basis': round(data['basis'], 2)})
+
+        # Bankdaten
+        bank_details = {}
+        if settings:
+            bank_details = {
+                'bank_name': settings.bank_name or '',
+                'iban': settings.iban or '',
+                'bic': settings.bic or '',
+            }
+
+        # Betraege: neues Model nutzt netto_gesamt/mwst_gesamt/brutto_gesamt
+        summe_netto = getattr(rechnung, 'summe_netto', None) or getattr(rechnung, 'netto_gesamt', 0) or 0
+        summe_mwst = getattr(rechnung, 'summe_mwst', None) or getattr(rechnung, 'mwst_gesamt', 0) or 0
+        summe_brutto = getattr(rechnung, 'summe_brutto', None) or getattr(rechnung, 'brutto_gesamt', 0) or 0
 
         return {
             'invoice_number': rechnung.rechnungsnummer,
             'invoice_date': rechnung.rechnungsdatum,
-            'delivery_date': rechnung.leistungsdatum or rechnung.rechnungsdatum,
+            'delivery_date': getattr(rechnung, 'leistungsdatum', None) or rechnung.rechnungsdatum,
             'due_date': rechnung.faelligkeitsdatum,
             'customer_number': rechnung.kunde_id,
             'payment_reference': rechnung.rechnungsnummer,
-            'payment_terms': rechnung.zahlungsbedingungen or 'Zahlbar innerhalb 14 Tagen',
+            'payment_terms': getattr(rechnung, 'zahlungsbedingungen', None) or 'Zahlbar innerhalb 14 Tagen',
             'currency': 'EUR',
             'items': items,
             'seller': seller_data,
             'buyer': buyer_data,
-            'recipient': buyer_data,  # Gleich wie Käufer
-            'sender': seller_data,  # Gleich wie Verkäufer
-            'subtotal': float(rechnung.netto_gesamt),
-            'total_net': float(rechnung.netto_gesamt),
-            'total_tax': float(rechnung.mwst_gesamt),
-            'total_gross': float(rechnung.brutto_gesamt),
+            'recipient': buyer_data,
+            'sender': seller_data,
+            'subtotal': float(summe_netto),
+            'total_net': float(summe_netto),
+            'total_tax': float(summe_mwst),
+            'total_gross': float(summe_brutto),
             'taxes': taxes,
-            'discount_amount': float(rechnung.rabatt_betrag or 0),
-            'discount_percent': float(rechnung.rabatt_prozent or 0),
+            'discount_amount': float(getattr(rechnung, 'rabatt_betrag', 0) or 0),
+            'discount_percent': float(getattr(rechnung, 'rabatt_prozent', 0) or 0),
             'subject': f"Rechnung {rechnung.rechnungsnummer}",
-            'bank_details': {
-                'bank_name': settings.bank_name if 'settings' in locals() and settings else '',
-                'iban': settings.iban if 'settings' in locals() and settings else '',
-                'bic': settings.bic if 'settings' in locals() and settings else ''
-            },
-            'footer_text': settings.invoice_footer_text if 'settings' in locals() and settings and settings.invoice_footer_text else 'Vielen Dank für Ihren Auftrag!'
+            'bank_details': bank_details,
+            'footer_text': settings.invoice_footer_text if settings and settings.invoice_footer_text else 'Vielen Dank fuer Ihren Auftrag!'
         }

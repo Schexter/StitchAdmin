@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Neuer Post{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-pencil-square me-2"></i>Neuer Post</h2>
+        <a href="{{ url_for('social_media.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurueck
+        </a>
+    </div>
+
+    {% if not accounts %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Keine aktiven Social Media Konten. <a href="{{ url_for('social_media.accounts') }}">Konto verbinden</a>
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label class="form-label">Konto</label>
+                            <select name="account_id" class="form-select" required>
+                                {% for acc in accounts %}
+                                <option value="{{ acc.id }}">
+                                    {{ acc.platform|capitalize }} - {{ acc.account_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Text</label>
+                            <textarea name="text" class="form-control" rows="5" placeholder="Post-Text eingeben..."
+                                      maxlength="5000" required></textarea>
+                            <div class="form-text">Max. 5000 Zeichen</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Hashtags</label>
+                            <input type="text" name="hashtags" class="form-control"
+                                   placeholder="#stickerei #textildruck #individuell">
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Bild (optional)</label>
+                                <input type="file" name="image" class="form-control" accept="image/*">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Link (optional)</label>
+                                <input type="url" name="link_url" class="form-control" placeholder="https://...">
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label">Zeitplanung (optional)</label>
+                            <input type="datetime-local" name="scheduled_at" class="form-control">
+                            <div class="form-text">Leer lassen fuer sofortige Veroeffentlichung oder Entwurf</div>
+                        </div>
+
+                        <hr>
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="action" value="publish" class="btn btn-success">
+                                <i class="bi bi-send me-1"></i>Jetzt veroeffentlichen
+                            </button>
+                            <button type="submit" name="action" value="schedule" class="btn btn-primary">
+                                <i class="bi bi-clock me-1"></i>Planen
+                            </button>
+                            <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
+                                <i class="bi bi-file-earmark me-1"></i>Als Entwurf
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tipps -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header"><h6 class="mb-0">Tipps</h6></div>
+                <div class="card-body small">
+                    <p><strong>Facebook:</strong> Bilder werden direkt hochgeladen. Links erzeugen eine Vorschau.</p>
+                    <p><strong>Instagram:</strong> Bild ist Pflicht. Das Bild muss oeffentlich erreichbar sein (URL).</p>
+                    <p><strong>Hashtags:</strong> Werden automatisch unter den Text angehaengt.</p>
+                    <p><strong>Beste Zeiten:</strong> Di-Do, 9-11 Uhr oder 13-15 Uhr fuer B2B.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

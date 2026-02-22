@@ -23,9 +23,9 @@ class DeliveryNote(db.Model):
     delivery_note_number = db.Column(db.String(50), unique=True, nullable=False)
 
     # Verknüpfungen
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=True)
+    order_id = db.Column(db.String(50), db.ForeignKey('orders.id'), nullable=True)
     packing_list_id = db.Column(db.Integer, db.ForeignKey('packing_lists.id'), nullable=True)
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
+    customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=True)
     post_entry_id = db.Column(db.Integer, db.ForeignKey('post_entries.id'), nullable=True)
 
     # Datum

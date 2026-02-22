@@ -87,6 +87,15 @@ class SumUpToken(db.Model):
         """
         return SumUpToken.query.filter_by(user_id=user_id).first()
 
+    @staticmethod
+    def get_current_token():
+        """Alias fuer get_token() - Kompatibilitaet mit Settings-Controller."""
+        return SumUpToken.get_token()
+
+    def is_valid(self):
+        """Prueft ob der Token noch gueltig ist (nicht abgelaufen)."""
+        return not self.is_expired()
+
     def __repr__(self):
         return f"<SumUpToken (User: {self.user_id}, Expires: {self.expires_at})>"
 

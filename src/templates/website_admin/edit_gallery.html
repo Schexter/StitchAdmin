@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Galerie bearbeiten{% endblock %}
+{% block extra_css %}
+<style>
+    .gallery-item { cursor: grab; transition: transform 0.2s, box-shadow 0.2s; }
+    .gallery-item:active { cursor: grabbing; }
+    .gallery-item.sortable-ghost { opacity: 0.4; transform: scale(0.95); }
+    .gallery-item.sortable-chosen { box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+    .gallery-img-wrap { position: relative; height: 140px; overflow: hidden; border-radius: 8px 8px 0 0; background: #f8f9fa; }
+    .gallery-img-wrap img { width: 100%; height: 100%; object-fit: cover; }
+    .gallery-img-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; flex-direction: column; color: #adb5bd; }
+    .gallery-img-placeholder i { font-size: 2rem; }
+    .gallery-drag-handle { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.5); color: #fff; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem; z-index: 2; }
+    .gallery-delete-btn { position: absolute; top: 8px; right: 8px; z-index: 2; }
+    .gallery-slot-number { position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.6); color: #fff; border-radius: 4px; padding: 1px 8px; font-size: 0.7rem; z-index: 2; }
+    .drop-zone { border: 2px dashed #dee2e6; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: var(--sa-primary, #0d6efd); background: rgba(13,110,253,0.05); }
+    .drop-zone input[type="file"] { display: none; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-images me-2"></i>Galerie</h2>
+            <p class="text-muted mb-0">Bilder per Drag & Drop sortieren. Bis zu 12 Bilder.</p>
+        </div>
+        <a href="{{ url_for('website_admin.dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Zur&uuml;ck</a>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" id="galleryForm">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Sektions-Titel</label>
+                        <input type="text" class="form-control" name="section_title" value="{{ content.get('section_title', 'Unsere Arbeiten') }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Untertitel</label>
+                        <input type="text" class="form-control" name="section_subtitle" value="{{ content.get('section_subtitle', '') }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3" id="galleryGrid">
+            {% for i in range(1, 13) %}
+            <div class="col-md-4 col-lg-3 gallery-item" data-slot="{{ i }}">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="gallery-img-wrap">
+                        <div class="gallery-drag-handle"><i class="bi bi-grip-vertical"></i></div>
+                        <span class="gallery-slot-number">{{ i }}</span>
+                        {% set img = content.get('image_%d' % i) %}
+                        {% if img %}
+                        <img src="{% if img.startswith('http') %}{{ img }}{% else %}{{ url_for('static', filename=img) }}{% endif %}"
+                             alt="Bild {{ i }}" id="preview_{{ i }}">
+                        <button type="button" class="btn btn-sm btn-danger gallery-delete-btn" onclick="deleteImage({{ i }})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        <input type="hidden" name="delete_image_{{ i }}" id="del_flag_{{ i }}" value="">
+                        {% else %}
+                        <div class="gallery-img-placeholder" id="placeholder_{{ i }}">
+                            <i class="bi bi-image"></i>
+                            <small>Bild {{ i }}</small>
+                        </div>
+                        <img src="" alt="" id="preview_{{ i }}" style="display:none; width:100%; height:100%; object-fit:cover;">
+                        <input type="hidden" name="delete_image_{{ i }}" id="del_flag_{{ i }}" value="">
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-2">
+                        <div class="drop-zone mb-1" onclick="this.querySelector('input').click()" id="dropzone_{{ i }}">
+                            <i class="bi bi-cloud-arrow-up me-1"></i>
+                            <small>Bild hochladen</small>
+                            <input type="file" name="image_{{ i }}" accept="image/*" onchange="previewImage(this, {{ i }})">
+                        </div>
+                        <input type="text" class="form-control form-control-sm" name="image_{{ i }}_alt"
+                               value="{{ content.get('image_%d_alt' % i, '') }}" placeholder="Alt-Text / Beschreibung">
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Speichern</button>
+            <a href="{{ url_for('website.home') }}#galerie" target="_blank" class="btn btn-outline-secondary">
+                <i class="bi bi-eye me-1"></i>Vorschau
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+// Drag & Drop Sortierung
+new Sortable(document.getElementById('galleryGrid'), {
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    handle: '.gallery-drag-handle',
+    draggable: '.gallery-item',
+    onEnd: function() {
+        // Slot-Nummern aktualisieren
+        document.querySelectorAll('.gallery-item').forEach((item, idx) => {
+            item.querySelector('.gallery-slot-number').textContent = idx + 1;
+        });
+    }
+});
+
+// Bild-Vorschau bei Upload
+function previewImage(input, slot) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('preview_' + slot);
+            const placeholder = document.getElementById('placeholder_' + slot);
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
+            // Delete-Flag zuruecksetzen
+            document.getElementById('del_flag_' + slot).value = '';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+// Bild loeschen
+function deleteImage(slot) {
+    if (!confirm('Bild wirklich l\u00f6schen?')) return;
+    document.getElementById('del_flag_' + slot).value = '1';
+    const preview = document.getElementById('preview_' + slot);
+    preview.style.display = 'none';
+    const placeholder = document.getElementById('placeholder_' + slot);
+    if (placeholder) placeholder.style.display = 'flex';
+    // Visuelles Feedback
+    const deleteBtn = preview.parentElement.querySelector('.gallery-delete-btn');
+    if (deleteBtn) deleteBtn.style.display = 'none';
+}
+
+// Drop-Zone Drag-Events
+document.querySelectorAll('.drop-zone').forEach(zone => {
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        const input = zone.querySelector('input[type="file"]');
+        input.files = e.dataTransfer.files;
+        input.dispatchEvent(new Event('change'));
+    });
+});
+</script>
+{% endblock %}

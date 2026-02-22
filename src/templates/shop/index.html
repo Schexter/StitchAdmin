@@ -1,0 +1,144 @@
+{% extends "shop/base_shop.html" %}
+{% block title %}Shop - Konfigurator{% endblock %}
+{% block nav_class %}{% endblock %}
+{% block content %}
+<div>
+    <!-- Shop Hero -->
+    <section class="ws-shop-hero" style="padding-top: 7rem;">
+        <div class="ws-shop-hero-bg"></div>
+        <div class="container position-relative" style="z-index: 2;">
+            <div class="row align-items-center">
+                <div class="col-lg-7">
+                    <div class="ws-hero-badge">{{ content.get('badge_text', 'Online-Konfigurator') }}</div>
+                    <h1 class="ws-hero-title">
+                        <span class="ws-gradient-text">{{ content.get('title', 'Ihr individuelles Textil-Design') }}</span>
+                    </h1>
+                    <p class="ws-hero-subtitle">{{ content.get('subtitle', 'Wählen Sie eine Veredelungsart und gestalten Sie Ihr persönliches Produkt') }}</p>
+                    <div class="ws-hero-actions">
+                        <a href="#veredelung" class="ws-btn ws-btn-primary ws-btn-lg">
+                            <i class="bi bi-brush"></i>Veredelung wählen
+                        </a>
+                        <a href="{{ url_for('shop.textilien') }}" class="ws-btn ws-btn-ghost ws-btn-lg">
+                            <i class="bi bi-grid"></i>Textil-Katalog
+                        </a>
+                    </div>
+                </div>
+                <div class="col-lg-5 d-none d-lg-block">
+                    <div class="ws-hero-visual">
+                        <div class="ws-hero-card ws-hero-card-1">
+                            <i class="bi bi-palette"></i>Design wählen
+                        </div>
+                        <div class="ws-hero-card ws-hero-card-2">
+                            <i class="bi bi-layers"></i>Textil konfigurieren
+                        </div>
+                        <div class="ws-hero-card ws-hero-card-3">
+                            <i class="bi bi-bag-check"></i>Bestellen
+                        </div>
+                        <div class="ws-hero-icon-main">
+                            <i class="bi bi-shop"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Veredelungsarten -->
+    <section class="ws-section" id="veredelung">
+        <div class="container">
+            <div class="ws-section-header">
+                <div class="ws-section-badge">{{ content.get('finishing_badge', 'Veredelung') }}</div>
+                <h2>{{ content.get('finishing_title', 'Veredelungsarten') }}</h2>
+                <p>{{ content.get('finishing_subtitle', 'Welche Veredelung möchten Sie für Ihr Textil?') }}</p>
+            </div>
+
+            {% if finishing_types %}
+            <div class="row g-4">
+                {% for ft in finishing_types %}
+                <div class="col-md-6 col-lg-3">
+                    <div class="ws-feature-card text-center">
+                        <div class="ws-feature-icon mx-auto">
+                            <i class="{{ ft.icon or 'bi-brush' }}"></i>
+                        </div>
+                        <h3>{{ ft.name }}</h3>
+                        <p>{{ ft.description or ft.type_display }}</p>
+                        {% if ft.setup_price %}
+                        <div class="mt-2 mb-3">
+                            <span class="ws-shop-badge">ab {{ "%.2f"|format(ft.setup_price) }} €</span>
+                        </div>
+                        {% endif %}
+                        <a href="{{ url_for('shop.textilien') }}?veredelung={{ ft.id }}" class="ws-btn ws-btn-primary ws-btn-sm mt-auto">
+                            Textil wählen <i class="bi bi-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <div class="ws-feature-icon mx-auto mb-3" style="width: 72px; height: 72px; font-size: 2rem;">
+                    <i class="bi bi-shop"></i>
+                </div>
+                <h4 class="fw-bold" style="color: var(--ws-text-muted);">Der Shop wird gerade eingerichtet</h4>
+                <p style="color: var(--ws-text-muted);">Bitte schauen Sie später vorbei.</p>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Kategorien -->
+    {% if categories %}
+    <section class="ws-section ws-section-alt">
+        <div class="container">
+            <div class="ws-section-header">
+                <div class="ws-section-badge">{{ content.get('categories_badge', 'Sortiment') }}</div>
+                <h2>{{ content.get('categories_title', 'Produktkategorien') }}</h2>
+                <p>{{ content.get('categories_subtitle', 'Durchstöbern Sie unsere Produktkategorien') }}</p>
+            </div>
+            <div class="row g-4 justify-content-center">
+                {% for cat in categories %}
+                <div class="col-md-4 col-lg-3">
+                    <a href="{{ url_for('shop.textilien', kategorie=cat.id) }}" class="ws-feature-card ws-feature-card-img text-decoration-none d-block">
+                        <div class="ws-feature-img">
+                            {% if cat.image_path %}
+                            <img src="{{ url_for('static', filename=cat.image_path) }}" alt="{{ cat.name }}">
+                            {% else %}
+                            <div class="d-flex align-items-center justify-content-center h-100" style="background: var(--ws-bg-alt);">
+                                <i class="bi bi-folder fs-1" style="color: var(--ws-text-muted);"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="ws-feature-body text-center">
+                            <h3>{{ cat.name }}</h3>
+                        </div>
+                    </a>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- CTA -->
+    <section class="ws-section">
+        <div class="container text-center">
+            <div class="ws-section-header">
+                <h2>{{ content.get('cta_title', 'Direkt zum Katalog') }}</h2>
+                <p>{{ content.get('cta_subtitle', 'Oder stöbern Sie direkt in unserem kompletten Sortiment') }}</p>
+            </div>
+            <a href="{{ url_for('shop.textilien') }}" class="ws-btn ws-btn-primary ws-btn-lg">
+                <i class="bi bi-grid"></i>Textil-Katalog ansehen
+            </a>
+        </div>
+    </section>
+</div>
+
+{% block extra_js %}
+<script>
+const nav = document.getElementById('mainNav');
+window.addEventListener('scroll', () => {
+    nav.classList.toggle('ws-nav-scrolled', window.scrollY > 50);
+});
+</script>
+{% endblock %}
+{% endblock %}

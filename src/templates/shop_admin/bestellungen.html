@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Shop-Bestellungen{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-bag-check me-2"></i>Shop-Bestellungen</h2>
+            <p class="text-muted mb-0">Bestellungen die über den öffentlichen Shop eingegangen sind</p>
+        </div>
+        <a href="{{ url_for('shop_admin.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurück
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-0">
+            {% if orders %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Bestellnr.</th>
+                            <th>Kunde</th>
+                            <th>E-Mail</th>
+                            <th>Betrag</th>
+                            <th>Status</th>
+                            <th>Zahlung</th>
+                            <th>Datum</th>
+                            <th class="text-end">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td><code>{{ order.order_number }}</code></td>
+                            <td>{{ order.customer.display_name if order.customer else '-' }}</td>
+                            <td><small>{{ order.customer_email_for_tracking or '-' }}</small></td>
+                            <td class="fw-semibold">{{ "%.2f"|format(order.total_price or 0) }} €</td>
+                            <td>
+                                <span class="badge {{ order.get_workflow_status_badge_class() }}">
+                                    {{ order.get_workflow_status_display() }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge {{ order.get_payment_status_badge_class() }}">
+                                    {{ order.get_payment_status_display() }}
+                                </span>
+                            </td>
+                            <td>{{ order.created_at.strftime('%d.%m.%Y %H:%M') if order.created_at else '-' }}</td>
+                            <td class="text-end">
+                                <a href="{{ url_for('order_bp.order_detail', order_id=order.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> Details
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-inbox fs-1"></i>
+                <p class="mt-2">Noch keine Shop-Bestellungen</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

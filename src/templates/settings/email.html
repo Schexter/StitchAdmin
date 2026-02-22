@@ -25,16 +25,27 @@
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <label class="form-label">E-Mail-Versand über:</label>
+                        <label class="form-label">E-Mail-Versand ueber:</label>
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" name="email_method" id="method_outlook"
-                                   value="outlook" {% if settings.email_method == 'outlook' or not settings.email_method %}checked{% endif %}
+                            <input class="form-check-input" type="radio" name="email_method" id="method_smtp"
+                                   value="smtp" {% if settings.email_method == 'smtp' %}checked{% endif %}
                                    onchange="toggleEmailMethod()">
-                            <label class="form-check-label" for="method_outlook">
-                                <i class="bi bi-microsoft text-primary"></i> <strong>Outlook (empfohlen)</strong>
+                            <label class="form-check-label" for="method_smtp">
+                                <i class="bi bi-server text-success"></i> <strong>SMTP-Server (empfohlen)</strong>
                             </label>
                             <div class="text-muted small ms-4">
-                                Nutzt das lokal installierte Outlook. E-Mails erscheinen im Gesendet-Ordner und nutzen Ihre Signatur.
+                                Direkter E-Mail-Versand ueber SMTP. Funktioniert auf allen Plattformen (Windows, Linux, Server).
+                            </div>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="radio" name="email_method" id="method_outlook"
+                                   value="outlook" {% if settings.email_method == 'outlook' %}checked{% endif %}
+                                   onchange="toggleEmailMethod()">
+                            <label class="form-check-label" for="method_outlook">
+                                <i class="bi bi-microsoft text-primary"></i> <strong>Outlook (nur Windows)</strong>
+                            </label>
+                            <div class="text-muted small ms-4">
+                                Nutzt das lokal installierte Outlook. Nur fuer lokale Windows-Installation geeignet.
                             </div>
                         </div>
                         <div class="form-check mt-2">
@@ -42,21 +53,10 @@
                                    value="mailto" {% if settings.email_method == 'mailto' %}checked{% endif %}
                                    onchange="toggleEmailMethod()">
                             <label class="form-check-label" for="method_mailto">
-                                <i class="bi bi-link-45deg text-success"></i> <strong>Standard-Mailprogramm (mailto:)</strong>
+                                <i class="bi bi-link-45deg text-secondary"></i> <strong>Standard-Mailprogramm (mailto:)</strong>
                             </label>
                             <div class="text-muted small ms-4">
                                 Oeffnet das Standard-E-Mail-Programm des Betriebssystems. Anhaenge muessen manuell hinzugefuegt werden.
-                            </div>
-                        </div>
-                        <div class="form-check mt-2">
-                            <input class="form-check-input" type="radio" name="email_method" id="method_smtp"
-                                   value="smtp" {% if settings.email_method == 'smtp' %}checked{% endif %}
-                                   onchange="toggleEmailMethod()">
-                            <label class="form-check-label" for="method_smtp">
-                                <i class="bi bi-server text-warning"></i> <strong>SMTP-Server</strong>
-                            </label>
-                            <div class="text-muted small ms-4">
-                                Direkter E-Mail-Versand ueber SMTP. Erfordert Zugangsdaten.
                             </div>
                         </div>
                     </div>
@@ -67,30 +67,30 @@
                         <span id="outlook_status_text">Pruefe Outlook-Verfuegbarkeit...</span>
                     </div>
 
-                    <!-- WSL-Warnung (initial versteckt) -->
+                    <!-- WSL/Linux-Warnung (initial versteckt) -->
                     <div id="wsl_warning" class="alert alert-warning" style="display: none;">
                         <i class="bi bi-exclamation-triangle"></i>
-                        <strong>Hinweis:</strong> Sie scheinen StitchAdmin unter Linux/WSL zu starten.
-                        Die Outlook-Integration funktioniert nur, wenn die App direkt unter Windows gestartet wird.
+                        <strong>Hinweis:</strong> StitchAdmin laeuft auf einem Linux-Server.
+                        Die Outlook-Integration funktioniert nur auf lokalen Windows-Installationen.
                         <br><br>
-                        <strong>Loesung:</strong> Starten Sie StitchAdmin mit <code>python app.py</code> in einer Windows PowerShell oder CMD, nicht im WSL-Terminal.
+                        <strong>Empfehlung:</strong> Nutzen Sie <strong>SMTP-Server</strong> fuer den E-Mail-Versand auf dem Server.
                     </div>
 
                     <!-- Outlook-Kontoauswahl (wird dynamisch befuellt) -->
                     <div id="outlook_accounts_section" style="display: none;">
                         <div class="mb-3">
-                            <label for="outlook_account" class="form-label">Outlook-Konto auswählen:</label>
+                            <label for="outlook_account" class="form-label">Outlook-Konto auswaehlen:</label>
                             <select class="form-select" id="outlook_account" name="outlook_account">
                                 <option value="">Standard-Konto verwenden</option>
                             </select>
-                            <small class="text-muted">Wählen Sie das Konto, über das E-Mails versendet werden sollen.</small>
+                            <small class="text-muted">Waehlen Sie das Konto, ueber das E-Mails versendet werden sollen.</small>
                         </div>
                     </div>
                 </div>
             </div>
 
             <!-- SMTP-Einstellungen (nur sichtbar wenn SMTP ausgewaehlt) -->
-            <div id="smtp_settings" class="card mb-4" style="display: {% if settings.email_method == 'smtp' %}block{% else %}none{% endif %};">
+            <div id="smtp_settings" class="card mb-4" style="display: {% if settings.email_method == 'smtp' or not settings.email_method %}block{% else %}none{% endif %};">
                 <div class="card-header">
                     <h5><i class="bi bi-server"></i> SMTP-Server Konfiguration</h5>
                 </div>
@@ -100,7 +100,7 @@
                             <div class="mb-3">
                                 <label for="smtp_server" class="form-label">SMTP-Server</label>
                                 <input type="text" class="form-control" id="smtp_server" name="smtp_server"
-                                       value="{{ settings.smtp_server or '' }}" placeholder="smtp.gmail.com">
+                                       value="{{ settings.smtp_server or '' }}" placeholder="smtp.ionos.de">
                             </div>
                         </div>
                         <div class="col-md-4">
@@ -117,7 +117,7 @@
                             <div class="mb-3">
                                 <label for="smtp_username" class="form-label">Benutzername</label>
                                 <input type="text" class="form-control" id="smtp_username" name="smtp_username"
-                                       value="{{ settings.smtp_username or '' }}">
+                                       value="{{ settings.smtp_username or '' }}" placeholder="info@firma.de">
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -133,7 +133,7 @@
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="smtp_use_tls" name="smtp_use_tls"
                                {% if settings.smtp_use_tls or settings.smtp_use_tls == None %}checked{% endif %}>
-                        <label class="form-check-label" for="smtp_use_tls">TLS-Verschluesselung verwenden</label>
+                        <label class="form-check-label" for="smtp_use_tls">TLS-Verschluesselung verwenden (STARTTLS)</label>
                     </div>
 
                     <hr>
@@ -143,7 +143,7 @@
                             <div class="mb-3">
                                 <label for="smtp_from_email" class="form-label">Absender E-Mail</label>
                                 <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email"
-                                       value="{{ settings.smtp_from_email or '' }}" placeholder="rechnung@firma.de">
+                                       value="{{ settings.smtp_from_email or '' }}" placeholder="info@firma.de">
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -153,6 +153,31 @@
                                        value="{{ settings.smtp_from_name or '' }}" placeholder="Firma GmbH">
                             </div>
                         </div>
+                    </div>
+
+                    <!-- SMTP Test -->
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <button type="button" class="btn btn-outline-success btn-sm" onclick="testSmtp()">
+                            <i class="bi bi-lightning"></i> Verbindung testen
+                        </button>
+                        <span id="smtp_test_result" class="small"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- E-Mail-Signatur -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-pen"></i> E-Mail-Signatur</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="email_signature" class="form-label">Signatur (wird an jede E-Mail angehaengt)</label>
+                        <textarea class="form-control" id="email_signature" name="email_signature" rows="5"
+                                  placeholder="Mit freundlichen Gruessen&#10;&#10;Firma GmbH&#10;Musterstr. 1, 12345 Musterstadt&#10;Tel: 0123 456789">{{ settings.email_signature or '' }}</textarea>
+                        <small class="text-muted">
+                            Wird bei SMTP-Versand automatisch an alle E-Mails angehaengt.
+                        </small>
                     </div>
                 </div>
             </div>
@@ -173,13 +198,9 @@
                     <div class="mb-3">
                         <label for="invoice_email_template" class="form-label">E-Mail-Text (optional)</label>
                         <textarea class="form-control" id="invoice_email_template" name="invoice_email_template" rows="6"
-                                  placeholder="Sehr geehrte Damen und Herren,
-
-anbei erhalten Sie unsere Rechnung {invoice_number} ueber {amount}.
-
-Mit freundlichen Gruessen">{{ settings.invoice_email_template or '' }}</textarea>
+                                  placeholder="Sehr geehrte Damen und Herren,&#10;&#10;anbei erhalten Sie unsere Rechnung {invoice_number} ueber {amount}.&#10;&#10;Mit freundlichen Gruessen">{{ settings.invoice_email_template or '' }}</textarea>
                         <small class="text-muted">
-                            Leer lassen fuer Standard-Vorlage. Bei Outlook wird Ihre Signatur automatisch angehaengt.
+                            Leer lassen fuer Standard-Vorlage.
                         </small>
                     </div>
                 </div>
@@ -200,37 +221,55 @@ Mit freundlichen Gruessen">{{ settings.invoice_email_template or '' }}</textarea
     </div>
 
     <div class="col-md-4">
-        <!-- Outlook-Info -->
-        <div class="card bg-primary text-white mb-3">
+        <!-- SMTP-Hilfe -->
+        <div class="card bg-success text-white mb-3">
             <div class="card-body">
-                <h5 class="card-title"><i class="bi bi-microsoft"></i> Outlook-Integration</h5>
+                <h5 class="card-title"><i class="bi bi-server"></i> SMTP-Versand</h5>
                 <p class="mb-2"><strong>Vorteile:</strong></p>
                 <ul class="mb-0 ps-3">
-                    <li>Keine SMTP-Konfiguration noetig</li>
-                    <li>Nutzt Ihre E-Mail-Signatur</li>
-                    <li>E-Mails im Gesendet-Ordner</li>
-                    <li>Funktioniert mit Exchange/M365</li>
-                    <li>Sie koennen vor dem Senden pruefen</li>
+                    <li>Funktioniert auf Server &amp; lokal</li>
+                    <li>E-Mails werden direkt gesendet</li>
+                    <li>Anhaenge werden automatisch beigefuegt</li>
+                    <li>Kein lokales Outlook noetig</li>
                 </ul>
             </div>
         </div>
 
-        <!-- SMTP-Hilfe -->
-        <div class="card bg-info text-white">
+        <!-- SMTP-Beispiele -->
+        <div class="card bg-info text-white mb-3">
             <div class="card-body">
                 <h5 class="card-title"><i class="bi bi-info-circle"></i> SMTP-Beispiele</h5>
+                <p class="mb-1"><strong>IONOS / 1&amp;1:</strong><br>
+                Server: smtp.ionos.de<br>
+                Port: 587 (TLS)</p>
+
+                <p class="mb-1"><strong>Strato:</strong><br>
+                Server: smtp.strato.de<br>
+                Port: 465 (SSL)</p>
+
                 <p class="mb-1"><strong>Gmail:</strong><br>
                 Server: smtp.gmail.com<br>
                 Port: 587 (TLS)<br>
                 <small>Benoetigt App-Passwort!</small></p>
 
-                <p class="mb-1"><strong>Outlook.com:</strong><br>
+                <p class="mb-1"><strong>Outlook.com / M365:</strong><br>
                 Server: smtp-mail.outlook.com<br>
                 Port: 587 (TLS)</p>
 
-                <p class="mb-0"><strong>IONOS:</strong><br>
-                Server: smtp.ionos.de<br>
+                <p class="mb-0"><strong>All-Inkl:</strong><br>
+                Server: smtp.all-inkl.com<br>
                 Port: 587 (TLS)</p>
+            </div>
+        </div>
+
+        <!-- Outlook-Info -->
+        <div class="card border-secondary">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-microsoft"></i> Outlook-Integration</h5>
+                <p class="text-muted small mb-0">
+                    Die Outlook-Integration funktioniert nur auf lokalen Windows-Installationen mit installiertem Microsoft Outlook.
+                    Fuer den Server-Betrieb nutzen Sie SMTP.
+                </p>
             </div>
         </div>
     </div>
@@ -261,7 +300,6 @@ function checkOutlookAvailability() {
     const accountSelect = document.getElementById('outlook_account');
     const wslWarning = document.getElementById('wsl_warning');
 
-    // API-Aufruf um Outlook-Status zu pruefen
     fetch('/api/email/check-outlook')
         .then(response => response.json())
         .then(data => {
@@ -270,14 +308,11 @@ function checkOutlookAvailability() {
                 statusText.innerHTML = '<i class="bi bi-check-circle"></i> Outlook ist verfuegbar. Standard-E-Mail: ' + (data.email || 'Nicht erkannt');
                 wslWarning.style.display = 'none';
 
-                // Konten anzeigen wenn mehrere vorhanden
                 if (data.accounts && data.accounts.length > 0) {
                     accountsSection.style.display = 'block';
-                    // Bestehende Optionen entfernen (außer Standard)
                     while (accountSelect.options.length > 1) {
                         accountSelect.remove(1);
                     }
-                    // Konten hinzufügen
                     data.accounts.forEach(function(account) {
                         const option = document.createElement('option');
                         option.value = account.email || account.name;
@@ -292,8 +327,7 @@ function checkOutlookAvailability() {
                 statusText.innerHTML = '<i class="bi bi-exclamation-triangle"></i> ' + (data.message || 'Outlook nicht gefunden');
                 accountsSection.style.display = 'none';
 
-                // Zeige WSL-Warnung wenn Linux erkannt
-                if (data.message && data.message.includes('Linux')) {
+                if (data.message && (data.message.includes('Linux') || data.message.includes('Windows'))) {
                     wslWarning.style.display = 'block';
                 }
             }
@@ -305,11 +339,58 @@ function checkOutlookAvailability() {
         });
 }
 
+function testSmtp() {
+    const resultSpan = document.getElementById('smtp_test_result');
+    resultSpan.innerHTML = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Teste Verbindung...</span>';
+
+    fetch('/api/email/test-smtp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultSpan.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> ' + data.message + '</span>';
+            } else {
+                resultSpan.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> ' + data.message + '</span>';
+            }
+        })
+        .catch(error => {
+            resultSpan.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Fehler: ' + error + '</span>';
+        });
+}
+
 function testEmail() {
     const method = document.querySelector('input[name="email_method"]:checked').value;
 
-    if (method === 'outlook') {
-        // Outlook-Test
+    if (method === 'smtp') {
+        // SMTP-Test-E-Mail
+        const testTo = prompt('Test-E-Mail senden an:', document.getElementById('smtp_from_email').value || '');
+        if (!testTo) return;
+
+        const resultSpan = document.getElementById('smtp_test_result');
+        resultSpan.innerHTML = '<span class="text-info"><i class="bi bi-hourglass-split"></i> Sende Test-E-Mail...</span>';
+
+        fetch('/api/email/test-smtp', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({test_email: testTo})
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    resultSpan.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> ' + data.message + '</span>';
+                    alert('Test-E-Mail erfolgreich gesendet an ' + testTo + '!');
+                } else {
+                    resultSpan.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> ' + data.message + '</span>';
+                    alert('Fehler: ' + data.message);
+                }
+            })
+            .catch(error => {
+                resultSpan.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle"></i> Fehler</span>';
+                alert('Fehler beim Testen: ' + error);
+            });
+    } else if (method === 'outlook') {
         fetch('/api/email/test-outlook', {method: 'POST'})
             .then(response => response.json())
             .then(data => {
@@ -322,11 +403,7 @@ function testEmail() {
             .catch(error => {
                 alert('Fehler beim Testen: ' + error);
             });
-    } else if (method === 'smtp') {
-        // SMTP-Test - erst Formular speichern dann testen
-        alert('Bitte speichern Sie zuerst die Einstellungen, dann kann ein Test durchgefuehrt werden.');
     } else {
-        // mailto-Test
         window.location.href = 'mailto:test@example.com?subject=StitchAdmin%20Test&body=Dies%20ist%20eine%20Test-E-Mail.';
     }
 }

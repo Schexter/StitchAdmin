@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Social Media{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-megaphone me-2"></i>Social Media</h2>
+        <div class="btn-group">
+            <a href="{{ url_for('social_media.create_post') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Neuer Post
+            </a>
+            <a href="{{ url_for('social_media.calendar') }}" class="btn btn-outline-primary">
+                <i class="bi bi-calendar3 me-1"></i>Kalender
+            </a>
+            <a href="{{ url_for('social_media.accounts') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-gear me-1"></i>Konten
+            </a>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 bg-primary bg-opacity-10">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold text-primary">{{ accounts|length }}</div>
+                    <div class="text-muted">Aktive Konten</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 bg-warning bg-opacity-10">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold text-warning">{{ scheduled|length }}</div>
+                    <div class="text-muted">Geplante Posts</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 bg-success bg-opacity-10">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold text-success">{{ recent|length }}</div>
+                    <div class="text-muted">Letzte Posts</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 bg-danger bg-opacity-10">
+                <div class="card-body text-center">
+                    <div class="fs-2 fw-bold text-danger">{{ failed_count }}</div>
+                    <div class="text-muted">Fehlgeschlagen</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Geplante Posts -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-clock me-2"></i>Geplante Posts</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if scheduled %}
+                    <div class="list-group list-group-flush">
+                        {% for post in scheduled %}
+                        <a href="{{ url_for('social_media.post_detail', post_id=post.id) }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <span class="badge bg-{{ 'primary' if post.account.platform == 'facebook' else 'danger' }} me-1">
+                                        <i class="bi bi-{{ post.account.platform }}"></i>
+                                    </span>
+                                    {{ (post.text or '')[:60] }}{{ '...' if post.text and post.text|length > 60 }}
+                                </div>
+                                <small class="text-muted">
+                                    {{ post.scheduled_at.strftime('%d.%m. %H:%M') if post.scheduled_at else '' }}
+                                </small>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p>Keine geplanten Posts</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Letzte Posts -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Zuletzt veroeffentlicht</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if recent %}
+                    <div class="list-group list-group-flush">
+                        {% for post in recent %}
+                        <a href="{{ url_for('social_media.post_detail', post_id=post.id) }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <span class="badge bg-{{ 'primary' if post.account.platform == 'facebook' else 'danger' }} me-1">
+                                        <i class="bi bi-{{ post.account.platform }}"></i>
+                                    </span>
+                                    {{ (post.text or '')[:60] }}{{ '...' if post.text and post.text|length > 60 }}
+                                </div>
+                                <small class="text-success">
+                                    {{ post.published_at.strftime('%d.%m. %H:%M') if post.published_at else '' }}
+                                </small>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p>Noch keine Posts veroeffentlicht</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

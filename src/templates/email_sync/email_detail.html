@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}{{ email.subject or 'E-Mail' }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="{{ url_for('email_sync.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurueck
+        </a>
+        {% if email.has_attachments %}
+        <span class="badge bg-secondary"><i class="bi bi-paperclip me-1"></i>{{ email.attachment_count }} Anhaenge</span>
+        {% endif %}
+    </div>
+
+    <div class="row g-4">
+        <!-- E-Mail -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="mb-1">{{ email.subject or '(Kein Betreff)' }}</h4>
+                    <div class="d-flex justify-content-between text-muted small">
+                        <div>
+                            <strong>Von:</strong> {{ email.from_address }}<br>
+                            <strong>An:</strong> {{ email.to_address }}
+                            {% if email.cc_address %}
+                            <br><strong>CC:</strong> {{ email.cc_address }}
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            {{ email.received_date.strftime('%d.%m.%Y %H:%M') if email.received_date else '' }}
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if email.body_html %}
+                    <div class="border rounded p-3" style="max-height: 600px; overflow-y: auto;">
+                        {{ email.body_html|safe }}
+                    </div>
+                    {% elif email.body_text %}
+                    <pre class="mb-0" style="white-space: pre-wrap; max-height: 600px; overflow-y: auto;">{{ email.body_text }}</pre>
+                    {% else %}
+                    <p class="text-muted">Kein Inhalt</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Kunden-Zuordnung -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-person me-2"></i>Kunde</h5>
+                </div>
+                <div class="card-body">
+                    {% if email.customer %}
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-2 me-3">
+                            <i class="bi bi-person-check fs-5 text-success"></i>
+                        </div>
+                        <div>
+                            <strong>{{ email.customer.display_name if email.customer.display_name else email.customer.company_name or 'Kunde' }}</strong>
+                            <br><small class="text-muted">{{ email.customer.email or '' }}</small>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-3">Kein Kunde zugeordnet</p>
+                    {% endif %}
+
+                    <form method="POST" action="{{ url_for('email_sync.assign_customer', email_id=email.id) }}">
+                        <div class="input-group input-group-sm">
+                            <input type="text" name="customer_id" class="form-control" placeholder="Kunden-ID">
+                            <button type="submit" class="btn btn-outline-primary">Zuordnen</button>
+                        </div>
+                        <button type="submit" name="customer_id" value="" class="btn btn-outline-secondary btn-sm w-100 mt-2">
+                            <i class="bi bi-magic me-1"></i>Auto-Zuordnung
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Meta -->
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">Details</h5></div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Konto</td>
+                            <td>{{ email.email_account.name if email.email_account else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Empfangen</td>
+                            <td>{{ email.received_date.strftime('%d.%m.%Y %H:%M') if email.received_date else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Archiviert</td>
+                            <td>{{ email.archived_at.strftime('%d.%m.%Y %H:%M') if email.archived_at else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Message-ID</td>
+                            <td class="small font-monospace">{{ (email.message_id or '-')[:30] }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

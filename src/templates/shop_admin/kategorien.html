@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Shop-Kategorien{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-folder me-2"></i>Shop-Kategorien</h2>
+            <p class="text-muted mb-0">Kategorien für den öffentlichen Shop verwalten</p>
+        </div>
+        <a href="{{ url_for('shop_admin.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurück
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Kategorien-Liste -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-0">
+                    {% if categories %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Beschreibung</th>
+                                    <th>Sortierung</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cat in categories %}
+                                <tr>
+                                    <td class="fw-semibold">
+                                        {% if cat.parent_id %}<span class="text-muted ms-3">└ </span>{% endif %}
+                                        {{ cat.name }}
+                                    </td>
+                                    <td><small class="text-muted">{{ cat.description or '-' }}</small></td>
+                                    <td>{{ cat.sort_order }}</td>
+                                    <td>
+                                        <span class="badge {{ 'bg-success' if cat.is_active else 'bg-secondary' }}">
+                                            {{ 'Aktiv' if cat.is_active else 'Inaktiv' }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ cat.id }}">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form method="POST" action="{{ url_for('shop_admin.kategorie_delete', cat_id=cat.id) }}" class="d-inline"
+                                              onsubmit="return confirm('Kategorie wirklich löschen?')">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+
+                                <!-- Edit Modal -->
+                                <div class="modal fade" id="editModal{{ cat.id }}" tabindex="-1">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <form method="POST" action="{{ url_for('shop_admin.kategorie_edit', cat_id=cat.id) }}">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title">Kategorie bearbeiten</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Name</label>
+                                                        <input type="text" class="form-control" name="name" value="{{ cat.name }}" required>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Beschreibung</label>
+                                                        <textarea class="form-control" name="description" rows="2">{{ cat.description or '' }}</textarea>
+                                                    </div>
+                                                    <div class="mb-3">
+                                                        <label class="form-label">Sortierung</label>
+                                                        <input type="number" class="form-control" name="sort_order" value="{{ cat.sort_order }}">
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input" type="checkbox" name="is_active" {{ 'checked' if cat.is_active }}>
+                                                        <label class="form-check-label">Aktiv</label>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                                                    <button type="submit" class="btn btn-primary">Speichern</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-folder-x fs-1"></i>
+                        <p class="mt-2">Noch keine Kategorien vorhanden</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Neue Kategorie -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-plus-circle me-1"></i>Neue Kategorie</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('shop_admin.kategorie_create') }}">
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" class="form-control" name="name" required placeholder="z.B. T-Shirts">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung</label>
+                            <textarea class="form-control" name="description" rows="2" placeholder="Kurze Beschreibung..."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Übergeordnete Kategorie</label>
+                            <select class="form-select" name="parent_id">
+                                <option value="">Keine (Hauptkategorie)</option>
+                                {% for cat in categories %}
+                                {% if not cat.parent_id %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Sortierung</label>
+                            <input type="number" class="form-control" name="sort_order" value="0">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-plus-lg me-1"></i>Erstellen
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

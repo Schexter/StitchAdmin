@@ -589,9 +589,9 @@ class DocumentPosition(db.Model):
     # Werte aus PositionsTyp Enum
     
     # ─── REFERENZEN ───────────────────────────────────────────────────────
-    artikel_id = Column(Integer, ForeignKey('articles.id'))
+    artikel_id = Column(String(50), ForeignKey('articles.id'))
     artikel = relationship('Article')
-    
+
     # Referenz zum Auftragsposten (für Nachverfolgung)
     order_item_id = Column(Integer)  # Ohne FK, da order_items anders strukturiert sein könnte
     

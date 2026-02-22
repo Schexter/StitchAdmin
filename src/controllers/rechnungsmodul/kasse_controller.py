@@ -323,8 +323,8 @@ def verkauf_interface():
     try:
         # Zahlungsarten definieren
         zahlungsarten = [
-            {'id': 'BAR', 'name': 'Bar', 'icon': 'bi-cash'},
-            {'id': 'SUMUP', 'name': 'Karte (SumUp)', 'icon': 'bi-credit-card'},
+            {'id': 'BAR', 'name': 'Barzahlung', 'icon': 'bi-cash-coin'},
+            {'id': 'EC_KARTE', 'name': 'EC / Kartenzahlung', 'icon': 'bi-credit-card-2-front'},
             {'id': 'RECHNUNG', 'name': 'Auf Rechnung', 'icon': 'bi-receipt'}
         ]
 

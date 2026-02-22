@@ -39,6 +39,14 @@ class ZahlungsArt(Enum):
     RECHNUNG = "RECHNUNG"
     SONSTIGE = "SONSTIGE"
     
+class ZugpferdProfil(Enum):
+    """Verfügbare ZUGFeRD/XRechnung Profile"""
+    MINIMUM = "MINIMUM"
+    BASIC = "BASIC"
+    COMFORT = "COMFORT"
+    EXTENDED = "EXTENDED"
+    XRECHNUNG = "XRECHNUNG"
+
 class RechnungsStatus(Enum):
     """Rechnungsstatus"""
     ENTWURF = "draft"
@@ -134,9 +142,9 @@ class RechnungsPosition(Base):
     rechnung = relationship('Rechnung', back_populates='positionen')
     
     position = Column(Integer, nullable=False)
-    artikel_id = Column(Integer, ForeignKey('articles.id'), nullable=True)
+    artikel_id = Column(String(50), ForeignKey('articles.id'), nullable=True)
     artikel = relationship('Article')
-    
+
     bezeichnung = Column(String(500), nullable=False)
     menge = Column(Numeric(10, 3), nullable=False)
     einheit = Column(String(20), default='Stk.')
@@ -255,9 +263,9 @@ class BelegPosition(Base):
     beleg = relationship('KassenBeleg', back_populates='positionen')
     
     position = Column(Integer, nullable=False)
-    artikel_id = Column(Integer, ForeignKey('articles.id'), nullable=True)
+    artikel_id = Column(String(50), ForeignKey('articles.id'), nullable=True)
     artikel = relationship('Article')
-    
+
     bezeichnung = Column(String(500), nullable=False)
     menge = Column(Numeric(10, 3), nullable=False)
     einzelpreis = Column(Numeric(10, 2), nullable=False)

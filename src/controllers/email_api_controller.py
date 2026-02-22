@@ -173,6 +173,80 @@ Diese E-Mail wurde automatisch generiert.
         })
 
 
+@email_api_bp.route('/test-smtp', methods=['POST'])
+@login_required
+def test_smtp():
+    """
+    Testet die SMTP-Verbindung und sendet optional eine Test-E-Mail
+    """
+    try:
+        from src.models.company_settings import CompanySettings
+        settings = CompanySettings.get_settings()
+
+        if not settings.smtp_server:
+            return jsonify({
+                'success': False,
+                'message': 'Kein SMTP-Server konfiguriert. Bitte zuerst die Einstellungen speichern.'
+            })
+
+        if not settings.smtp_from_email:
+            return jsonify({
+                'success': False,
+                'message': 'Keine Absender-E-Mail konfiguriert.'
+            })
+
+        # Test-Empfaenger aus Request oder Absender-Adresse
+        test_to = None
+        if request.is_json:
+            test_to = request.json.get('test_email')
+        if not test_to:
+            test_to = settings.smtp_from_email
+
+        from src.services.email_service_new import EmailService
+        service = EmailService()
+
+        # Zuerst nur Verbindung testen
+        conn_result = service.test_connection()
+        if not conn_result.get('success'):
+            return jsonify({
+                'success': False,
+                'message': f'SMTP-Verbindung fehlgeschlagen: {conn_result.get("error", "Unbekannter Fehler")}'
+            })
+
+        # Verbindung OK - Test-E-Mail senden
+        result = service.send_email(
+            to=test_to,
+            subject='StitchAdmin - SMTP Test',
+            body='Diese Test-E-Mail wurde von StitchAdmin gesendet.\n\nWenn Sie diese E-Mail erhalten, funktioniert der SMTP-Versand korrekt.',
+            html_body='''<html><body style="font-family: Arial, sans-serif;">
+<h2>StitchAdmin SMTP-Test</h2>
+<p>Diese Test-E-Mail wurde von StitchAdmin gesendet.</p>
+<p style="color: green; font-weight: bold;">Wenn Sie diese E-Mail sehen, funktioniert der SMTP-Versand korrekt!</p>
+<hr>
+<p style="color: #666; font-size: 12px;">Automatisch generiert von StitchAdmin.</p>
+</body></html>''',
+            track=True
+        )
+
+        if result.get('success'):
+            return jsonify({
+                'success': True,
+                'message': f'Test-E-Mail erfolgreich an {test_to} gesendet!'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'SMTP-Verbindung OK, aber Versand fehlgeschlagen: {result.get("error", "Unbekannter Fehler")}'
+            })
+
+    except Exception as e:
+        logger.error(f"SMTP-Test fehlgeschlagen: {e}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
 @email_api_bp.route('/send-invoice/<int:rechnung_id>', methods=['POST'])
 @login_required
 def send_invoice_email(rechnung_id):
@@ -182,21 +256,33 @@ def send_invoice_email(rechnung_id):
     try:
         from src.models.rechnungsmodul import Rechnung
         from src.models.company_settings import CompanySettings
-        from src.services.outlook_service import OutlookService
         import tempfile
         import os
+
+        # OutlookService nur importieren wenn noetig (Windows-only)
+        OutlookService = None
+        try:
+            from src.services.outlook_service import OutlookService
+        except ImportError:
+            pass
 
         # Rechnung laden
         rechnung = Rechnung.query.get_or_404(rechnung_id)
         settings = CompanySettings.get_settings()
 
-        # Empfaenger-E-Mail
-        to_email = rechnung.kunde_email
+        # Empfaenger-E-Mail (kunde_email Snapshot oder Kunde-Relationship)
+        to_email = getattr(rechnung, 'kunde_email', None)
+        if not to_email and rechnung.kunde:
+            to_email = rechnung.kunde.email
         if not to_email:
             return jsonify({
                 'success': False,
                 'message': 'Keine E-Mail-Adresse fuer diesen Kunden hinterlegt'
             }), 400
+
+        # Betrag ermitteln (neues Model: brutto_gesamt, altes: summe_brutto)
+        betrag = float(getattr(rechnung, 'brutto_gesamt', None) or getattr(rechnung, 'summe_brutto', 0) or 0)
+        kunde_name = rechnung.kunde.display_name if rechnung.kunde else (getattr(rechnung, 'kunde_name', None) or 'Kunde')
 
         # PDF generieren
         from src.services.zugpferd_service import ZugpferdService
@@ -210,10 +296,16 @@ def send_invoice_email(rechnung_id):
             f.write(pdf_content)
 
         # E-Mail-Methode bestimmen
-        email_method = settings.email_method or 'outlook'
+        email_method = settings.email_method or 'smtp'
 
         if email_method == 'outlook':
             # Outlook-Versand
+            if not OutlookService:
+                return jsonify({
+                    'success': False,
+                    'message': 'Outlook ist auf diesem System nicht verfuegbar (nur Windows)'
+                })
+
             service = OutlookService()
 
             if not service.is_available():
@@ -225,16 +317,16 @@ def send_invoice_email(rechnung_id):
             # Betreff mit Platzhaltern ersetzen
             subject = (settings.invoice_email_subject or 'Rechnung {invoice_number}').format(
                 invoice_number=rechnung.rechnungsnummer,
-                customer_name=rechnung.kunde_name,
-                amount=f'{float(rechnung.brutto_gesamt or 0):,.2f}'
+                customer_name=kunde_name,
+                amount=f'{betrag:,.2f}'
             )
 
             # Body mit Platzhaltern oder Standard
             if settings.invoice_email_template:
                 body = settings.invoice_email_template.format(
                     invoice_number=rechnung.rechnungsnummer,
-                    customer_name=rechnung.kunde_name,
-                    amount=f'{float(rechnung.brutto_gesamt or 0):,.2f}'
+                    customer_name=kunde_name,
+                    amount=f'{betrag:,.2f}'
                 )
                 html_body = False
             else:
@@ -244,7 +336,7 @@ def send_invoice_email(rechnung_id):
 <body style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
 <p>Sehr geehrte Damen und Herren,</p>
 
-<p>anbei erhalten Sie unsere Rechnung <strong>{rechnung.rechnungsnummer}</strong> ueber <strong>{float(rechnung.brutto_gesamt or 0):,.2f} EUR</strong>.</p>
+<p>anbei erhalten Sie unsere Rechnung <strong>{rechnung.rechnungsnummer}</strong> ueber <strong>{betrag:,.2f} EUR</strong>.</p>
 
 <p>Bei Fragen stehen wir Ihnen gerne zur Verfuegung.</p>
 
@@ -281,8 +373,8 @@ def send_invoice_email(rechnung_id):
             import urllib.parse
             subject = (settings.invoice_email_subject or 'Rechnung {invoice_number}').format(
                 invoice_number=rechnung.rechnungsnummer,
-                customer_name=rechnung.kunde_name,
-                amount=f'{float(rechnung.brutto_gesamt or 0):,.2f}'
+                customer_name=kunde_name,
+                amount=f'{betrag:,.2f}'
             )
             body = f'Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unsere Rechnung {rechnung.rechnungsnummer}.\n\nMit freundlichen Gruessen'
 
@@ -295,11 +387,63 @@ def send_invoice_email(rechnung_id):
                 'message': 'Bitte fuegen Sie die PDF-Datei manuell als Anhang hinzu'
             })
 
+        elif email_method == 'smtp':
+            # SMTP-Versand
+            from src.services.email_service_new import EmailService
+            service = EmailService()
+
+            # Betreff mit Platzhaltern
+            subject = (settings.invoice_email_subject or 'Rechnung {invoice_number}').format(
+                invoice_number=rechnung.rechnungsnummer,
+                customer_name=kunde_name,
+                amount=f'{betrag:,.2f}'
+            )
+
+            # Body
+            if settings.invoice_email_template:
+                body = settings.invoice_email_template.format(
+                    invoice_number=rechnung.rechnungsnummer,
+                    customer_name=kunde_name,
+                    amount=f'{betrag:,.2f}'
+                )
+                html_body = None
+            else:
+                body = f'Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unsere Rechnung {rechnung.rechnungsnummer} ueber {betrag:,.2f} EUR.\n\nBei Fragen stehen wir Ihnen gerne zur Verfuegung.\n\nMit freundlichen Gruessen'
+                html_body = f'''<html><body style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+<p>Sehr geehrte Damen und Herren,</p>
+<p>anbei erhalten Sie unsere Rechnung <strong>{rechnung.rechnungsnummer}</strong> ueber <strong>{betrag:,.2f} EUR</strong>.</p>
+<p>Bei Fragen stehen wir Ihnen gerne zur Verfuegung.</p>
+<p>Mit freundlichen Gruessen</p>'''
+
+                # Signatur anhaengen
+                if settings.email_signature:
+                    html_body += f'<hr><div style="font-size: 12px; color: #666;">{settings.email_signature}</div>'
+
+                html_body += '</body></html>'
+
+            result = service.send_email(
+                to=to_email,
+                subject=subject,
+                body=body,
+                html_body=html_body,
+                attachments=[pdf_path]
+            )
+
+            if result.get('success'):
+                return jsonify({
+                    'success': True,
+                    'message': f'Rechnung per E-Mail an {to_email} gesendet'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': f'Versand fehlgeschlagen: {result.get("error", "Unbekannter Fehler")}'
+                })
+
         else:
-            # SMTP-Versand (TODO: implementieren)
             return jsonify({
                 'success': False,
-                'message': 'SMTP-Versand noch nicht implementiert'
+                'message': f'Unbekannte E-Mail-Methode: {email_method}'
             })
 
     except Exception as e:
@@ -319,20 +463,32 @@ def send_reminder_email(rechnung_id):
     try:
         from src.models.rechnungsmodul import Rechnung
         from src.models.company_settings import CompanySettings
-        from src.services.outlook_service import OutlookService
         from datetime import date
+
+        # OutlookService nur importieren wenn noetig (Windows-only)
+        OutlookService = None
+        try:
+            from src.services.outlook_service import OutlookService
+        except ImportError:
+            pass
 
         # Rechnung laden
         rechnung = Rechnung.query.get_or_404(rechnung_id)
         settings = CompanySettings.get_settings()
 
-        # Empfaenger-E-Mail
-        to_email = rechnung.kunde_email
+        # Empfaenger-E-Mail (kunde_email Snapshot oder Kunde-Relationship)
+        to_email = getattr(rechnung, 'kunde_email', None)
+        if not to_email and rechnung.kunde:
+            to_email = rechnung.kunde.email
         if not to_email:
             return jsonify({
                 'success': False,
                 'message': 'Keine E-Mail-Adresse fuer diesen Kunden hinterlegt'
             }), 400
+
+        # Betrag und Kundenname ermitteln
+        betrag = float(getattr(rechnung, 'brutto_gesamt', None) or getattr(rechnung, 'summe_brutto', 0) or 0)
+        kunde_name = rechnung.kunde.display_name if rechnung.kunde else (getattr(rechnung, 'kunde_name', None) or 'Kunde')
 
         # Mahnstufe aus Request
         reminder_level = request.json.get('reminder_level', 1) if request.is_json else 1
@@ -343,9 +499,15 @@ def send_reminder_email(rechnung_id):
             days_overdue = (date.today() - rechnung.faelligkeitsdatum).days
 
         # E-Mail-Methode
-        email_method = settings.email_method or 'outlook'
+        email_method = settings.email_method or 'smtp'
 
         if email_method == 'outlook':
+            if not OutlookService:
+                return jsonify({
+                    'success': False,
+                    'message': 'Outlook ist auf diesem System nicht verfuegbar (nur Windows)'
+                })
+
             service = OutlookService()
 
             if not service.is_available():
@@ -357,8 +519,8 @@ def send_reminder_email(rechnung_id):
             success = service.send_reminder_email(
                 to=to_email,
                 invoice_number=rechnung.rechnungsnummer,
-                customer_name=rechnung.kunde_name,
-                amount=float(rechnung.brutto_gesamt or 0),
+                customer_name=kunde_name,
+                amount=betrag,
                 original_due_date=rechnung.faelligkeitsdatum.strftime('%d.%m.%Y') if rechnung.faelligkeitsdatum else '',
                 days_overdue=days_overdue,
                 reminder_level=reminder_level,
@@ -374,6 +536,30 @@ def send_reminder_email(rechnung_id):
                 return jsonify({
                     'success': False,
                     'message': 'Fehler beim Erstellen der Zahlungserinnerung'
+                })
+
+        elif email_method == 'smtp':
+            from src.services.email_service_new import EmailService
+            service = EmailService()
+
+            result = service.send_payment_reminder(
+                to=to_email,
+                customer_name=kunde_name,
+                invoice_number=rechnung.rechnungsnummer,
+                due_date=rechnung.faelligkeitsdatum.strftime('%d.%m.%Y') if rechnung.faelligkeitsdatum else '',
+                amount=betrag,
+                reminder_level=reminder_level
+            )
+
+            if result.get('success'):
+                return jsonify({
+                    'success': True,
+                    'message': f'Zahlungserinnerung per E-Mail an {to_email} gesendet'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'message': f'Versand fehlgeschlagen: {result.get("error", "Unbekannter Fehler")}'
                 })
 
         else:

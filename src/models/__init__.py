@@ -1,6 +1,10 @@
 # StitchAdmin 2.0 - Models Package
 # Erstellt von Hans Hahn - Alle Rechte vorbehalten
 
+# Multi-Tenant Foundation
+from .tenant import Tenant, UserTenant
+from .tenant_mixin import TenantMixin
+
 # Kern-Models aus models.py importieren
 from .models import (
     db,
@@ -59,6 +63,15 @@ from .settings import (
     CalculationMode
 )
 
+# Shop (öffentlicher Webshop)
+from .shop import ShopCategory, ShopFinishingType, ShopDesignTemplate
+
+# Website CMS
+from .website_content import WebsiteContent
+
+# Anfragen (öffentliche Website)
+from .inquiry import Inquiry, InquiryStatus
+
 # Design-Management
 from .design import (
     Design,
@@ -114,6 +127,12 @@ except ImportError:
     POSTransaction = None
     POSPayment = None
 
+# Speicher-Einstellungen
+try:
+    from .storage_settings import StorageSettings
+except ImportError:
+    StorageSettings = None
+
 # Dokument-Workflow (Nummernkreise, Geschäftsdokumente, Zahlungen)
 try:
     from .document_workflow import (
@@ -146,6 +165,40 @@ except ImportError:
     DocumentPayment = None
     initialisiere_nummernkreise = None
     initialisiere_zahlungsbedingungen = None
+
+# Buchhaltung (optional)
+try:
+    from .buchhaltung import (
+        Konto,
+        BuchhaltungBuchung,
+        Kostenstelle,
+        Geschaeftsjahr,
+        UStVoranmeldung,
+        Finanzplan,
+        Kalkulation,
+    )
+    BUCHHALTUNG_AVAILABLE = True
+except ImportError:
+    BUCHHALTUNG_AVAILABLE = False
+    Konto = None
+    BuchhaltungBuchung = None
+    Kostenstelle = None
+    Geschaeftsjahr = None
+    UStVoranmeldung = None
+    Finanzplan = None
+    Kalkulation = None
+
+# Kalender (optional)
+try:
+    from .kalender import (
+        KalenderTermin,
+        KalenderRessource,
+    )
+    KALENDER_AVAILABLE = True
+except ImportError:
+    KALENDER_AVAILABLE = False
+    KalenderTermin = None
+    KalenderRessource = None
 
 # Exportiere alle Models
 __all__ = [
@@ -266,4 +319,36 @@ __all__ = [
     'initialisiere_nummernkreise',
     'initialisiere_zahlungsbedingungen',
     'DOCUMENT_WORKFLOW_AVAILABLE',
+
+    # Buchhaltung
+    'Konto',
+    'BuchhaltungBuchung',
+    'Kostenstelle',
+    'Geschaeftsjahr',
+    'UStVoranmeldung',
+    'Finanzplan',
+    'Kalkulation',
+    'BUCHHALTUNG_AVAILABLE',
+
+    # Kalender
+    'KalenderTermin',
+    'KalenderRessource',
+    'KALENDER_AVAILABLE',
+
+    # Shop (öffentlicher Webshop)
+    'ShopCategory',
+    'ShopFinishingType',
+    'ShopDesignTemplate',
+
+    # Website CMS
+    'WebsiteContent',
+
+    # Anfragen
+    'Inquiry',
+    'InquiryStatus',
+
+    # Multi-Tenant
+    'Tenant',
+    'UserTenant',
+    'TenantMixin',
 ]

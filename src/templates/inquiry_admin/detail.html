@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block title %}Anfrage {{ inquiry.inquiry_number }}{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1">{{ inquiry.inquiry_number }}</h2>
+            <p class="text-muted mb-0">{{ inquiry.type_label }} &ndash; {{ inquiry.created_at.strftime('%d.%m.%Y %H:%M') if inquiry.created_at else '' }}</p>
+        </div>
+        <a href="{{ url_for('inquiry_admin.list') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurück
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Hauptbereich -->
+        <div class="col-lg-8">
+            <!-- Kundendaten -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-person me-2"></i>Kundendaten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <strong>Name:</strong> {{ inquiry.full_name }}
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>E-Mail:</strong> <a href="mailto:{{ inquiry.email }}">{{ inquiry.email }}</a>
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>Telefon:</strong> {{ inquiry.phone or '-' }}
+                        </div>
+                        <div class="col-md-6 mb-2">
+                            <strong>Firma:</strong> {{ inquiry.company_name or '-' }}
+                        </div>
+                    </div>
+                    {% if inquiry.customer_id %}
+                    <a href="{{ url_for('customers.detail', customer_id=inquiry.customer_id) }}" class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="bi bi-person-badge me-1"></i>Kunde im CRM öffnen
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Anfrage-Details -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-chat-text me-2"></i>Anfrage-Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Beschreibung:</strong>
+                        <p class="mb-0 mt-1">{{ inquiry.description }}</p>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <strong>Menge:</strong> {{ inquiry.quantity or '-' }}
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <strong>Textilart:</strong> {{ inquiry.textile_type or '-' }}
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <strong>Wunschtermin:</strong> {{ inquiry.desired_date.strftime('%d.%m.%Y') if inquiry.desired_date else '-' }}
+                        </div>
+                    </div>
+                    {% if inquiry.design_file_path %}
+                    <div class="mt-3">
+                        <strong>Hochgeladene Datei:</strong>
+                        <a href="{{ url_for('static', filename=inquiry.design_file_path) }}" target="_blank" class="btn btn-sm btn-outline-secondary ms-2">
+                            <i class="bi bi-download me-1"></i>{{ inquiry.design_file_name }}
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- DSGVO -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-shield-check me-2"></i>DSGVO-Einwilligung</h5>
+                </div>
+                <div class="card-body">
+                    <span class="badge bg-{{ 'success' if inquiry.dsgvo_consent else 'danger' }}">
+                        {{ 'Einwilligung erteilt' if inquiry.dsgvo_consent else 'Keine Einwilligung' }}
+                    </span>
+                    {% if inquiry.dsgvo_consent_at %}
+                    <small class="text-muted ms-2">am {{ inquiry.dsgvo_consent_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                    {% endif %}
+                    {% if inquiry.dsgvo_consent_ip %}
+                    <small class="text-muted ms-2">IP: {{ inquiry.dsgvo_consent_ip }}</small>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Interne Notizen -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-sticky me-2"></i>Interne Notizen</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('inquiry_admin.save_notes', id=inquiry.id) }}">
+                        <textarea class="form-control mb-2" name="internal_notes" rows="3"
+                                  placeholder="Interne Notizen...">{{ inquiry.internal_notes or '' }}</textarea>
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            <i class="bi bi-save me-1"></i>Speichern
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seitenleiste -->
+        <div class="col-lg-4">
+            <!-- Status ändern -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Status</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <span class="badge bg-{{ inquiry.status_color }} fs-6">
+                            <i class="{{ inquiry.status_icon }} me-1"></i>{{ inquiry.status_label }}
+                        </span>
+                    </div>
+                    <form method="POST" action="{{ url_for('inquiry_admin.change_status', id=inquiry.id) }}">
+                        <select name="status" class="form-select form-select-sm mb-2">
+                            <option value="neu" {{ 'selected' if inquiry.status == 'neu' }}>Neu</option>
+                            <option value="in_bearbeitung" {{ 'selected' if inquiry.status == 'in_bearbeitung' }}>In Bearbeitung</option>
+                            <option value="angebot_erstellt" {{ 'selected' if inquiry.status == 'angebot_erstellt' }}>Angebot erstellt</option>
+                            <option value="angebot_versendet" {{ 'selected' if inquiry.status == 'angebot_versendet' }}>Angebot versendet</option>
+                            <option value="angenommen" {{ 'selected' if inquiry.status == 'angenommen' }}>Angenommen</option>
+                            <option value="erledigt" {{ 'selected' if inquiry.status == 'erledigt' }}>Erledigt</option>
+                            <option value="storniert" {{ 'selected' if inquiry.status == 'storniert' }}>Storniert</option>
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-primary w-100">Status ändern</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Bearbeiter -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Bearbeiter</h6>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('inquiry_admin.assign', id=inquiry.id) }}">
+                        <select name="assigned_to" class="form-select form-select-sm mb-2">
+                            <option value="">Nicht zugewiesen</option>
+                            {% for user in users %}
+                            <option value="{{ user.username }}" {{ 'selected' if inquiry.assigned_to == user.username }}>
+                                {{ user.username }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-outline-primary w-100">Zuweisen</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Tracking -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0">Tracking</h6>
+                </div>
+                <div class="card-body">
+                    <small class="text-muted d-block mb-1">Tracking-Token:</small>
+                    <code class="small">{{ inquiry.tracking_token }}</code>
+                    <small class="text-muted d-block mt-2 mb-1">Öffentlicher Status-Link:</small>
+                    <a href="{{ url_for('inquiry.status', token=inquiry.tracking_token) }}" target="_blank" class="btn btn-sm btn-outline-secondary w-100">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>Status-Seite öffnen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

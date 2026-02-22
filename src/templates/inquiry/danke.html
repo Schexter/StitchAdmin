@@ -1,0 +1,64 @@
+{% extends "shop/base_shop.html" %}
+{% block title %}Anfrage gesendet{% endblock %}
+{% block content %}
+<div style="padding-top: 80px;">
+    <section class="ws-section">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="text-center mb-4">
+                        <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-3"
+                             style="width: 80px; height: 80px; background: var(--ws-primary-light);">
+                            <i class="bi bi-check-circle fs-1" style="color: var(--ws-primary);"></i>
+                        </div>
+                        <h1 class="fw-bold">Vielen Dank für Ihre Anfrage!</h1>
+                        <p class="text-muted fs-5">Wir haben Ihre Anfrage erhalten und melden uns zeitnah bei Ihnen.</p>
+                    </div>
+
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-4 mb-3">
+                                    <small class="text-muted d-block">Anfragen-Nummer</small>
+                                    <span class="fw-bold fs-5">{{ inquiry.inquiry_number }}</span>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <small class="text-muted d-block">Anfrageart</small>
+                                    <span class="fw-bold">{{ inquiry.type_label }}</span>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <small class="text-muted d-block">Status</small>
+                                    <span class="badge bg-{{ inquiry.status_color }} fs-6">
+                                        <i class="{{ inquiry.status_icon }} me-1"></i>{{ inquiry.status_label }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tracking Link -->
+                    <div class="card border-0 shadow-sm mb-4" style="background: var(--ws-primary-light);">
+                        <div class="card-body text-center">
+                            <h5 class="fw-bold mb-2">Status verfolgen</h5>
+                            <p class="text-muted mb-3">Speichern Sie diesen Link, um den Status Ihrer Anfrage jederzeit zu prüfen:</p>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="trackingUrl"
+                                       value="{{ request.host_url }}anfrage/status/{{ inquiry.tracking_token }}" readonly>
+                                <button class="btn btn-outline-dark" onclick="navigator.clipboard.writeText(document.getElementById('trackingUrl').value); this.innerHTML='<i class=\'bi bi-check me-1\'></i>Kopiert!'">
+                                    <i class="bi bi-clipboard me-1"></i>Kopieren
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <a href="{{ url_for('website.home') }}" class="btn btn-lg btn-outline-dark">
+                            <i class="bi bi-arrow-left me-2"></i>Zurück zur Startseite
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

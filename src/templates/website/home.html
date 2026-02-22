@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% set meta = content.get('meta', {}) %}
+    <title>{{ meta.get('seo_title', '') or (company.display_name if company and company.company_name else 'StitchAdmin') }} - Professionelle Stickerei</title>
+    {% if meta.get('meta_description') %}<meta name="description" content="{{ meta.get('meta_description') }}">{% endif %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    {% if branding and branding.logo_path %}
+    <link rel="icon" href="{{ url_for('static', filename=branding.logo_path) }}">
+    {% endif %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/website.css') }}">
+    {% if branding and branding.primary_color %}
+    <style>
+        :root {
+            --ws-primary: {{ branding.primary_color }};
+            --ws-primary-dark: color-mix(in srgb, {{ branding.primary_color }}, black 25%);
+            --ws-primary-light: color-mix(in srgb, {{ branding.primary_color }}, white 85%);
+            --ws-primary-glow: color-mix(in srgb, {{ branding.primary_color }}, transparent 70%);
+        }
+    </style>
+    {% endif %}
+</head>
+<body>
+    {% set hero = content.get('hero', {}) %}
+    {% set services = content.get('services', {}) %}
+    {% set gallery = content.get('gallery', {}) %}
+    {% set about = content.get('about', {}) %}
+    {% set process = content.get('process', {}) %}
+    {% set footer_content = content.get('footer', {}) %}
+
+    <!-- Navigation -->
+    <nav class="ws-nav" id="wsNav">
+        <div class="container">
+            <div class="ws-nav-inner">
+                <a href="/" class="ws-nav-brand">
+                    {% if branding and branding.logo_path %}
+                    <img src="{{ url_for('static', filename=branding.logo_path) }}" alt="Logo" class="ws-nav-logo">
+                    {% endif %}
+                    <span>{{ company.company_name if company and company.company_name else 'StitchAdmin' }}</span>
+                </a>
+                <div class="ws-nav-links d-none d-md-flex">
+                    <a href="#leistungen">Leistungen</a>
+                    <a href="#galerie">Galerie</a>
+                    <a href="#ueber-uns">Über uns</a>
+                    <a href="#kontakt">Kontakt</a>
+                    <a href="{{ url_for('shop.index') }}">Shop</a>
+                    <a href="{{ url_for('inquiry.form') }}">Anfrage</a>
+                </div>
+                <a href="{{ url_for('auth.login') }}" class="ws-btn ws-btn-outline ws-btn-sm">
+                    <i class="bi bi-box-arrow-in-right"></i> Login
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="ws-hero">
+        <div class="ws-hero-bg">
+            {% set hero_bg = hero.get('bg_image', 'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=1920&q=80') %}
+            <img src="{% if hero_bg.startswith('http') %}{{ hero_bg }}{% else %}{{ url_for('static', filename=hero_bg) }}{% endif %}"
+                 alt="Hintergrund" class="ws-hero-bg-img">
+        </div>
+        <div class="ws-hero-content">
+            <div class="container">
+                <div class="row align-items-center min-vh-80">
+                    <div class="col-lg-7">
+                        <div class="ws-hero-badge">{{ hero.get('badge_text', 'Professionelle Stickerei') }}</div>
+                        <h1 class="ws-hero-title">
+                            {{ hero.get('title', 'Ihr Partner für hochwertige Stickerei') }}
+                        </h1>
+                        <p class="ws-hero-subtitle">
+                            {{ hero.get('subtitle', 'Von Firmenlogos über Vereinsausstattung bis hin zu individuellen Designs – wir veredeln Ihre Textilien mit modernster Sticktechnik und höchster Präzision.') }}
+                        </p>
+                        <div class="ws-hero-actions">
+                            <a href="{{ hero.get('cta_link', '#kontakt') }}" class="ws-btn ws-btn-primary ws-btn-lg">
+                                <i class="bi bi-envelope"></i> {{ hero.get('cta_text', 'Anfrage stellen') }}
+                            </a>
+                            <a href="#leistungen" class="ws-btn ws-btn-ghost ws-btn-lg">
+                                Unsere Leistungen <i class="bi bi-arrow-down"></i>
+                            </a>
+                        </div>
+                        <div class="ws-hero-stats">
+                            <div class="ws-stat">
+                                <span class="ws-stat-number">{{ stats.designs }}+</span>
+                                <span class="ws-stat-label">Designs</span>
+                            </div>
+                            <div class="ws-stat-divider"></div>
+                            <div class="ws-stat">
+                                <span class="ws-stat-number">{{ stats.customers }}+</span>
+                                <span class="ws-stat-label">Kunden</span>
+                            </div>
+                            <div class="ws-stat-divider"></div>
+                            <div class="ws-stat">
+                                <span class="ws-stat-number">{{ stats.orders }}+</span>
+                                <span class="ws-stat-label">Aufträge</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-lg-5 d-none d-lg-block">
+                        <div class="ws-hero-visual">
+                            <div class="ws-hero-card ws-hero-card-1">
+                                <i class="bi bi-palette-fill"></i>
+                                <span>Design-Erstellung</span>
+                            </div>
+                            <div class="ws-hero-card ws-hero-card-2">
+                                <i class="bi bi-gear-wide-connected"></i>
+                                <span>Produktion</span>
+                            </div>
+                            <div class="ws-hero-card ws-hero-card-3">
+                                <i class="bi bi-truck"></i>
+                                <span>Lieferung</span>
+                            </div>
+                            <div class="ws-hero-icon-main">
+                                <i class="bi bi-vector-pen"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Leistungen -->
+    <section class="ws-section" id="leistungen">
+        <div class="container">
+            <div class="ws-section-header">
+                <span class="ws-section-badge">Was wir bieten</span>
+                <h2>{{ services.get('section_title', 'Unsere Leistungen') }}</h2>
+                <p>{{ services.get('section_subtitle', 'Professionelle Textilveredelung für jeden Bedarf') }}</p>
+            </div>
+            <div class="row g-4">
+                {% for i in range(1, 9) %}
+                {% set card_title = services.get('card_%d_title' % i, '') %}
+                {% if card_title %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="ws-feature-card ws-feature-card-img">
+                        {% set card_img = services.get('card_%d_image' % i, '') %}
+                        {% if card_img %}
+                        <div class="ws-feature-img">
+                            <img src="{% if card_img.startswith('http') %}{{ card_img }}{% else %}{{ url_for('static', filename=card_img) }}{% endif %}" alt="{{ card_title }}">
+                        </div>
+                        {% endif %}
+                        <div class="ws-feature-body">
+                            <h3>{{ card_title }}</h3>
+                            <p>{{ services.get('card_%d_description' % i, '') }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Bildergalerie -->
+    <section class="ws-section ws-section-dark" id="galerie">
+        <div class="container">
+            <div class="ws-section-header ws-section-header-light">
+                <span class="ws-section-badge ws-section-badge-light">Portfolio</span>
+                <h2>{{ gallery.get('section_title', 'Unsere Arbeiten') }}</h2>
+                <p>{{ gallery.get('section_subtitle', 'Einblicke in aktuelle Projekte und fertige Stickereien') }}</p>
+            </div>
+            <div class="row g-3">
+                {% for i in range(1, 13) %}
+                {% set gal_img = gallery.get('image_%d' % i, '') %}
+                {% if gal_img %}
+                <div class="col-6 col-md-4 col-lg-3">
+                    <div class="ws-gallery-item">
+                        <img src="{% if gal_img.startswith('http') %}{{ gal_img }}{% else %}{{ url_for('static', filename=gal_img) }}{% endif %}"
+                             alt="{{ gallery.get('image_%d_alt' % i, 'Galerie-Bild %d' % i) }}">
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Über Uns -->
+    <section class="ws-section" id="ueber-uns">
+        <div class="container">
+            <div class="row align-items-center g-5">
+                <div class="col-lg-6">
+                    <div class="ws-about-image">
+                        {% set about_img = about.get('image', 'https://images.unsplash.com/photo-1581783898377-1c85bf937427?w=800&q=80') %}
+                        <img src="{% if about_img.startswith('http') %}{{ about_img }}{% else %}{{ url_for('static', filename=about_img) }}{% endif %}"
+                             alt="Über uns" class="ws-about-img-main">
+                        <div class="ws-about-img-badge">
+                            <span class="ws-about-badge-number">{{ stats.orders }}+</span>
+                            <span class="ws-about-badge-text">erledigte Aufträge</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <span class="ws-section-badge">Über uns</span>
+                    <h2 class="mb-3">{{ about.get('title', 'Qualität aus Leidenschaft') }}</h2>
+                    <p class="ws-text-lg mb-4">
+                        {% if company and company.company_name %}
+                        {{ company.display_name }} steht für erstklassige Stickerei-Arbeit
+                        und persönlichen Service.
+                        {% else %}
+                        Wir stehen für erstklassige Stickerei-Arbeit und persönlichen Service.
+                        {% endif %}
+                        {{ about.get('text', 'Mit modernsten Maschinen und jahrelanger Erfahrung setzen wir Ihre Ideen präzise um.') }}
+                    </p>
+                    <div class="ws-check-list">
+                        {% for i in range(1, 7) %}
+                        {% set check_text = about.get('checklist_%d' % i, '') %}
+                        {% if check_text %}
+                        <div class="ws-check-item">
+                            <i class="bi bi-check-circle-fill"></i>
+                            <span>{{ check_text }}</span>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    <a href="#kontakt" class="ws-btn ws-btn-primary mt-4">
+                        <i class="bi bi-chat-dots"></i> Jetzt beraten lassen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Prozess-Schritte -->
+    <section class="ws-section ws-section-alt">
+        <div class="container">
+            <div class="ws-section-header">
+                <span class="ws-section-badge">So funktioniert's</span>
+                <h2>{{ process.get('section_title', 'In 4 Schritten zum fertigen Produkt') }}</h2>
+            </div>
+            <div class="row g-4">
+                {% set step_num = [0] %}
+                {% for i in range(1, 7) %}
+                {% set step_title = process.get('step_%d_title' % i, '') %}
+                {% if step_title %}
+                {% if step_num.append(step_num.pop() + 1) %}{% endif %}
+                <div class="col-6 col-lg-3">
+                    <div class="ws-step-card">
+                        <div class="ws-step-number">{{ step_num[0] }}</div>
+                        <div class="ws-step-icon"><i class="bi {{ process.get('step_%d_icon' % i, 'bi-circle') }}"></i></div>
+                        <h4>{{ step_title }}</h4>
+                        <p>{{ process.get('step_%d_description' % i, '') }}</p>
+                    </div>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <!-- Kontakt -->
+    <section class="ws-section" id="kontakt">
+        <div class="container">
+            <div class="ws-section-header">
+                <span class="ws-section-badge">Kontakt</span>
+                <h2>Sprechen Sie uns an</h2>
+                <p>Wir beraten Sie gerne zu Ihrem Projekt</p>
+            </div>
+            <div class="row g-4 justify-content-center">
+                {% if company and company.phone %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="ws-contact-card">
+                        <div class="ws-contact-icon">
+                            <i class="bi bi-telephone-fill"></i>
+                        </div>
+                        <h4>Telefon</h4>
+                        <a href="tel:{{ company.phone }}">{{ company.phone }}</a>
+                    </div>
+                </div>
+                {% endif %}
+                {% if company and company.email %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="ws-contact-card">
+                        <div class="ws-contact-icon">
+                            <i class="bi bi-envelope-fill"></i>
+                        </div>
+                        <h4>E-Mail</h4>
+                        <a href="mailto:{{ company.email }}">{{ company.email }}</a>
+                    </div>
+                </div>
+                {% endif %}
+                {% if company and company.street %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="ws-contact-card">
+                        <div class="ws-contact-icon">
+                            <i class="bi bi-geo-alt-fill"></i>
+                        </div>
+                        <h4>Adresse</h4>
+                        <span>{{ company.full_address }}</span>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="col-md-6 col-lg-4">
+                    <div class="ws-contact-card">
+                        <div class="ws-contact-icon">
+                            <i class="bi bi-pencil-square"></i>
+                        </div>
+                        <h4>Online-Anfrage</h4>
+                        <p class="small mb-2">Stellen Sie direkt eine Anfrage mit Designupload</p>
+                        <a href="{{ url_for('inquiry.form') }}" class="ws-btn ws-btn-primary ws-btn-sm">
+                            <i class="bi bi-send"></i> Zur Anfrage
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="ws-footer">
+        <div class="container">
+            <div class="ws-footer-inner">
+                <div class="ws-footer-brand">
+                    {% if branding and branding.logo_path %}
+                    <img src="{{ url_for('static', filename=branding.logo_path) }}" alt="Logo" height="28">
+                    {% endif %}
+                    <span>{{ company.display_name if company and company.company_name else 'StitchAdmin' }}</span>
+                </div>
+                <div class="ws-footer-copy">
+                    &copy; {{ today.year if today is defined else '2026' }} &ndash; Alle Rechte vorbehalten
+                </div>
+                <div class="ws-footer-links">
+                    {% if footer_content.get('impressum_link') %}
+                    <a href="{{ url_for('website.impressum') }}">Impressum</a>
+                    {% endif %}
+                    {% if footer_content.get('datenschutz_link') %}
+                    <a href="{{ url_for('website.datenschutz') }}">Datenschutz</a>
+                    {% endif %}
+                    <a href="{{ url_for('auth.login') }}">Login</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // Navbar Scroll-Effekt
+    const nav = document.getElementById('wsNav');
+    window.addEventListener('scroll', () => {
+        nav.classList.toggle('ws-nav-scrolled', window.scrollY > 50);
+    });
+
+    // Smooth Scroll
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+        a.addEventListener('click', e => {
+            e.preventDefault();
+            const target = document.querySelector(a.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+    </script>
+</body>
+</html>

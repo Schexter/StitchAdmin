@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Anfragen{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-envelope-open me-2"></i>Anfragen</h2>
+            <p class="text-muted mb-0">Website-Anfragen verwalten</p>
+        </div>
+    </div>
+
+    <!-- Statistik-Karten -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h3 class="fw-bold text-primary mb-0">{{ stats.neu }}</h3>
+                    <small class="text-muted">Neue Anfragen</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h3 class="fw-bold text-warning mb-0">{{ stats.in_bearbeitung }}</h3>
+                    <small class="text-muted">In Bearbeitung</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h3 class="fw-bold text-info mb-0">{{ stats.angebot_erstellt }}</h3>
+                    <small class="text-muted">Angebot erstellt</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body text-center">
+                    <h3 class="fw-bold mb-0">{{ stats.total }}</h3>
+                    <small class="text-muted">Gesamt</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <form method="GET" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label small">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">Alle</option>
+                        <option value="neu" {{ 'selected' if status_filter == 'neu' }}>Neu</option>
+                        <option value="in_bearbeitung" {{ 'selected' if status_filter == 'in_bearbeitung' }}>In Bearbeitung</option>
+                        <option value="angebot_erstellt" {{ 'selected' if status_filter == 'angebot_erstellt' }}>Angebot erstellt</option>
+                        <option value="angebot_versendet" {{ 'selected' if status_filter == 'angebot_versendet' }}>Angebot versendet</option>
+                        <option value="angenommen" {{ 'selected' if status_filter == 'angenommen' }}>Angenommen</option>
+                        <option value="erledigt" {{ 'selected' if status_filter == 'erledigt' }}>Erledigt</option>
+                        <option value="storniert" {{ 'selected' if status_filter == 'storniert' }}>Storniert</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small">Typ</label>
+                    <select name="type" class="form-select form-select-sm">
+                        <option value="">Alle</option>
+                        {% for key, label in inquiry_types.items() %}
+                        <option value="{{ key }}" {{ 'selected' if type_filter == key }}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-funnel me-1"></i>Filtern
+                    </button>
+                    <a href="{{ url_for('inquiry_admin.list') }}" class="btn btn-sm btn-outline-secondary">Zurücksetzen</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabelle -->
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nummer</th>
+                        <th>Datum</th>
+                        <th>Kunde</th>
+                        <th>Typ</th>
+                        <th>Status</th>
+                        <th>Bearbeiter</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inq in inquiries %}
+                    <tr>
+                        <td><strong>{{ inq.inquiry_number }}</strong></td>
+                        <td>{{ inq.created_at.strftime('%d.%m.%Y') if inq.created_at else '-' }}</td>
+                        <td>
+                            {{ inq.full_name }}
+                            {% if inq.company_name %}<br><small class="text-muted">{{ inq.company_name }}</small>{% endif %}
+                        </td>
+                        <td>{{ inq.type_label }}</td>
+                        <td><span class="badge bg-{{ inq.status_color }}"><i class="{{ inq.status_icon }} me-1"></i>{{ inq.status_label }}</span></td>
+                        <td>{{ inq.assigned_to or '-' }}</td>
+                        <td>
+                            <a href="{{ url_for('inquiry_admin.detail', id=inq.id) }}" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">Keine Anfragen gefunden</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

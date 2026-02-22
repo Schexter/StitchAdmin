@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Shop-Inhalte bearbeiten{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-shop me-2"></i>Shop-Inhalte</h2>
+            <p class="text-muted mb-0">Texte und Titel der Shop-Seiten bearbeiten</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('shop.index') }}" target="_blank" class="btn btn-outline-primary">
+                <i class="bi bi-eye me-1"></i>Shop Vorschau
+            </a>
+            <a href="{{ url_for('website_admin.dashboard') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Zur&uuml;ck
+            </a>
+        </div>
+    </div>
+
+    <form method="POST">
+        <!-- Hero-Bereich -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-stars me-2"></i>Shop-Hero</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Badge-Text</label>
+                        <input type="text" class="form-control" name="badge_text"
+                               value="{{ content.get('badge_text', 'Online-Konfigurator') }}" placeholder="z.B. Online-Konfigurator">
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold">Titel</label>
+                        <input type="text" class="form-control" name="title"
+                               value="{{ content.get('title', 'Ihr individuelles Textil-Design') }}" placeholder="Haupttitel des Shops">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-semibold">Untertitel</label>
+                        <input type="text" class="form-control" name="subtitle"
+                               value="{{ content.get('subtitle', 'Wählen Sie eine Veredelungsart und gestalten Sie Ihr persönliches Produkt') }}" placeholder="Beschreibungstext">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Veredelungs-Sektion -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-brush me-2"></i>Veredelungs-Sektion</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Badge</label>
+                        <input type="text" class="form-control" name="finishing_badge"
+                               value="{{ content.get('finishing_badge', 'Veredelung') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Titel</label>
+                        <input type="text" class="form-control" name="finishing_title"
+                               value="{{ content.get('finishing_title', 'Veredelungsarten') }}">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold">Untertitel</label>
+                        <input type="text" class="form-control" name="finishing_subtitle"
+                               value="{{ content.get('finishing_subtitle', 'Welche Veredelung möchten Sie für Ihr Textil?') }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kategorien-Sektion -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-folder me-2"></i>Kategorien-Sektion</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label fw-semibold">Badge</label>
+                        <input type="text" class="form-control" name="categories_badge"
+                               value="{{ content.get('categories_badge', 'Sortiment') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold">Titel</label>
+                        <input type="text" class="form-control" name="categories_title"
+                               value="{{ content.get('categories_title', 'Produktkategorien') }}">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold">Untertitel</label>
+                        <input type="text" class="form-control" name="categories_subtitle"
+                               value="{{ content.get('categories_subtitle', 'Durchstöbern Sie unsere Produktkategorien') }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CTA-Sektion -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-megaphone me-2"></i>Call-to-Action</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <label class="form-label fw-semibold">Titel</label>
+                        <input type="text" class="form-control" name="cta_title"
+                               value="{{ content.get('cta_title', 'Direkt zum Katalog') }}">
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label fw-semibold">Untertitel</label>
+                        <input type="text" class="form-control" name="cta_subtitle"
+                               value="{{ content.get('cta_subtitle', 'Oder stöbern Sie direkt in unserem kompletten Sortiment') }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Speichern</button>
+            <a href="{{ url_for('shop.index') }}" target="_blank" class="btn btn-outline-secondary">
+                <i class="bi bi-eye me-1"></i>Vorschau
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}

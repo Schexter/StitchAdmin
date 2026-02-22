@@ -74,7 +74,7 @@ class BWAService:
         Returns:
             Dict mit BWA-Positionen und Werten
         """
-        from src.models.buchhaltung import Buchung, Konto
+        from src.models.buchhaltung import BuchhaltungBuchung as Buchung, Konto
         
         # Zeitraum bestimmen
         if monat:
@@ -202,7 +202,7 @@ class UStService:
         """
         Berechnet USt-Voranmeldung aus Buchungen
         """
-        from src.models.buchhaltung import Buchung, UStVoranmeldung
+        from src.models.buchhaltung import BuchhaltungBuchung as Buchung, UStVoranmeldung
         
         # Zeitraum
         if monat:
@@ -333,7 +333,7 @@ class LiquiditaetsService:
         """
         Berechnet Cashflow (vereinfacht)
         """
-        from src.models.buchhaltung import Buchung
+        from src.models.buchhaltung import BuchhaltungBuchung as Buchung
         
         if monat:
             datum_von = date(jahr, monat, 1)

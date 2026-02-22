@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Shop-Motive{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-palette me-2"></i>Shop-Motive</h2>
+            <p class="text-muted mb-0">Motive und Designs für den Shop-Konfigurator</p>
+        </div>
+        <div>
+            <a href="{{ url_for('shop_admin.motiv_create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Neues Motiv
+            </a>
+            <a href="{{ url_for('shop_admin.dashboard') }}" class="btn btn-outline-secondary ms-2">
+                <i class="bi bi-arrow-left me-1"></i>Zurück
+            </a>
+        </div>
+    </div>
+
+    {% if templates %}
+    <div class="row g-3">
+        {% for tmpl in templates %}
+        <div class="col-md-4 col-lg-3">
+            <div class="card border-0 shadow-sm h-100">
+                {% if tmpl.thumbnail_path or tmpl.image_path %}
+                <img src="{{ url_for('static', filename=tmpl.thumbnail_path or tmpl.image_path) }}"
+                     class="card-img-top" alt="{{ tmpl.name }}" style="height: 160px; object-fit: cover;">
+                {% else %}
+                <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 160px;">
+                    <i class="bi bi-image fs-1 text-muted"></i>
+                </div>
+                {% endif %}
+                <div class="card-body">
+                    <h6 class="card-title">{{ tmpl.name }}</h6>
+                    <div class="d-flex gap-1 mb-2">
+                        <span class="badge bg-light text-dark">{{ tmpl.category_display }}</span>
+                        {% if tmpl.stitch_count %}
+                        <span class="badge bg-info bg-opacity-10 text-info">{{ tmpl.stitch_count }} Stiche</span>
+                        {% endif %}
+                    </div>
+                    <span class="badge {{ 'bg-success' if tmpl.is_active else 'bg-secondary' }}">
+                        {{ 'Aktiv' if tmpl.is_active else 'Inaktiv' }}
+                    </span>
+                </div>
+                <div class="card-footer bg-white border-0">
+                    <a href="{{ url_for('shop_admin.motiv_edit', tmpl_id=tmpl.id) }}" class="btn btn-sm btn-outline-primary w-100">
+                        <i class="bi bi-pencil me-1"></i>Bearbeiten
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-palette fs-1 text-muted"></i>
+            <p class="mt-2 text-muted">Noch keine Motive vorhanden</p>
+            <a href="{{ url_for('shop_admin.motiv_create') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Erstes Motiv erstellen
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

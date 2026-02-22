@@ -205,7 +205,7 @@ def sumup_integration():
         if token and token.is_valid():
             is_connected = True
     except Exception as e:
-        print(f"Fehler beim Laden des SumUp Tokens: {e}")
+        logger.error(f"Fehler beim Laden des SumUp Tokens: {e}")
 
     return render_template('settings/sumup.html',
                          is_connected=is_connected,
@@ -257,12 +257,12 @@ def sumup_callback():
 
     try:
         # Tausche Code gegen Access Token
-        success = sumup_service.exchange_code_for_token(
+        result = sumup_service.exchange_code_for_token(
             code=code,
             redirect_uri=url_for('settings.sumup_callback', _external=True)
         )
 
-        if success:
+        if result and result.get('success'):
             flash('SumUp erfolgreich verbunden! Kartenzahlungen sind jetzt aktiviert.', 'success')
         else:
             flash('Fehler beim Verbinden mit SumUp. Bitte versuchen Sie es erneut.', 'error')

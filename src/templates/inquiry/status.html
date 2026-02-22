@@ -1,0 +1,111 @@
+{% extends "shop/base_shop.html" %}
+{% block title %}Anfrage {{ inquiry.inquiry_number }}{% endblock %}
+{% block content %}
+<div style="padding-top: 80px;">
+    <section class="ws-section">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <h2 class="fw-bold mb-0">Anfrage {{ inquiry.inquiry_number }}</h2>
+                        <span class="badge bg-{{ inquiry.status_color }} fs-6">
+                            <i class="{{ inquiry.status_icon }} me-1"></i>{{ inquiry.status_label }}
+                        </span>
+                    </div>
+
+                    <!-- Status-Timeline -->
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body">
+                            {% set statuses = ['neu', 'in_bearbeitung', 'angebot_erstellt', 'angebot_versendet', 'angenommen', 'erledigt'] %}
+                            {% set status_labels = {'neu': 'Eingegangen', 'in_bearbeitung': 'In Bearbeitung', 'angebot_erstellt': 'Angebot erstellt', 'angebot_versendet': 'Angebot versendet', 'angenommen': 'Angenommen', 'erledigt': 'Erledigt'} %}
+                            {% set current_index = statuses.index(inquiry.status) if inquiry.status in statuses else -1 %}
+
+                            <div class="d-flex justify-content-between position-relative" style="padding: 0 10px;">
+                                <div class="position-absolute" style="top: 14px; left: 30px; right: 30px; height: 3px; background: var(--ws-border);"></div>
+                                <div class="position-absolute" style="top: 14px; left: 30px; height: 3px; background: var(--ws-primary); width: {{ (current_index / (statuses|length - 1) * 100) if current_index >= 0 else 0 }}%;"></div>
+
+                                {% for s in statuses %}
+                                <div class="text-center position-relative" style="z-index: 1; flex: 1;">
+                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-1"
+                                         style="width: 30px; height: 30px;
+                                         {% if loop.index0 <= current_index %}
+                                         background: var(--ws-primary); color: white;
+                                         {% else %}
+                                         background: var(--ws-border); color: var(--ws-text-muted);
+                                         {% endif %}">
+                                        {% if loop.index0 < current_index %}
+                                        <i class="bi bi-check" style="font-size: 0.9rem;"></i>
+                                        {% elif loop.index0 == current_index %}
+                                        <i class="bi bi-circle-fill" style="font-size: 0.5rem;"></i>
+                                        {% else %}
+                                        <span style="font-size: 0.7rem;">{{ loop.index }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="small {% if loop.index0 <= current_index %}fw-semibold{% else %}text-muted{% endif %}" style="font-size: 0.7rem;">
+                                        {{ status_labels[s] }}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Details -->
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-header bg-white">
+                            <h5 class="mb-0">Anfrage-Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <strong>Anfrageart:</strong><br>
+                                    {{ inquiry.type_label }}
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Eingegangen am:</strong><br>
+                                    {{ inquiry.created_at.strftime('%d.%m.%Y um %H:%M') if inquiry.created_at else '-' }}
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <strong>Beschreibung:</strong><br>
+                                {{ inquiry.description }}
+                            </div>
+                            <div class="row">
+                                {% if inquiry.quantity %}
+                                <div class="col-md-4 mb-2">
+                                    <strong>Menge:</strong> {{ inquiry.quantity }} Stück
+                                </div>
+                                {% endif %}
+                                {% if inquiry.textile_type %}
+                                <div class="col-md-4 mb-2">
+                                    <strong>Textil:</strong> {{ inquiry.textile_type }}
+                                </div>
+                                {% endif %}
+                                {% if inquiry.desired_date %}
+                                <div class="col-md-4 mb-2">
+                                    <strong>Wunschtermin:</strong> {{ inquiry.desired_date.strftime('%d.%m.%Y') }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% if inquiry.design_file_name %}
+                            <div class="mt-2">
+                                <strong>Hochgeladene Datei:</strong>
+                                <span class="badge bg-light text-dark">
+                                    <i class="bi bi-paperclip me-1"></i>{{ inquiry.design_file_name }}
+                                </span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <a href="{{ url_for('website.home') }}" class="btn btn-outline-dark">
+                            <i class="bi bi-arrow-left me-2"></i>Zurück zur Startseite
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

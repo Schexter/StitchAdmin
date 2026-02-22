@@ -80,7 +80,7 @@ def index():
 @admin_required
 def journal():
     """Buchungsjournal"""
-    from src.models.buchhaltung import Buchung, Konto
+    from src.models.buchhaltung import BuchhaltungBuchung as Buchung, Konto
     
     jahr = request.args.get('jahr', date.today().year, type=int)
     monat = request.args.get('monat', type=int)
@@ -213,7 +213,7 @@ def export_uebersicht():
 @admin_required
 def export_datev():
     """DATEV-Export"""
-    from src.models.buchhaltung import Buchung
+    from src.models.buchhaltung import BuchhaltungBuchung as Buchung
     from src.services.buchhaltung_export_service import DATEVExporter
     
     datum_von = datetime.strptime(request.form['datum_von'], '%Y-%m-%d').date()
@@ -232,12 +232,40 @@ def export_datev():
                    headers={'Content-Disposition': f'attachment; filename=DATEV_Export.csv'})
 
 
+@buchhaltung_bp.route('/export/datev-belege', methods=['POST'])
+@login_required
+@admin_required
+def export_datev_belege():
+    """DATEV-Export mit Belegen als ZIP"""
+    from src.models.buchhaltung import BuchhaltungBuchung as Buchung
+    from src.services.buchhaltung_export_service import DATEVExporter
+
+    datum_von = datetime.strptime(request.form['datum_von'], '%Y-%m-%d').date()
+    datum_bis = datetime.strptime(request.form['datum_bis'], '%Y-%m-%d').date()
+
+    buchungen = Buchung.query.filter(
+        Buchung.buchungsdatum >= datum_von,
+        Buchung.buchungsdatum <= datum_bis,
+        Buchung.ist_storniert == False
+    ).all()
+
+    exporter = DATEVExporter()
+    zip_bytes = exporter.export_with_receipts(buchungen, datum_von, datum_bis)
+
+    return send_file(
+        io.BytesIO(zip_bytes),
+        mimetype='application/zip',
+        as_attachment=True,
+        download_name=f'DATEV_Belege_{datum_von.strftime("%Y%m%d")}_{datum_bis.strftime("%Y%m%d")}.zip'
+    )
+
+
 @buchhaltung_bp.route('/export/gobd', methods=['POST'])
 @login_required
 @admin_required
 def export_gobd():
     """GoBD-Export"""
-    from src.models.buchhaltung import Buchung
+    from src.models.buchhaltung import BuchhaltungBuchung as Buchung
     from src.models.models import Customer, Supplier
     from src.services.buchhaltung_export_service import GoBDExporter
     import zipfile
@@ -378,7 +406,7 @@ def finanzplan():
 @admin_required
 def kontenplan():
     """Kontenplan"""
-    from src.models.buchhaltung import Konto
+    from src.models.buchhaltung import Konto as Konto
     
     konten = Konto.query.filter_by(ist_aktiv=True).order_by(Konto.kontonummer).all()
     return render_template('buchhaltung/kontenplan.html', konten=konten)
@@ -557,7 +585,7 @@ def wettbewerb_preis_neu():
 def kontenplan_setup():
     """Kontenrahmen-Auswahl und Initialisierung"""
     from src.services.kontenrahmen_service import KontenrahmenService
-    from src.models.buchhaltung import Konto
+    from src.models.buchhaltung import Konto as Konto
     
     kr_service = KontenrahmenService()
     branchen = kr_service.get_branchen()

@@ -437,7 +437,7 @@ class Rechnung(db.Model):
     richtung = db.Column(db.Enum(RechnungsRichtung), nullable=False, default=RechnungsRichtung.AUSGANG)
 
     # Lieferant (für Eingangsrechnungen)
-    lieferant_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=True)
+    lieferant_id = db.Column(db.String(50), db.ForeignKey('suppliers.id'), nullable=True)
     lieferant_name = db.Column(db.String(200))  # Snapshot
 
     # ZUGPFERD-Konfiguration

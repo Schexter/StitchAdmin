@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Post-Kalender{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-calendar3 me-2"></i>Post-Kalender</h2>
+        <div class="btn-group">
+            <a href="{{ url_for('social_media.create_post') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg me-1"></i>Neuer Post
+            </a>
+            <a href="{{ url_for('social_media.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Zurueck
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div id="calendar"></div>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/main.min.css">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.9/index.global.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const events = [
+        {% for post in posts %}
+        {
+            title: '{{ post.account.platform|capitalize }}: {{ (post.text or "Post")|truncate(30)|e }}',
+            start: '{{ (post.scheduled_at or post.published_at).isoformat() if (post.scheduled_at or post.published_at) else "" }}',
+            url: '{{ url_for("social_media.post_detail", post_id=post.id) }}',
+            color: '{{ "#0d6efd" if post.account.platform == "facebook" else "#dc3545" if post.account.platform == "instagram" else "#6c757d" }}',
+            {% if post.status == 'published' %}
+            borderColor: '#198754',
+            {% endif %}
+        },
+        {% endfor %}
+    ];
+
+    const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+        initialView: 'dayGridMonth',
+        locale: 'de',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek'
+        },
+        events: events,
+        eventClick: function(info) {
+            if (info.event.url) {
+                info.jsEvent.preventDefault();
+                window.location.href = info.event.url;
+            }
+        }
+    });
+    calendar.render();
+});
+</script>
+{% endblock %}

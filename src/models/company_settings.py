@@ -90,6 +90,8 @@ class CompanySettings(db.Model):
     # E-Mail-Vorlagen
     invoice_email_subject = db.Column(db.String(500), default='Rechnung {invoice_number}')
     invoice_email_template = db.Column(db.Text)  # HTML-Template für Rechnungsmail
+    email_signature = db.Column(db.Text)  # E-Mail Signatur
+    outlook_account = db.Column(db.Text)  # Outlook Account Konfiguration
 
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

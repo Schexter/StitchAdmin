@@ -1,0 +1,230 @@
+{% extends "shop/base_shop.html" %}
+{% block title %}{{ article.name }}{% endblock %}
+{% block content %}
+<div style="padding-top: 80px;">
+    <section class="ws-section">
+        <div class="container">
+            <!-- Breadcrumb -->
+            <ul class="ws-breadcrumb">
+                <li><a href="{{ url_for('shop.index') }}">Shop</a></li>
+                <li><a href="{{ url_for('shop.textilien') }}">Textilien</a></li>
+                <li class="active">{{ article.name }}</li>
+            </ul>
+
+            <div class="row g-5">
+                <!-- Bild -->
+                <div class="col-lg-5">
+                    <div class="ws-product-image">
+                        {% if article.shop_image_path %}
+                        <img src="{{ url_for('static', filename=article.shop_image_path) }}" alt="{{ article.name }}">
+                        {% else %}
+                        <div class="d-flex align-items-center justify-content-center" style="height: 400px; background: var(--ws-bg-alt); border-radius: var(--ws-radius-lg);">
+                            <i class="bi bi-image" style="font-size: 4rem; color: var(--ws-text-muted);"></i>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Details -->
+                <div class="col-lg-7">
+                    <h1 style="font-size: 2rem; font-weight: 800; color: var(--ws-text); letter-spacing: -0.01em;">{{ article.name }}</h1>
+                    {% if article.brand %}
+                    <p style="color: var(--ws-text-muted); font-size: 1.05rem;">{{ article.brand }}</p>
+                    {% endif %}
+
+                    <div class="mb-4">
+                        <span class="ws-shop-price" style="font-size: 2rem;" id="displayPrice">{{ "%.2f"|format(article.price or 0) }} &euro;</span>
+                        <small style="color: var(--ws-text-muted); margin-left: 0.5rem;">inkl. MwSt.</small>
+                    </div>
+
+                    {% if article.shop_description %}
+                    <p style="color: var(--ws-text-muted); line-height: 1.7;">{{ article.shop_description }}</p>
+                    {% elif article.description %}
+                    <p style="color: var(--ws-text-muted); line-height: 1.7;">{{ article.description }}</p>
+                    {% endif %}
+
+                    <!-- Artikelinfos -->
+                    <div class="mb-4 d-flex gap-2 flex-wrap">
+                        {% if article.material %}
+                        <span class="ws-product-badge"><i class="bi bi-layers"></i>{{ article.material }}</span>
+                        {% endif %}
+                        {% if article.article_number %}
+                        <span class="ws-product-badge">Art.-Nr.: {{ article.article_number }}</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Varianten -->
+                    {% if variants %}
+                    <div class="mb-3">
+                        <label style="font-weight: 600; font-size: 0.9rem; color: var(--ws-text); margin-bottom: 0.5rem; display: block;">Farbe / Größe</label>
+                        <select class="form-select" id="variantSelect" style="border-radius: 10px; border-color: var(--ws-border);">
+                            <option value="">Bitte wählen...</option>
+                            {% for v in variants %}
+                            <option value="{{ v.id }}" data-price="{{ v.single_price or article.price or 0 }}">
+                                {{ v.color }}{% if v.size %} / {{ v.size }}{% endif %}
+                                {% if v.stock > 0 %} ({{ v.stock }} verfügbar){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+
+                    <!-- Veredelung -->
+                    {% if finishing_types %}
+                    <div class="mb-3">
+                        <label style="font-weight: 600; font-size: 0.9rem; color: var(--ws-text); margin-bottom: 0.5rem; display: block;">Veredelung (optional)</label>
+                        <select class="form-select" id="finishingSelect" style="border-radius: 10px; border-color: var(--ws-border);">
+                            <option value="">Ohne Veredelung</option>
+                            {% for ft in finishing_types %}
+                            <option value="{{ ft.id }}"
+                                    data-name="{{ ft.name }}"
+                                    data-type="{{ ft.finishing_type }}"
+                                    data-setup="{{ ft.setup_price or 0 }}"
+                                    data-piece="{{ ft.price_per_piece or 0 }}"
+                                    data-stitch="{{ ft.price_per_1000_stitches or 0 }}">
+                                {{ ft.name }} (ab {{ "%.2f"|format(ft.setup_price or 0) }} &euro;)
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Veredelungs-Details -->
+                    <div id="finishingDetails" class="d-none mb-3" style="padding: 1.25rem; background: var(--ws-bg-alt); border-radius: var(--ws-radius); border: 1px solid var(--ws-border);">
+                        <div class="mb-2">
+                            <label style="font-size: 0.85rem; font-weight: 500; color: var(--ws-text);">Position</label>
+                            <select class="form-select form-select-sm" id="finishingPosition" style="border-radius: 8px;">
+                                <option value="brust_links">Brust links</option>
+                                <option value="brust_rechts">Brust rechts</option>
+                                <option value="brust_mitte">Brust Mitte</option>
+                                <option value="ruecken">Rücken</option>
+                                <option value="aermel_links">Ärmel links</option>
+                                <option value="aermel_rechts">Ärmel rechts</option>
+                            </select>
+                        </div>
+                        <div class="mb-2" id="stitchCountGroup">
+                            <label style="font-size: 0.85rem; font-weight: 500; color: var(--ws-text);">Stichzahl (ca.)</label>
+                            <input type="number" class="form-control form-control-sm" id="stitchCount" value="5000" min="1000" step="1000" style="border-radius: 8px;">
+                        </div>
+                        <div class="mb-2">
+                            <label style="font-size: 0.85rem; font-weight: 500; color: var(--ws-text);">Sonderwünsche</label>
+                            <input type="text" class="form-control form-control-sm" id="finishingNotes" placeholder="z.B. Schriftzug, Farben..." style="border-radius: 8px;">
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Menge -->
+                    <div class="mb-4">
+                        <label style="font-weight: 600; font-size: 0.9rem; color: var(--ws-text); margin-bottom: 0.5rem; display: block;">Menge</label>
+                        <div class="input-group" style="max-width: 160px;">
+                            <button class="btn btn-outline-secondary" type="button" onclick="changeQty(-1)" style="border-radius: 10px 0 0 10px;">-</button>
+                            <input type="number" class="form-control text-center" id="quantity" value="{{ article.shop_min_quantity or 1 }}" min="{{ article.shop_min_quantity or 1 }}" style="border-color: var(--ws-border);">
+                            <button class="btn btn-outline-secondary" type="button" onclick="changeQty(1)" style="border-radius: 0 10px 10px 0;">+</button>
+                        </div>
+                    </div>
+
+                    <!-- In den Warenkorb -->
+                    <button class="ws-btn ws-btn-primary ws-btn-lg" style="width: 100%; justify-content: center;" onclick="addToCart()">
+                        <i class="bi bi-bag-plus"></i>In den Warenkorb
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+{% block extra_js %}
+<script>
+const articleId = '{{ article.id }}';
+const basePrice = {{ article.price or 0 }};
+
+function changeQty(delta) {
+    const input = document.getElementById('quantity');
+    const min = parseInt(input.min) || 1;
+    input.value = Math.max(min, parseInt(input.value) + delta);
+}
+
+// Veredelungs-Auswahl
+const finishingSelect = document.getElementById('finishingSelect');
+if (finishingSelect) {
+    finishingSelect.addEventListener('change', function() {
+        const details = document.getElementById('finishingDetails');
+        const stitchGroup = document.getElementById('stitchCountGroup');
+        if (this.value) {
+            details.classList.remove('d-none');
+            const type = this.options[this.selectedIndex].dataset.type;
+            stitchGroup.style.display = type === 'stick' ? '' : 'none';
+        } else {
+            details.classList.add('d-none');
+        }
+    });
+}
+
+// Varianten-Preis
+const variantSelect = document.getElementById('variantSelect');
+if (variantSelect) {
+    variantSelect.addEventListener('change', function() {
+        const opt = this.options[this.selectedIndex];
+        const price = opt.dataset.price || basePrice;
+        document.getElementById('displayPrice').textContent = parseFloat(price).toFixed(2) + ' \u20AC';
+    });
+}
+
+function addToCart() {
+    const quantity = parseInt(document.getElementById('quantity').value);
+    const variantEl = document.getElementById('variantSelect');
+    const finishingEl = document.getElementById('finishingSelect');
+
+    let variantInfo = '';
+    let variantId = null;
+    let unitPrice = basePrice;
+
+    if (variantEl && variantEl.value) {
+        const opt = variantEl.options[variantEl.selectedIndex];
+        variantInfo = opt.textContent.trim();
+        variantId = parseInt(variantEl.value);
+        unitPrice = parseFloat(opt.dataset.price) || basePrice;
+    }
+
+    const finishings = [];
+    if (finishingEl && finishingEl.value) {
+        const opt = finishingEl.options[finishingEl.selectedIndex];
+        const finishing = {
+            finishing_type_id: parseInt(finishingEl.value),
+            finishing_name: opt.dataset.name,
+            finishing_type: opt.dataset.type,
+            position: document.getElementById('finishingPosition').value,
+            design_name: document.getElementById('finishingNotes').value,
+            stitch_count: opt.dataset.type === 'stick' ? parseInt(document.getElementById('stitchCount').value) : null,
+            setup_price: parseFloat(opt.dataset.setup),
+            price_per_piece: opt.dataset.type === 'stick'
+                ? (parseInt(document.getElementById('stitchCount').value) / 1000) * parseFloat(opt.dataset.stitch)
+                : parseFloat(opt.dataset.piece),
+        };
+        finishings.push(finishing);
+    }
+
+    fetch('{{ url_for("shop.api_warenkorb_add") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            article_id: articleId,
+            variant_id: variantId,
+            variant_info: variantInfo,
+            quantity: quantity,
+            unit_price: unitPrice,
+            finishings: finishings,
+            notes: ''
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = '{{ url_for("shop.warenkorb") }}';
+        } else {
+            alert(data.error || 'Fehler beim Hinzufügen');
+        }
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}

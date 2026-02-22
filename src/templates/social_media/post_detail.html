@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}Post #{{ post.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-chat-square-text me-2"></i>Post #{{ post.id }}</h2>
+        <a href="{{ url_for('social_media.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurueck
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <!-- Status -->
+                    <div class="mb-3">
+                        {% if post.status == 'published' %}
+                        <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i>Veroeffentlicht</span>
+                        {% elif post.status == 'scheduled' %}
+                        <span class="badge bg-warning text-dark fs-6"><i class="bi bi-clock me-1"></i>Geplant</span>
+                        {% elif post.status == 'failed' %}
+                        <span class="badge bg-danger fs-6"><i class="bi bi-x-circle me-1"></i>Fehlgeschlagen</span>
+                        {% else %}
+                        <span class="badge bg-secondary fs-6"><i class="bi bi-file-earmark me-1"></i>Entwurf</span>
+                        {% endif %}
+
+                        <span class="badge bg-{{ 'primary' if post.account.platform == 'facebook' else 'danger' }} fs-6 ms-2">
+                            <i class="bi bi-{{ post.account.platform }} me-1"></i>{{ post.account.account_name }}
+                        </span>
+                    </div>
+
+                    <!-- Text -->
+                    <div class="mb-4">
+                        <p style="white-space: pre-wrap; font-size: 1.1rem;">{{ post.text or '(Kein Text)' }}</p>
+                        {% if post.hashtags %}
+                        <p class="text-primary">{{ post.hashtags }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Bild -->
+                    {% if post.image_path %}
+                    <div class="mb-3">
+                        <img src="{{ url_for('static', filename=post.image_path.replace('src/static/', '')) }}"
+                             alt="Post-Bild" class="img-fluid rounded" style="max-height: 400px;">
+                    </div>
+                    {% endif %}
+
+                    <!-- Link -->
+                    {% if post.link_url %}
+                    <div class="mb-3">
+                        <a href="{{ post.link_url }}" target="_blank" class="text-decoration-none">
+                            <i class="bi bi-link-45deg me-1"></i>{{ post.link_url }}
+                        </a>
+                    </div>
+                    {% endif %}
+
+                    <!-- Fehler -->
+                    {% if post.error_message %}
+                    <div class="alert alert-danger mt-3">
+                        <i class="bi bi-exclamation-triangle me-2"></i>{{ post.error_message }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Aktionen -->
+                <div class="card-footer d-flex gap-2">
+                    {% if post.status in ('draft', 'failed') %}
+                    <form method="POST" action="{{ url_for('social_media.publish_post', post_id=post.id) }}">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-send me-1"></i>Jetzt veroeffentlichen
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if post.status == 'scheduled' %}
+                    <form method="POST" action="{{ url_for('social_media.cancel_post', post_id=post.id) }}">
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-x-lg me-1"></i>Abbrechen
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Meta -->
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">Details</h5></div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted">Erstellt</td>
+                            <td>{{ post.created_at.strftime('%d.%m.%Y %H:%M') if post.created_at else '-' }}</td>
+                        </tr>
+                        {% if post.scheduled_at %}
+                        <tr>
+                            <td class="text-muted">Geplant fuer</td>
+                            <td>{{ post.scheduled_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if post.published_at %}
+                        <tr>
+                            <td class="text-muted">Veroeffentlicht</td>
+                            <td>{{ post.published_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">Quelle</td>
+                            <td>{{ post.source_type or 'manuell' }}</td>
+                        </tr>
+                        {% if post.external_post_id %}
+                        <tr>
+                            <td class="text-muted">Externe ID</td>
+                            <td class="font-monospace small">{{ post.external_post_id[:20] }}...</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

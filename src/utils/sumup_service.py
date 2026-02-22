@@ -41,14 +41,15 @@ class SumUpService:
         if not self.client_id or not self.client_secret:
             logger.critical("SUMUP_CLIENT_ID oder SUMUP_CLIENT_SECRET sind nicht konfiguriert! SumUp-Dienst ist nicht funktionsfähig.")
 
-    def get_authorization_url(self):
+    def get_authorization_url(self, redirect_uri=None):
         """
         Generiert die URL für den OAuth2-Authentifizierungs-Flow.
         """
         if not self.client_id:
-            return None, "SumUp Client ID nicht konfiguriert."
+            return None
 
-        redirect_uri = url_for('settings.sumup_callback', _external=True)
+        if not redirect_uri:
+            redirect_uri = url_for('settings.sumup_callback', _external=True)
         params = {
             'response_type': 'code',
             'client_id': self.client_id,
@@ -56,15 +57,16 @@ class SumUpService:
             'scope': 'payments transactions.history',
             'state': str(uuid.uuid4())
         }
-        
-        req = requests.Request('GET', SUMUP_AUTH_URL, params=params)
-        return req.prepare().url, None
 
-    def exchange_code_for_token(self, code):
+        req = requests.Request('GET', SUMUP_AUTH_URL, params=params)
+        return req.prepare().url
+
+    def exchange_code_for_token(self, code, redirect_uri=None):
         """
         Tauscht den Autorisierungscode gegen Access- und Refresh-Token.
         """
-        redirect_uri = url_for('settings.sumup_callback', _external=True)
+        if not redirect_uri:
+            redirect_uri = url_for('settings.sumup_callback', _external=True)
         data = {
             'grant_type': 'authorization_code',
             'client_id': self.client_id,

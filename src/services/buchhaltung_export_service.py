@@ -14,6 +14,7 @@ Erstellt von Hans Hahn - Alle Rechte vorbehalten
 import os
 import csv
 import json
+import zipfile
 from datetime import datetime, date
 from decimal import Decimal
 from typing import List, Dict, Any, Optional
@@ -184,6 +185,98 @@ class DATEVExporter:
             '',      # Zinssperre
             ''       # Beleglink
         ]
+
+
+    def export_with_receipts(self, buchungen: List, datum_von: date, datum_bis: date) -> bytes:
+        """
+        DATEV-Export mit zugehoerigen Belegen als ZIP.
+
+        Erstellt ZIP mit:
+        - EXTF_Buchungsstapel.csv (DATEV-Format)
+        - belege/RE-xxx.pdf (verknuepfte Rechnungs-PDFs)
+
+        Args:
+            buchungen: Liste von BuchhaltungBuchung-Objekten
+            datum_von: Startdatum
+            datum_bis: Enddatum
+
+        Returns:
+            ZIP-Datei als Bytes
+        """
+        # 1. DATEV-CSV generieren
+        csv_content = self.export_buchungen(buchungen, datum_von, datum_bis)
+
+        # 2. Verknuepfte Dokumente sammeln
+        rechnung_ids = set()
+        for b in buchungen:
+            if b.rechnung_id:
+                rechnung_ids.add(b.rechnung_id)
+
+        # 3. PDFs sammeln/generieren
+        belege = {}  # filename -> pdf_bytes
+
+        if rechnung_ids:
+            try:
+                from src.models.business_documents import BusinessDocument
+                from src.services.document_pdf_service import DocumentPDFService
+
+                pdf_service = DocumentPDFService()
+                dokumente = BusinessDocument.query.filter(
+                    BusinessDocument.id.in_(rechnung_ids)
+                ).all()
+
+                for dok in dokumente:
+                    try:
+                        pdf_bytes = None
+
+                        # Existierende PDF laden
+                        if dok.pdf_pfad and os.path.exists(dok.pdf_pfad):
+                            with open(dok.pdf_pfad, 'rb') as f:
+                                pdf_bytes = f.read()
+                        else:
+                            # PDF generieren
+                            if dok.dokument_typ in ('rechnung', 'gutschrift'):
+                                pdf_bytes = pdf_service.generate_rechnung_pdf(dok, with_zugpferd=False)
+                            else:
+                                pdf_bytes = pdf_service.generate_document_pdf(dok)
+
+                        if pdf_bytes:
+                            safe_name = dok.dokument_nummer.replace('/', '-').replace('\\', '-')
+                            belege[f'belege/{safe_name}.pdf'] = pdf_bytes
+                            logger.info(f"Beleg hinzugefuegt: {dok.dokument_nummer}")
+
+                    except Exception as e:
+                        logger.warning(f"PDF-Generierung fehlgeschlagen fuer {dok.dokument_nummer}: {e}")
+
+            except ImportError as e:
+                logger.warning(f"PDF-Service nicht verfuegbar: {e}")
+
+        # 4. ZIP erstellen
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr('EXTF_Buchungsstapel.csv', csv_content)
+
+            for filename, pdf_bytes in belege.items():
+                zf.writestr(filename, pdf_bytes)
+
+            # Info-Datei
+            info = [
+                'DATEV Export mit Belegen',
+                f'Erstellt: {datetime.now().strftime("%d.%m.%Y %H:%M")}',
+                f'Zeitraum: {datum_von.strftime("%d.%m.%Y")} - {datum_bis.strftime("%d.%m.%Y")}',
+                f'Buchungen: {len(buchungen)}',
+                f'Belege: {len(belege)}',
+                '',
+                'Dateien:',
+                '  EXTF_Buchungsstapel.csv - DATEV Buchungsstapel',
+            ]
+            for fname in sorted(belege.keys()):
+                info.append(f'  {fname}')
+
+            zf.writestr('INFO.txt', '\n'.join(info))
+
+        zip_buffer.seek(0)
+        return zip_buffer.getvalue()
 
 
 class ELSTERExporter:

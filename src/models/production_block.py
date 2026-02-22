@@ -63,7 +63,7 @@ class ProductionBlock(db.Model):
     order = db.relationship('Order', backref=db.backref('calendar_activities', lazy='dynamic'))
     
     # Maschinenbezug (für Wartung, Produktion)
-    machine_id = db.Column(db.Integer, db.ForeignKey('machines.id'), nullable=True)
+    machine_id = db.Column(db.String(50), db.ForeignKey('machines.id'), nullable=True)
     machine = db.relationship('Machine', backref=db.backref('production_blocks', lazy='dynamic'))
     
     # Mitarbeiterbezug

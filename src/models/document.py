@@ -41,10 +41,10 @@ class Document(db.Model):
     searchable_content = db.Column(db.Text)  # Für Fulltext-Index
     
     # Verknüpfungen zu anderen Modulen
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=True)
+    customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=True)
+    order_id = db.Column(db.String(50), db.ForeignKey('orders.id'), nullable=True)
     invoice_id = db.Column(db.Integer, nullable=True)  # Optional: db.ForeignKey('rechnungen.id')
-    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=True)
+    supplier_id = db.Column(db.String(50), db.ForeignKey('suppliers.id'), nullable=True)
     
     # Metadaten
     document_date = db.Column(db.Date)  # Rechnungsdatum, Vertragsdatum etc.
@@ -283,8 +283,8 @@ class PostEntry(db.Model):
     recipient_address = db.Column(db.Text)
     
     # Verknüpfung zu Kunden/Lieferanten
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
-    supplier_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'), nullable=True)
+    customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=True)
+    supplier_id = db.Column(db.String(50), db.ForeignKey('suppliers.id'), nullable=True)
     
     # Inhalt
     subject = db.Column(db.String(300), nullable=False)
@@ -301,10 +301,10 @@ class PostEntry(db.Model):
     signature_name = db.Column(db.String(100))
     
     # Verknüpfungen zu anderen Modulen
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=True)
+    order_id = db.Column(db.String(50), db.ForeignKey('orders.id'), nullable=True)
     invoice_id = db.Column(db.Integer, nullable=True)  # Optional: db.ForeignKey('rechnungen.id')
     document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=True)
-    
+
     # Bearbeitung
     handled_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     status = db.Column(db.String(20), default='open')  # open, in_progress, completed, archived
@@ -471,7 +471,7 @@ class EmailAccount(db.Model):
     last_error = db.Column(db.Text)
     
     # Zuordnung
-    default_customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
+    default_customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=True)
     
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -534,8 +534,8 @@ class ArchivedEmail(db.Model):
     attachment_count = db.Column(db.Integer, default=0)
     
     # Verknüpfungen
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=True)
+    customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=True)
+    order_id = db.Column(db.String(50), db.ForeignKey('orders.id'), nullable=True)
     document_id = db.Column(db.Integer, db.ForeignKey('documents.id'), nullable=True)  # Als PDF gespeichert
     
     # Klassifizierung

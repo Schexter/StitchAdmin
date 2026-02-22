@@ -589,7 +589,7 @@ class DocumentPosition(db.Model):
     typ = Column(String(30), default=PositionTyp.ARTIKEL.value)
     
     # Referenzen
-    artikel_id = Column(Integer, ForeignKey('articles.id'))
+    artikel_id = Column(String(50), ForeignKey('articles.id'))
     artikel = relationship('Article')
     
     order_item_id = Column(Integer)  # Für Auftrags-Verknüpfung

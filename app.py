@@ -74,7 +74,19 @@ def create_app():
     # ==========================================
     # KONFIGURATION
     # ==========================================
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    secret_key = os.environ.get('SECRET_KEY')
+    if not secret_key:
+        # Persistenten Key aus Datei laden oder erzeugen
+        key_file = os.path.join(DATA_DIR, '.secret_key')
+        if os.path.exists(key_file):
+            with open(key_file, 'r') as f:
+                secret_key = f.read().strip()
+        else:
+            import secrets
+            secret_key = secrets.token_hex(32)
+            with open(key_file, 'w') as f:
+                f.write(secret_key)
+    app.config['SECRET_KEY'] = secret_key
     app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', 'False') == 'True'  # Default: False im EXE
 
     # Erstelle notwendige Verzeichnisse im DATA_DIR (persistent)
@@ -135,6 +147,13 @@ def create_app():
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Bitte melden Sie sich an, um auf diese Seite zuzugreifen.'
     login_manager.login_message_category = 'info'
+
+    # ==========================================
+    # CSRF-SCHUTZ
+    # ==========================================
+    from flask_wtf.csrf import CSRFProtect
+    csrf = CSRFProtect(app)
+    app.config['WTF_CSRF_CHECK_DEFAULT'] = True
 
     @login_manager.user_loader
     def load_user(user_id):
@@ -342,6 +361,12 @@ def create_app():
 
     # Social Media
     register_blueprint_safe('src.controllers.social_media_controller', 'social_media_bp', 'Social Media')
+
+    # CSRF-Ausnahmen fuer oeffentliche Blueprints (Shop, Anfragen, Website)
+    for bp_name in ['shop', 'inquiry', 'website', 'design_approval']:
+        bp = app.blueprints.get(bp_name)
+        if bp:
+            csrf.exempt(bp)
 
     # ==========================================
     # HAUPT-ROUTEN
@@ -649,7 +674,7 @@ def create_app():
                 "ALTER TABLE customers ADD COLUMN is_active BOOLEAN DEFAULT TRUE"
             ))
             _db.session.commit()
-            logger.info("customers.is_active Spalte hinzugefuegt")
+            print("[OK] customers.is_active Spalte hinzugefuegt")
         except Exception:
             _db.session.rollback()
 
@@ -813,10 +838,14 @@ def create_app():
 
         # Erstelle Admin-User falls nicht vorhanden
         if not User.query.filter_by(username='admin').first():
+            import secrets
+            initial_pw = secrets.token_urlsafe(12)
             admin = User(username='admin', email='admin@example.com', is_admin=True)
-            admin.set_password('admin')
+            admin.set_password(initial_pw)
             _db.session.add(admin)
             _db.session.commit()
+            print(f"[WICHTIG] Admin-User erstellt. Passwort: {initial_pw}")
+            print("[WICHTIG] Bitte sofort aendern unter Einstellungen > Benutzer!")
 
         # Default-Tenant erstellen falls nicht vorhanden
         try:

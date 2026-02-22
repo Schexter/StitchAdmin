@@ -59,23 +59,27 @@ class EmailService:
         try:
             from src.models import CompanySettings
             settings = CompanySettings.get_settings()
-            
+
             # Erstelle virtuellen Account aus Settings
             self.smtp_config = {
-                'server': getattr(settings, 'smtp_server', 'localhost'),
-                'port': getattr(settings, 'smtp_port', 587),
-                'username': getattr(settings, 'smtp_username', ''),
-                'password': getattr(settings, 'smtp_password', ''),
+                'server': getattr(settings, 'smtp_server', '') or '',
+                'port': getattr(settings, 'smtp_port', 587) or 587,
+                'username': getattr(settings, 'smtp_username', '') or '',
+                'password': getattr(settings, 'smtp_password', '') or '',
                 'use_tls': getattr(settings, 'smtp_use_tls', True),
-                'from_email': getattr(settings, 'company_email', ''),
-                'from_name': getattr(settings, 'company_name', 'StitchAdmin')
+                'from_email': getattr(settings, 'smtp_from_email', '') or getattr(settings, 'email', '') or '',
+                'from_name': getattr(settings, 'smtp_from_name', '') or getattr(settings, 'company_name', 'StitchAdmin')
             }
         except Exception as e:
             logger.warning(f"Could not load email settings: {e}")
             self.smtp_config = {
-                'server': 'localhost',
+                'server': '',
                 'port': 587,
-                'use_tls': True
+                'username': '',
+                'password': '',
+                'use_tls': True,
+                'from_email': '',
+                'from_name': ''
             }
     
     def send_email(self, 

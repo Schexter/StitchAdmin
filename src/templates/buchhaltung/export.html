@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Exporte - Buchhaltung{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-download me-2"></i>Exporte</h2>
+        <a href="{{ url_for('buchhaltung.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurueck
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <!-- DATEV Export -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                            <i class="bi bi-file-earmark-spreadsheet fs-4 text-primary"></i>
+                        </div>
+                        <div>
+                            <h5 class="card-title mb-0">DATEV-Export</h5>
+                            <small class="text-muted">Buchungsstapel (CSV)</small>
+                        </div>
+                    </div>
+                    <p class="card-text">DATEV-kompatibler Export im EXTF-Format. Importierbar in DATEV Unternehmen Online.</p>
+                    <form method="POST" action="{{ url_for('buchhaltung.export_datev') }}">
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small">Von</label>
+                                <input type="date" name="datum_von" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Bis</label>
+                                <input type="date" name="datum_bis" class="form-control form-control-sm" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-download me-1"></i>DATEV-CSV exportieren
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- DATEV mit Belegen -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 border-success">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-success bg-opacity-10 p-3 me-3">
+                            <i class="bi bi-file-earmark-zip fs-4 text-success"></i>
+                        </div>
+                        <div>
+                            <h5 class="card-title mb-0">DATEV mit Belegen</h5>
+                            <small class="text-muted">CSV + PDF-Rechnungen (ZIP)</small>
+                        </div>
+                    </div>
+                    <p class="card-text">DATEV-Export inkl. aller verknuepften Rechnungs-PDFs als ZIP-Archiv fuer den Steuerberater.</p>
+                    <form method="POST" action="{{ url_for('buchhaltung.export_datev_belege') }}">
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small">Von</label>
+                                <input type="date" name="datum_von" class="form-control form-control-sm" required>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Bis</label>
+                                <input type="date" name="datum_bis" class="form-control form-control-sm" required>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="bi bi-download me-1"></i>DATEV + Belege exportieren
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- GoBD Export -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="rounded-circle bg-warning bg-opacity-10 p-3 me-3">
+                            <i class="bi bi-shield-check fs-4 text-warning"></i>
+                        </div>
+                        <div>
+                            <h5 class="card-title mb-0">GoBD-Export</h5>
+                            <small class="text-muted">Archivpaket (ZIP)</small>
+                        </div>
+                    </div>
+                    <p class="card-text">GoBD-konformes Exportpaket mit Buchungen, Stammdaten, Index und Pruefsummen.</p>
+                    <form method="POST" action="{{ url_for('buchhaltung.export_gobd') }}">
+                        <div class="mb-3">
+                            <label class="form-label small">Geschaeftsjahr</label>
+                            <input type="number" name="jahr" class="form-control form-control-sm"
+                                   value="{{ today.year if today is defined else 2026 }}" min="2020" max="2030" required>
+                        </div>
+                        <button type="submit" class="btn btn-warning w-100">
+                            <i class="bi bi-download me-1"></i>GoBD-Paket exportieren
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

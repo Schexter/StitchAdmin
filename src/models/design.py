@@ -122,6 +122,10 @@ class Design(db.Model):
     # HERKUNFT & KOSTEN
     # ═══════════════════════════════════════════════════════════════
     
+    # Shop-Felder (öffentlicher Webshop)
+    show_in_shop = db.Column(db.Boolean, default=False, index=True)
+    shop_category = db.Column(db.String(50))  # logo, schrift, motiv, wappen
+
     # Woher kommt das Design?
     source = db.Column(db.String(50))  # customer, internal, external_order
     source_order_id = db.Column(db.String(50))  # Verknüpfung zur Design-Bestellung
@@ -446,10 +450,11 @@ class ThreadBrand(db.Model):
     website = db.Column(db.String(200))
     notes = db.Column(db.Text)
     is_default = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
     sort_order = db.Column(db.Integer, default=0)
-    
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     colors = db.relationship('ThreadColor', back_populates='brand', cascade='all, delete-orphan')
     
     def __repr__(self):

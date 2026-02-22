@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Konten verwalten{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-gear me-2"></i>Bankkonten verwalten</h2>
+        <a href="{{ url_for('banking.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurueck
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Neues Konto -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Neues Konto</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Kontoname</label>
+                            <input type="text" name="name" class="form-control" placeholder="z.B. Geschaeftskonto" required>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-8">
+                                <label class="form-label">IBAN</label>
+                                <input type="text" name="iban" class="form-control" placeholder="DE89 3704 0044 0532 0130 00">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label">BIC</label>
+                                <input type="text" name="bic" class="form-control" placeholder="COBADEFFXXX">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Bankname</label>
+                            <input type="text" name="bank_name" class="form-control" placeholder="z.B. Sparkasse">
+                        </div>
+
+                        <hr>
+                        <h6 class="fw-bold"><i class="bi bi-shield-lock me-1"></i>FinTS-Zugangsdaten (optional)</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-4">
+                                <label class="form-label">BLZ</label>
+                                <input type="text" name="fints_blz" class="form-control" placeholder="37040044">
+                            </div>
+                            <div class="col-8">
+                                <label class="form-label">FinTS-Endpoint</label>
+                                <input type="url" name="fints_endpoint" class="form-control" placeholder="https://...">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Login</label>
+                                <input type="text" name="fints_login" class="form-control">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">PIN</label>
+                                <input type="password" name="fints_pin" class="form-control">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-plus-lg me-1"></i>Konto anlegen
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bestehende Konten -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Bestehende Konten</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if accounts %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>IBAN</th>
+                                    <th>Bank</th>
+                                    <th>FinTS</th>
+                                    <th>Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for acc in accounts %}
+                                <tr class="{{ '' if acc.is_active else 'text-muted' }}">
+                                    <td class="fw-bold">{{ acc.name }}</td>
+                                    <td class="font-monospace small">{{ acc.iban or '-' }}</td>
+                                    <td>{{ acc.bank_name or '-' }}</td>
+                                    <td>
+                                        {% if acc.fints_blz and acc.fints_login %}
+                                        <span class="badge bg-success">Eingerichtet</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Nicht konfiguriert</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            {% if acc.fints_blz and acc.fints_login %}
+                                            <form method="POST" action="{{ url_for('banking.test_connection', account_id=acc.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-info btn-sm">
+                                                    <i class="bi bi-lightning"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                            {% if acc.is_active %}
+                                            <form method="POST" action="{{ url_for('banking.delete_account', account_id=acc.id) }}" class="d-inline"
+                                                  onsubmit="return confirm('Konto deaktivieren?')">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p>Noch keine Konten angelegt</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

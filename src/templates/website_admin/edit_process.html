@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Prozess-Schritte bearbeiten{% endblock %}
+{% block extra_css %}
+<style>
+    .step-card { cursor: grab; transition: transform 0.2s, box-shadow 0.2s; }
+    .step-card:active { cursor: grabbing; }
+    .step-card.sortable-ghost { opacity: 0.4; transform: scale(0.95); }
+    .step-card.sortable-chosen { box-shadow: 0 8px 25px rgba(0,0,0,0.15); }
+    .step-drag-handle { cursor: grab; color: #adb5bd; }
+    .step-drag-handle:hover { color: #495057; }
+    .step-icon-preview { width: 40px; height: 40px; border-radius: 8px; background: linear-gradient(135deg, var(--sa-primary, #0d6efd), color-mix(in srgb, var(--sa-primary, #0d6efd), black 25%)); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.2rem; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-list-ol me-2"></i>Prozess-Schritte</h2>
+            <p class="text-muted mb-0">Schritte per Drag & Drop sortieren. Leere Schritte werden nicht angezeigt.</p>
+        </div>
+        <a href="{{ url_for('website_admin.dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Zur&uuml;ck</a>
+    </div>
+
+    <form method="POST">
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <label class="form-label fw-semibold">Sektions-Titel</label>
+                <input type="text" class="form-control" name="section_title" value="{{ content.get('section_title', 'In 4 Schritten zum fertigen Produkt') }}">
+            </div>
+        </div>
+
+        <div class="row g-3" id="processGrid">
+            {% for i in range(1, 7) %}
+            <div class="col-md-6 col-lg-4 step-card" data-slot="{{ i }}">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center py-2">
+                        <div class="d-flex align-items-center">
+                            <span class="step-drag-handle me-2"><i class="bi bi-grip-vertical fs-5"></i></span>
+                            <h6 class="mb-0 small fw-bold">Schritt {{ i }}</h6>
+                        </div>
+                        {% if content.get('step_%d_title' % i) %}
+                        <span class="badge bg-success">Aktiv</span>
+                        {% else %}
+                        <span class="badge bg-light text-muted">Leer</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="mb-2">
+                            <label class="form-label small">Titel</label>
+                            <input type="text" class="form-control form-control-sm" name="step_{{ i }}_title"
+                                   value="{{ content.get('step_%d_title' % i, '') }}" placeholder="Leer = nicht angezeigt">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Beschreibung</label>
+                            <textarea class="form-control form-control-sm" name="step_{{ i }}_description" rows="2">{{ content.get('step_%d_description' % i, '') }}</textarea>
+                        </div>
+                        <div>
+                            <label class="form-label small">Icon</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="step-icon-preview">
+                                    <i class="bi {{ content.get('step_%d_icon' % i, 'bi-circle') }}" id="icon_i_{{ i }}"></i>
+                                </div>
+                                <input type="text" class="form-control form-control-sm" name="step_{{ i }}_icon"
+                                       value="{{ content.get('step_%d_icon' % i, '') }}" placeholder="z.B. bi-chat-text-fill"
+                                       oninput="document.getElementById('icon_i_{{ i }}').className='bi ' + this.value">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Speichern</button>
+            <a href="{{ url_for('website.home') }}" target="_blank" class="btn btn-outline-secondary">
+                <i class="bi bi-eye me-1"></i>Vorschau
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+new Sortable(document.getElementById('processGrid'), {
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    handle: '.step-drag-handle',
+    draggable: '.step-card'
+});
+</script>
+{% endblock %}

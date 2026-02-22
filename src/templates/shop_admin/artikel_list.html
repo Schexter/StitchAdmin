@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Shop-Artikel{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-box-seam me-2"></i>Shop-Artikel</h2>
+            <p class="text-muted mb-0">Artikel für den öffentlichen Shop aktivieren und konfigurieren</p>
+        </div>
+        <a href="{{ url_for('shop_admin.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurück
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white">
+            <div class="row align-items-center">
+                <div class="col">
+                    <input type="text" id="searchArticle" class="form-control" placeholder="Artikel suchen...">
+                </div>
+                <div class="col-auto">
+                    <select id="filterCategory" class="form-select">
+                        <option value="">Alle Kategorien</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <select id="filterShop" class="form-select">
+                        <option value="">Alle</option>
+                        <option value="1">Im Shop</option>
+                        <option value="0">Nicht im Shop</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="articleTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 50px;"></th>
+                            <th>Artikel</th>
+                            <th>Art.-Nr.</th>
+                            <th>Kategorie</th>
+                            <th>VK-Preis</th>
+                            <th>Bestand</th>
+                            <th class="text-center">Im Shop</th>
+                            <th class="text-end">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for article in articles %}
+                        <tr data-name="{{ article.name|lower }}" data-category="{{ article.shop_category_id or '' }}" data-shop="{{ '1' if article.show_in_shop else '0' }}">
+                            <td>
+                                {% if article.shop_image_path %}
+                                <img src="{{ url_for('static', filename=article.shop_image_path) }}" alt=""
+                                     style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">
+                                {% else %}
+                                <div class="bg-light d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border-radius: 4px;">
+                                    <i class="bi bi-image text-muted small"></i>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="fw-semibold">{{ article.name }}</div>
+                                {% if article.brand %}<small class="text-muted">{{ article.brand }}</small>{% endif %}
+                            </td>
+                            <td><code>{{ article.article_number or '-' }}</code></td>
+                            <td>
+                                {% if article.shop_category %}
+                                <span class="badge bg-light text-dark">{{ article.shop_category.name }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ "%.2f"|format(article.price or 0) }} €</td>
+                            <td>
+                                {% if article.stock and article.stock > 0 %}
+                                <span class="text-success">{{ article.stock }}</span>
+                                {% else %}
+                                <span class="text-muted">0</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <form method="POST" action="{{ url_for('shop_admin.artikel_toggle', article_id=article.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm {{ 'btn-success' if article.show_in_shop else 'btn-outline-secondary' }}">
+                                        <i class="bi {{ 'bi-check-circle-fill' if article.show_in_shop else 'bi-circle' }}"></i>
+                                    </button>
+                                </form>
+                            </td>
+                            <td class="text-end">
+                                <a href="{{ url_for('shop_admin.artikel_edit', article_id=article.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Einfacher Filter
+document.getElementById('searchArticle').addEventListener('input', filterTable);
+document.getElementById('filterCategory').addEventListener('change', filterTable);
+document.getElementById('filterShop').addEventListener('change', filterTable);
+
+function filterTable() {
+    const search = document.getElementById('searchArticle').value.toLowerCase();
+    const cat = document.getElementById('filterCategory').value;
+    const shop = document.getElementById('filterShop').value;
+    document.querySelectorAll('#articleTable tbody tr').forEach(row => {
+        const name = row.dataset.name;
+        const rowCat = row.dataset.category;
+        const rowShop = row.dataset.shop;
+        let show = true;
+        if (search && !name.includes(search)) show = false;
+        if (cat && rowCat !== cat) show = false;
+        if (shop && rowShop !== shop) show = false;
+        row.style.display = show ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}

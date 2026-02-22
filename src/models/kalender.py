@@ -81,8 +81,8 @@ class KalenderTermin(db.Model):
     farbe = db.Column(db.String(20), default='#3788d8')
     
     # Verknüpfungen
-    kunde_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
-    auftrag_id = db.Column(db.Integer, db.ForeignKey('orders.id'))
+    kunde_id = db.Column(db.String(50), db.ForeignKey('customers.id'))
+    auftrag_id = db.Column(db.String(50), db.ForeignKey('orders.id'))
     dokument_id = db.Column(db.Integer, db.ForeignKey('business_documents.id'))
     maschine_id = db.Column(db.Integer, db.ForeignKey('kalender_ressourcen.id'))
     mitarbeiter_id = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -219,66 +219,8 @@ class KalenderRessource(db.Model):
         }
 
 
-class RatenzahlungTermin(db.Model):
-    """
-    Ratenzahlungs-Termine (verknüpft mit Kalender)
-    """
-    __tablename__ = 'ratenzahlungen'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    
-    # Verknüpfung
-    kunde_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False)
-    dokument_id = db.Column(db.Integer, db.ForeignKey('business_documents.id'))
-    
-    # Ratenplan
-    gesamtbetrag = db.Column(db.Numeric(12, 2), nullable=False)
-    anzahl_raten = db.Column(db.Integer, nullable=False)
-    rate_betrag = db.Column(db.Numeric(12, 2), nullable=False)
-    
-    # Termine
-    erste_rate = db.Column(db.Date, nullable=False)
-    intervall_tage = db.Column(db.Integer, default=30)  # Standard: monatlich
-    
-    # Status
-    bezahlte_raten = db.Column(db.Integer, default=0)
-    restbetrag = db.Column(db.Numeric(12, 2))
-    ist_abgeschlossen = db.Column(db.Boolean, default=False)
-    
-    # Notizen
-    notizen = db.Column(db.Text)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    # Beziehungen
-    kunde = db.relationship('Customer', backref='ratenzahlungen')
-    kalender_termine = db.relationship('KalenderTermin', backref='ratenzahlung', 
-                                       foreign_keys='KalenderTermin.ratenzahlung_id')
-    
-    def erstelle_kalendertermine(self):
-        """Erstellt Kalendertermine für alle Raten"""
-        termine = []
-        
-        for i in range(self.anzahl_raten):
-            faellig = self.erste_rate + timedelta(days=i * self.intervall_tage)
-            
-            termin = KalenderTermin(
-                titel=f"Rate {i+1}/{self.anzahl_raten}: {self.rate_betrag}€",
-                beschreibung=f"Ratenzahlung für Rechnung",
-                start_datum=faellig,
-                ganztaegig=True,
-                termin_typ='rate',
-                status='geplant',
-                farbe='#dc3545',  # Rot für Zahlungen
-                kunde_id=self.kunde_id,
-                dokument_id=self.dokument_id,
-                ratenzahlung_id=self.id,
-                betrag=self.rate_betrag,
-                erinnerung_minuten=1440 * 3,  # 3 Tage vorher
-            )
-            termine.append(termin)
-        
-        return termine
+# RatenzahlungTermin wurde nach mahnwesen.py verschoben (als Ratenzahlung)
+# Die ratenzahlungen-Tabelle wird von mahnwesen.py verwaltet.
 
 
 # ============================================================================

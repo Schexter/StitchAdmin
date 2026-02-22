@@ -1,0 +1,137 @@
+{% extends "shop/base_shop.html" %}
+{% block title %}Anfrage stellen{% endblock %}
+{% block content %}
+<div style="padding-top: 80px;">
+    <section class="ws-section" style="background: var(--ws-primary-light); padding: 3rem 0;">
+        <div class="container text-center">
+            <h1 class="fw-bold mb-2">Anfrage stellen</h1>
+            <p class="text-muted fs-5">Beschreiben Sie Ihr Projekt und wir melden uns zeitnah bei Ihnen</p>
+        </div>
+    </section>
+
+    <section class="ws-section">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <form method="POST" enctype="multipart/form-data">
+                        <!-- Anfrageart -->
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0"><i class="bi bi-tag me-2"></i>Was möchten Sie?</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-2">
+                                    {% for key, label in inquiry_types.items() %}
+                                    <div class="col-md-4 col-6">
+                                        <input type="radio" class="btn-check" name="inquiry_type" id="type_{{ key }}"
+                                               value="{{ key }}" {{ 'checked' if form_data.get('inquiry_type') == key }}>
+                                        <label class="btn btn-outline-dark w-100 py-3" for="type_{{ key }}">
+                                            {{ label }}
+                                        </label>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Kontaktdaten -->
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0"><i class="bi bi-person me-2"></i>Ihre Kontaktdaten</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Vorname *</label>
+                                        <input type="text" class="form-control" name="first_name"
+                                               value="{{ form_data.get('first_name', '') }}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nachname *</label>
+                                        <input type="text" class="form-control" name="last_name"
+                                               value="{{ form_data.get('last_name', '') }}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">E-Mail *</label>
+                                        <input type="email" class="form-control" name="email"
+                                               value="{{ form_data.get('email', '') }}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Telefon</label>
+                                        <input type="tel" class="form-control" name="phone"
+                                               value="{{ form_data.get('phone', '') }}">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Firma</label>
+                                        <input type="text" class="form-control" name="company_name"
+                                               value="{{ form_data.get('company_name', '') }}">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Projekt-Details -->
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-header bg-white">
+                                <h5 class="mb-0"><i class="bi bi-chat-text me-2"></i>Ihr Projekt</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label class="form-label">Beschreibung *</label>
+                                        <textarea class="form-control" name="description" rows="4"
+                                                  placeholder="Beschreiben Sie Ihr Projekt: Was soll bestickt/bedruckt werden? Welches Motiv? Welche Farben?" required>{{ form_data.get('description', '') }}</textarea>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Menge (ca.)</label>
+                                        <input type="number" class="form-control" name="quantity" min="1"
+                                               value="{{ form_data.get('quantity', '') }}"
+                                               placeholder="z.B. 50">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Textilart</label>
+                                        <input type="text" class="form-control" name="textile_type"
+                                               value="{{ form_data.get('textile_type', '') }}"
+                                               placeholder="z.B. Poloshirt, T-Shirt">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Wunschtermin</label>
+                                        <input type="date" class="form-control" name="desired_date"
+                                               value="{{ form_data.get('desired_date', '') }}">
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Design/Logo hochladen</label>
+                                        <input type="file" class="form-control" name="design_file"
+                                               accept=".png,.jpg,.jpeg,.gif,.pdf,.ai,.eps,.svg,.dst,.emb">
+                                        <small class="text-muted">Erlaubte Formate: PNG, JPG, PDF, AI, EPS, SVG, DST, EMB (max. 16 MB)</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- DSGVO -->
+                        <div class="card border-0 shadow-sm mb-4">
+                            <div class="card-body">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="dsgvo_consent"
+                                           name="dsgvo_consent" value="1" required>
+                                    <label class="form-check-label" for="dsgvo_consent">
+                                        {{ dsgvo_text }} *
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Absenden -->
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-lg px-5" style="background: var(--ws-primary); color: white;">
+                                <i class="bi bi-send me-2"></i>Anfrage absenden
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

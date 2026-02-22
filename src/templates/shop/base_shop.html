@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Shop{% endblock %} - {{ company.company_name if company else 'StitchAdmin' }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    {% if branding and branding.logo_path %}
+    <link rel="icon" href="{{ url_for('static', filename=branding.logo_path) }}">
+    {% endif %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/website.css') }}">
+    {% if branding and branding.primary_color %}
+    <style>
+        :root {
+            --ws-primary: {{ branding.primary_color }};
+            --ws-primary-dark: color-mix(in srgb, {{ branding.primary_color }}, black 25%);
+            --ws-primary-light: color-mix(in srgb, {{ branding.primary_color }}, white 85%);
+            --ws-primary-glow: color-mix(in srgb, {{ branding.primary_color }}, transparent 70%);
+        }
+    </style>
+    {% endif %}
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="ws-nav {% block nav_class %}ws-nav-scrolled{% endblock %}" id="mainNav">
+        <div class="container">
+            <div class="ws-nav-inner">
+                <a href="{{ url_for('website.home') }}" class="ws-nav-brand">
+                    {% if branding and branding.logo_path %}
+                    <img src="{{ url_for('static', filename=branding.logo_path) }}" alt="Logo" class="ws-nav-logo">
+                    {% endif %}
+                    <span>{{ company.company_name if company else 'StitchAdmin' }}</span>
+                </a>
+                <div class="ws-nav-links d-none d-md-flex">
+                    <a href="{{ url_for('website.home') }}">Startseite</a>
+                    <a href="{{ url_for('shop.index') }}">Konfigurator</a>
+                    <a href="{{ url_for('shop.textilien') }}">Textilien</a>
+                    <a href="{{ url_for('shop.motive') }}">Motive</a>
+                    <a href="{{ url_for('inquiry.form') }}">Anfrage</a>
+                    <a href="{{ url_for('shop.warenkorb') }}">
+                        <i class="bi bi-bag"></i>
+                        {% if cart_count %}
+                        <span class="badge bg-danger rounded-pill ms-1">{{ cart_count }}</span>
+                        {% endif %}
+                    </a>
+                </div>
+                <a href="{{ url_for('auth.login') }}" class="ws-btn ws-btn-outline ws-btn-sm">
+                    <i class="bi bi-box-arrow-in-right"></i> Login
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="container" style="padding-top: 90px;">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    <!-- Content -->
+    {% block content %}{% endblock %}
+
+    <!-- Footer -->
+    <footer class="ws-footer">
+        <div class="container">
+            <div class="ws-footer-inner">
+                <div class="ws-footer-brand">
+                    {% if branding and branding.logo_path %}
+                    <img src="{{ url_for('static', filename=branding.logo_path) }}" alt="Logo" height="28">
+                    {% endif %}
+                    <span>{{ company.display_name if company and company.company_name else 'StitchAdmin' }}</span>
+                </div>
+                <div class="ws-footer-copy">
+                    &copy; {{ today.year if today is defined else '2026' }} &ndash; Alle Rechte vorbehalten
+                </div>
+                <div class="ws-footer-links">
+                    <a href="{{ url_for('website.home') }}">Startseite</a>
+                    <a href="{{ url_for('website.impressum') }}">Impressum</a>
+                    <a href="{{ url_for('website.datenschutz') }}">Datenschutz</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

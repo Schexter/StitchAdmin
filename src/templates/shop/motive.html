@@ -1,0 +1,72 @@
+{% extends "shop/base_shop.html" %}
+{% block title %}Motive{% endblock %}
+{% block content %}
+<div style="padding-top: 80px;">
+    <section class="ws-section" style="padding-bottom: 2rem;">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="ws-section-badge">Design-Katalog</div>
+                    <h1 style="font-size: 2rem; font-weight: 800; letter-spacing: -0.01em; color: var(--ws-text); margin-bottom: 0.25rem;">Motive &amp; Designs</h1>
+                    <p style="color: var(--ws-text-muted);">Wählen Sie ein Motiv für Ihre Veredelung</p>
+                </div>
+                <a href="{{ url_for('shop.index') }}" class="ws-btn ws-btn-primary ws-btn-sm" style="color: var(--ws-primary); background: var(--ws-primary-light); border-color: transparent;">
+                    <i class="bi bi-arrow-left"></i>Zurück
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section class="ws-section" style="padding-top: 0;">
+        <div class="container">
+            <!-- Kategorie-Filter -->
+            <div class="d-flex gap-2 mb-4 flex-wrap">
+                <a href="{{ url_for('shop.motive') }}" class="ws-pill {{ 'active' if not selected_category else '' }}">Alle</a>
+                {% for val, label in [('logo', 'Logos'), ('schrift', 'Schriftzüge'), ('motiv', 'Motive'), ('wappen', 'Wappen'), ('clipart', 'Cliparts')] %}
+                <a href="{{ url_for('shop.motive', kategorie=val) }}" class="ws-pill {{ 'active' if selected_category == val else '' }}">{{ label }}</a>
+                {% endfor %}
+            </div>
+
+            {% if templates %}
+            <div class="row g-4">
+                {% for tmpl in templates %}
+                <div class="col-md-3 col-6">
+                    <div class="ws-feature-card ws-feature-card-img h-100">
+                        <div class="ws-feature-img" style="height: 160px;">
+                            {% if tmpl.thumbnail_path or tmpl.image_path %}
+                            <img src="{{ url_for('static', filename=tmpl.thumbnail_path or tmpl.image_path) }}"
+                                 alt="{{ tmpl.name }}" style="object-fit: contain; padding: 1rem; background: var(--ws-bg-alt);">
+                            {% else %}
+                            <div class="d-flex align-items-center justify-content-center h-100" style="background: var(--ws-bg-alt);">
+                                <i class="bi bi-palette fs-1" style="color: var(--ws-text-muted);"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="ws-feature-body">
+                            <h3 style="font-size: 0.95rem;">{{ tmpl.name }}</h3>
+                            <div class="d-flex gap-1 flex-wrap">
+                                <span class="ws-shop-badge">{{ tmpl.category_display }}</span>
+                                {% if tmpl.stitch_count %}
+                                <span class="ws-shop-badge">{{ tmpl.stitch_count }} Stiche</span>
+                                {% endif %}
+                                {% if tmpl.width_mm and tmpl.height_mm %}
+                                <span class="ws-shop-badge">{{ tmpl.width_mm }}&times;{{ tmpl.height_mm }}mm</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <div class="ws-feature-icon mx-auto mb-3" style="width: 72px; height: 72px; font-size: 2rem;">
+                    <i class="bi bi-palette"></i>
+                </div>
+                <h4 class="fw-bold" style="color: var(--ws-text-muted);">Noch keine Motive verfügbar</h4>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+{% endblock %}

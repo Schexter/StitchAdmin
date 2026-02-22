@@ -24,6 +24,7 @@ class ContactType(Enum):
     NOTIZ = 'notiz'                      # Interne Notiz
     TERMIN = 'termin'                    # Terminvereinbarung
     BESUCH = 'besuch'                    # Kundenbesuch
+    WEBSITE_ANFRAGE = 'website_anfrage'  # Anfrage über Website
 
 
 class ContactStatus(Enum):
@@ -67,8 +68,8 @@ class CustomerContact(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     # Zuordnung
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=False, index=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), index=True)  # Optional: Auftragsbezug
+    customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=False, index=True)
+    order_id = db.Column(db.String(50), db.ForeignKey('orders.id'), index=True)  # Optional: Auftragsbezug
 
     # Kontaktart
     contact_type = db.Column(db.Enum(ContactType), nullable=False)
@@ -145,7 +146,8 @@ class CustomerContact(db.Model):
             ContactType.TELEFON_EINGANG: 'bi-telephone-inbound',
             ContactType.NOTIZ: 'bi-sticky',
             ContactType.TERMIN: 'bi-calendar-event',
-            ContactType.BESUCH: 'bi-person-walking'
+            ContactType.BESUCH: 'bi-person-walking',
+            ContactType.WEBSITE_ANFRAGE: 'bi-globe2'
         }
         return icons.get(self.contact_type, 'bi-chat-dots')
 
@@ -159,7 +161,8 @@ class CustomerContact(db.Model):
             ContactType.TELEFON_EINGANG: 'success',
             ContactType.NOTIZ: 'warning',
             ContactType.TERMIN: 'danger',
-            ContactType.BESUCH: 'secondary'
+            ContactType.BESUCH: 'secondary',
+            ContactType.WEBSITE_ANFRAGE: 'dark'
         }
         return colors.get(self.contact_type, 'secondary')
 
@@ -173,7 +176,8 @@ class CustomerContact(db.Model):
             ContactType.TELEFON_EINGANG: 'Anruf (eingehend)',
             ContactType.NOTIZ: 'Notiz',
             ContactType.TERMIN: 'Termin',
-            ContactType.BESUCH: 'Besuch'
+            ContactType.BESUCH: 'Besuch',
+            ContactType.WEBSITE_ANFRAGE: 'Website-Anfrage'
         }
         return labels.get(self.contact_type, str(self.contact_type.value))
 

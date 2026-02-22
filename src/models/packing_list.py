@@ -23,9 +23,9 @@ class PackingList(db.Model):
     packing_list_number = db.Column(db.String(50), unique=True, nullable=False)
 
     # Verknüpfungen
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=True)
+    order_id = db.Column(db.String(50), db.ForeignKey('orders.id'), nullable=True)
     production_id = db.Column(db.Integer, nullable=True)  # Hinweis: productions Tabelle existiert nicht
-    customer_id = db.Column(db.Integer, db.ForeignKey('customers.id'), nullable=True)
+    customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=True)
 
     # Teillieferungen (Cartons)
     carton_number = db.Column(db.Integer, default=1)  # Karton 1 von 3

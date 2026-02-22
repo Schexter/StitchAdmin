@@ -146,7 +146,7 @@ def new_contact(customer_id):
             # Auftragsbezug
             order_id = request.form.get('order_id')
             if order_id:
-                contact.order_id = int(order_id)
+                contact.order_id = order_id
 
             # Wiedervorlage
             if request.form.get('follow_up_date'):
@@ -324,7 +324,7 @@ def phone_note(customer_id):
             # Auftragsbezug
             order_id = request.form.get('order_id')
             if order_id:
-                contact.order_id = int(order_id)
+                contact.order_id = order_id
 
             db.session.add(contact)
             db.session.commit()

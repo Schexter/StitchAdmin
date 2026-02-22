@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}E-Mail-Sync{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-envelope-arrow-down me-2"></i>Posteingang</h2>
+            {% if unread_count %}<span class="badge bg-danger">{{ unread_count }} ungelesen</span>{% endif %}
+        </div>
+        <div class="btn-group">
+            <a href="{{ url_for('email_sync.accounts') }}" class="btn btn-outline-primary">
+                <i class="bi bi-gear me-1"></i>Konten
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <form method="GET" class="row g-2 align-items-end">
+                <div class="col-auto">
+                    <select name="account_id" class="form-select form-select-sm">
+                        <option value="">Alle Konten</option>
+                        {% for acc in accounts %}
+                        <option value="{{ acc.id }}" {{ 'selected' if filter_account == acc.id }}>{{ acc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-auto">
+                    <div class="form-check">
+                        <input type="checkbox" name="unread" value="1" class="form-check-input" id="unreadFilter"
+                               {{ 'checked' if filter_unread }}>
+                        <label class="form-check-label small" for="unreadFilter">Nur ungelesene</label>
+                    </div>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filtern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- E-Mail-Liste -->
+    <div class="card">
+        <div class="card-body p-0">
+            {% if emails.items %}
+            <div class="list-group list-group-flush">
+                {% for mail in emails.items %}
+                <a href="{{ url_for('email_sync.email_detail', email_id=mail.id) }}"
+                   class="list-group-item list-group-item-action {{ '' if mail.is_read else 'fw-bold' }}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-fill me-3">
+                            <div class="d-flex align-items-center mb-1">
+                                {% if not mail.is_read %}
+                                <span class="badge bg-primary rounded-pill me-2">Neu</span>
+                                {% endif %}
+                                <span class="small {{ '' if mail.is_read else 'fw-bold' }}">{{ mail.from_address[:50] }}</span>
+                                {% if mail.customer %}
+                                <span class="badge bg-success ms-2">{{ mail.customer.display_name[:20] if mail.customer.display_name else 'Kunde' }}</span>
+                                {% endif %}
+                            </div>
+                            <div>{{ mail.subject or '(Kein Betreff)' }}</div>
+                            {% if mail.body_text %}
+                            <small class="text-muted">{{ mail.body_text[:120] }}...</small>
+                            {% endif %}
+                        </div>
+                        <div class="text-end text-nowrap">
+                            <small class="text-muted">{{ mail.received_date.strftime('%d.%m. %H:%M') if mail.received_date else '' }}</small>
+                            {% if mail.has_attachments %}
+                            <br><i class="bi bi-paperclip text-muted"></i>
+                            {% endif %}
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+
+            {% if emails.pages > 1 %}
+            <nav class="p-3">
+                <ul class="pagination pagination-sm justify-content-center mb-0">
+                    {% for p in emails.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% if p %}
+                    <li class="page-item {{ 'active' if p == emails.page }}">
+                        <a class="page-link" href="{{ url_for('email_sync.index', page=p, account_id=filter_account, unread='1' if filter_unread else '') }}">{{ p }}</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled"><span class="page-link">...</span></li>
+                    {% endif %}
+                    {% endfor %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-envelope-open fs-1"></i>
+                <p class="mt-2">Keine E-Mails vorhanden</p>
+                {% if accounts %}
+                <p class="small">Synchronisieren Sie ein Konto, um E-Mails abzurufen</p>
+                {% else %}
+                <a href="{{ url_for('email_sync.accounts') }}" class="btn btn-primary btn-sm">E-Mail-Konto einrichten</a>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

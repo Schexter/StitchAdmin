@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}E-Mail-Konten{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-gear me-2"></i>E-Mail-Konten</h2>
+        <a href="{{ url_for('email_sync.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Posteingang
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Neues Konto -->
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Neues E-Mail-Konto</h5></div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <input type="text" name="name" class="form-control" placeholder="z.B. Firmen-E-Mail" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">E-Mail-Adresse</label>
+                            <input type="email" name="email_address" class="form-control" required>
+                        </div>
+
+                        <h6 class="fw-bold mt-4"><i class="bi bi-envelope-arrow-down me-1"></i>IMAP (Empfang)</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-8">
+                                <label class="form-label small">Server</label>
+                                <input type="text" name="imap_server" class="form-control form-control-sm" placeholder="imap.provider.de">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small">Port</label>
+                                <input type="number" name="imap_port" class="form-control form-control-sm" value="993">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small">Benutzername</label>
+                                <input type="text" name="imap_username" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Passwort</label>
+                                <input type="password" name="imap_password" class="form-control form-control-sm">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input type="checkbox" name="imap_use_ssl" class="form-check-input" id="imapSsl" checked>
+                                <label class="form-check-label small" for="imapSsl">SSL verwenden</label>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Ordner</label>
+                            <input type="text" name="archive_folder" class="form-control form-control-sm" value="INBOX">
+                        </div>
+
+                        <h6 class="fw-bold mt-4"><i class="bi bi-envelope-arrow-up me-1"></i>SMTP (Versand)</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-8">
+                                <label class="form-label small">Server</label>
+                                <input type="text" name="smtp_server" class="form-control form-control-sm" placeholder="smtp.provider.de">
+                            </div>
+                            <div class="col-4">
+                                <label class="form-label small">Port</label>
+                                <input type="number" name="smtp_port" class="form-control form-control-sm" value="587">
+                            </div>
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label small">Benutzername</label>
+                                <input type="text" name="smtp_username" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Passwort</label>
+                                <input type="password" name="smtp_password" class="form-control form-control-sm">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 mt-3">
+                            <i class="bi bi-plus-lg me-1"></i>Konto anlegen
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bestehende Konten -->
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">Bestehende Konten</h5></div>
+                <div class="card-body p-0">
+                    {% if accounts %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>E-Mail</th>
+                                    <th>Server</th>
+                                    <th>Status</th>
+                                    <th>Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for acc in accounts %}
+                                <tr>
+                                    <td class="fw-bold">{{ acc.name }}</td>
+                                    <td>{{ acc.email_address }}</td>
+                                    <td class="small">{{ acc.imap_server or '-' }}</td>
+                                    <td>
+                                        {% if acc.last_error %}
+                                        <span class="badge bg-danger" title="{{ acc.last_error }}">Fehler</span>
+                                        {% elif acc.last_check %}
+                                        <span class="badge bg-success">OK</span>
+                                        <br><small class="text-muted">{{ acc.last_check.strftime('%d.%m. %H:%M') }}</small>
+                                        {% else %}
+                                        <span class="badge bg-secondary">Nie gesynct</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <form method="POST" action="{{ url_for('email_sync.test_account', account_id=acc.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-info btn-sm" title="Testen">
+                                                    <i class="bi bi-lightning"></i>
+                                                </button>
+                                            </form>
+                                            <form method="POST" action="{{ url_for('email_sync.sync_account', account_id=acc.id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-outline-primary btn-sm" title="Synchronisieren">
+                                                    <i class="bi bi-arrow-repeat"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <p>Noch keine E-Mail-Konten eingerichtet</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -20,7 +20,7 @@ from enum import Enum
 from src.models import db
 
 
-class Kontenrahmen(Enum):
+class KontenrahmenTyp(Enum):
     """Unterstützte Kontenrahmen"""
     SKR03 = "SKR03"  # Standard für kleine/mittlere Unternehmen
     SKR04 = "SKR04"  # Alternative
@@ -76,13 +76,13 @@ class Konto(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Beziehungen
-    buchungen = db.relationship('Buchung', backref='konto', lazy='dynamic')
+    buchungen = db.relationship('BuchhaltungBuchung', foreign_keys='BuchhaltungBuchung.konto_id', backref='konto', lazy='dynamic')
     
     def __repr__(self):
         return f"<Konto {self.kontonummer} - {self.bezeichnung}>"
 
 
-class Buchung(db.Model):
+class BuchhaltungBuchung(db.Model):
     """
     Einzelne Buchung im Journal
     """
@@ -118,8 +118,8 @@ class Buchung(db.Model):
     
     # Verknüpfungen
     rechnung_id = db.Column(db.Integer, db.ForeignKey('business_documents.id'))
-    kunde_id = db.Column(db.Integer, db.ForeignKey('customers.id'))
-    lieferant_id = db.Column(db.Integer, db.ForeignKey('suppliers.id'))
+    kunde_id = db.Column(db.String(50), db.ForeignKey('customers.id'))
+    lieferant_id = db.Column(db.String(50), db.ForeignKey('suppliers.id'))
     
     # Kostenstelle
     kostenstelle_id = db.Column(db.Integer, db.ForeignKey('buchhaltung_kostenstellen.id'))
@@ -138,11 +138,11 @@ class Buchung(db.Model):
     # Beziehungen
     soll_konto = db.relationship('Konto', foreign_keys=[soll_konto_id])
     haben_konto = db.relationship('Konto', foreign_keys=[haben_konto_id])
-    kostenstelle = db.relationship('Kostenstelle', backref='buchungen')
-    kunde = db.relationship('Customer', backref='buchungen')
-    
+    kostenstelle = db.relationship('Kostenstelle', backref='buchhaltung_buchungen')
+    kunde = db.relationship('Customer', backref='buchhaltung_buchungen')
+
     def __repr__(self):
-        return f"<Buchung {self.belegnummer} - {self.betrag_brutto}€>"
+        return f"<BuchhaltungBuchung {self.belegnummer} - {self.betrag_brutto}€>"
 
 
 class Kostenstelle(db.Model):

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Kalender-Sync{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-calendar-check me-2"></i>Kalender-Sync</h2>
+        <a href="{{ url_for('calendar_sync.settings') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-gear me-1"></i>Einstellungen
+        </a>
+    </div>
+
+    {% if not is_configured %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        Microsoft Graph ist nicht konfiguriert. Bitte hinterlegen Sie <strong>Client-ID</strong> und <strong>Client-Secret</strong>
+        in den <a href="{{ url_for('settings.index') }}">Einstellungen</a>.
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- Verbindung herstellen -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-body text-center py-5">
+                    <div class="mb-4">
+                        <i class="bi bi-microsoft fs-1 text-primary"></i>
+                    </div>
+                    <h4>Microsoft Outlook</h4>
+                    <p class="text-muted">Synchronisieren Sie StitchAdmin-Termine mit Ihrem Outlook-Kalender.</p>
+                    {% if is_configured %}
+                    <a href="{{ url_for('calendar_sync.connect_microsoft') }}" class="btn btn-primary btn-lg">
+                        <i class="bi bi-link-45deg me-1"></i>Mit Microsoft verbinden
+                    </a>
+                    {% else %}
+                    <button class="btn btn-secondary btn-lg" disabled>
+                        Nicht konfiguriert
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Aktive Verbindungen -->
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-plug me-2"></i>Aktive Verbindungen</h5>
+                </div>
+                <div class="card-body">
+                    {% if connections %}
+                    {% for conn in connections %}
+                    <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded">
+                        <div>
+                            <div class="fw-bold">
+                                <i class="bi bi-microsoft me-1"></i>
+                                {{ conn.calendar_name or 'Outlook-Kalender' }}
+                            </div>
+                            <small class="text-muted">
+                                {% if conn.is_active %}
+                                <span class="badge bg-success">Verbunden</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inaktiv</span>
+                                {% endif %}
+                                | {{ conn.sync_direction }}
+                                {% if conn.last_sync_at %}
+                                | Letzter Sync: {{ conn.last_sync_at.strftime('%d.%m. %H:%M') }}
+                                {% endif %}
+                            </small>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            {% if conn.is_active %}
+                            <form method="POST" action="{{ url_for('calendar_sync.sync', conn_id=conn.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-arrow-repeat"></i> Sync
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ url_for('calendar_sync.disconnect', conn_id=conn.id) }}" class="d-inline"
+                                  onsubmit="return confirm('Verbindung trennen?')">
+                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-calendar-x fs-1"></i>
+                        <p class="mt-2">Keine Verbindungen eingerichtet</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "shop/base_shop.html" %}
+{% block title %}Textilien{% endblock %}
+{% block content %}
+<div style="padding-top: 80px;">
+    <section class="ws-section" style="padding-bottom: 2rem;">
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="ws-section-badge">Textil-Katalog</div>
+                    <h1 style="font-size: 2rem; font-weight: 800; letter-spacing: -0.01em; color: var(--ws-text); margin-bottom: 0.25rem;">Textilien</h1>
+                    <p style="color: var(--ws-text-muted);">{{ articles|length }} Artikel verfügbar</p>
+                </div>
+                <a href="{{ url_for('shop.index') }}" class="ws-btn ws-btn-primary ws-btn-sm" style="color: var(--ws-primary); background: var(--ws-primary-light); border-color: transparent;">
+                    <i class="bi bi-arrow-left"></i>Zurück
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section class="ws-section" style="padding-top: 0;">
+        <div class="container">
+            <div class="row g-4">
+                <!-- Filter Sidebar -->
+                <div class="col-lg-3">
+                    <div class="ws-feature-card" style="padding: 1.5rem;">
+                        <h6 style="font-weight: 700; margin-bottom: 1rem; color: var(--ws-text);"><i class="bi bi-funnel me-1"></i>Filter</h6>
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="searchInput" placeholder="Suchen..."
+                                   style="border-radius: 8px; border-color: var(--ws-border);">
+                        </div>
+                        <h6 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ws-text-muted); margin-bottom: 0.5rem;">Kategorien</h6>
+                        <div class="d-flex flex-column gap-1">
+                            <a href="{{ url_for('shop.textilien') }}"
+                               class="ws-filter-link {{ 'active' if not selected_category else '' }}">
+                                Alle
+                            </a>
+                            {% for cat in categories %}
+                            <a href="{{ url_for('shop.textilien', kategorie=cat.id) }}"
+                               class="ws-filter-link {{ 'active' if selected_category == cat.id else '' }}">
+                                {{ cat.name }}
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Artikel Grid -->
+                <div class="col-lg-9">
+                    {% if articles %}
+                    <div class="row g-4" id="articleGrid">
+                        {% for article in articles %}
+                        <div class="col-md-4 col-6 article-item" data-name="{{ article.name|lower }}">
+                            <a href="{{ url_for('shop.artikel_detail', article_id=article.id) }}" class="ws-feature-card ws-feature-card-img text-decoration-none d-block h-100">
+                                <div class="ws-feature-img">
+                                    {% if article.shop_image_path %}
+                                    <img src="{{ url_for('static', filename=article.shop_image_path) }}" alt="{{ article.name }}">
+                                    {% else %}
+                                    <div class="d-flex align-items-center justify-content-center h-100" style="background: var(--ws-bg-alt);">
+                                        <i class="bi bi-image fs-1" style="color: var(--ws-text-muted);"></i>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="ws-feature-body">
+                                    <h3>{{ article.name }}</h3>
+                                    {% if article.brand %}
+                                    <p class="mb-1">{{ article.brand }}</p>
+                                    {% endif %}
+                                    <div class="mt-2">
+                                        <span class="ws-shop-price" style="font-size: 1.15rem;">{{ "%.2f"|format(article.price or 0) }} €</span>
+                                    </div>
+                                    {% if article.material %}
+                                    <div class="mt-1">
+                                        <span class="ws-shop-badge">{{ article.material }}</span>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <div class="ws-feature-icon mx-auto mb-3" style="width: 72px; height: 72px; font-size: 2rem;">
+                            <i class="bi bi-inbox"></i>
+                        </div>
+                        <h4 class="fw-bold" style="color: var(--ws-text-muted);">Keine Artikel in dieser Kategorie</h4>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+document.getElementById('searchInput').addEventListener('input', function() {
+    const search = this.value.toLowerCase();
+    document.querySelectorAll('.article-item').forEach(item => {
+        item.style.display = item.dataset.name.includes(search) ? '' : 'none';
+    });
+});
+</script>
+{% endblock %}

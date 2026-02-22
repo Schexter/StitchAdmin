@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+{% block title %}Website-Designer{% endblock %}
+{% block extra_css %}
+<style>
+    .pb-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 1rem; overflow: hidden; transition: box-shadow 0.2s, border-color 0.2s; }
+    .pb-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+    .pb-card.open { border-color: var(--sa-primary, #0d6efd); box-shadow: 0 4px 16px rgba(13,110,253,0.1); }
+    .pb-header { display: flex; align-items: center; padding: 1rem 1.25rem; cursor: pointer; user-select: none; gap: 0.75rem; }
+    .pb-drag { cursor: grab; color: #adb5bd; font-size: 1.2rem; padding: 0 0.25rem; }
+    .pb-drag:hover { color: #495057; }
+    .pb-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+    .pb-info { flex: 1; min-width: 0; }
+    .pb-info h6 { font-weight: 700; font-size: 0.95rem; margin: 0; color: #1e293b; }
+    .pb-info small { color: #64748b; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 400px; }
+    .pb-toggle { width: 32px; height: 32px; border: none; background: #f1f5f9; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #64748b; transition: all 0.2s; }
+    .pb-toggle:hover { background: #e2e8f0; color: #1e293b; }
+    .pb-card.open .pb-toggle { background: var(--sa-primary, #0d6efd); color: #fff; transform: rotate(180deg); }
+    .pb-body { display: none; border-top: 1px solid #e2e8f0; padding: 1.5rem; background: #fafbfc; }
+    .pb-card.open .pb-body { display: block; }
+    .pb-preview-images { display: flex; gap: 0.5rem; margin-top: 0.25rem; }
+    .pb-preview-img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; border: 1px solid #e2e8f0; }
+    .pb-preview-img-placeholder { width: 36px; height: 36px; border-radius: 6px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #adb5bd; border: 1px dashed #dee2e6; }
+    .pb-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .pb-edit-link { color: var(--sa-primary, #0d6efd); text-decoration: none; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.25rem; }
+    .pb-edit-link:hover { text-decoration: underline; }
+    .pb-mini-form .form-control, .pb-mini-form .form-select { border-radius: 8px; font-size: 0.9rem; }
+    .pb-mini-form label { font-weight: 600; font-size: 0.82rem; color: #475569; margin-bottom: 0.25rem; }
+    .pb-save-row { display: flex; gap: 0.5rem; align-items: center; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; }
+    .sortable-ghost { opacity: 0.3; }
+    .sortable-chosen { box-shadow: 0 8px 30px rgba(0,0,0,0.12); }
+</style>
+{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-palette me-2"></i>Website-Designer</h2>
+            <p class="text-muted mb-0">Sektionen per Drag & Drop verwalten. Klicken zum Bearbeiten.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('website.home') }}" target="_blank" class="btn btn-outline-primary">
+                <i class="bi bi-eye me-1"></i>Website Vorschau
+            </a>
+            <a href="{{ url_for('shop.index') }}" target="_blank" class="btn btn-outline-success">
+                <i class="bi bi-shop me-1"></i>Shop Vorschau
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div id="sectionList">
+                {% set hero = sections.get('hero', {}) %}
+                {% set services = sections.get('services', {}) %}
+                {% set gallery = sections.get('gallery', {}) %}
+                {% set about = sections.get('about', {}) %}
+                {% set process = sections.get('process', {}) %}
+                {% set shop = sections.get('shop', {}) %}
+                {% set meta = sections.get('meta', {}) %}
+
+                <!-- HERO -->
+                <div class="pb-card" data-section="hero">
+                    <div class="pb-header" onclick="toggleSection(this)">
+                        <span class="pb-drag" onclick="event.stopPropagation()"><i class="bi bi-grip-vertical"></i></span>
+                        <div class="pb-icon bg-primary bg-opacity-10 text-primary"><i class="bi bi-stars"></i></div>
+                        <div class="pb-info">
+                            <h6>Hero-Bereich</h6>
+                            <small>{{ hero.get('title', 'Nicht konfiguriert') | truncate(60) }}</small>
+                        </div>
+                        <div class="pb-actions">
+                            <a href="{{ url_for('website_admin.edit_hero') }}" class="pb-edit-link" onclick="event.stopPropagation()"><i class="bi bi-pencil"></i>Vollansicht</a>
+                            <button type="button" class="pb-toggle"><i class="bi bi-chevron-down"></i></button>
+                        </div>
+                    </div>
+                    <div class="pb-body">
+                        <form method="POST" action="{{ url_for('website_admin.edit_hero') }}" enctype="multipart/form-data" class="pb-mini-form">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label>Badge-Text</label>
+                                    <input type="text" class="form-control" name="badge_text" value="{{ hero.get('badge_text', 'Professionelle Stickerei') }}">
+                                </div>
+                                <div class="col-md-8">
+                                    <label>Titel</label>
+                                    <input type="text" class="form-control" name="title" value="{{ hero.get('title', '') }}">
+                                </div>
+                                <div class="col-12">
+                                    <label>Untertitel</label>
+                                    <textarea class="form-control" name="subtitle" rows="2">{{ hero.get('subtitle', '') }}</textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label>Button-Text</label>
+                                    <input type="text" class="form-control" name="cta_text" value="{{ hero.get('cta_text', 'Anfrage stellen') }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label>Button-Link</label>
+                                    <input type="text" class="form-control" name="cta_link" value="{{ hero.get('cta_link', '#kontakt') }}">
+                                </div>
+                            </div>
+                            <div class="pb-save-row">
+                                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Hero speichern</button>
+                                <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Hintergrundbild: <a href="{{ url_for('website_admin.edit_hero') }}">Vollansicht &ouml;ffnen</a></span>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- LEISTUNGEN -->
+                <div class="pb-card" data-section="services">
+                    <div class="pb-header" onclick="toggleSection(this)">
+                        <span class="pb-drag" onclick="event.stopPropagation()"><i class="bi bi-grip-vertical"></i></span>
+                        <div class="pb-icon bg-success bg-opacity-10 text-success"><i class="bi bi-grid-3x2"></i></div>
+                        <div class="pb-info">
+                            <h6>Leistungen</h6>
+                            <small>{{ services.get('section_title', 'Unsere Leistungen') }} &ndash;
+                                {% set svc_count = [] %}{% for i in range(1,9) %}{% if services.get('card_%d_title' % i) %}{% if svc_count.append(1) %}{% endif %}{% endif %}{% endfor %}
+                                {{ svc_count|length }} Karte{{ 'n' if svc_count|length != 1 }}
+                            </small>
+                            <div class="pb-preview-images">
+                                {% for i in range(1, 5) %}
+                                {% set simg = services.get('card_%d_image' % i) %}
+                                {% if simg %}
+                                <img src="{% if simg.startswith('http') %}{{ simg }}{% else %}{{ url_for('static', filename=simg) }}{% endif %}" class="pb-preview-img" alt="">
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="pb-actions">
+                            <a href="{{ url_for('website_admin.edit_services') }}" class="pb-edit-link" onclick="event.stopPropagation()"><i class="bi bi-pencil"></i>Editor mit Drag&amp;Drop</a>
+                            <button type="button" class="pb-toggle"><i class="bi bi-chevron-down"></i></button>
+                        </div>
+                    </div>
+                    <div class="pb-body">
+                        <form method="POST" action="{{ url_for('website_admin.edit_services') }}" class="pb-mini-form">
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-6">
+                                    <label>Sektions-Titel</label>
+                                    <input type="text" class="form-control" name="section_title" value="{{ services.get('section_title', 'Unsere Leistungen') }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label>Untertitel</label>
+                                    <input type="text" class="form-control" name="section_subtitle" value="{{ services.get('section_subtitle', '') }}">
+                                </div>
+                            </div>
+                            <div class="row g-2">
+                                {% for i in range(1, 9) %}
+                                {% set stitle = services.get('card_%d_title' % i, '') %}
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control form-control-sm" name="card_{{ i }}_title" value="{{ stitle }}" placeholder="Karte {{ i }}">
+                                    <textarea class="form-control form-control-sm mt-1" name="card_{{ i }}_description" rows="1" placeholder="Beschreibung" style="font-size: 0.8rem;">{{ services.get('card_%d_description' % i, '') }}</textarea>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="pb-save-row">
+                                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Leistungen speichern</button>
+                                <a href="{{ url_for('website_admin.edit_services') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrows-move me-1"></i>Drag&amp;Drop Editor</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- GALERIE -->
+                <div class="pb-card" data-section="gallery">
+                    <div class="pb-header" onclick="toggleSection(this)">
+                        <span class="pb-drag" onclick="event.stopPropagation()"><i class="bi bi-grip-vertical"></i></span>
+                        <div class="pb-icon bg-warning bg-opacity-10 text-warning"><i class="bi bi-images"></i></div>
+                        <div class="pb-info">
+                            <h6>Bildergalerie</h6>
+                            <small>{{ gallery.get('section_title', 'Unsere Arbeiten') }} &ndash;
+                                {% set gal_count = [] %}{% for i in range(1,13) %}{% if gallery.get('image_%d' % i) %}{% if gal_count.append(1) %}{% endif %}{% endif %}{% endfor %}
+                                {{ gal_count|length }} Bild{{ 'er' if gal_count|length != 1 }}
+                            </small>
+                            <div class="pb-preview-images">
+                                {% for i in range(1, 7) %}
+                                {% set gimg = gallery.get('image_%d' % i) %}
+                                {% if gimg %}
+                                <img src="{% if gimg.startswith('http') %}{{ gimg }}{% else %}{{ url_for('static', filename=gimg) }}{% endif %}" class="pb-preview-img" alt="">
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="pb-actions">
+                            <a href="{{ url_for('website_admin.edit_gallery') }}" class="pb-edit-link" onclick="event.stopPropagation()"><i class="bi bi-pencil"></i>Galerie-Editor</a>
+                            <button type="button" class="pb-toggle"><i class="bi bi-chevron-down"></i></button>
+                        </div>
+                    </div>
+                    <div class="pb-body">
+                        <div class="text-center py-3">
+                            <p class="text-muted mb-2">Bilder hochladen und per Drag &amp; Drop sortieren:</p>
+                            <a href="{{ url_for('website_admin.edit_gallery') }}" class="btn btn-primary"><i class="bi bi-images me-1"></i>Galerie-Editor &ouml;ffnen</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ÜBER UNS -->
+                <div class="pb-card" data-section="about">
+                    <div class="pb-header" onclick="toggleSection(this)">
+                        <span class="pb-drag" onclick="event.stopPropagation()"><i class="bi bi-grip-vertical"></i></span>
+                        <div class="pb-icon bg-info bg-opacity-10 text-info"><i class="bi bi-info-circle"></i></div>
+                        <div class="pb-info">
+                            <h6>&Uuml;ber uns</h6>
+                            <small>{{ about.get('title', 'Nicht konfiguriert') | truncate(60) }}</small>
+                        </div>
+                        <div class="pb-actions">
+                            <a href="{{ url_for('website_admin.edit_about') }}" class="pb-edit-link" onclick="event.stopPropagation()"><i class="bi bi-pencil"></i>Vollansicht</a>
+                            <button type="button" class="pb-toggle"><i class="bi bi-chevron-down"></i></button>
+                        </div>
+                    </div>
+                    <div class="pb-body">
+                        <form method="POST" action="{{ url_for('website_admin.edit_about') }}" class="pb-mini-form">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label>Titel</label>
+                                    <input type="text" class="form-control" name="title" value="{{ about.get('title', '') }}">
+                                </div>
+                                <div class="col-12">
+                                    <label>Text</label>
+                                    <textarea class="form-control" name="text" rows="3">{{ about.get('text', '') }}</textarea>
+                                </div>
+                                {% for i in range(1, 5) %}
+                                <div class="col-md-6">
+                                    <label>Checkliste {{ i }}</label>
+                                    <input type="text" class="form-control" name="checklist_{{ i }}" value="{{ about.get('checklist_%d' % i, '') }}" placeholder="z.B. Schnelle Lieferung">
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="pb-save-row">
+                                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>&Uuml;ber uns speichern</button>
+                                <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Bild: <a href="{{ url_for('website_admin.edit_about') }}">Vollansicht &ouml;ffnen</a></span>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- PROZESS-SCHRITTE -->
+                <div class="pb-card" data-section="process">
+                    <div class="pb-header" onclick="toggleSection(this)">
+                        <span class="pb-drag" onclick="event.stopPropagation()"><i class="bi bi-grip-vertical"></i></span>
+                        <div class="pb-icon bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-list-ol"></i></div>
+                        <div class="pb-info">
+                            <h6>Prozess-Schritte</h6>
+                            <small>{{ process.get('section_title', 'So funktioniert\'s') }} &ndash;
+                                {% set step_count = [] %}{% for i in range(1,7) %}{% if process.get('step_%d_title' % i) %}{% if step_count.append(1) %}{% endif %}{% endif %}{% endfor %}
+                                {{ step_count|length }} Schritt{{ 'e' if step_count|length != 1 }}
+                            </small>
+                        </div>
+                        <div class="pb-actions">
+                            <a href="{{ url_for('website_admin.edit_process') }}" class="pb-edit-link" onclick="event.stopPropagation()"><i class="bi bi-pencil"></i>Editor mit Drag&amp;Drop</a>
+                            <button type="button" class="pb-toggle"><i class="bi bi-chevron-down"></i></button>
+                        </div>
+                    </div>
+                    <div class="pb-body">
+                        <form method="POST" action="{{ url_for('website_admin.edit_process') }}" class="pb-mini-form">
+                            <div class="mb-3">
+                                <label>Sektions-Titel</label>
+                                <input type="text" class="form-control" name="section_title" value="{{ process.get('section_title', '') }}">
+                            </div>
+                            <div class="row g-2">
+                                {% for i in range(1, 7) %}
+                                <div class="col-md-4">
+                                    <div class="d-flex gap-2 align-items-start mb-2">
+                                        <input type="text" class="form-control form-control-sm" name="step_{{ i }}_icon" value="{{ process.get('step_%d_icon' % i, 'bi-circle') }}" placeholder="Icon" style="max-width: 100px;">
+                                        <input type="text" class="form-control form-control-sm" name="step_{{ i }}_title" value="{{ process.get('step_%d_title' % i, '') }}" placeholder="Schritt {{ i }}">
+                                    </div>
+                                    <textarea class="form-control form-control-sm" name="step_{{ i }}_description" rows="1" placeholder="Beschreibung" style="font-size: 0.8rem;">{{ process.get('step_%d_description' % i, '') }}</textarea>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="pb-save-row">
+                                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Prozess speichern</button>
+                                <a href="{{ url_for('website_admin.edit_process') }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrows-move me-1"></i>Drag&amp;Drop Editor</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- SHOP-SEITE -->
+                <div class="pb-card" data-section="shop">
+                    <div class="pb-header" onclick="toggleSection(this)">
+                        <span class="pb-drag" onclick="event.stopPropagation()"><i class="bi bi-grip-vertical"></i></span>
+                        <div class="pb-icon bg-success bg-opacity-10 text-success"><i class="bi bi-shop"></i></div>
+                        <div class="pb-info">
+                            <h6>Shop-Seite</h6>
+                            <small>{{ shop.get('title', 'Ihr individuelles Textil-Design') | truncate(60) }}</small>
+                        </div>
+                        <div class="pb-actions">
+                            <a href="{{ url_for('website_admin.edit_shop') }}" class="pb-edit-link" onclick="event.stopPropagation()"><i class="bi bi-pencil"></i>Vollansicht</a>
+                            <button type="button" class="pb-toggle"><i class="bi bi-chevron-down"></i></button>
+                        </div>
+                    </div>
+                    <div class="pb-body">
+                        <form method="POST" action="{{ url_for('website_admin.edit_shop') }}" class="pb-mini-form">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label>Badge</label>
+                                    <input type="text" class="form-control" name="badge_text" value="{{ shop.get('badge_text', 'Online-Konfigurator') }}">
+                                </div>
+                                <div class="col-md-8">
+                                    <label>Hero-Titel</label>
+                                    <input type="text" class="form-control" name="title" value="{{ shop.get('title', 'Ihr individuelles Textil-Design') }}">
+                                </div>
+                                <div class="col-12">
+                                    <label>Hero-Untertitel</label>
+                                    <input type="text" class="form-control" name="subtitle" value="{{ shop.get('subtitle', '') }}">
+                                </div>
+                                <div class="col-md-4"><label>Veredelung Badge</label><input type="text" class="form-control" name="finishing_badge" value="{{ shop.get('finishing_badge', 'Veredelung') }}"></div>
+                                <div class="col-md-4"><label>Veredelung Titel</label><input type="text" class="form-control" name="finishing_title" value="{{ shop.get('finishing_title', 'Veredelungsarten') }}"></div>
+                                <div class="col-md-4"><label>Veredelung Untertitel</label><input type="text" class="form-control" name="finishing_subtitle" value="{{ shop.get('finishing_subtitle', '') }}"></div>
+                                <div class="col-md-4"><label>Kategorien Badge</label><input type="text" class="form-control" name="categories_badge" value="{{ shop.get('categories_badge', 'Sortiment') }}"></div>
+                                <div class="col-md-4"><label>Kategorien Titel</label><input type="text" class="form-control" name="categories_title" value="{{ shop.get('categories_title', 'Produktkategorien') }}"></div>
+                                <div class="col-md-4"><label>Kategorien Untertitel</label><input type="text" class="form-control" name="categories_subtitle" value="{{ shop.get('categories_subtitle', '') }}"></div>
+                                <div class="col-md-6"><label>CTA Titel</label><input type="text" class="form-control" name="cta_title" value="{{ shop.get('cta_title', 'Direkt zum Katalog') }}"></div>
+                                <div class="col-md-6"><label>CTA Untertitel</label><input type="text" class="form-control" name="cta_subtitle" value="{{ shop.get('cta_subtitle', '') }}"></div>
+                            </div>
+                            <div class="pb-save-row">
+                                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Shop speichern</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- SEO & FOOTER -->
+                <div class="pb-card" data-section="meta">
+                    <div class="pb-header" onclick="toggleSection(this)">
+                        <span class="pb-drag" onclick="event.stopPropagation()"><i class="bi bi-grip-vertical"></i></span>
+                        <div class="pb-icon bg-dark bg-opacity-10"><i class="bi bi-search"></i></div>
+                        <div class="pb-info">
+                            <h6>SEO &amp; Footer</h6>
+                            <small>{{ meta.get('seo_title', 'Nicht konfiguriert') | truncate(60) }}</small>
+                        </div>
+                        <div class="pb-actions">
+                            <a href="{{ url_for('website_admin.edit_meta') }}" class="pb-edit-link" onclick="event.stopPropagation()"><i class="bi bi-pencil"></i>Vollansicht</a>
+                            <button type="button" class="pb-toggle"><i class="bi bi-chevron-down"></i></button>
+                        </div>
+                    </div>
+                    <div class="pb-body">
+                        <form method="POST" action="{{ url_for('website_admin.edit_meta') }}" class="pb-mini-form">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label>SEO-Titel</label>
+                                    <input type="text" class="form-control" name="seo_title" value="{{ meta.get('seo_title', '') }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label>Meta-Beschreibung</label>
+                                    <input type="text" class="form-control" name="meta_description" value="{{ meta.get('meta_description', '') }}">
+                                </div>
+                                <div class="col-md-6">
+                                    <label>Impressum</label>
+                                    <input type="text" class="form-control" name="impressum_link" value="{{ meta.get('impressum_link', '') }}" placeholder="Text oder Link">
+                                </div>
+                                <div class="col-md-6">
+                                    <label>Datenschutz</label>
+                                    <input type="text" class="form-control" name="datenschutz_link" value="{{ meta.get('datenschutz_link', '') }}" placeholder="Text oder Link">
+                                </div>
+                            </div>
+                            <div class="pb-save-row">
+                                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>SEO speichern</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Rechte Spalte: Schnellzugriff -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-lightning me-1"></i>Schnellzugriff</h6></div>
+                <div class="list-group list-group-flush">
+                    <a href="{{ url_for('shop_admin.dashboard') }}" class="list-group-item list-group-item-action d-flex align-items-center">
+                        <i class="bi bi-box-seam me-2 text-primary"></i>Artikel &amp; Kategorien verwalten
+                        <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                    </a>
+                    <a href="{{ url_for('shop_admin.kategorien') }}" class="list-group-item list-group-item-action d-flex align-items-center">
+                        <i class="bi bi-folder me-2 text-success"></i>Shop-Kategorien bearbeiten
+                        <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                    </a>
+                    <a href="{{ url_for('shop_admin.veredelung_list') }}" class="list-group-item list-group-item-action d-flex align-items-center">
+                        <i class="bi bi-brush me-2 text-info"></i>Veredelungsarten &amp; Preise
+                        <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                    </a>
+                    <a href="{{ url_for('inquiry_admin.list') }}" class="list-group-item list-group-item-action d-flex align-items-center">
+                        <i class="bi bi-envelope-paper me-2 text-warning"></i>Anfragen verwalten
+                        <i class="bi bi-chevron-right ms-auto text-muted"></i>
+                    </a>
+                </div>
+            </div>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white"><h6 class="mb-0"><i class="bi bi-question-circle me-1"></i>Hilfe</h6></div>
+                <div class="card-body small text-muted">
+                    <p class="mb-2"><strong>Sektionen bearbeiten:</strong> Klicken Sie auf eine Sektion um sie aufzuklappen. Änderungen mit dem jeweiligen Speichern-Button sichern.</p>
+                    <p class="mb-2"><strong>Bilder verwalten:</strong> Galerie und Leistungen haben eigene Drag&amp;Drop-Editoren für die Bildsortierung.</p>
+                    <p class="mb-0"><strong>Kategorien:</strong> Shop-Kategorien werden unter &quot;Artikel &amp; Kategorien verwalten&quot; definiert und erscheinen automatisch im Shop-Filter.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+function toggleSection(header) {
+    const card = header.closest('.pb-card');
+    card.classList.toggle('open');
+}
+
+// Drag & Drop Sektionen
+new Sortable(document.getElementById('sectionList'), {
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    handle: '.pb-drag',
+    draggable: '.pb-card'
+});
+</script>
+{% endblock %}
