@@ -329,10 +329,9 @@
                             <span class="ms-2 text-muted" style="font-size: 0.8rem;">stitchadmin.hahn-it-wuppertal.de/dashboard</span>
                         </div>
                         <div class="screenshot-body">
-                            {% if screenshot_dashboard %}
-                            <img src="{{ url_for('static', filename='img/screenshots/dashboard.png') }}" alt="StitchAdmin Dashboard">
-                            {% else %}
-                            <div class="screenshot-placeholder">
+                            <img src="{{ url_for('static', filename='img/screenshots/dashboard.png') }}" alt="StitchAdmin Dashboard"
+                                 style="width:100%; display:block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                            <div class="screenshot-placeholder" style="display:none;">
                                 <!-- CSS Dashboard Mockup -->
                                 <div class="w-100 px-3">
                                     <div class="d-flex gap-2 mb-3">
@@ -373,7 +372,6 @@
                                     </div>
                                 </div>
                             </div>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -528,16 +526,16 @@
                         <p>Auftraege erfassen, bearbeiten und verfolgen</p>
                     </div>
                     <div class="screenshot-tab" data-tab="machines" onclick="showScreenshot(this, 'machines')">
-                        <h6><i class="bi bi-cpu me-2 text-warning"></i>Maschinenplanung</h6>
-                        <p>Heatmap-Ansicht der Maschinenauslastung</p>
+                        <h6><i class="bi bi-cpu me-2 text-warning"></i>Maschinenverwaltung</h6>
+                        <p>Alle Maschinen auf einen Blick verwalten</p>
                     </div>
                     <div class="screenshot-tab" data-tab="invoices" onclick="showScreenshot(this, 'invoices')">
                         <h6><i class="bi bi-receipt me-2 text-danger"></i>Rechnungen</h6>
                         <p>Professionelle Rechnungen mit ZUGFeRD</p>
                     </div>
                     <div class="screenshot-tab" data-tab="crm" onclick="showScreenshot(this, 'crm')">
-                        <h6><i class="bi bi-people me-2 text-info"></i>CRM</h6>
-                        <p>Kundenhistorie und Umsatz-Rankings</p>
+                        <h6><i class="bi bi-people me-2 text-info"></i>Kundenverwaltung</h6>
+                        <p>Kunden, Kontakte und CRM-Funktionen</p>
                     </div>
                 </div>
                 <div class="col-md-8">
@@ -811,9 +809,9 @@ function showScreenshot(el, tab) {
     var labels = {
         'dashboard': 'Dashboard-Ansicht',
         'orders': 'Auftragsmanagement',
-        'machines': 'Maschinenplanung & Heatmap',
+        'machines': 'Maschinenverwaltung',
         'invoices': 'Rechnungswesen',
-        'crm': 'CRM & Kundenmanagement'
+        'crm': 'Kundenverwaltung'
     };
 
     var content = document.getElementById('screenshotContent');
