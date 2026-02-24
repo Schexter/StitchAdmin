@@ -340,6 +340,7 @@
                                 <th>Kunde</th>
                                 <th>Freigegeben am</th>
                                 <th>Notiz</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -356,6 +357,12 @@
                                     <small class="text-muted">
                                         {{ (order.design_approval_notes or '-')[:80] }}
                                     </small>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('design_approval.freigabe_pdf', order_id=order.id) }}"
+                                       class="btn btn-sm btn-outline-success" title="Freigabe-Nachweis PDF">
+                                        <i class="bi bi-file-pdf"></i> PDF
+                                    </a>
                                 </td>
                             </tr>
                             {% endfor %}

@@ -8,8 +8,10 @@ Erstellt von Hans Hahn - Alle Rechte vorbehalten
 """
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort, current_app
+from flask_login import login_required, current_user
 from datetime import datetime
 import os
+import io
 import json
 import logging
 
@@ -280,6 +282,49 @@ def thank_you(token):
     )
 
 
+@design_approval_bp.route('/<token>/preview-image/<int:design_id>')
+def preview_image_watermarked(token, design_id):
+    """Design-Vorschau mit Wasserzeichen (fuer oeffentliche Freigabe-Seite)"""
+    from flask import send_file
+
+    order = Order.query.filter_by(design_approval_token=token).first()
+    if not order:
+        abort(404)
+
+    # Finde Design-Bildpfad
+    if design_id == 0:
+        filepath = order.design_file_path
+        if not filepath:
+            # Fallback auf design_file (relative URL)
+            filepath = os.path.join(current_app.root_path, 'static', order.design_file) if order.design_file else None
+    else:
+        design = order.designs.filter_by(id=design_id).first()
+        if not design:
+            abort(404)
+        filepath = design.design_file_path or (
+            os.path.join(current_app.root_path, 'static', design.design_thumbnail_path)
+            if design.design_thumbnail_path else None
+        )
+
+    if not filepath or not os.path.exists(filepath):
+        abort(404)
+
+    # Wasserzeichen anwenden
+    from src.services.design_approval_service import get_design_approval_service
+    service = get_design_approval_service()
+    watermarked_bytes = service.add_watermark_to_image(filepath)
+
+    if watermarked_bytes:
+        return send_file(
+            io.BytesIO(watermarked_bytes),
+            mimetype='image/png',
+            download_name=f'preview_{order.order_number}.png'
+        )
+    else:
+        # Fallback: Original senden
+        return send_file(filepath)
+
+
 @design_approval_bp.route('/<token>/download/<int:design_id>')
 def download_design(token, design_id):
     """Design-Datei herunterladen"""
@@ -312,229 +357,185 @@ def download_design(token, design_id):
 # ==========================================
 
 @design_approval_bp.route('/admin')
+@login_required
 def admin_index():
     """Dashboard für Design-Freigaben (On-Premise Workflow)"""
-    from flask_login import login_required, current_user
     from datetime import timedelta
 
-    @login_required
-    def _index():
-        # Ausstehend: Design vorhanden, aber noch nicht gesendet
-        pending_orders = Order.query.filter(
-            Order.design_approval_status.in_([None, 'pending']),
-            (Order.design_file.isnot(None)) | (Order.design_file_path.isnot(None))
-        ).order_by(Order.created_at.desc()).all()
-        
-        # Gesendet: Warte auf Kundenreaktion
-        sent_orders = Order.query.filter(
-            Order.design_approval_status == 'sent'
-        ).order_by(Order.design_approval_sent_at.desc()).all()
-        
-        # Änderung gewünscht
-        revision_orders = Order.query.filter(
-            Order.design_approval_status == 'revision_requested'
-        ).order_by(Order.created_at.desc()).all()
-        
-        # Freigegeben (letzte 30 Tage)
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        approved_orders = Order.query.filter(
-            Order.design_approval_status == 'approved',
-            Order.design_approval_date >= thirty_days_ago
-        ).order_by(Order.design_approval_date.desc()).all()
-        
-        return render_template('design_approval/dashboard.html',
-            pending_orders=pending_orders,
-            sent_orders=sent_orders,
-            revision_orders=revision_orders,
-            approved_orders=approved_orders,
-            now=datetime.utcnow()
-        )
+    # Ausstehend: Design vorhanden, aber noch nicht gesendet
+    pending_orders = Order.query.filter(
+        Order.design_approval_status.in_([None, 'pending']),
+        (Order.design_file.isnot(None)) | (Order.design_file_path.isnot(None))
+    ).order_by(Order.created_at.desc()).all()
 
-    return _index()
+    # Gesendet: Warte auf Kundenreaktion
+    sent_orders = Order.query.filter(
+        Order.design_approval_status == 'sent'
+    ).order_by(Order.design_approval_sent_at.desc()).all()
+
+    # Änderung gewünscht
+    revision_orders = Order.query.filter(
+        Order.design_approval_status == 'revision_requested'
+    ).order_by(Order.created_at.desc()).all()
+
+    # Freigegeben (letzte 30 Tage)
+    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    approved_orders = Order.query.filter(
+        Order.design_approval_status == 'approved',
+        Order.design_approval_date >= thirty_days_ago
+    ).order_by(Order.design_approval_date.desc()).all()
+
+    return render_template('design_approval/dashboard.html',
+        pending_orders=pending_orders,
+        sent_orders=sent_orders,
+        revision_orders=revision_orders,
+        approved_orders=approved_orders,
+        now=datetime.utcnow()
+    )
 
 
 @design_approval_bp.route('/admin/send/<order_id>', methods=['POST'])
+@login_required
 def admin_send_approval_request(order_id):
     """Sendet Freigabe-Anfrage an Kunden (Admin-Funktion)"""
-    
-    from flask_login import login_required, current_user
-    
-    @login_required
-    def _send():
-        order = Order.query.get_or_404(order_id)
-        
-        if not order.customer or not order.customer.email:
-            return jsonify({'success': False, 'error': 'Keine Kunden-E-Mail vorhanden'}), 400
-        
-        if not order.has_design_file():
-            return jsonify({'success': False, 'error': 'Kein Design vorhanden'}), 400
-        
-        try:
-            # Token generieren falls nicht vorhanden
-            if not order.design_approval_token:
-                order.generate_approval_token()
-            
-            # Status aktualisieren
-            order.design_approval_status = 'sent'
-            order.design_approval_sent_at = datetime.utcnow()
-            order.workflow_status = 'design_pending'
-            
+    from flask_login import current_user
+
+    order = Order.query.get_or_404(order_id)
+
+    if not order.customer or not order.customer.email:
+        return jsonify({'success': False, 'error': 'Keine Kunden-E-Mail vorhanden'}), 400
+
+    try:
+        if not order.design_approval_token:
+            order.generate_approval_token()
+
+        order.design_approval_status = 'sent'
+        order.design_approval_sent_at = datetime.utcnow()
+        order.workflow_status = 'design_pending'
+        db.session.commit()
+
+        success = _send_approval_email(order)
+
+        if success:
+            activity = ActivityLog(
+                username=current_user.username,
+                action='design_approval_sent',
+                details=f'Freigabe-Anfrage gesendet fuer Auftrag {order.order_number}'
+            )
+            db.session.add(activity)
             db.session.commit()
-            
-            # E-Mail senden
-            success = _send_approval_email(order)
-            
-            if success:
-                activity = ActivityLog(
-                    username=current_user.username,
-                    action='design_approval_sent',
-                    details=f'Freigabe-Anfrage gesendet für Auftrag {order.order_number}'
-                )
-                db.session.add(activity)
-                db.session.commit()
-                
-                return jsonify({
-                    'success': True,
-                    'message': 'Freigabe-Anfrage wurde versendet',
-                    'approval_url': url_for('design_approval.approval_page', 
-                                           token=order.design_approval_token, _external=True)
-                })
-            else:
-                return jsonify({'success': False, 'error': 'E-Mail konnte nicht gesendet werden'}), 500
-                
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'error': str(e)}), 500
-    
-    return _send()
+
+            return jsonify({
+                'success': True,
+                'message': 'Freigabe-Anfrage wurde versendet',
+                'approval_url': url_for('design_approval.approval_page',
+                                       token=order.design_approval_token, _external=True)
+            })
+        else:
+            return jsonify({'success': False, 'error': 'E-Mail konnte nicht gesendet werden'}), 500
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @design_approval_bp.route('/admin/preview/<order_id>')
+@login_required
 def admin_preview(order_id):
-    """Vorschau der Freigabe-Seite (für Admins)"""
-    
-    from flask_login import login_required, current_user
-    
-    @login_required
-    def _preview():
-        order = Order.query.get_or_404(order_id)
-        
-        # Generiere temporären Token für Vorschau
-        if not order.design_approval_token:
-            order.generate_approval_token()
-            db.session.commit()
-        
-        return redirect(url_for('design_approval.approval_page', token=order.design_approval_token))
-    
-    return _preview()
+    """Vorschau der Freigabe-Seite (fuer Admins)"""
+    order = Order.query.get_or_404(order_id)
+
+    if not order.design_approval_token:
+        order.generate_approval_token()
+        db.session.commit()
+
+    return redirect(url_for('design_approval.approval_page', token=order.design_approval_token))
 
 
 @design_approval_bp.route('/admin/resend/<order_id>', methods=['POST'])
+@login_required
 def admin_resend_request(order_id):
     """Freigabe-Anfrage erneut senden"""
+    order = Order.query.get_or_404(order_id)
 
-    from flask_login import login_required, current_user
+    order.generate_approval_token()
+    order.design_approval_status = 'sent'
+    order.design_approval_sent_at = datetime.utcnow()
+    db.session.commit()
 
-    @login_required
-    def _resend():
-        order = Order.query.get_or_404(order_id)
+    success = _send_approval_email(order)
 
-        # Neuen Token generieren
-        order.generate_approval_token()
-        order.design_approval_status = 'sent'
-        order.design_approval_sent_at = datetime.utcnow()
-
-        db.session.commit()
-
-        # E-Mail senden
-        success = _send_approval_email(order)
-
-        if success:
-            return jsonify({'success': True, 'message': 'Freigabe-Anfrage erneut versendet'})
-        else:
-            return jsonify({'success': False, 'error': 'E-Mail-Versand fehlgeschlagen'}), 500
-
-    return _resend()
+    if success:
+        return jsonify({'success': True, 'message': 'Freigabe-Anfrage erneut versendet'})
+    else:
+        return jsonify({'success': False, 'error': 'E-Mail-Versand fehlgeschlagen'}), 500
 
 
-@design_approval_bp.route('/send/<int:order_id>', methods=['POST'])
+@design_approval_bp.route('/send/<order_id>', methods=['POST'])
+@login_required
 def send_approval_request(order_id):
     """Einzelne Freigabe-Anfrage senden"""
-    from flask_login import login_required, current_user
+    order = Order.query.get_or_404(order_id)
 
-    @login_required
-    def _send():
-        order = Order.query.get_or_404(order_id)
+    if not order.customer or not order.customer.email:
+        flash('Keine E-Mail-Adresse fuer den Kunden hinterlegt', 'danger')
+        return redirect(url_for('design_approval.admin_index'))
 
-        if not order.customer or not order.customer.email:
-            flash('Keine E-Mail-Adresse für den Kunden hinterlegt', 'danger')
-            return redirect(url_for('design_approval.admin_index'))
+    if not order.design_approval_token:
+        order.generate_approval_token()
 
-        # Token generieren falls nicht vorhanden
+    order.design_approval_status = 'sent'
+    order.design_approval_sent_at = datetime.utcnow()
+    db.session.commit()
+
+    success = _send_approval_email(order)
+
+    if success:
+        flash(f'Freigabe-Anfrage fuer Auftrag {order.order_number} wurde versendet', 'success')
+    else:
+        flash('E-Mail konnte nicht gesendet werden', 'danger')
+
+    return redirect(url_for('design_approval.admin_index'))
+
+
+@design_approval_bp.route('/send-batch', methods=['POST'])
+@login_required
+def send_batch_approval_request():
+    """Gebuendelte Freigabe-Anfragen senden"""
+    order_ids = request.form.getlist('order_ids[]')
+
+    if not order_ids:
+        flash('Keine Auftraege ausgewaehlt', 'warning')
+        return redirect(url_for('design_approval.admin_index'))
+
+    sent_count = 0
+    failed_count = 0
+
+    for order_id in order_ids:
+        order = Order.query.get(order_id)
+        if not order or not order.customer or not order.customer.email:
+            failed_count += 1
+            continue
+
         if not order.design_approval_token:
             order.generate_approval_token()
 
         order.design_approval_status = 'sent'
         order.design_approval_sent_at = datetime.utcnow()
-        db.session.commit()
 
-        # E-Mail senden
-        success = _send_approval_email(order)
-
-        if success:
-            flash(f'Freigabe-Anfrage für Auftrag {order.order_number} wurde versendet', 'success')
+        if _send_approval_email(order):
+            sent_count += 1
         else:
-            flash('E-Mail konnte nicht gesendet werden', 'danger')
+            failed_count += 1
 
-        return redirect(url_for('design_approval.admin_index'))
+    db.session.commit()
 
-    return _send()
+    if sent_count > 0:
+        flash(f'{sent_count} Freigabe-Anfrage(n) erfolgreich versendet', 'success')
+    if failed_count > 0:
+        flash(f'{failed_count} Anfrage(n) konnten nicht versendet werden', 'warning')
 
-
-@design_approval_bp.route('/send-batch', methods=['POST'])
-def send_batch_approval_request():
-    """Gebündelte Freigabe-Anfragen senden"""
-    from flask_login import login_required, current_user
-
-    @login_required
-    def _send_batch():
-        order_ids = request.form.getlist('order_ids[]')
-
-        if not order_ids:
-            flash('Keine Aufträge ausgewählt', 'warning')
-            return redirect(url_for('design_approval.admin_index'))
-
-        sent_count = 0
-        failed_count = 0
-
-        for order_id in order_ids:
-            order = Order.query.get(order_id)
-            if not order or not order.customer or not order.customer.email:
-                failed_count += 1
-                continue
-
-            # Token generieren falls nicht vorhanden
-            if not order.design_approval_token:
-                order.generate_approval_token()
-
-            order.design_approval_status = 'sent'
-            order.design_approval_sent_at = datetime.utcnow()
-
-            if _send_approval_email(order):
-                sent_count += 1
-            else:
-                failed_count += 1
-
-        db.session.commit()
-
-        if sent_count > 0:
-            flash(f'{sent_count} Freigabe-Anfrage(n) erfolgreich versendet', 'success')
-        if failed_count > 0:
-            flash(f'{failed_count} Anfrage(n) konnten nicht versendet werden', 'warning')
-
-        return redirect(url_for('design_approval.admin_index'))
-
-    return _send_batch()
+    return redirect(url_for('design_approval.admin_index'))
 
 
 @design_approval_bp.route('/public/<token>')
@@ -827,42 +828,31 @@ def api_mark_approved(order_id):
 
 
 @design_approval_bp.route('/api/resend/<order_id>', methods=['POST'])
+@login_required
 def api_resend(order_id):
-    """API: Erinnerungs-E-Mail senden"""
-    from flask_login import login_required, current_user
-    
-    @login_required
-    def _resend():
-        try:
-            from src.services.design_approval_service import get_design_approval_service
-            
-            order = Order.query.get_or_404(order_id)
-            
-            if not order.customer or not order.customer.email:
-                return jsonify({'success': False, 'error': 'Keine Kunden-E-Mail'}), 400
-            
-            service = get_design_approval_service()
-            
-            # Neue PDF generieren
-            pdf_path, _ = service.generate_approval_pdf(order)
-            
-            # E-Mail senden
-            result = service.send_approval_email(
-                order, 
-                pdf_path, 
-                custom_message="Dies ist eine Erinnerung an die ausstehende Design-Freigabe."
-            )
-            
-            if result.get('success'):
-                return jsonify({'success': True, 'message': 'Erinnerung gesendet'})
-            else:
-                return jsonify({'success': False, 'error': result.get('error')}), 500
-                
-        except Exception as e:
-            logger.error(f"Resend error: {e}")
-            return jsonify({'success': False, 'error': str(e)}), 500
-    
-    return _resend()
+    """API: Erinnerungs-E-Mail senden (Link-Mail, kein PDF-Anhang)"""
+    try:
+        order = Order.query.get_or_404(order_id)
+
+        if not order.customer or not order.customer.email:
+            return jsonify({'success': False, 'error': 'Keine Kunden-E-Mail hinterlegt'}), 400
+
+        if not order.design_approval_token:
+            order.generate_approval_token()
+            order.design_approval_status = 'pending'
+            db.session.commit()
+
+        success = _send_approval_email(order)
+
+        if success:
+            logger.info(f"Reminder sent for order {order.id}")
+            return jsonify({'success': True, 'message': 'Erinnerung gesendet'})
+        else:
+            return jsonify({'success': False, 'error': 'E-Mail-Versand fehlgeschlagen - E-Mail-Konfiguration pruefen'}), 500
+
+    except Exception as e:
+        logger.error(f"Resend error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @design_approval_bp.route('/download-generated-pdf/<order_id>')
@@ -1168,6 +1158,135 @@ def create_approval_request(order_id):
             return redirect(url_for('order_db.order_detail', order_id=order_id))
     
     return _create()
+
+
+@design_approval_bp.route('/freigabe-pdf/<order_id>')
+@login_required
+def freigabe_pdf(order_id):
+    """Freigabe-Nachweis als PDF herunterladen"""
+    from flask import send_file
+    import base64
+
+    order = Order.query.get_or_404(order_id)
+
+    if order.design_approval_status != 'approved':
+        flash('Dieses Design wurde noch nicht freigegeben.', 'warning')
+        return redirect(url_for('design_approval.admin_index'))
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import cm
+        from reportlab.lib.colors import HexColor, white, grey
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image as RLImage
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+        from src.models.company_settings import CompanySettings
+
+        company = CompanySettings.get_settings()
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4,
+                                leftMargin=2*cm, rightMargin=2*cm,
+                                topMargin=2*cm, bottomMargin=2*cm)
+
+        PRIMARY = HexColor('#1a6b5a')
+        GREEN = HexColor('#28a745')
+        LIGHT = HexColor('#f8f9fa')
+        BORDER = HexColor('#dee2e6')
+        GRAY = HexColor('#6c757d')
+
+        story = []
+
+        # Header-Banner
+        header_data = [[
+            Paragraph('Design-Freigabe-Nachweis', ParagraphStyle('H', fontSize=18,
+                textColor=white, fontName='Helvetica-Bold')),
+            Paragraph(company.company_name or 'StitchAdmin', ParagraphStyle('C', fontSize=10,
+                textColor=HexColor('#c8e6c9'), alignment=TA_RIGHT))
+        ]]
+        header_tbl = Table(header_data, colWidths=[12*cm, 5*cm])
+        header_tbl.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), PRIMARY),
+            ('PADDING', (0, 0), (-1, -1), 14),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ]))
+        story.append(header_tbl)
+        story.append(Spacer(1, 0.4*cm))
+
+        # Status-Badge
+        badge = Table([[Paragraph(
+            '&#10003; DESIGN FREIGEGEBEN',
+            ParagraphStyle('B', fontSize=13, textColor=white, fontName='Helvetica-Bold', alignment=TA_CENTER)
+        )]], colWidths=[17*cm])
+        badge.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, -1), GREEN),
+            ('PADDING', (0, 0), (-1, -1), 8),
+        ]))
+        story.append(badge)
+        story.append(Spacer(1, 0.6*cm))
+
+        # Auftragsdaten
+        label_s = ParagraphStyle('L', fontSize=9, textColor=GRAY, fontName='Helvetica-Bold')
+        value_s = ParagraphStyle('V', fontSize=10, fontName='Helvetica')
+
+        rows = [
+            ['Auftragsnummer:', order.order_number or str(order.id)],
+            ['Kunde:', order.customer.display_name if order.customer else '-'],
+        ]
+        if order.customer and order.customer.company_name:
+            rows.append(['Firma:', order.customer.company_name])
+        rows.append(['Freigegeben am:', order.design_approval_date.strftime('%d.%m.%Y %H:%M')
+                     if order.design_approval_date else '-'])
+        if order.design_approval_ip:
+            rows.append(['IP-Adresse:', order.design_approval_ip])
+
+        tbl_data = [[Paragraph(r[0], label_s), Paragraph(str(r[1]), value_s)] for r in rows]
+        info_tbl = Table(tbl_data, colWidths=[5*cm, 12*cm])
+        info_tbl.setStyle(TableStyle([
+            ('GRID', (0, 0), (-1, -1), 0.5, BORDER),
+            ('PADDING', (0, 0), (-1, -1), 8),
+            ('BACKGROUND', (0, 0), (0, -1), LIGHT),
+        ]))
+        story.append(info_tbl)
+        story.append(Spacer(1, 0.5*cm))
+
+        # Kundenanmerkungen
+        if order.design_approval_notes:
+            story.append(Paragraph('Anmerkungen des Kunden:', label_s))
+            story.append(Spacer(1, 0.2*cm))
+            story.append(Paragraph(order.design_approval_notes or '-', value_s))
+            story.append(Spacer(1, 0.4*cm))
+
+        # Digitale Unterschrift
+        if order.design_approval_signature:
+            try:
+                story.append(Paragraph('Digitale Unterschrift:', label_s))
+                story.append(Spacer(1, 0.2*cm))
+                sig_data = order.design_approval_signature
+                if ',' in sig_data:
+                    sig_data = sig_data.split(',', 1)[1]
+                sig_bytes = base64.b64decode(sig_data)
+                sig_img = RLImage(io.BytesIO(sig_bytes), width=8*cm, height=2.5*cm)
+                story.append(sig_img)
+                story.append(Spacer(1, 0.4*cm))
+            except Exception as e:
+                logger.warning(f"Unterschrift konnte nicht gerendert werden: {e}")
+
+        # Fusszeile
+        story.append(Spacer(1, 1*cm))
+        story.append(Paragraph(
+            f'Dokument erstellt am {datetime.now().strftime("%d.%m.%Y %H:%M")} &#8226; Powered by StitchAdmin',
+            ParagraphStyle('F', fontSize=8, textColor=GRAY, alignment=TA_CENTER)
+        ))
+
+        doc.build(story)
+        buffer.seek(0)
+        filename = f'Freigabe-Nachweis_{order.order_number or order.id}.pdf'
+        return send_file(buffer, as_attachment=True, download_name=filename, mimetype='application/pdf')
+
+    except Exception as e:
+        logger.error(f"Freigabe PDF Fehler: {e}")
+        flash(f'PDF-Generierung fehlgeschlagen: {str(e)}', 'danger')
+        return redirect(url_for('design_approval.admin_index'))
 
 
 def _notify_team_rejection(order, customer_name, reason, requested_changes):
