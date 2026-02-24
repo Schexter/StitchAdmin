@@ -25,7 +25,11 @@ from typing import Optional, Tuple, List
 from flask import current_app, url_for
 
 from src.models import db
-from src.models.models import Order, Customer, CompanySettings
+from src.models.models import Order, Customer
+try:
+    from src.models.company_settings import CompanySettings
+except ImportError:
+    from src.models.models import CompanySettings
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +263,7 @@ Mit freundlichen Grüßen
         
         # E-Mail senden mit Anhang
         try:
-            from src.services.email_service import EmailService
+            from src.services.email_service_new import EmailService
             email_service = EmailService()
             
             # Anhang vorbereiten
@@ -460,7 +464,7 @@ Mit freundlichen Grüßen
     def _notify_team_approval(self, order: Order, source: str, is_signed: bool):
         """Benachrichtigt das Team über Freigabe"""
         try:
-            from src.services.email_service import EmailService
+            from src.services.email_service_new import EmailService
             
             company = CompanySettings.get_settings()
             if not company.notification_email:
@@ -489,7 +493,7 @@ Der Auftrag kann jetzt in die Produktion gehen.
     def _notify_team_revision(self, order: Order, reason: str, changes: str):
         """Benachrichtigt das Team über Änderungswunsch"""
         try:
-            from src.services.email_service import EmailService
+            from src.services.email_service_new import EmailService
             
             company = CompanySettings.get_settings()
             if not company.notification_email:
@@ -541,6 +545,62 @@ Bitte das Design anpassen und erneut zur Freigabe senden.
             Order.design_approval_status == 'approved',
             Order.design_approval_date >= cutoff
         ).order_by(Order.design_approval_date.desc()).all()
+
+
+    # ============================================
+    # WASSERZEICHEN
+    # ============================================
+
+    @staticmethod
+    def add_watermark_to_image(image_path: str) -> Optional[bytes]:
+        """
+        Fuegt ein diagonales 'ENTWURF'-Wasserzeichen auf ein Design-Bild.
+        Gibt das Ergebnis als PNG-Bytes zurueck.
+        """
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+
+            img = Image.open(image_path).convert('RGBA')
+
+            # Transparente Overlay-Ebene
+            overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+            draw = ImageDraw.Draw(overlay)
+
+            # Font-Groesse relativ zur Bildgroesse
+            font_size = max(img.width, img.height) // 8
+            try:
+                font = ImageFont.truetype("arial.ttf", font_size)
+            except (IOError, OSError):
+                try:
+                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+                except (IOError, OSError):
+                    font = ImageFont.load_default()
+
+            text = "ENTWURF"
+
+            # Text diagonal ueber das Bild
+            bbox = draw.textbbox((0, 0), text, font=font)
+            tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+
+            # Mehrfach diagonal
+            import math
+            angle = -30
+            for y_offset in range(-img.height, img.height * 2, int(th * 2.5)):
+                for x_offset in range(-img.width, img.width * 2, int(tw * 1.5)):
+                    draw.text((x_offset, y_offset), text, font=font, fill=(255, 0, 0, 60))
+
+            # Overlay zusammenfuegen
+            watermarked = Image.alpha_composite(img, overlay)
+
+            # Als PNG-Bytes zurueckgeben
+            buffer = io.BytesIO()
+            watermarked.convert('RGB').save(buffer, format='PNG', quality=85)
+            buffer.seek(0)
+            return buffer.getvalue()
+
+        except Exception as e:
+            logger.error(f"Wasserzeichen-Fehler: {e}")
+            return None
 
 
 # Singleton-Instanz

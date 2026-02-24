@@ -552,7 +552,7 @@ def _send_approval_email(order):
     """Sendet Freigabe-E-Mail an Kunden"""
     
     try:
-        from src.services.email_service import EmailService
+        from src.services.email_service_new import EmailService
         from src.models.company_settings import CompanySettings
 
         company = CompanySettings.get_settings()

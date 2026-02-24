@@ -243,6 +243,14 @@
                                                 title="Unterschriebene PDF hochladen">
                                             <i class="bi bi-upload"></i>
                                         </button>
+                                        <!-- Freigabe-Seite anzeigen -->
+                                        {% if order.design_approval_token %}
+                                        <a href="{{ url_for('design_approval.approval_page', token=order.design_approval_token) }}"
+                                           class="btn btn-outline-info" target="_blank"
+                                           title="Freigabe-Seite anzeigen (Kunden-Ansicht)">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% endif %}
                                         <!-- Erneut senden -->
                                         <button type="button" class="btn btn-outline-secondary resend-approval"
                                                 data-order-id="{{ order.id }}"
