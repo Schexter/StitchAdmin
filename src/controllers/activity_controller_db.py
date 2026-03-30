@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, request
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from src.models import db, ActivityLog
+from src.utils.activity_logger import log_activity
 
 # Blueprint erstellen
 activity_bp = Blueprint('activities', __name__, url_prefix='/activities')
@@ -43,9 +44,9 @@ def index():
                 ActivityLog.timestamp >= start_date,
                 ActivityLog.timestamp < end_date
             )
-        except:
+        except (ValueError, TypeError):
             pass
-    
+
     # Nach Zeitstempel sortieren (neueste zuerst)
     activities = query.order_by(ActivityLog.timestamp.desc()).limit(500).all()
     
@@ -108,14 +109,14 @@ def export():
         try:
             from_date = datetime.strptime(date_from, '%Y-%m-%d')
             query = query.filter(ActivityLog.timestamp >= from_date)
-        except:
+        except (ValueError, TypeError):
             pass
     
     if date_to:
         try:
             to_date = datetime.strptime(date_to, '%Y-%m-%d') + timedelta(days=1)
             query = query.filter(ActivityLog.timestamp < to_date)
-        except:
+        except (ValueError, TypeError):
             pass
     
     activities = query.order_by(ActivityLog.timestamp.desc()).all()
@@ -178,15 +179,3 @@ def cleanup():
     
     flash(f'{deleted} alte Aktivitäten wurden gelöscht!', 'success')
     return redirect(url_for('activities.index'))
-
-# Hilfsfunktionen für andere Module
-def log_activity(user, action, details, ip_address=None):
-    """Aktivität protokollieren (für andere Module)"""
-    activity = ActivityLog(
-        user=user,
-        action=action,
-        details=details,
-        ip_address=ip_address or request.remote_addr
-    )
-    db.session.add(activity)
-    db.session.commit()

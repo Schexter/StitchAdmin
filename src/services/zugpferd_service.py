@@ -72,6 +72,20 @@ class ZugpferdService:
         """Initialisiere ZUGPFERD Service"""
         self.profile = self.PROFILE_BASIC  # Standard-Profil
 
+    def _get_creator_name(self, username: str) -> str:
+        """Vollständigen Namen des Erstellers aus User-Tabelle holen"""
+        if not username:
+            return ''
+        try:
+            from src.models.models import User
+            user = User.query.filter_by(username=username).first()
+            if user:
+                name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+                return name or username
+        except Exception:
+            pass
+        return username
+
     def _safe_str(self, value, default: str = '') -> str:
         """Konvertiert einen Wert sicher zu String, ersetzt None durch default"""
         if value is None:
@@ -704,6 +718,8 @@ class ZugpferdService:
             # MwSt-Betrag
             mwst_betrag = getattr(pos, 'mwst_betrag', 0) or 0
 
+            rabatt_pct = float(getattr(pos, 'rabatt_prozent', 0) or 0)
+            rabatt_betrag = float(getattr(pos, 'rabatt_betrag', 0) or 0)
             items.append({
                 'position': pos.position,
                 'description': bezeichnung,
@@ -712,7 +728,9 @@ class ZugpferdService:
                 'unit_price': float(pos.einzelpreis),
                 'tax_rate': mwst_rate,
                 'total_net': float(netto),
-                'total': float(brutto)
+                'total': float(brutto),
+                'rabatt_prozent': rabatt_pct,
+                'rabatt_betrag': rabatt_betrag,
             })
 
         # Verkäufer-Daten aus CompanySettings laden
@@ -732,6 +750,7 @@ class ZugpferdService:
 
             seller_data = {
                 'name': settings.display_name,
+                'owner_name': settings.owner_name or '',
                 'street': f"{settings.street or ''} {settings.house_number or ''}".strip(),
                 'postcode': settings.postal_code or '',
                 'city': settings.city or '',
@@ -822,7 +841,19 @@ class ZugpferdService:
         summe_mwst = getattr(rechnung, 'summe_mwst', None) or getattr(rechnung, 'mwst_gesamt', 0) or 0
         summe_brutto = getattr(rechnung, 'summe_brutto', None) or getattr(rechnung, 'brutto_gesamt', 0) or 0
 
+        # Logo aus CompanySettings
+        logo_path = None
+        if settings and settings.logo_path:
+            try:
+                from flask import current_app
+                logo_full = os.path.join(current_app.static_folder, settings.logo_path)
+                if os.path.exists(logo_full):
+                    logo_path = logo_full
+            except Exception:
+                pass
+
         return {
+            'logo_path': logo_path,
             'invoice_number': rechnung.rechnungsnummer,
             'invoice_date': rechnung.rechnungsdatum,
             'delivery_date': getattr(rechnung, 'leistungsdatum', None) or rechnung.rechnungsdatum,
@@ -845,5 +876,6 @@ class ZugpferdService:
             'discount_percent': float(getattr(rechnung, 'rabatt_prozent', 0) or 0),
             'subject': f"Rechnung {rechnung.rechnungsnummer}",
             'bank_details': bank_details,
+            'created_by': self._get_creator_name(getattr(rechnung, 'erstellt_von', None)),
             'footer_text': settings.invoice_footer_text if settings and settings.invoice_footer_text else 'Vielen Dank fuer Ihren Auftrag!'
         }

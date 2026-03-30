@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Positionen & Veredelungsarten - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold mb-1"><i class="bi bi-brush me-2"></i>Veredelungsarten & Positionen</h2>
+            <p class="text-muted mb-0">Veredelungsarten und Textil-Positionen für Aufträge verwalten</p>
+        </div>
+        <a href="{{ url_for('settings.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Zurück
+        </a>
+    </div>
+
+    <div class="row g-4">
+        <!-- Veredelungsarten -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-palette me-2"></i>Veredelungsarten</h5>
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#artModal" onclick="resetArtForm()">
+                        <i class="bi bi-plus-lg me-1"></i>Neu
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:40px;">#</th>
+                                    <th>Name</th>
+                                    <th>Code</th>
+                                    <th style="width:70px;">Status</th>
+                                    <th style="width:100px;">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for art in arten %}
+                                <tr>
+                                    <td>{{ art.sort_order }}</td>
+                                    <td>
+                                        <i class="{{ art.icon }} text-{{ art.farbe }} me-1"></i>
+                                        <strong>{{ art.name }}</strong>
+                                        {% if art.beschreibung %}
+                                        <br><small class="text-muted">{{ art.beschreibung }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td><code>{{ art.code }}</code></td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if art.aktiv else 'secondary' }}">
+                                            {{ 'Aktiv' if art.aktiv else 'Inaktiv' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" onclick="editArt({{ art.id }}, '{{ art.code }}', '{{ art.name }}', '{{ art.beschreibung or '' }}', '{{ art.icon }}', '{{ art.farbe }}', {{ art.sort_order }}, {{ 'true' if art.aktiv else 'false' }})">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <form method="POST" action="{{ url_for('settings.veredelungsart_delete', art_id=art.id) }}" class="d-inline" onsubmit="return confirm('Veredelungsart löschen?')">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if not arten %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-3">Keine Veredelungsarten vorhanden</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Positionstypen -->
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-pin-map me-2"></i>Positionstypen</h5>
+                    <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#typModal" onclick="resetTypForm()">
+                        <i class="bi bi-plus-lg me-1"></i>Neu
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width:40px;">#</th>
+                                    <th>Name</th>
+                                    <th>Code</th>
+                                    <th>Veredelungsart</th>
+                                    <th style="width:70px;">Status</th>
+                                    <th style="width:100px;">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for typ in typen %}
+                                <tr>
+                                    <td>{{ typ.sort_order }}</td>
+                                    <td><strong>{{ typ.name }}</strong></td>
+                                    <td><code>{{ typ.code }}</code></td>
+                                    <td>
+                                        {% set art_ids = typ.get_veredelungsart_id_list() %}
+                                        {% if art_ids %}
+                                            {% for art in arten if art.id in art_ids %}
+                                            <span class="badge bg-{{ art.farbe }} me-1">
+                                                <i class="{{ art.icon }} me-1"></i>{{ art.name }}
+                                            </span>
+                                            {% endfor %}
+                                        {% else %}
+                                        <small class="text-muted">Alle</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if typ.aktiv else 'secondary' }}">
+                                            {{ 'Aktiv' if typ.aktiv else 'Inaktiv' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" onclick="editTyp({{ typ.id }}, '{{ typ.code }}', '{{ typ.name }}', '{{ typ.veredelungsart_ids or '' }}', {{ typ.sort_order }}, {{ 'true' if typ.aktiv else 'false' }})">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <form method="POST" action="{{ url_for('settings.positiontyp_delete', typ_id=typ.id) }}" class="d-inline" onsubmit="return confirm('Positionstyp löschen?')">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% if not typen %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-3">Keine Positionstypen vorhanden</td>
+                                </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Veredelungsart -->
+<div class="modal fade" id="artModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('settings.veredelungsart_save') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="id" id="art_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="artModalTitle">Veredelungsart erstellen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Code *</label>
+                        <input type="text" class="form-control" name="code" id="art_code" required placeholder="z.B. stick, druck, dtf">
+                        <small class="text-muted">Eindeutiger Kurzcode (nur Kleinbuchstaben)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name *</label>
+                        <input type="text" class="form-control" name="name" id="art_name" required placeholder="z.B. Stickerei">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <input type="text" class="form-control" name="beschreibung" id="art_beschreibung" placeholder="Kurze Beschreibung">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Icon</label>
+                                <input type="text" class="form-control" name="icon" id="art_icon" value="bi-brush" placeholder="bi-brush">
+                                <small class="text-muted">Bootstrap Icon Klasse</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Farbe</label>
+                                <select class="form-select" name="farbe" id="art_farbe">
+                                    <option value="primary">Blau</option>
+                                    <option value="success">Grün</option>
+                                    <option value="info">Hellblau</option>
+                                    <option value="warning">Gelb</option>
+                                    <option value="danger">Rot</option>
+                                    <option value="secondary">Grau</option>
+                                    <option value="dark">Dunkel</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Reihenfolge</label>
+                                <input type="number" class="form-control" name="sort_order" id="art_sort" value="0" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="aktiv" id="art_aktiv" checked>
+                        <label class="form-check-label" for="art_aktiv">Aktiv</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Positionstyp -->
+<div class="modal fade" id="typModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('settings.positiontyp_save') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="id" id="typ_id">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="typModalTitle">Positionstyp erstellen</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Code *</label>
+                        <input type="text" class="form-control" name="code" id="typ_code" required placeholder="z.B. brust_links">
+                        <small class="text-muted">Eindeutiger Kurzcode (nur Kleinbuchstaben, Unterstriche)</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name *</label>
+                        <input type="text" class="form-control" name="name" id="typ_name" required placeholder="z.B. Brust links">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Veredelungsarten <small class="text-muted">(leer = alle)</small></label>
+                        <div class="border rounded p-2">
+                            {% for art in arten %}
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input typ-art-check" type="checkbox"
+                                       name="veredelungsart_ids" value="{{ art.id }}"
+                                       id="art_cb_{{ art.id }}">
+                                <label class="form-check-label small" for="art_cb_{{ art.id }}">
+                                    <i class="{{ art.icon }} text-{{ art.farbe }}"></i> {{ art.name }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <small class="text-muted">Mehrere auswählbar — keine Auswahl = für alle anzeigen</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Reihenfolge</label>
+                                <input type="number" class="form-control" name="sort_order" id="typ_sort" value="0" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="aktiv" id="typ_aktiv" checked>
+                        <label class="form-check-label" for="typ_aktiv">Aktiv</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Speichern</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function resetArtForm() {
+    document.getElementById('artModalTitle').textContent = 'Veredelungsart erstellen';
+    document.getElementById('art_id').value = '';
+    document.getElementById('art_code').value = '';
+    document.getElementById('art_code').readOnly = false;
+    document.getElementById('art_name').value = '';
+    document.getElementById('art_beschreibung').value = '';
+    document.getElementById('art_icon').value = 'bi-brush';
+    document.getElementById('art_farbe').value = 'primary';
+    document.getElementById('art_sort').value = '0';
+    document.getElementById('art_aktiv').checked = true;
+}
+
+function editArt(id, code, name, beschreibung, icon, farbe, sort, aktiv) {
+    document.getElementById('artModalTitle').textContent = 'Veredelungsart bearbeiten';
+    document.getElementById('art_id').value = id;
+    document.getElementById('art_code').value = code;
+    document.getElementById('art_code').readOnly = true;
+    document.getElementById('art_name').value = name;
+    document.getElementById('art_beschreibung').value = beschreibung;
+    document.getElementById('art_icon').value = icon;
+    document.getElementById('art_farbe').value = farbe;
+    document.getElementById('art_sort').value = sort;
+    document.getElementById('art_aktiv').checked = aktiv;
+    new bootstrap.Modal(document.getElementById('artModal')).show();
+}
+
+function resetTypForm() {
+    document.getElementById('typModalTitle').textContent = 'Positionstyp erstellen';
+    document.getElementById('typ_id').value = '';
+    document.getElementById('typ_code').value = '';
+    document.getElementById('typ_code').readOnly = false;
+    document.getElementById('typ_name').value = '';
+    document.querySelectorAll('.typ-art-check').forEach(cb => cb.checked = false);
+    document.getElementById('typ_sort').value = '0';
+    document.getElementById('typ_aktiv').checked = true;
+}
+
+function editTyp(id, code, name, veredelungsartIds, sort, aktiv) {
+    document.getElementById('typModalTitle').textContent = 'Positionstyp bearbeiten';
+    document.getElementById('typ_id').value = id;
+    document.getElementById('typ_code').value = code;
+    document.getElementById('typ_code').readOnly = true;
+    document.getElementById('typ_name').value = name;
+    // Alle Checkboxen zurücksetzen, dann die gespeicherten ankreuzen
+    document.querySelectorAll('.typ-art-check').forEach(cb => cb.checked = false);
+    if (veredelungsartIds) {
+        veredelungsartIds.split(',').forEach(function(artId) {
+            const cb = document.getElementById('art_cb_' + artId.trim());
+            if (cb) cb.checked = true;
+        });
+    }
+    document.getElementById('typ_sort').value = sort;
+    document.getElementById('typ_aktiv').checked = aktiv;
+    new bootstrap.Modal(document.getElementById('typModal')).show();
+}
+</script>
+{% endblock %}

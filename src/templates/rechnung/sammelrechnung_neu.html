@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Sammelrechnung erstellen - StitchAdmin{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1><i class="bi bi-collection"></i> Sammelrechnung</h1>
+        <p class="text-muted">Mehrere Auftraege in einer Rechnung zusammenfassen</p>
+    </div>
+    <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Zurueck
+    </a>
+</div>
+
+<form method="POST" action="{{ url_for('rechnung.sammelrechnung_erstellen') }}" id="sammelform">
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="bi bi-list-check"></i> Auftraege auswaehlen</h5>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAll(true)">
+                    Alle auswaehlen
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleAll(false)">
+                    Alle abwaehlen
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if customer_orders %}
+            {% for customer_key, group in customer_orders.items() %}
+            <div class="border-bottom">
+                <div class="bg-light px-3 py-2 d-flex align-items-center gap-2">
+                    <input type="checkbox" class="form-check-input customer-toggle"
+                           onchange="toggleCustomer('{{ customer_key }}', this)"
+                           title="Alle Auftraege dieses Kunden">
+                    <strong class="text-primary">
+                        <i class="bi bi-person me-1"></i>
+                        {{ group.customer.display_name if group.customer else 'Kein Kunde' }}
+                        {% if group.customer and group.customer.customer_number %}
+                            <small class="text-muted">({{ group.customer.customer_number }})</small>
+                        {% endif %}
+                    </strong>
+                    <small class="text-muted ms-2">{{ group.orders|length }} Auftrag/Auftraege</small>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 40px"></th>
+                                <th>Auftragsnr.</th>
+                                <th>Datum</th>
+                                <th>Beschreibung</th>
+                                <th>Status</th>
+                                <th class="text-end">Betrag</th>
+                                <th>Positionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in group.orders %}
+                            <tr class="customer-group-{{ customer_key }}">
+                                <td class="text-center">
+                                    <input type="checkbox" class="form-check-input order-checkbox"
+                                           name="order_ids[]" value="{{ order.id }}"
+                                           data-customer="{{ customer_key }}">
+                                </td>
+                                <td><strong>{{ order.order_number or order.id }}</strong></td>
+                                <td>{{ order.created_at.strftime('%d.%m.%Y') if order.created_at else '-' }}</td>
+                                <td>{{ (order.description or '')[:50] }}</td>
+                                <td>
+                                    {% if order.status == 'accepted' %}<span class="badge bg-primary">Angenommen</span>
+                                    {% elif order.status == 'in_progress' %}<span class="badge bg-warning">In Arbeit</span>
+                                    {% elif order.status == 'ready' %}<span class="badge bg-info">Abholbereit</span>
+                                    {% elif order.status == 'completed' %}<span class="badge bg-success">Abgeschlossen</span>
+                                    {% else %}<span class="badge bg-secondary">{{ order.status }}</span>{% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if order.total_price %}
+                                        <strong>{{ "%.2f"|format(order.total_price) }} &euro;</strong>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ order.items.count() }} Pos.</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-inbox fs-1"></i>
+                <p class="mt-2">Keine abrechenbaren Auftraege vorhanden</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Vorschau Summe -->
+    <div class="card mb-4" id="summary-card" style="display: none;">
+        <div class="card-body">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <span id="selected-count" class="badge bg-primary fs-6">0 Auftraege ausgewaehlt</span>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-file-earmark-plus"></i> Sammelrechnung erstellen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+function toggleAll(select) {
+    document.querySelectorAll('.order-checkbox').forEach(cb => { cb.checked = select; });
+    document.querySelectorAll('.customer-toggle').forEach(cb => { cb.checked = select; });
+    updateSummary();
+}
+
+function toggleCustomer(customerKey, toggle) {
+    document.querySelectorAll(`.customer-group-${customerKey} .order-checkbox`).forEach(cb => {
+        cb.checked = toggle.checked;
+    });
+    updateSummary();
+}
+
+function updateSummary() {
+    const checked = document.querySelectorAll('.order-checkbox:checked').length;
+    const card = document.getElementById('summary-card');
+    const count = document.getElementById('selected-count');
+    card.style.display = checked > 0 ? 'block' : 'none';
+    count.textContent = `${checked} Auftrag${checked !== 1 ? 'e' : ''} ausgewaehlt`;
+}
+
+document.querySelectorAll('.order-checkbox').forEach(cb => {
+    cb.addEventListener('change', updateSummary);
+});
+</script>
+{% endblock %}

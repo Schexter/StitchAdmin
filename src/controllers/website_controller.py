@@ -8,17 +8,17 @@ Erstellt von: Hans Hahn - Alle Rechte vorbehalten
 
 from flask import Blueprint, render_template
 
-website_bp = Blueprint('website', __name__)
+website_bp = Blueprint('website', __name__, url_prefix='/site')
 
 
 @website_bp.route('/')
 def home():
     """Oeffentliche Startseite"""
     from flask_login import current_user
-    from flask import redirect, url_for
+    from flask import redirect, url_for, request
 
-    # Eingeloggte User direkt zum Dashboard
-    if current_user.is_authenticated:
+    # Eingeloggte User zum Dashboard - ausser bei Vorschau-Modus
+    if current_user.is_authenticated and 'preview' not in request.args:
         return redirect(url_for('dashboard'))
 
     # Company-Daten laden
@@ -98,3 +98,37 @@ def datenschutz():
 
     return render_template('website/datenschutz.html',
                            company=company, datenschutz_text=datenschutz_text)
+
+
+@website_bp.route('/agb')
+def agb():
+    """AGB-Seite"""
+    company = _get_company()
+    agb_text = ''
+    try:
+        from src.models.website_content import WebsiteContent
+        agb_text = WebsiteContent.get('footer', 'agb_text', '')
+    except Exception:
+        pass
+    return render_template('website/agb.html', company=company, page_text=agb_text)
+
+
+@website_bp.route('/widerruf')
+def widerruf():
+    """Widerrufsbelehrung"""
+    company = _get_company()
+    widerruf_text = ''
+    try:
+        from src.models.website_content import WebsiteContent
+        widerruf_text = WebsiteContent.get('footer', 'widerruf_text', '')
+    except Exception:
+        pass
+    return render_template('website/widerruf.html', company=company, page_text=widerruf_text)
+
+
+def _get_company():
+    try:
+        from src.models.company_settings import CompanySettings
+        return CompanySettings.get_settings()
+    except Exception:
+        return None

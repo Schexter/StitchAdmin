@@ -1,74 +1,57 @@
+# -*- coding: utf-8 -*-
 """
-Aktivitäts-Logger für Audit-Trail
+Zentraler Aktivitaets-Logger fuer Audit-Trail (DB-basiert)
+==========================================================
+Ersetzt die duplizierten log_activity()-Funktionen in den Controllern.
+
+Erstellt von Hans Hahn - Alle Rechte vorbehalten
 """
 
-import json
-import os
-from datetime import datetime
-from pathlib import Path
+import logging
+from flask import request
+from flask_login import current_user
 
-ACTIVITY_LOG_FILE = 'activity_log.json'
+logger = logging.getLogger(__name__)
 
-def log_activity(username, action, details, ip_address=None):
+
+def log_activity(action, details, username=None):
     """
-    Protokolliert Benutzeraktivitäten
-    
+    Protokolliert Benutzeraktivitaeten in der Datenbank.
+
     Args:
-        username: Benutzername
-        action: Aktion (login, logout, create_user, etc.)
+        action: Aktion (login, logout, create_order, etc.)
         details: Detaillierte Beschreibung
-        ip_address: IP-Adresse (optional)
+        username: Optional - wird automatisch von current_user geholt
     """
-    # Lade existierende Logs
-    logs = load_activity_logs()
-    
-    # Erstelle neuen Log-Eintrag
-    log_entry = {
-        'id': len(logs) + 1,
-        'timestamp': datetime.now().isoformat(),
-        'username': username,
-        'action': action,
-        'details': details,
-        'ip_address': ip_address or 'N/A'
-    }
-    
-    # Füge neuen Eintrag hinzu
-    logs.append(log_entry)
-    
-    # Speichere Logs (behalte nur die letzten 1000 Einträge)
-    if len(logs) > 1000:
-        logs = logs[-1000:]
-    
-    save_activity_logs(logs)
+    from src.models.models import db, ActivityLog
 
-def load_activity_logs():
-    """Lade Aktivitäts-Logs aus Datei"""
-    if os.path.exists(ACTIVITY_LOG_FILE):
+    try:
+        if username is None:
+            if current_user and current_user.is_authenticated:
+                username = current_user.username
+            else:
+                username = 'system'
+
+        ip_address = None
+        user_agent = None
         try:
-            with open(ACTIVITY_LOG_FILE, 'r') as f:
-                return json.load(f)
-        except:
-            return []
-    return []
+            ip_address = request.remote_addr
+            user_agent = request.headers.get('User-Agent', '')[:200]
+        except RuntimeError:
+            pass  # Ausserhalb eines Request-Kontexts
 
-def save_activity_logs(logs):
-    """Speichere Aktivitäts-Logs in Datei"""
-    with open(ACTIVITY_LOG_FILE, 'w') as f:
-        json.dump(logs, f, indent=2)
-
-def get_user_activities(username, limit=50):
-    """Hole Aktivitäten eines bestimmten Benutzers"""
-    logs = load_activity_logs()
-    user_logs = [log for log in logs if log['username'] == username]
-    return user_logs[-limit:]  # Neueste zuerst
-
-def get_recent_activities(limit=50):
-    """Hole die neuesten Aktivitäten"""
-    logs = load_activity_logs()
-    return logs[-limit:][::-1]  # Neueste zuerst
-
-def get_activities_by_action(action, limit=50):
-    """Hole Aktivitäten nach Aktionstyp"""
-    logs = load_activity_logs()
-    action_logs = [log for log in logs if log['action'] == action]
-    return action_logs[-limit:][::-1]  # Neueste zuerst
+        activity = ActivityLog(
+            username=username,
+            action=action,
+            details=details,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        db.session.add(activity)
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"Fehler beim Protokollieren: {e}")
+        try:
+            db.session.rollback()
+        except Exception:
+            pass

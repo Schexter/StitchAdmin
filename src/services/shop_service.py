@@ -298,8 +298,9 @@ def _find_or_create_customer(data):
         if customer:
             return customer
 
-    # Neuen Kunden anlegen
-    customer_id = str(uuid.uuid4())
+    # Neuen Kunden anlegen - fortlaufende Kundennummer (KD001, KD002, ...)
+    from src.controllers.customer_controller_db import generate_customer_id
+    customer_id = generate_customer_id()
     customer_type = 'business' if data.get('company_name') else 'private'
 
     customer = Customer(

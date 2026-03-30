@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Anfrage {{ inquiry.inquiry_number }} bearbeiten{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px;">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('inquiry_admin.detail', id=inquiry.id) }}" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+        <div>
+            <h4 class="mb-0"><i class="bi bi-pencil me-2"></i>Anfrage {{ inquiry.inquiry_number }} bearbeiten</h4>
+            <small class="text-muted">{{ inquiry.full_name }}{% if inquiry.company_name %} ({{ inquiry.company_name }}){% endif %}</small>
+        </div>
+    </div>
+
+    <form method="POST">
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-person me-1"></i> Kundendaten</h6></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Vorname *</label>
+                        <input type="text" class="form-control" name="first_name" value="{{ inquiry.first_name }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Nachname *</label>
+                        <input type="text" class="form-control" name="last_name" value="{{ inquiry.last_name }}" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Firma</label>
+                        <input type="text" class="form-control" name="company_name" value="{{ inquiry.company_name or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">E-Mail</label>
+                        <input type="email" class="form-control" name="email" value="{{ inquiry.email or '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Telefon</label>
+                        <input type="tel" class="form-control" name="phone" value="{{ inquiry.phone or '' }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-chat-left-text me-1"></i> Anfrage-Details</h6></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Typ *</label>
+                        <select class="form-select" name="inquiry_type" required>
+                            {% for key, label in inquiry_types.items() %}
+                            <option value="{{ key }}" {{ 'selected' if inquiry.inquiry_type == key }}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Menge</label>
+                        <input type="number" class="form-control" name="quantity" min="1" value="{{ inquiry.quantity or '' }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Wunschtermin</label>
+                        <input type="date" class="form-control" name="desired_date"
+                               value="{{ inquiry.desired_date.isoformat() if inquiry.desired_date else '' }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Textilart</label>
+                        <input type="text" class="form-control" name="textile_type" value="{{ inquiry.textile_type or '' }}" placeholder="z.B. T-Shirt, Poloshirt">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Farbe</label>
+                        <input type="text" class="form-control" name="textile_color" value="{{ inquiry.textile_color or '' }}">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Beschreibung *</label>
+                        <textarea class="form-control" name="description" rows="3" required>{{ inquiry.description or '' }}</textarea>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Interne Notizen</label>
+                        <textarea class="form-control" name="internal_notes" rows="2" placeholder="Nur intern sichtbar">{{ inquiry.internal_notes or '' }}</textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{{ url_for('inquiry_admin.detail', id=inquiry.id) }}" class="btn btn-outline-secondary">Abbrechen</a>
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-check-lg me-1"></i> Speichern
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

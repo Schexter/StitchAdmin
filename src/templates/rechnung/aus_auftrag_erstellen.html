@@ -1,13 +1,20 @@
 {% extends "base.html" %}
 
-{% block title %}Rechnung für Auftrag {{ order.order_number or order.id }} - StitchAdmin{% endblock %}
+{% block title %}Rechnung erstellen - StitchAdmin{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h1><i class="bi bi-file-earmark-plus"></i> Rechnung erstellen</h1>
-            <p class="text-muted">Aus Auftrag: <strong>{{ order.order_number or order.id }}</strong></p>
+            <p class="text-muted">
+                {% if orders|length == 1 %}
+                    Aus Auftrag: <strong>{{ orders[0].order_number or orders[0].id }}</strong>
+                {% else %}
+                    Aus {{ orders|length }} Aufträgen:
+                    {% for o in orders %}<strong>{{ o.order_number or o.id }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}
+                {% endif %}
+            </p>
         </div>
         <a href="{{ url_for('rechnung.neue_rechnung_aus_auftrag') }}" class="btn btn-secondary">
             <i class="bi bi-arrow-left"></i> Zurück zur Auswahl
@@ -15,74 +22,56 @@
     </div>
 
     <form method="POST" action="{{ url_for('rechnung.rechnung_erstellen') }}" id="rechnungsform">
-        <input type="hidden" name="auftrag_id" value="{{ order.id }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% for o in orders %}
+        <input type="hidden" name="auftrag_id" value="{{ o.id }}">
+        {% endfor %}
 
-        <div class="row">
-            <!-- Linke Spalte: Kundendaten -->
+        <div class="row g-4 mb-4">
+            <!-- Kundendaten -->
             <div class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="bi bi-person"></i> Kundendaten</h5>
+                <div class="card h-100">
+                    <div class="card-header bg-success" style="color:#fff;">
+                        <h5 class="mb-0" style="color:#fff;"><i class="bi bi-person-fill"></i> Kundendaten</h5>
                     </div>
                     <div class="card-body">
                         {% if kunde %}
                         <input type="hidden" name="kunde_id" value="{{ kunde.id }}">
-                        <table class="table table-borderless mb-0">
-                            <tr>
-                                <th style="width: 30%;">Name:</th>
-                                <td><strong>{{ kunde.display_name }}</strong></td>
-                            </tr>
-                            {% if kunde.company_name %}
-                            <tr>
-                                <th>Firma:</th>
-                                <td>{{ kunde.company_name }}</td>
-                            </tr>
+                        <table class="table table-borderless table-sm mb-0">
+                            <tr><th style="width:35%">Name:</th><td><strong>{{ kunde.display_name }}</strong></td></tr>
+                            {% if kunde.company_name and kunde.company_name != kunde.display_name %}
+                            <tr><th>Firma:</th><td>{{ kunde.company_name }}</td></tr>
                             {% endif %}
-                            <tr>
-                                <th>Adresse:</th>
-                                <td>
-                                    {{ kunde.street }} {{ kunde.house_number }}<br>
-                                    {{ kunde.postal_code }} {{ kunde.city }}
-                                </td>
-                            </tr>
-                            {% if kunde.email %}
-                            <tr>
-                                <th>E-Mail:</th>
-                                <td>{{ kunde.email }}</td>
-                            </tr>
-                            {% endif %}
+                            <tr><th>Adresse:</th><td>{{ kunde.street }} {{ kunde.house_number or '' }}<br>{{ kunde.postal_code }} {{ kunde.city }}</td></tr>
+                            {% if kunde.email %}<tr><th>E-Mail:</th><td>{{ kunde.email }}</td></tr>{% endif %}
                         </table>
                         {% else %}
-                        <div class="alert alert-warning mb-0">
-                            <i class="bi bi-exclamation-triangle"></i> Kein Kunde im Auftrag hinterlegt
-                        </div>
+                        <div class="alert alert-warning mb-0"><i class="bi bi-exclamation-triangle"></i> Kein Kunde hinterlegt</div>
                         {% endif %}
                     </div>
                 </div>
             </div>
 
-            <!-- Rechte Spalte: Rechnungsdaten -->
+            <!-- Rechnungsdaten -->
             <div class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-header bg-secondary text-white">
-                        <h5 class="mb-0"><i class="bi bi-calendar"></i> Rechnungsdaten</h5>
+                <div class="card h-100">
+                    <div class="card-header bg-secondary" style="color:#fff;">
+                        <h5 class="mb-0" style="color:#fff;"><i class="bi bi-calendar3"></i> Rechnungsdaten</h5>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label class="form-label">Rechnungsnummer</label>
-                            <input type="text" class="form-control" value="{{ naechste_nummer }}" disabled>
+                            <label class="form-label fw-semibold">Rechnungsnummer</label>
+                            <input type="text" class="form-control bg-light" value="{{ naechste_nummer }}" disabled>
                             <div class="form-text">Wird automatisch vergeben</div>
                         </div>
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="rechnungsdatum" class="form-label">Rechnungsdatum *</label>
-                                <input type="date" class="form-control" id="rechnungsdatum" name="rechnungsdatum"
-                                       value="{{ today }}" required>
+                            <div class="col-6 mb-3">
+                                <label for="rechnungsdatum" class="form-label fw-semibold">Rechnungsdatum *</label>
+                                <input type="date" class="form-control" id="rechnungsdatum" name="rechnungsdatum" value="{{ today }}" required>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="leistungsdatum" class="form-label">Leistungsdatum *</label>
-                                <input type="date" class="form-control" id="leistungsdatum" name="leistungsdatum"
-                                       value="{{ today }}" required>
+                            <div class="col-6 mb-3">
+                                <label for="leistungsdatum" class="form-label fw-semibold">Leistungsdatum *</label>
+                                <input type="date" class="form-control" id="leistungsdatum" name="leistungsdatum" value="{{ today }}" required>
                             </div>
                         </div>
                     </div>
@@ -93,87 +82,98 @@
         <!-- Positionen -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-list-ol"></i> Rechnungspositionen (aus Auftrag)</h5>
+                <h5 class="mb-0"><i class="bi bi-list-ol"></i> Rechnungspositionen</h5>
             </div>
-            <div class="card-body">
+            <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table">
+                    <table class="table mb-0" id="pos-table">
                         <thead class="table-light">
                             <tr>
-                                <th>Pos.</th>
+                                <th style="width:35px" class="text-center text-muted">#</th>
                                 <th>Artikel / Beschreibung</th>
-                                <th class="text-end">Menge</th>
-                                <th class="text-end">Einzelpreis</th>
-                                <th class="text-end">MwSt</th>
-                                <th class="text-end">Gesamt</th>
+                                <th class="text-end" style="width:80px">Menge</th>
+                                <th class="text-end" style="width:110px">Netto EP</th>
+                                <th class="text-end" style="width:60px">MwSt</th>
+                                <th class="text-end" style="width:100px">Gesamt</th>
+                                <th style="width:70px"></th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="pos-body">
                             {% for pos in positionen %}
-                            <tr>
-                                <td>{{ pos.position }}</td>
-                                <td>
-                                    <strong>{{ pos.artikel_name }}</strong>
-                                    {% if pos.beschreibung %}
-                                    <br><small class="text-muted">{{ pos.beschreibung }}</small>
-                                    {% endif %}
+                            {% if pos.get('is_header') %}
+                            <tr class="table-light">
+                                <td colspan="7" class="py-1 px-3">
+                                    <strong class="text-primary"><i class="bi bi-receipt"></i> {{ pos.artikel_name }}</strong>
+                                    {% if pos.beschreibung %}<small class="text-muted ms-2">{{ pos.beschreibung }}</small>{% endif %}
                                 </td>
-                                <td class="text-end">{{ pos.menge }} {{ pos.einheit }}</td>
-                                <td class="text-end">{{ "%.2f"|format(pos.einzelpreis_netto) }} €</td>
-                                <td class="text-end">{{ pos.mwst_satz|int }}%</td>
-                                <td class="text-end"><strong>{{ "%.2f"|format(pos.brutto_betrag) }} €</strong></td>
                             </tr>
+                            {% else %}
+                            <tr class="pos-row" data-idx="{{ loop.index0 }}">
+                                <td class="text-center text-muted">{{ pos.position }}</td>
+                                <td>
+                                    <div class="fw-semibold pos-name">{{ pos.artikel_name }}</div>
+                                    {% if pos.beschreibung %}<small class="text-muted">{{ pos.beschreibung }}</small>{% endif %}
+                                    <div class="rabatt-row mt-1 d-none">
+                                        <div class="input-group input-group-sm" style="max-width:220px">
+                                            <span class="input-group-text">Rabatt</span>
+                                            <input type="number" class="form-control rabatt-input" min="0" max="100" step="0.5" value="0" placeholder="0">
+                                            <button type="button" class="btn btn-outline-primary btn-sm rabatt-mode-btn" onclick="toggleRabattMode(this)" title="Zwischen % und € wechseln" style="min-width:32px">%</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="removeRabatt(this)">×</button>
+                                        </div>
+                                        <small class="text-danger rabatt-label ms-1 d-none"></small>
+                                    </div>
+                                </td>
+                                <td class="text-end">{{ "%.2f"|format(pos.menge) }} {{ pos.einheit }}</td>
+                                <td class="text-end pos-ep">{{ "%.2f"|format(pos.einzelpreis_netto) }} €</td>
+                                <td class="text-end">{{ pos.mwst_satz|int }}%</td>
+                                <td class="text-end fw-bold pos-gesamt">{{ "%.2f"|format(pos.brutto_betrag) }} €</td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-outline-warning btn-sm" title="Rabatt" onclick="toggleRabatt(this)">
+                                        <i class="bi bi-percent"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endif %}
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
 
                 <!-- Summen -->
-                <div class="row">
-                    <div class="col-md-8"></div>
-                    <div class="col-md-4">
-                        <table class="table table-sm">
-                            <tr>
-                                <td class="text-end"><strong>Netto:</strong></td>
-                                <td class="text-end">{{ "%.2f"|format(netto_gesamt) }} €</td>
-                            </tr>
-                            <tr>
-                                <td class="text-end">MwSt:</td>
-                                <td class="text-end">{{ "%.2f"|format(mwst_gesamt) }} €</td>
-                            </tr>
-                            <tr class="table-primary">
-                                <td class="text-end"><strong>Brutto:</strong></td>
-                                <td class="text-end"><strong>{{ "%.2f"|format(brutto_gesamt) }} €</strong></td>
-                            </tr>
-                        </table>
-                    </div>
+                <div class="d-flex justify-content-end p-3 border-top">
+                    <table class="table table-sm mb-0" style="max-width:280px">
+                        <tr>
+                            <td class="text-end text-muted">Netto:</td>
+                            <td class="text-end fw-semibold" id="sum-netto">{{ "%.2f"|format(netto_gesamt) }} €</td>
+                        </tr>
+                        <tr>
+                            <td class="text-end text-muted">MwSt (19%):</td>
+                            <td class="text-end" id="sum-mwst">{{ "%.2f"|format(mwst_gesamt) }} €</td>
+                        </tr>
+                        <tr class="table-primary">
+                            <td class="text-end fw-bold">Brutto:</td>
+                            <td class="text-end fw-bold" id="sum-brutto">{{ "%.2f"|format(brutto_gesamt) }} €</td>
+                        </tr>
+                    </table>
                 </div>
             </div>
         </div>
 
-        <!-- Hidden: Positionen als JSON -->
-        <input type="hidden" name="positionen" value='{{ positionen | tojson }}'>
-
         <!-- Optionen -->
-        <div class="row">
+        <div class="row g-4 mb-4">
             <div class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-gear"></i> Optionen</h5>
-                    </div>
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0"><i class="bi bi-gear"></i> Optionen</h5></div>
                     <div class="card-body">
                         <div class="mb-3">
                             <label for="zahlungsbedingungen" class="form-label">Zahlungsbedingungen</label>
-                            <input type="text" class="form-control" id="zahlungsbedingungen"
-                                   name="zahlungsbedingungen" value="Zahlbar innerhalb 14 Tagen">
+                            <input type="text" class="form-control" id="zahlungsbedingungen" name="zahlungsbedingungen" value="Zahlbar innerhalb 14 Tagen">
                         </div>
                         <div class="mb-3">
                             <label for="zugpferd_profil" class="form-label">ZUGFeRD-Profil</label>
                             <select class="form-select" id="zugpferd_profil" name="zugpferd_profil">
                                 {% for profil in zugpferd_profile %}
-                                <option value="{{ profil.value }}" {% if profil.value == 'BASIC' %}selected{% endif %}>
-                                    {{ profil.label }}
-                                </option>
+                                <option value="{{ profil.value }}" {% if profil.value == 'BASIC' %}selected{% endif %}>{{ profil.label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -181,19 +181,19 @@
                 </div>
             </div>
             <div class="col-md-6">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-chat-text"></i> Bemerkungen</h5>
-                    </div>
+                <div class="card">
+                    <div class="card-header"><h5 class="mb-0"><i class="bi bi-chat-text"></i> Bemerkungen</h5></div>
                     <div class="card-body">
                         <textarea class="form-control" id="bemerkungen" name="bemerkungen" rows="5"
-                                  placeholder="Optionale Bemerkungen...">Rechnung zu Auftrag {{ order.order_number or order.id }}</textarea>
+                            placeholder="Optionale Bemerkungen...">Rechnung zu {% for o in orders %}{{ o.order_number or o.id }}{% if not loop.last %}, {% endif %}{% endfor %}</textarea>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Aktionen -->
+        <!-- Positionen als JSON (wird vor Submit aktualisiert) -->
+        <input type="hidden" id="positionen-json" name="positionen" value='{{ positionen | tojson }}'>
+
         <div class="d-flex gap-2 mb-4">
             <button type="submit" class="btn btn-success btn-lg">
                 <i class="bi bi-check-circle"></i> Rechnung erstellen
@@ -204,4 +204,125 @@
         </div>
     </form>
 </div>
+
+<script>
+// Originaldaten aus Server
+const posData = {{ positionen | tojson }};
+
+function toggleRabatt(btn) {
+    const row = btn.closest('tr');
+    const rabattRow = row.querySelector('.rabatt-row');
+    rabattRow.classList.toggle('d-none');
+    if (!rabattRow.classList.contains('d-none')) {
+        const input = rabattRow.querySelector('.rabatt-input');
+        input.focus();
+        input.addEventListener('input', () => recalcRow(row));
+    }
+}
+
+function toggleRabattMode(modeBtn) {
+    const row = modeBtn.closest('tr');
+    const input = row.querySelector('.rabatt-input');
+    const isPercent = modeBtn.textContent.trim() === '%';
+    if (isPercent) {
+        // Wechsel zu € Betrag
+        modeBtn.textContent = '€';
+        modeBtn.classList.replace('btn-outline-primary', 'btn-outline-success');
+        input.removeAttribute('max');
+        input.step = '0.01';
+        input.placeholder = '0.00';
+    } else {
+        // Wechsel zu %
+        modeBtn.textContent = '%';
+        modeBtn.classList.replace('btn-outline-success', 'btn-outline-primary');
+        input.max = '100';
+        input.step = '0.5';
+        input.placeholder = '0';
+    }
+    input.value = '';
+    recalcRow(row);
+}
+
+function removeRabatt(btn) {
+    const rabattRow = btn.closest('.rabatt-row');
+    rabattRow.querySelector('.rabatt-input').value = 0;
+    recalcRow(rabattRow.closest('tr'));
+    rabattRow.classList.add('d-none');
+}
+
+// Gibt { rabattNetto, rabattPct, nettoNeu } für eine Zeile zurück
+function getRabattForRow(row, orig) {
+    const modeBtn = row.querySelector('.rabatt-mode-btn');
+    const isEuro = modeBtn && modeBtn.textContent.trim() === '€';
+    const inputVal = parseFloat(row.querySelector('.rabatt-input')?.value || 0);
+    let rabattNetto, rabattPct;
+    if (isEuro) {
+        rabattNetto = Math.min(Math.max(inputVal, 0), orig.netto_betrag);
+        rabattPct = orig.netto_betrag > 0 ? (rabattNetto / orig.netto_betrag * 100) : 0;
+    } else {
+        rabattPct = Math.min(Math.max(inputVal, 0), 100);
+        rabattNetto = orig.netto_betrag * rabattPct / 100;
+    }
+    return { rabattNetto, rabattPct, nettoNeu: orig.netto_betrag - rabattNetto, isEuro, inputVal };
+}
+
+function recalcRow(row) {
+    const idx = parseInt(row.dataset.idx);
+    const orig = posData.filter(p => !p.is_header)[idx] || posData[idx];
+    if (!orig) return;
+
+    const { rabattNetto, rabattPct, nettoNeu, isEuro, inputVal } = getRabattForRow(row, orig);
+    const mwst = nettoNeu * (orig.mwst_satz / 100);
+    const brutto = nettoNeu + mwst;
+
+    row.querySelector('.pos-gesamt').textContent = brutto.toFixed(2) + ' €';
+    const rabattLabel = row.querySelector('.rabatt-label');
+    if (inputVal > 0) {
+        if (isEuro) {
+            rabattLabel.textContent = `- ${rabattNetto.toFixed(2)} € netto (${rabattPct.toFixed(1)}%)`;
+        } else {
+            rabattLabel.textContent = `- ${rabattPct.toFixed(1)}% = -${rabattNetto.toFixed(2)} € netto`;
+        }
+        rabattLabel.classList.remove('d-none');
+    } else {
+        rabattLabel.classList.add('d-none');
+    }
+    recalcTotals();
+}
+
+function recalcTotals() {
+    let netto = 0, mwst = 0;
+    const origList = posData.filter(p => !p.is_header);
+    document.querySelectorAll('.pos-row').forEach((row, i) => {
+        const orig = origList[i];
+        if (!orig) return;
+        const { nettoNeu } = getRabattForRow(row, orig);
+        netto += nettoNeu;
+        mwst += nettoNeu * (orig.mwst_satz / 100);
+    });
+    document.getElementById('sum-netto').textContent = netto.toFixed(2) + ' €';
+    document.getElementById('sum-mwst').textContent = mwst.toFixed(2) + ' €';
+    document.getElementById('sum-brutto').textContent = (netto + mwst).toFixed(2) + ' €';
+}
+
+// Vor Submit: aktualisierte Positionen serialisieren
+document.getElementById('rechnungsform').addEventListener('submit', function() {
+    const rows = document.querySelectorAll('.pos-row');
+    const origList = posData.filter(p => !p.is_header);
+    let nonHeaderCount = 0;
+    const result = posData.map((p) => {
+        if (p.is_header) return p;
+        const row = rows[nonHeaderCount++];
+        if (!row) return p;
+        const { rabattNetto, rabattPct } = getRabattForRow(row, p);
+        if (rabattNetto > 0) {
+            const netto = p.netto_betrag - rabattNetto;
+            const mwst = netto * (p.mwst_satz / 100);
+            return {...p, netto_betrag: netto, mwst_betrag: mwst, brutto_betrag: netto + mwst, rabatt_prozent: rabattPct};
+        }
+        return p;
+    });
+    document.getElementById('positionen-json').value = JSON.stringify(result);
+});
+</script>
 {% endblock %}

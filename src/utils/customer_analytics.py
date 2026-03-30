@@ -64,10 +64,17 @@ class CustomerAnalytics:
             'vip_customers': []
         }
         
+        # Helper: display_name aus DB-Feldern berechnen
+        def _display_name(row):
+            if row.customer_type == 'business':
+                return row.company_name or 'Unbekannte Firma'
+            return f"{row.first_name or ''} {row.last_name or ''}".strip() or 'Unbekannt'
+
         # === TOP UMSATZ (Gesamt) ===
         revenue_query = db.session.query(
             Customer.id,
-            Customer.display_name,
+            Customer.first_name,
+            Customer.last_name,
             Customer.company_name,
             Customer.customer_type,
             func.sum(Order.total_price).label('total_revenue'),
@@ -80,11 +87,11 @@ class CustomerAnalytics:
         ).group_by(Customer.id).order_by(
             desc('total_revenue')
         ).limit(limit)
-        
+
         for row in revenue_query:
             rankings['top_revenue'].append({
                 'customer_id': row.id,
-                'name': row.display_name or row.company_name,
+                'name': _display_name(row),
                 'type': row.customer_type,
                 'total_revenue': float(row.total_revenue or 0),
                 'order_count': row.order_count
@@ -93,8 +100,10 @@ class CustomerAnalytics:
         # === TOP UMSATZ (letztes Jahr) ===
         revenue_year_query = db.session.query(
             Customer.id,
-            Customer.display_name,
+            Customer.first_name,
+            Customer.last_name,
             Customer.company_name,
+            Customer.customer_type,
             func.sum(Order.total_price).label('revenue_year'),
             func.count(Order.id).label('orders_year')
         ).outerjoin(Order, and_(
@@ -108,11 +117,11 @@ class CustomerAnalytics:
         ).order_by(
             desc('revenue_year')
         ).limit(limit)
-        
+
         for row in revenue_year_query:
             rankings['top_revenue_year'].append({
                 'customer_id': row.id,
-                'name': row.display_name or row.company_name,
+                'name': _display_name(row),
                 'revenue_year': float(row.revenue_year or 0),
                 'orders_year': row.orders_year
             })
@@ -120,8 +129,10 @@ class CustomerAnalytics:
         # === MEISTE AUFTRÄGE ===
         orders_query = db.session.query(
             Customer.id,
-            Customer.display_name,
+            Customer.first_name,
+            Customer.last_name,
             Customer.company_name,
+            Customer.customer_type,
             func.count(Order.id).label('order_count'),
             func.avg(Order.total_price).label('avg_order_value')
         ).outerjoin(Order, and_(
@@ -134,11 +145,11 @@ class CustomerAnalytics:
         ).order_by(
             desc('order_count')
         ).limit(limit)
-        
+
         for row in orders_query:
             rankings['most_orders'].append({
                 'customer_id': row.id,
-                'name': row.display_name or row.company_name,
+                'name': _display_name(row),
                 'order_count': row.order_count,
                 'avg_order_value': float(row.avg_order_value or 0)
             })
@@ -150,52 +161,54 @@ class CustomerAnalytics:
             # Beste Zahler (schnellste Zahlung nach Fälligkeit)
             payment_query = db.session.query(
                 Customer.id,
-                Customer.display_name,
+                Customer.first_name,
+                Customer.last_name,
                 Customer.company_name,
+                Customer.customer_type,
                 func.count(Rechnung.id).label('invoice_count'),
                 func.avg(
-                    func.julianday(RechnungsZahlung.zahlung_datum) - 
-                    func.julianday(Rechnung.faelligkeitsdatum)
+                    RechnungsZahlung.zahlungsdatum - Rechnung.faelligkeitsdatum
                 ).label('avg_payment_days')
             ).join(Rechnung, Rechnung.kunde_id == Customer.id
             ).join(RechnungsZahlung, RechnungsZahlung.rechnung_id == Rechnung.id
             ).filter(
                 Customer.is_active == True,
-                Rechnung.status == RechnungsStatus.BEZAHLT.value,
-                RechnungsZahlung.bestaetigt == True
+                Rechnung.status == RechnungsStatus.BEZAHLT
             ).group_by(Customer.id).having(
-                func.count(Rechnung.id) >= 2  # Mindestens 2 Rechnungen
+                func.count(Rechnung.id) >= 2
             ).order_by('avg_payment_days').limit(limit)
-            
+
             for row in payment_query:
                 avg_days = row.avg_payment_days or 0
                 rankings['best_payers'].append({
                     'customer_id': row.id,
-                    'name': row.display_name or row.company_name,
+                    'name': _display_name(row),
                     'invoice_count': row.invoice_count,
                     'avg_payment_days': round(avg_days, 1),
                     'rating': cls._payment_rating(avg_days)
                 })
-            
+
             # Schlechteste Zahler
             worst_query = db.session.query(
                 Customer.id,
-                Customer.display_name,
+                Customer.first_name,
+                Customer.last_name,
                 Customer.company_name,
+                Customer.customer_type,
                 func.count(Rechnung.id).label('overdue_count'),
-                func.sum(Rechnung.summe_brutto).label('overdue_amount')
+                func.sum(Rechnung.brutto_gesamt).label('overdue_amount')
             ).join(Rechnung, Rechnung.kunde_id == Customer.id
             ).filter(
                 Customer.is_active == True,
-                Rechnung.status == RechnungsStatus.UEBERFAELLIG.value
+                Rechnung.status == RechnungsStatus.UEBERFAELLIG
             ).group_by(Customer.id).order_by(
                 desc('overdue_amount')
             ).limit(limit)
-            
+
             for row in worst_query:
                 rankings['worst_payers'].append({
                     'customer_id': row.id,
-                    'name': row.display_name or row.company_name,
+                    'name': _display_name(row),
                     'overdue_count': row.overdue_count,
                     'overdue_amount': float(row.overdue_amount or 0)
                 })
@@ -218,8 +231,10 @@ class CustomerAnalytics:
             
             no_contact_query = db.session.query(
                 Customer.id,
-                Customer.display_name,
+                Customer.first_name,
+                Customer.last_name,
                 Customer.company_name,
+                Customer.customer_type,
                 Customer.phone,
                 Customer.email,
                 last_contact_subq.c.last_contact
@@ -240,7 +255,7 @@ class CustomerAnalytics:
                 
                 rankings['no_contact'].append({
                     'customer_id': row.id,
-                    'name': row.display_name or row.company_name,
+                    'name': _display_name(row),
                     'phone': row.phone,
                     'email': row.email,
                     'last_contact': row.last_contact.strftime('%d.%m.%Y') if row.last_contact else 'Nie',
@@ -305,10 +320,16 @@ class CustomerAnalytics:
         
         vip_list = []
         
+        def _display_name(row):
+            if row.customer_type == 'business':
+                return row.company_name or 'Unbekannte Firma'
+            return f"{row.first_name or ''} {row.last_name or ''}".strip() or 'Unbekannt'
+
         # Alle aktiven Kunden mit Aufträgen
         customers_query = db.session.query(
             Customer.id,
-            Customer.display_name,
+            Customer.first_name,
+            Customer.last_name,
             Customer.company_name,
             Customer.customer_type,
             Customer.created_at,
@@ -353,7 +374,7 @@ class CustomerAnalytics:
             
             vip_list.append({
                 'customer_id': row.id,
-                'name': row.display_name or row.company_name,
+                'name': _display_name(row),
                 'type': row.customer_type,
                 'total_revenue': float(row.total_revenue or 0),
                 'order_count': row.order_count,
@@ -488,7 +509,7 @@ class CustomerAnalytics:
             for invoice in invoices:
                 stats['payment']['invoices_total'] += 1
                 
-                if invoice.status == RechnungsStatus.BEZAHLT.value:
+                if invoice.status == RechnungsStatus.BEZAHLT:
                     stats['payment']['invoices_paid'] += 1
                     
                     # Zahlungsdauer berechnen
@@ -497,7 +518,7 @@ class CustomerAnalytics:
                             days = (payment.zahlung_datum - invoice.faelligkeitsdatum).days
                             payment_days_list.append(days)
                             
-                elif invoice.status == RechnungsStatus.UEBERFAELLIG.value:
+                elif invoice.status == RechnungsStatus.UEBERFAELLIG:
                     stats['payment']['invoices_overdue'] += 1
             
             if payment_days_list:
@@ -531,16 +552,33 @@ class CustomerAnalytics:
                 if activity.follow_up_date and activity.follow_up_date <= today:
                     stats['engagement']['pending_follow_ups'] += 1
             
-            # Letzter Kontakt
-            last_contact = ProductionBlock.query.filter(
+            # Letzter Kontakt (ProductionBlock CRM-Aktivitaeten)
+            last_pb = ProductionBlock.query.filter(
                 ProductionBlock.customer_id == customer_id,
                 ProductionBlock.is_active == True,
                 ProductionBlock.block_type.in_(['call_in', 'call_out', 'customer_visit', 'site_visit', 'email'])
             ).order_by(ProductionBlock.start_date.desc()).first()
-            
-            if last_contact:
-                stats['engagement']['last_contact'] = last_contact.start_date
-                stats['engagement']['days_since_contact'] = (today - last_contact.start_date).days
+
+            # Letzter Kontakt auch aus CustomerContact (Design-Freigaben, E-Mails)
+            last_cc_date = None
+            try:
+                from src.models.crm_contact import CustomerContact
+                last_cc = CustomerContact.query.filter_by(customer_id=customer_id).order_by(
+                    CustomerContact.contact_date.desc()
+                ).first()
+                if last_cc:
+                    last_cc_date = last_cc.contact_date.date() if last_cc.contact_date else None
+            except Exception:
+                pass
+
+            # Neuesten Kontakt verwenden
+            pb_date = last_pb.start_date if last_pb else None
+            candidates = [d for d in [pb_date, last_cc_date] if d is not None]
+            last_contact_date = max(candidates) if candidates else None
+
+            if last_contact_date:
+                stats['engagement']['last_contact'] = last_contact_date
+                stats['engagement']['days_since_contact'] = (today - last_contact_date).days
                 
         except ImportError:
             pass
@@ -641,7 +679,7 @@ class CustomerAnalytics:
         try:
             from src.models.rechnungsmodul import Rechnung, RechnungsStatus
             summary['overdue_invoices'] = Rechnung.query.filter(
-                Rechnung.status == RechnungsStatus.UEBERFAELLIG.value
+                Rechnung.status == RechnungsStatus.UEBERFAELLIG
             ).count()
         except:
             pass

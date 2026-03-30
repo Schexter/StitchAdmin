@@ -14,6 +14,12 @@
             <div class="row justify-content-center">
                 <div class="col-lg-8">
                     <form method="POST" enctype="multipart/form-data">
+                        <!-- Honeypot Anti-Spam (für echte Benutzer unsichtbar) -->
+                        <div style="position:absolute;left:-9999px;height:0;overflow:hidden;" aria-hidden="true">
+                            <input type="text" name="website" tabindex="-1" autocomplete="off">
+                        </div>
+                        <input type="hidden" name="form_timestamp" value="{{ form_timestamp }}">
+
                         <!-- Anfrageart -->
                         <div class="card border-0 shadow-sm mb-4">
                             <div class="card-header bg-white">

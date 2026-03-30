@@ -1,0 +1,593 @@
+{% extends "base.html" %}
+{% block title %}Eingangsrechnung erfassen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" style="max-width:900px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="bi bi-receipt-cutoff me-2"></i>Eingangsrechnung erfassen</h2>
+        <a href="{{ url_for('buchungen.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Zurück
+        </a>
+    </div>
+
+    <!-- Fortschrittsanzeige -->
+    <div class="d-flex align-items-center mb-4">
+        <div class="step-indicator active" id="step-dot-1">1</div>
+        <div class="step-line" id="step-line-1"></div>
+        <div class="step-indicator" id="step-dot-2">2</div>
+        <div class="step-line" id="step-line-2"></div>
+        <div class="step-indicator" id="step-dot-3">3</div>
+        <div class="ms-3 text-muted small" id="step-label">Rechnung fotografieren oder hochladen</div>
+    </div>
+
+    <!-- ===== SCHRITT 1: UPLOAD / KAMERA ===== -->
+    <div id="schritt1">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-4">
+                <h5 class="mb-3"><i class="bi bi-file-earmark-arrow-up me-2 text-primary"></i>Rechnung erfassen</h5>
+
+                <div class="row g-3">
+                    <!-- Kamera-Button (Mobil & Desktop) -->
+                    <div class="col-12 col-md-6">
+                        <div id="kameraBox" class="border border-2 rounded-3 p-4 text-center h-100 d-flex flex-column justify-content-center"
+                             style="border-color:#198754 !important; cursor:pointer; transition:background .2s; background:#f0fff4;"
+                             onclick="kameraStarten()">
+                            <i class="bi bi-camera-fill display-3 text-success"></i>
+                            <p class="mt-2 mb-0 fw-bold text-success">Rechnung fotografieren</p>
+                            <p class="text-muted small mb-0">Kamera öffnen &amp; Beleg abfotografieren</p>
+                            <!-- Versteckter Kamera-Input (Mobil) -->
+                            <input type="file" id="kameraInput" accept="image/*" capture="environment" class="d-none">
+                        </div>
+                    </div>
+
+                    <!-- Upload (PDF/Bild) -->
+                    <div class="col-12 col-md-6">
+                        <div id="dropzone"
+                             class="border border-2 border-dashed rounded-3 p-4 text-center h-100 d-flex flex-column justify-content-center"
+                             style="border-color:#adb5bd !important; cursor:pointer; transition:background .2s;">
+                            <i class="bi bi-cloud-arrow-up display-3 text-primary"></i>
+                            <p class="mt-2 mb-0 fw-bold">Datei hochladen</p>
+                            <p class="text-muted small mb-0">PDF, JPG oder PNG hierher ziehen</p>
+                            <input type="file" id="dateiInput" accept=".pdf,.jpg,.jpeg,.png,.webp" class="d-none">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vorschau nach Foto/Upload -->
+                <div id="vorschauBeleg" class="mt-3 d-none">
+                    <div class="card bg-light">
+                        <div class="card-body d-flex align-items-center gap-3 py-2">
+                            <img id="vorschauBild" src="" alt="Vorschau" style="max-height:80px;max-width:120px;border-radius:6px;object-fit:contain;border:1px solid #dee2e6" class="d-none">
+                            <div id="vorschauPdf" class="d-none">
+                                <i class="bi bi-file-earmark-pdf text-danger fs-1"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <strong id="vorschauName">Datei.pdf</strong>
+                                <div class="text-muted small" id="vorschauInfo">Wird analysiert...</div>
+                            </div>
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="belegEntfernen()" title="Entfernen">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="uploadProgress" class="mt-3 d-none">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="spinner-border spinner-border-sm text-primary"></div>
+                        <span>Rechnung wird analysiert - Daten werden erkannt...</span>
+                    </div>
+                    <div class="progress mt-2" style="height:4px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%"></div>
+                    </div>
+                </div>
+
+                <div id="uploadFehler" class="alert alert-warning mt-3 d-none"></div>
+
+                <hr class="my-3">
+                <div class="text-center">
+                    <button type="button" class="btn btn-outline-secondary" onclick="ohneBeleg()">
+                        <i class="bi bi-pencil-square me-1"></i>Ohne Beleg direkt eingeben
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SCHRITT 2: PRÜFEN & KATEGORISIEREN ===== -->
+    <div id="schritt2" class="d-none">
+        <form id="wizardForm" method="POST" action="{{ url_for('buchungen.eingangsrechnung_buchen') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="temp_datei" id="f_temp_datei">
+            <input type="hidden" name="mwst_satz" id="f_mwst_satz" value="19">
+
+            <!-- Rechnungsdaten -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-pencil me-2"></i>Rechnungsdaten</h6>
+                    <small class="text-muted" id="ocrHinweis">Automatisch erkannt - bitte kurz prüfen</small>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold">Lieferant / Absender *</label>
+                            <input type="text" class="form-control form-control-lg" name="lieferant" id="f_lieferant" required
+                                   placeholder="z.B. L-Shop, Madeira, Amazon...">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Rechnungsnummer</label>
+                            <input type="text" class="form-control" name="rechnungsnummer" id="f_rechnungsnummer"
+                                   placeholder="RE-12345">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Rechnungsdatum *</label>
+                            <input type="date" class="form-control" name="rechnungsdatum" id="f_rechnungsdatum" required>
+                        </div>
+                    </div>
+
+                    <!-- Beträge-Box -->
+                    <div class="row g-3 mt-1">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label fw-bold">Netto (€) *</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" min="0" class="form-control"
+                                       name="netto" id="f_netto" required onchange="berechneBetraege()">
+                                <span class="input-group-text">€</span>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label fw-bold">MwSt-Satz</label>
+                            <select class="form-select" id="f_mwst_satz_sel" onchange="berechneBetraege()">
+                                <option value="19">19 %</option>
+                                <option value="7">7 %</option>
+                                <option value="0">0 % (steuerfrei)</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label">MwSt (€)</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" min="0" class="form-control"
+                                       name="mwst_betrag" id="f_mwst_betrag" onchange="berechneBetraege('von_mwst')">
+                                <span class="input-group-text">€</span>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <label class="form-label fw-bold">Brutto gesamt</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" min="0" class="form-control fw-bold fs-5"
+                                       id="f_brutto" readonly style="background:#e8f5e9; color:#2e7d32;">
+                                <span class="input-group-text">€</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Kategorie: Wofür wurde bezahlt? -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-tags me-2"></i>Wofür wurde bezahlt?</h6>
+                    <small class="text-muted">Einfach die passende Kategorie wählen - das Konto wird automatisch zugewiesen</small>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        {% for key, kat in kategorien.items() %}
+                        <div class="col-6 col-md-4 col-lg-3">
+                            <div class="kategorie-card border rounded-3 p-3 text-center h-100"
+                                 style="cursor:pointer; transition:all .15s;"
+                                 onclick="waehleKategorie('{{ key }}', this)"
+                                 data-key="{{ key }}">
+                                <i class="{{ kat.icon }} fs-2 d-block mb-1"
+                                   style="color:var(--sa-primary, #1a6b5a);"></i>
+                                <div class="fw-bold">{{ kat.label }}</div>
+                                <div class="text-muted" style="font-size:.75rem; line-height:1.2;">{{ kat.beispiele }}</div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <input type="hidden" name="kategorie" id="f_kategorie" value="sonstiges">
+                    <div id="konto_hinweis" class="mt-2 p-2 bg-light rounded d-flex align-items-center gap-2">
+                        <i class="bi bi-arrow-right-circle text-primary"></i>
+                        <span>Buchung auf Konto: <strong id="konto_label_text">Sonstige Kosten (4980)</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zahlungsart: Schon bezahlt? -->
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-wallet2 me-2"></i>Schon bezahlt?</h6>
+                    <small class="text-muted">Wie wurde die Rechnung bezahlt (oder ist sie noch offen)?</small>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-4">
+                            <div class="zahlungsart-card border rounded-3 p-3 text-center selected"
+                                 style="cursor:pointer; transition:all .15s;"
+                                 onclick="waehleZahlungsart('offen', this)" data-key="offen">
+                                <i class="bi bi-hourglass-split fs-2 d-block mb-1 text-warning"></i>
+                                <div class="fw-bold">Noch offen</div>
+                                <div class="text-muted small">Rechnung noch nicht bezahlt</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="zahlungsart-card border rounded-3 p-3 text-center"
+                                 style="cursor:pointer; transition:all .15s;"
+                                 onclick="waehleZahlungsart('bank', this)" data-key="bank">
+                                <i class="bi bi-bank fs-2 d-block mb-1 text-primary"></i>
+                                <div class="fw-bold">Überweisung / Lastschrift</div>
+                                <div class="text-muted small">Bereits per Bank bezahlt</div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <div class="zahlungsart-card border rounded-3 p-3 text-center"
+                                 style="cursor:pointer; transition:all .15s;"
+                                 onclick="waehleZahlungsart('bar', this)" data-key="bar">
+                                <i class="bi bi-cash-stack fs-2 d-block mb-1 text-success"></i>
+                                <div class="fw-bold">Bar bezahlt</div>
+                                <div class="text-muted small">Aus der Barkasse bezahlt</div>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="hidden" name="zahlungsart" id="f_zahlungsart" value="offen">
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-secondary" onclick="zurueckZuSchritt1()">
+                    <i class="bi bi-arrow-left me-1"></i>Zurück
+                </button>
+                <button type="button" class="btn btn-primary flex-grow-1 btn-lg" onclick="zeigeVorschau()">
+                    <i class="bi bi-eye me-1"></i>Vorschau &amp; buchen
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ===== SCHRITT 3: VORSCHAU & BUCHEN ===== -->
+    <div id="schritt3" class="d-none">
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="bi bi-check2-all me-2"></i>So wird gebucht:</h6>
+            </div>
+            <div class="card-body">
+                <!-- Zusammenfassung visuell -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded">
+                            <small class="text-muted">Lieferant</small>
+                            <div class="fw-bold fs-5" id="prev_lieferant">-</div>
+                            <small class="text-muted" id="prev_beleg">-</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="p-3 bg-light rounded text-end">
+                            <small class="text-muted">Brutto-Betrag</small>
+                            <div class="fw-bold fs-3 text-success" id="prev_brutto">0,00 €</div>
+                            <small class="text-muted" id="prev_netto_mwst">-</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buchungszeilen -->
+                <h6 class="text-muted mb-2"><i class="bi bi-journal-text me-1"></i>Buchungszeilen (Doppelte Buchführung)</h6>
+                <table class="table table-sm mb-0 table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:30%">Was</th>
+                            <th style="width:30%">Soll (Aufwand)</th>
+                            <th style="width:30%">Haben (Gegenkonto)</th>
+                            <th class="text-end" style="width:10%">Betrag</th>
+                        </tr>
+                    </thead>
+                    <tbody id="vorschauTabelle"></tbody>
+                </table>
+
+                <div class="mt-2 text-muted small" id="vorschauHinweis"></div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-secondary" onclick="zurueckZuSchritt2()">
+                <i class="bi bi-arrow-left me-1"></i>Ändern
+            </button>
+            <button type="button" class="btn btn-success flex-grow-1 btn-lg" onclick="finalBuchen()" id="btnBuchen">
+                <i class="bi bi-check-lg me-1"></i>Jetzt buchen &amp; speichern
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+.step-indicator {
+    width: 36px; height: 36px; border-radius: 50%; border: 2px solid #dee2e6;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; color: #adb5bd; background: #fff; flex-shrink: 0;
+    font-size: .9rem;
+}
+.step-indicator.active { border-color: var(--sa-primary, #1a6b5a); color: var(--sa-primary, #1a6b5a); }
+.step-indicator.done { background: var(--sa-primary, #1a6b5a); border-color: var(--sa-primary, #1a6b5a); color: #fff; }
+.step-line { flex: 1; height: 2px; background: #dee2e6; margin: 0 6px; }
+.step-line.done { background: var(--sa-primary, #1a6b5a); }
+
+.kategorie-card { border-color: #dee2e6 !important; }
+.kategorie-card:hover { border-color: var(--sa-primary, #1a6b5a) !important; background: #f0f9f6; transform: translateY(-1px); }
+.kategorie-card.selected {
+    border-color: var(--sa-primary, #1a6b5a) !important; border-width: 2px;
+    background: #e8f5f1; box-shadow: 0 2px 8px rgba(26,107,90,.15);
+}
+
+.zahlungsart-card { border-color: #dee2e6 !important; }
+.zahlungsart-card:hover { border-color: #198754 !important; background: #f0fff4; }
+.zahlungsart-card.selected {
+    border-color: #198754 !important; border-width: 2px;
+    background: #d0f0de; box-shadow: 0 2px 8px rgba(25,135,84,.15);
+}
+
+#dropzone:hover, #dropzone.dragover { background: #f0f4ff; border-color: #0d6efd !important; }
+#kameraBox:hover { background: #e0ffe0 !important; }
+
+@media (max-width: 576px) {
+    .kategorie-card { padding: 0.6rem !important; }
+    .kategorie-card .fs-2 { font-size: 1.3rem !important; }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const KATEGORIEN = {{ kategorien | tojson }};
+const ZAHLUNGSARTEN = {{ zahlungsarten | tojson }};
+let tempDatei = '';
+
+// ============================
+// SCHRITT 1 - Kamera & Upload
+// ============================
+const dropzone = document.getElementById('dropzone');
+const dateiInput = document.getElementById('dateiInput');
+const kameraInput = document.getElementById('kameraInput');
+
+// Dropzone
+dropzone.addEventListener('click', () => dateiInput.click());
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) verarbeiteDatei(e.dataTransfer.files[0]);
+});
+dateiInput.addEventListener('change', () => {
+    if (dateiInput.files[0]) verarbeiteDatei(dateiInput.files[0]);
+});
+
+// Kamera
+function kameraStarten() {
+    kameraInput.click();
+}
+kameraInput.addEventListener('change', () => {
+    if (kameraInput.files[0]) verarbeiteDatei(kameraInput.files[0]);
+});
+
+function verarbeiteDatei(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const erlaubt = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'heic'];
+    if (!erlaubt.includes(ext)) {
+        zeigeFehler('Erlaubte Formate: PDF, JPG, PNG');
+        return;
+    }
+
+    // Vorschau anzeigen
+    const vorschau = document.getElementById('vorschauBeleg');
+    const vorschauBild = document.getElementById('vorschauBild');
+    const vorschauPdf = document.getElementById('vorschauPdf');
+    const vorschauName = document.getElementById('vorschauName');
+    const vorschauInfo = document.getElementById('vorschauInfo');
+
+    vorschau.classList.remove('d-none');
+    vorschauName.textContent = file.name;
+    vorschauInfo.textContent = `${(file.size / 1024).toFixed(0)} KB - Wird analysiert...`;
+
+    if (file.type.startsWith('image/')) {
+        vorschauBild.src = URL.createObjectURL(file);
+        vorschauBild.classList.remove('d-none');
+        vorschauPdf.classList.add('d-none');
+    } else {
+        vorschauBild.classList.add('d-none');
+        vorschauPdf.classList.remove('d-none');
+    }
+
+    // Hochladen
+    document.getElementById('uploadProgress').classList.remove('d-none');
+    document.getElementById('uploadFehler').classList.add('d-none');
+
+    const fd = new FormData();
+    fd.append('datei', file);
+
+    fetch("{{ url_for('buchungen.eingangsrechnung_upload') }}", {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin'
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('uploadProgress').classList.add('d-none');
+        if (data.success) {
+            const d = data.daten;
+            const erkannt = d.gefunden && (d.lieferant || d.brutto || d.netto);
+            vorschauInfo.innerHTML = erkannt
+                ? '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Daten erkannt!</span>'
+                : '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Keine Daten erkannt - bitte manuell eingeben</span>';
+            befuelleFormular(d);
+            // Kurz warten, dann weiter
+            setTimeout(() => zeigeSchritt(2), 800);
+        } else {
+            zeigeFehler(data.error || 'Fehler beim Verarbeiten');
+        }
+    })
+    .catch(() => {
+        document.getElementById('uploadProgress').classList.add('d-none');
+        zeigeFehler('Netzwerkfehler - bitte erneut versuchen');
+    });
+}
+
+function belegEntfernen() {
+    document.getElementById('vorschauBeleg').classList.add('d-none');
+    dateiInput.value = '';
+    kameraInput.value = '';
+    tempDatei = '';
+}
+
+function zeigeFehler(msg) {
+    const el = document.getElementById('uploadFehler');
+    el.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + msg;
+    el.classList.remove('d-none');
+}
+
+function ohneBeleg() {
+    document.getElementById('f_rechnungsdatum').value = new Date().toISOString().split('T')[0];
+    document.getElementById('ocrHinweis').textContent = 'Bitte alle Felder manuell ausfüllen';
+    zeigeSchritt(2);
+}
+
+// ============================
+// SCHRITT 2 - Formular
+// ============================
+function befuelleFormular(d) {
+    document.getElementById('f_lieferant').value = d.lieferant || '';
+    document.getElementById('f_rechnungsnummer').value = d.rechnungsnummer || '';
+    document.getElementById('f_rechnungsdatum').value = d.datum || new Date().toISOString().split('T')[0];
+    document.getElementById('f_netto').value = d.netto || '';
+    document.getElementById('f_mwst_betrag').value = d.mwst_betrag || '';
+    document.getElementById('f_mwst_satz_sel').value = String(d.mwst_satz || 19);
+    document.getElementById('f_mwst_satz').value = String(d.mwst_satz || 19);
+    document.getElementById('f_temp_datei').value = d.temp_datei || '';
+    document.getElementById('f_brutto').value = d.brutto || '';
+    tempDatei = d.temp_datei || '';
+
+    if (d.gefunden && (d.lieferant || d.brutto)) {
+        document.getElementById('ocrHinweis').innerHTML =
+            '<span class="text-success"><i class="bi bi-check-circle me-1"></i>Automatisch erkannt - bitte kurz prüfen</span>';
+    }
+    berechneBetraege();
+}
+
+function berechneBetraege(quelle) {
+    const netto = parseFloat(document.getElementById('f_netto').value) || 0;
+    const mwstSatz = parseInt(document.getElementById('f_mwst_satz_sel').value) || 0;
+    document.getElementById('f_mwst_satz').value = mwstSatz;
+
+    if (quelle === 'von_mwst') {
+        const mwst = parseFloat(document.getElementById('f_mwst_betrag').value) || 0;
+        document.getElementById('f_brutto').value = (netto + mwst).toFixed(2);
+    } else {
+        const mwst = netto * mwstSatz / 100;
+        document.getElementById('f_mwst_betrag').value = mwst.toFixed(2);
+        document.getElementById('f_brutto').value = (netto + mwst).toFixed(2);
+    }
+}
+
+function waehleKategorie(key, el) {
+    document.querySelectorAll('.kategorie-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('f_kategorie').value = key;
+    const kat = KATEGORIEN[key];
+    if (kat) {
+        document.getElementById('konto_label_text').textContent = kat.konto_label;
+    }
+}
+
+function waehleZahlungsart(key, el) {
+    document.querySelectorAll('.zahlungsart-card').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+    document.getElementById('f_zahlungsart').value = key;
+}
+
+// Standard-Auswahl setzen
+document.addEventListener('DOMContentLoaded', () => {
+    const defaultKat = document.querySelector('.kategorie-card[data-key="sonstiges"]');
+    if (defaultKat) defaultKat.classList.add('selected');
+});
+
+// ============================
+// SCHRITT 3 - Vorschau
+// ============================
+function zeigeVorschau() {
+    const lieferant = document.getElementById('f_lieferant').value.trim();
+    if (!lieferant) { alert('Bitte Lieferant eingeben.'); document.getElementById('f_lieferant').focus(); return; }
+
+    const netto = parseFloat(document.getElementById('f_netto').value) || 0;
+    const mwst = parseFloat(document.getElementById('f_mwst_betrag').value) || 0;
+    const brutto = netto + mwst;
+    const mwstSatz = parseInt(document.getElementById('f_mwst_satz').value) || 19;
+    const rechnungsnr = document.getElementById('f_rechnungsnummer').value.trim();
+
+    const katKey = document.getElementById('f_kategorie').value;
+    const zahlKey = document.getElementById('f_zahlungsart').value;
+    const kat = KATEGORIEN[katKey] || KATEGORIEN['sonstiges'];
+    const [zahlKonto, zahlLabel] = ZAHLUNGSARTEN[zahlKey] || ['1600', 'Verbindlichkeiten'];
+    const vorsteuerKonto = mwstSatz === 7 ? '1571' : '1576';
+
+    // Zusammenfassung
+    document.getElementById('prev_lieferant').textContent = lieferant;
+    document.getElementById('prev_beleg').textContent = rechnungsnr
+        ? `Beleg: ${rechnungsnr} | ${document.getElementById('f_rechnungsdatum').value}`
+        : document.getElementById('f_rechnungsdatum').value;
+    document.getElementById('prev_brutto').textContent = brutto.toFixed(2).replace('.', ',') + ' €';
+    document.getElementById('prev_netto_mwst').textContent =
+        `Netto: ${netto.toFixed(2).replace('.',',')} € + ${mwstSatz}% MwSt: ${mwst.toFixed(2).replace('.',',')} €`;
+
+    // Buchungszeilen
+    let rows = `
+        <tr>
+            <td><span class="badge bg-primary">Aufwand (Netto)</span></td>
+            <td><i class="bi bi-${kat.icon} me-1"></i>${kat.konto_label}</td>
+            <td>${zahlLabel}</td>
+            <td class="text-end fw-bold">${netto.toFixed(2)} €</td>
+        </tr>`;
+    if (mwst > 0) {
+        rows += `
+        <tr class="table-light">
+            <td><span class="badge bg-warning text-dark">Vorsteuer ${mwstSatz}%</span></td>
+            <td>Abziehbare Vorsteuer (${vorsteuerKonto})</td>
+            <td>${zahlLabel}</td>
+            <td class="text-end">${mwst.toFixed(2)} €</td>
+        </tr>`;
+    }
+    document.getElementById('vorschauTabelle').innerHTML = rows;
+    document.getElementById('vorschauHinweis').innerHTML = tempDatei
+        ? '<i class="bi bi-paperclip me-1"></i>Beleg wird archiviert'
+        : '<i class="bi bi-exclamation-circle me-1"></i>Kein Beleg angehängt';
+
+    zeigeSchritt(3);
+}
+
+function finalBuchen() {
+    const btn = document.getElementById('btnBuchen');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Wird gebucht...';
+    document.getElementById('wizardForm').submit();
+}
+
+// ============================
+// Navigation
+// ============================
+function zeigeSchritt(n) {
+    document.getElementById('schritt1').classList.toggle('d-none', n !== 1);
+    document.getElementById('schritt2').classList.toggle('d-none', n !== 2);
+    document.getElementById('schritt3').classList.toggle('d-none', n !== 3);
+
+    const labels = ['', 'Rechnung fotografieren oder hochladen', 'Daten prüfen & Kategorie wählen', 'Vorschau prüfen & buchen'];
+    document.getElementById('step-label').textContent = labels[n];
+
+    for (let i = 1; i <= 3; i++) {
+        document.getElementById('step-dot-' + i).classList.toggle('active', i === n);
+        document.getElementById('step-dot-' + i).classList.toggle('done', i < n);
+        if (i < 3) document.getElementById('step-line-' + i).classList.toggle('done', i < n);
+    }
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function zurueckZuSchritt1() { zeigeSchritt(1); }
+function zurueckZuSchritt2() { zeigeSchritt(2); }
+</script>
+{% endblock %}

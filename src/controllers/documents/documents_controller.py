@@ -46,7 +46,17 @@ def dashboard():
         .order_by(Document.created_at.desc()).limit(10).all()
     
     recent_post = PostEntry.query.order_by(PostEntry.entry_date.desc()).limit(10).all()
-    
+
+    # Letzte Rechnungen
+    try:
+        from src.models.rechnungsmodul.models import Rechnung, RechnungsRichtung
+        recent_rechnungen = Rechnung.query.order_by(Rechnung.rechnungsdatum.desc()).limit(8).all()
+    except Exception:
+        recent_rechnungen = []
+
+    # Letzte archivierte E-Mails
+    recent_emails = ArchivedEmail.query.order_by(ArchivedEmail.received_date.desc()).limit(8).all()
+
     # Wiedervorlagen (Reminder)
     reminders = PostEntry.query.filter(
         PostEntry.reminder_date <= date.today(),
@@ -61,6 +71,8 @@ def dashboard():
                          unread_emails=unread_emails,
                          recent_documents=recent_documents,
                          recent_post=recent_post,
+                         recent_rechnungen=recent_rechnungen,
+                         recent_emails=recent_emails,
                          reminders=reminders)
 
 

@@ -112,6 +112,10 @@ class KassenBeleg(db.Model):
     kassierer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     kassierer_name = db.Column(db.String(100))  # Snapshot
     
+    # Rabatt
+    rabatt_betrag = db.Column(db.Numeric(10, 2), default=0)  # Rabatt in EUR
+    rabatt_prozent = db.Column(db.Numeric(5, 2), default=0)  # Rabatt in %
+
     # Status
     storniert = db.Column(db.Boolean, default=False)
     storno_grund = db.Column(db.String(500))
@@ -436,6 +440,14 @@ class Rechnung(db.Model):
     # Richtung (Eingang/Ausgang)
     richtung = db.Column(db.Enum(RechnungsRichtung), nullable=False, default=RechnungsRichtung.AUSGANG)
 
+    # Rechnungstyp: rechnung, proforma, gutschrift
+    rechnung_typ = db.Column(db.String(20), default='rechnung')  # rechnung, proforma, gutschrift
+
+    # Proforma-Verknuepfung (bei finaler Rechnung: welche Proformas gegengerechnet)
+    angebot_id = db.Column(db.Integer, db.ForeignKey('angebote.id'), nullable=True)
+    proforma_rechnung_id = db.Column(db.Integer, db.ForeignKey('rechnungen.id'), nullable=True)  # Verweis auf Proforma
+    anzahlung_betrag = db.Column(db.Numeric(10, 2), default=0)  # Bereits bezahlte Anzahlung
+
     # Lieferant (für Eingangsrechnungen)
     lieferant_id = db.Column(db.String(50), db.ForeignKey('suppliers.id'), nullable=True)
     lieferant_name = db.Column(db.String(200))  # Snapshot
@@ -447,6 +459,7 @@ class Rechnung(db.Model):
     # Dateien
     pdf_datei = db.Column(db.String(500))  # Pfad zur PDF-Datei
     xml_datei = db.Column(db.String(500))  # Pfad zur XML-Datei
+    scan_foto = db.Column(db.String(500))  # Pfad zum gescannten Beleg-Foto
     
     # Versand
     versendet_am = db.Column(db.DateTime)
@@ -461,6 +474,7 @@ class Rechnung(db.Model):
     # Bezahlung
     bezahlt_am = db.Column(db.Date)
     bezahlt_betrag = db.Column(db.Numeric(10, 2), default=0)
+    zahlungsart = db.Column(db.String(20))  # bar, ueberweisung, ec_karte
     
     # Sonstiges
     bemerkungen = db.Column(db.Text)
@@ -487,17 +501,20 @@ class Rechnung(db.Model):
             self.faelligkeitsdatum = self.rechnungsdatum + timedelta(days=14)
     
     def generate_rechnungsnummer(self):
-        """Generiert eindeutige Rechnungsnummer"""
-        prefix = "RE"
-        jahr = datetime.now().year
-        monat = datetime.now().month
-        
-        # Hole die nächste Nummer für diesen Monat
-        count = Rechnung.query.filter(
-            Rechnung.rechnungsnummer.like(f"{prefix}-{jahr:04d}{monat:02d}-%")
-        ).count()
-        
-        return f"{prefix}-{jahr:04d}{monat:02d}-{count + 1:04d}"
+        """Generiert Arbeitsnummer für Entwurf (ENT-YYYYMM-XXXX).
+        Echte RE-Nummer wird erst beim Versenden (Status OFFEN) vergeben."""
+        now = datetime.now()
+        pattern = f"ENT-{now.year:04d}{now.month:02d}-%"
+        existing = Rechnung.query.filter(
+            Rechnung.rechnungsnummer.like(pattern)
+        ).order_by(Rechnung.rechnungsnummer.desc()).first()
+        last_num = 0
+        if existing:
+            try:
+                last_num = int(existing.rechnungsnummer.rsplit('-', 1)[-1])
+            except (ValueError, IndexError):
+                pass
+        return f"ENT-{now.year:04d}{now.month:02d}-{last_num + 1:04d}"
     
     def calculate_totals(self):
         """Berechnet Gesamtsummen aus Positionen"""
@@ -522,8 +539,13 @@ class Rechnung(db.Model):
     
     def get_open_amount(self):
         """Gibt den offenen Betrag zurück"""
-        return self.brutto_gesamt - self.bezahlt_betrag
-    
+        return (self.brutto_gesamt or Decimal('0')) - (self.bezahlt_betrag or Decimal('0'))
+
+    @property
+    def offener_betrag(self):
+        """Property-Wrapper für get_open_amount()"""
+        return self.get_open_amount()
+
     def __repr__(self):
         return f'<Rechnung {self.rechnungsnummer}>'
 

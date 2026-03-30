@@ -284,6 +284,117 @@
 
 </div>
 
+<!-- Rechnungen & E-Mail-Archiv -->
+<div class="row">
+
+    <!-- Letzte Rechnungen -->
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-receipt"></i> Letzte Rechnungen ({{ recent_rechnungen|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_rechnungen %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 table-sm">
+                        <thead>
+                            <tr>
+                                <th>Nr.</th>
+                                <th>Empfänger</th>
+                                <th>Betrag</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in recent_rechnungen %}
+                            <tr>
+                                <td><small>{{ r.rechnungsnummer }}</small></td>
+                                <td><small>{{ r.kunde_name or r.lieferant_name or '-' }}</small></td>
+                                <td><small>{{ '%.2f'|format(r.brutto_gesamt|float) }} €</small></td>
+                                <td>
+                                    {% if r.status.value == 'bezahlt' %}
+                                        <span class="badge bg-success">Bezahlt</span>
+                                    {% elif r.status.value == 'offen' %}
+                                        <span class="badge bg-warning text-dark">Offen</span>
+                                    {% elif r.status.value == 'ueberfaellig' %}
+                                        <span class="badge bg-danger">Überfällig</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ r.status.value }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('rechnung.rechnung_detail', rechnung_id=r.id) }}" class="btn btn-sm btn-outline-info">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-0">Noch keine Rechnungen vorhanden</p>
+                {% endif %}
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-secondary btn-sm">
+                        <i class="bi bi-list"></i> Alle Rechnungen
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archivierte E-Mails -->
+    <div class="col-md-6">
+        <div class="card mb-3">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-envelope-open"></i> E-Mail-Archiv ({{ recent_emails|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_emails %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 table-sm">
+                        <thead>
+                            <tr>
+                                <th>Von</th>
+                                <th>Betreff</th>
+                                <th>Datum</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for email in recent_emails %}
+                            <tr class="{{ 'fw-bold' if not email.is_read }}">
+                                <td><small>{{ email.from_address or '-' }}</small></td>
+                                <td>
+                                    <small>{{ email.subject or '(kein Betreff)' }}</small>
+                                    {% if not email.is_read %}<span class="badge bg-primary ms-1">Neu</span>{% endif %}
+                                </td>
+                                <td><small>{{ email.received_date.strftime('%d.%m.%y') if email.received_date else '-' }}</small></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center mb-2">Noch keine E-Mails archiviert</p>
+                <p class="text-center">
+                    <a href="{{ url_for('documents.email_accounts') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-gear"></i> E-Mail-Konto einrichten
+                    </a>
+                </p>
+                {% endif %}
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('documents.email_archived') }}" class="btn btn-secondary btn-sm">
+                        <i class="bi bi-archive"></i> Alle E-Mails
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
 <!-- Quick Links -->
 <div class="card">
     <div class="card-header">

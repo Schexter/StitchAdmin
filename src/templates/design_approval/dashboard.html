@@ -11,7 +11,7 @@
                 <i class="bi bi-palette-fill text-primary"></i>
                 Design-Freigaben
             </h1>
-            <p class="text-muted mb-0">PDF-basierter Freigabe-Workflow</p>
+            <p class="text-muted mb-0">Design-Bilder hochladen &amp; Kunden-Freigabe verwalten</p>
         </div>
     </div>
 
@@ -107,71 +107,91 @@
     </ul>
 
     <div class="tab-content">
-        <!-- Tab: Ausstehend (noch nicht gesendet) -->
+        <!-- Tab: Ausstehend -->
         <div class="tab-pane fade show active" id="pending">
             {% if pending_orders %}
             <div class="card">
                 <div class="card-header">
-                    <i class="bi bi-list-check"></i> Aufträge mit Design - Freigabe noch nicht gesendet
+                    <i class="bi bi-list-check"></i> Aufträge - Design hochladen &amp; Freigabe senden
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>Auftrag</th>
                                 <th>Kunde</th>
-                                <th>E-Mail</th>
-                                <th>Design</th>
-                                <th>Erstellt</th>
+                                <th style="width:110px">Design-Bilder</th>
                                 <th>Aktionen</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for order in pending_orders %}
+                            {% set design_count = order.designs.count() if order.designs else 0 %}
+                            {% set has_design = design_count > 0 or order.design_file or order.design_file_path %}
                             <tr>
                                 <td>
                                     <a href="{{ url_for('orders.show', order_id=order.id) }}">
                                         <strong>{{ order.order_number }}</strong>
                                     </a>
+                                    <br><small class="text-muted">{{ order.created_at.strftime('%d.%m.%Y') if order.created_at else '' }}</small>
                                 </td>
-                                <td>{{ order.customer.display_name if order.customer else '-' }}</td>
                                 <td>
+                                    {{ order.customer.display_name if order.customer else '-' }}
+                                    <br>
                                     {% if order.customer and order.customer.email %}
-                                    <small>{{ order.customer.email }}</small>
+                                    <small class="text-muted">{{ order.customer.email }}</small>
                                     {% else %}
-                                    <span class="badge bg-warning">Keine E-Mail</span>
+                                    <span class="badge bg-danger">Keine E-Mail</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if design_count > 0 %}
+                                        <!-- Erstes Design als Thumbnail -->
+                                        {% set first_design = order.designs.first() %}
+                                        {% if order.design_approval_token and first_design %}
+                                        <img src="{{ url_for('design_approval.preview_image_watermarked', token=order.design_approval_token, design_id=first_design.id) }}"
+                                             style="height:50px;width:auto;border-radius:4px;cursor:pointer"
+                                             class="border"
+                                             title="{{ design_count }} Bild(er)"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='inline'">
+                                        {% endif %}
+                                        <span class="badge bg-success">{{ design_count }} Bild{% if design_count != 1 %}er{% endif %}</span>
+                                    {% elif order.design_file_path or order.design_file %}
+                                        <span class="badge bg-success"><i class="bi bi-check"></i> 1 Bild</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Fehlt</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if order.design_file or order.design_file_path %}
-                                    <span class="badge bg-success"><i class="bi bi-check"></i> Vorhanden</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">Fehlt</span>
-                                    {% endif %}
-                                </td>
-                                <td>{{ order.created_at.strftime('%d.%m.%Y') if order.created_at else '-' }}</td>
-                                <td>
-                                    <div class="btn-group btn-group-sm">
-                                        <!-- PDF generieren & senden -->
-                                        {% if order.customer and order.customer.email %}
-                                        <button type="button" class="btn btn-primary send-approval" 
+                                    <div class="btn-group btn-group-sm flex-wrap gap-1">
+                                        <!-- Design-Bilder hochladen -->
+                                        <button type="button" class="btn btn-outline-primary upload-design"
                                                 data-order-id="{{ order.id }}"
                                                 data-order-number="{{ order.order_number }}"
-                                                title="PDF generieren & per E-Mail senden">
+                                                title="Design-Bilder hochladen">
+                                            <i class="bi bi-upload"></i> Bilder
+                                        </button>
+                                        <!-- Freigabe senden -->
+                                        {% if order.customer and order.customer.email and has_design %}
+                                        <button type="button" class="btn btn-primary send-approval"
+                                                data-order-id="{{ order.id }}"
+                                                data-order-number="{{ order.order_number }}"
+                                                title="Freigabe-Link per E-Mail senden">
                                             <i class="bi bi-send"></i> Senden
                                         </button>
                                         {% else %}
                                         <button type="button" class="btn btn-secondary" disabled
-                                                title="Keine E-Mail-Adresse">
+                                                title="{% if not has_design %}Erst Bilder hochladen{% else %}Keine E-Mail{% endif %}">
                                             <i class="bi bi-send"></i> Senden
                                         </button>
                                         {% endif %}
-                                        <!-- Nur PDF generieren -->
-                                        <button type="button" class="btn btn-outline-secondary generate-pdf"
-                                                data-order-id="{{ order.id }}"
-                                                title="Nur PDF generieren (zum manuellen Versand)">
-                                            <i class="bi bi-file-pdf"></i>
-                                        </button>
+                                        <!-- Vorschau -->
+                                        {% if order.design_approval_token and has_design %}
+                                        <a href="{{ url_for('design_approval.approval_page', token=order.design_approval_token) }}"
+                                           class="btn btn-outline-info" target="_blank" title="Kunden-Ansicht anzeigen">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        {% endif %}
                                     </div>
                                 </td>
                             </tr>
@@ -187,7 +207,7 @@
             {% endif %}
         </div>
 
-        <!-- Tab: Gesendet (warte auf Antwort) -->
+        <!-- Tab: Gesendet -->
         <div class="tab-pane fade" id="sent">
             {% if sent_orders %}
             <div class="card">
@@ -195,11 +215,12 @@
                     <i class="bi bi-envelope-check"></i> Gesendet - Warte auf Kundenreaktion
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>Auftrag</th>
                                 <th>Kunde</th>
+                                <th style="width:110px">Design</th>
                                 <th>Gesendet am</th>
                                 <th>Wartezeit</th>
                                 <th>Aktionen</th>
@@ -208,6 +229,7 @@
                         <tbody>
                             {% for order in sent_orders %}
                             {% set days_waiting = ((now - order.design_approval_sent_at).days) if order.design_approval_sent_at else 0 %}
+                            {% set design_count = order.designs.count() if order.designs else 0 %}
                             <tr class="{{ 'table-warning' if days_waiting > 7 else '' }}">
                                 <td>
                                     <a href="{{ url_for('orders.show', order_id=order.id) }}">
@@ -217,6 +239,22 @@
                                 <td>
                                     {{ order.customer.display_name if order.customer else '-' }}
                                     <br><small class="text-muted">{{ order.customer.email if order.customer else '' }}</small>
+                                </td>
+                                <td class="text-center">
+                                    {% if design_count > 0 %}
+                                        {% set first_design = order.designs.first() %}
+                                        {% if order.design_approval_token and first_design %}
+                                        <img src="{{ url_for('design_approval.preview_image_watermarked', token=order.design_approval_token, design_id=first_design.id) }}"
+                                             style="height:50px;width:auto;border-radius:4px"
+                                             class="border"
+                                             onerror="this.style.display='none'">
+                                        {% endif %}
+                                        <br><small class="text-muted">{{ design_count }} Bild(er)</small>
+                                    {% elif order.design_file_path or order.design_file %}
+                                        <i class="bi bi-image text-success fs-4"></i>
+                                    {% else %}
+                                        <span class="badge bg-secondary">-</span>
+                                    {% endif %}
                                 </td>
                                 <td>{{ order.design_approval_sent_at.strftime('%d.%m.%Y %H:%M') if order.design_approval_sent_at else '-' }}</td>
                                 <td>
@@ -230,32 +268,29 @@
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <!-- Freigabe eintragen (E-Mail-Antwort erhalten) -->
                                         <button type="button" class="btn btn-success mark-approved"
                                                 data-order-id="{{ order.id }}"
                                                 data-order-number="{{ order.order_number }}"
-                                                title="Kunde hat per E-Mail freigegeben">
+                                                title="Freigabe manuell eintragen">
                                             <i class="bi bi-check-lg"></i> Freigabe eintragen
                                         </button>
-                                        <!-- Signierte PDF hochladen -->
-                                        <button type="button" class="btn btn-outline-success upload-signed"
+                                        <button type="button" class="btn btn-outline-primary upload-design"
                                                 data-order-id="{{ order.id }}"
-                                                title="Unterschriebene PDF hochladen">
+                                                data-order-number="{{ order.order_number }}"
+                                                title="Design-Bilder ersetzen">
                                             <i class="bi bi-upload"></i>
                                         </button>
-                                        <!-- Freigabe-Seite anzeigen -->
                                         {% if order.design_approval_token %}
                                         <a href="{{ url_for('design_approval.approval_page', token=order.design_approval_token) }}"
                                            class="btn btn-outline-info" target="_blank"
-                                           title="Freigabe-Seite anzeigen (Kunden-Ansicht)">
+                                           title="Kunden-Ansicht anzeigen">
                                             <i class="bi bi-eye"></i>
                                         </a>
                                         {% endif %}
-                                        <!-- Erneut senden -->
-                                        <button type="button" class="btn btn-outline-secondary resend-approval"
+                                        <button type="button" class="btn btn-warning resend-approval"
                                                 data-order-id="{{ order.id }}"
-                                                title="Erinnerung senden">
-                                            <i class="bi bi-arrow-repeat"></i>
+                                                title="Freigabe-Link erneut senden">
+                                            <i class="bi bi-arrow-repeat me-1"></i>Erneut senden
                                         </button>
                                     </div>
                                 </td>
@@ -280,7 +315,7 @@
                     <i class="bi bi-pencil-square"></i> Änderungswünsche - Design anpassen erforderlich
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>Auftrag</th>
@@ -302,22 +337,28 @@
                                     <div style="max-width: 400px;">
                                         {{ (order.design_approval_notes or '-')[:150] }}
                                         {% if order.design_approval_notes and order.design_approval_notes|length > 150 %}
-                                        <a href="#" class="show-full-notes" 
+                                        <a href="#" class="show-full-notes"
                                            data-notes="{{ order.design_approval_notes }}">...mehr</a>
                                         {% endif %}
                                     </div>
                                 </td>
                                 <td>
                                     <div class="btn-group btn-group-sm">
-                                        <a href="{{ url_for('orders.show', order_id=order.id) }}" 
-                                           class="btn btn-primary">
-                                            <i class="bi bi-pencil"></i> Bearbeiten
-                                        </a>
+                                        <button type="button" class="btn btn-outline-primary upload-design"
+                                                data-order-id="{{ order.id }}"
+                                                data-order-number="{{ order.order_number }}"
+                                                title="Neues Design hochladen">
+                                            <i class="bi bi-upload"></i> Neues Design
+                                        </button>
                                         <button type="button" class="btn btn-success resend-after-revision"
                                                 data-order-id="{{ order.id }}"
                                                 title="Nach Änderung erneut zur Freigabe senden">
                                             <i class="bi bi-send"></i> Neu senden
                                         </button>
+                                        <a href="{{ url_for('orders.show', order_id=order.id) }}"
+                                           class="btn btn-outline-secondary">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
                                     </div>
                                 </td>
                             </tr>
@@ -336,53 +377,150 @@
         <!-- Tab: Freigegeben -->
         <div class="tab-pane fade" id="approved">
             {% if approved_orders %}
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <i class="bi bi-check-circle-fill"></i> Kürzlich freigegebene Designs (letzte 30 Tage)
+            <div class="row g-3">
+                {% for order in approved_orders %}
+                {% set design_count = order.designs.count() if order.designs else 0 %}
+                <div class="col-md-6 col-xl-4">
+                    <div class="card h-100 border-success">
+                        <div class="card-header bg-success bg-opacity-10 d-flex justify-content-between align-items-center">
+                            <div>
+                                <a href="{{ url_for('orders.show', order_id=order.id) }}" class="fw-bold text-decoration-none">
+                                    {{ order.order_number }}
+                                </a>
+                                <span class="text-muted ms-2">{{ order.customer.display_name if order.customer else '' }}</span>
+                            </div>
+                            <span class="badge bg-success"><i class="bi bi-check-lg"></i> Freigegeben</span>
+                        </div>
+                        <div class="card-body">
+                            <!-- Design-Bilder -->
+                            <div class="d-flex gap-2 mb-3 flex-wrap">
+                                {% if design_count > 0 %}
+                                    {% for design in order.designs.all() %}
+                                    <div class="text-center">
+                                        {% if order.design_approval_token %}
+                                        <img src="{{ url_for('design_approval.preview_image_watermarked', token=order.design_approval_token, design_id=design.id) }}"
+                                             style="height:80px;width:auto;border-radius:6px;border:1px solid #dee2e6"
+                                             onerror="this.outerHTML='<i class=\'bi bi-image text-muted fs-1\'></i>'">
+                                        {% endif %}
+                                        <div class="small text-muted mt-1">{{ design.get_position_label() }}</div>
+                                        {% if design.width_mm and design.height_mm %}
+                                        <div class="small text-muted">{{ design.width_mm }}x{{ design.height_mm }}mm</div>
+                                        {% endif %}
+                                    </div>
+                                    {% endfor %}
+                                {% elif order.design_file_path or order.design_file %}
+                                    <div class="text-center">
+                                        <i class="bi bi-image text-success fs-1"></i>
+                                        {% if order.design_width_mm and order.design_height_mm %}
+                                        <div class="small text-muted">{{ order.design_width_mm }}x{{ order.design_height_mm }}mm</div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Farben -->
+                            {% if order.thread_colors %}
+                            <div class="mb-3">
+                                <small class="text-muted d-block mb-1"><i class="bi bi-palette"></i> Farben</small>
+                                <small>{{ order.thread_colors }}</small>
+                            </div>
+                            {% endif %}
+
+                            <!-- Unterschrift -->
+                            {% if order.design_approval_signature %}
+                            <div class="mb-2">
+                                <small class="text-muted d-block mb-1"><i class="bi bi-pen"></i> Kundenunterschrift</small>
+                                <img src="{{ order.design_approval_signature }}" alt="Unterschrift"
+                                     style="max-height:60px;max-width:100%;border:1px solid #dee2e6;border-radius:4px;background:#fff;padding:4px">
+                            </div>
+                            {% endif %}
+
+                            <!-- Freigabe-Details -->
+                            <div class="d-flex justify-content-between align-items-center text-muted small">
+                                <span>
+                                    <i class="bi bi-calendar-check"></i>
+                                    {{ order.design_approval_date.strftime('%d.%m.%Y %H:%M') if order.design_approval_date else '-' }}
+                                </span>
+                                {% if order.design_approval_ip %}
+                                <span title="IP: {{ order.design_approval_ip }}"><i class="bi bi-globe"></i> {{ order.design_approval_ip }}</span>
+                                {% endif %}
+                            </div>
+                            {% if order.design_approval_notes %}
+                            <div class="mt-2 p-2 bg-light rounded small">
+                                <i class="bi bi-chat-left-text"></i> {{ order.design_approval_notes }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <div class="btn-group btn-group-sm w-100">
+                                <a href="{{ url_for('design_approval.freigabe_pdf', order_id=order.id) }}"
+                                   class="btn btn-outline-success" title="Freigabe-Nachweis PDF">
+                                    <i class="bi bi-file-pdf"></i> PDF
+                                </a>
+                                {% if order.design_approval_token %}
+                                <a href="{{ url_for('design_approval.approval_page', token=order.design_approval_token) }}"
+                                   class="btn btn-outline-info" target="_blank" title="Kunden-Ansicht anzeigen">
+                                    <i class="bi bi-eye"></i> Kunden-Ansicht
+                                </a>
+                                {% endif %}
+                                <a href="{{ url_for('orders.show', order_id=order.id) }}"
+                                   class="btn btn-outline-secondary" title="Auftrag öffnen">
+                                    <i class="bi bi-folder2-open"></i> Auftrag
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Auftrag</th>
-                                <th>Kunde</th>
-                                <th>Freigegeben am</th>
-                                <th>Notiz</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for order in approved_orders %}
-                            <tr>
-                                <td>
-                                    <a href="{{ url_for('orders.show', order_id=order.id) }}">
-                                        {{ order.order_number }}
-                                    </a>
-                                </td>
-                                <td>{{ order.customer.display_name if order.customer else '-' }}</td>
-                                <td>{{ order.design_approval_date.strftime('%d.%m.%Y %H:%M') if order.design_approval_date else '-' }}</td>
-                                <td>
-                                    <small class="text-muted">
-                                        {{ (order.design_approval_notes or '-')[:80] }}
-                                    </small>
-                                </td>
-                                <td>
-                                    <a href="{{ url_for('design_approval.freigabe_pdf', order_id=order.id) }}"
-                                       class="btn btn-sm btn-outline-success" title="Freigabe-Nachweis PDF">
-                                        <i class="bi bi-file-pdf"></i> PDF
-                                    </a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                {% endfor %}
             </div>
             {% else %}
             <div class="alert alert-info">
                 <i class="bi bi-info-circle"></i> Keine Freigaben in den letzten 30 Tagen.
             </div>
             {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Design-Bilder hochladen -->
+<div class="modal fade" id="uploadDesignModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-upload me-1"></i> Design-Bilder hochladen</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Auftrag: <strong id="uploadOrderNumber"></strong></p>
+                <p class="text-muted small mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Mehrere Bilder möglich (z.B. Brust, Rücken, Ärmel).
+                    Unterstützte Formate: PNG, JPG, PDF, DST, EMB.
+                    <br>Ein neuer Upload ersetzt alle bisherigen Design-Bilder dieses Auftrags.
+                </p>
+
+                <!-- Drag &amp; Drop Zone -->
+                <div id="dropZone" class="border-2 border-dashed rounded p-4 text-center mb-3"
+                     style="border: 2px dashed #dee2e6; cursor:pointer; transition: all 0.2s"
+                     onclick="document.getElementById('designFileInput').click()">
+                    <i class="bi bi-cloud-arrow-up fs-1 text-muted"></i>
+                    <p class="mb-1 fw-bold">Bilder hier ablegen oder klicken</p>
+                    <p class="text-muted small mb-0">PNG, JPG, PDF, DST, EMB – mehrere Dateien gleichzeitig möglich</p>
+                    <input type="file" id="designFileInput" multiple
+                           accept=".png,.jpg,.jpeg,.pdf,.dst,.emb,.jef,.exp,.vp3,.pes"
+                           style="display:none"
+                           onchange="previewFiles(this.files)">
+                </div>
+
+                <!-- Vorschau der ausgewählten Bilder -->
+                <div id="filePreviewList" class="row g-2" style="display:none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" id="uploadBtn" class="btn btn-primary" onclick="doUpload()" disabled>
+                    <i class="bi bi-upload me-1"></i> Hochladen
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -398,44 +536,38 @@
             <form id="approvalForm">
                 <div class="modal-body">
                     <p>Auftrag: <strong id="approvalOrderNumber"></strong></p>
-                    
                     <div class="mb-3">
                         <label class="form-label">Freigabe-Methode</label>
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" name="approval_method" 
+                            <input class="form-check-input" type="radio" name="approval_method"
                                    id="methodEmail" value="email" checked>
                             <label class="form-check-label" for="methodEmail">
                                 <i class="bi bi-envelope"></i> E-Mail-Antwort erhalten
-                                <small class="text-muted d-block">Kunde hat per E-Mail bestätigt</small>
                             </label>
                         </div>
                         <div class="form-check mt-2">
-                            <input class="form-check-input" type="radio" name="approval_method" 
+                            <input class="form-check-input" type="radio" name="approval_method"
                                    id="methodPdf" value="pdf">
                             <label class="form-check-label" for="methodPdf">
                                 <i class="bi bi-file-pdf"></i> Unterschriebene PDF erhalten
-                                <small class="text-muted d-block">Ausgedruckt, unterschrieben, eingescannt</small>
                             </label>
                         </div>
                         <div class="form-check mt-2">
-                            <input class="form-check-input" type="radio" name="approval_method" 
+                            <input class="form-check-input" type="radio" name="approval_method"
                                    id="methodPhone" value="phone">
                             <label class="form-check-label" for="methodPhone">
                                 <i class="bi bi-telephone"></i> Telefonische Freigabe
-                                <small class="text-muted d-block">Kunde hat telefonisch bestätigt</small>
                             </label>
                         </div>
                     </div>
-                    
                     <div class="mb-3" id="pdfUploadSection" style="display: none;">
                         <label class="form-label">PDF-Datei hochladen</label>
                         <input type="file" class="form-control" id="signedPdfFile" accept=".pdf">
                     </div>
-                    
                     <div class="mb-3">
                         <label class="form-label">Notiz (optional)</label>
-                        <textarea class="form-control" id="approvalNotes" rows="2" 
-                                  placeholder="z.B. Name des Ansprechpartners, Datum der Bestätigung..."></textarea>
+                        <textarea class="form-control" id="approvalNotes" rows="2"
+                                  placeholder="z.B. Name des Ansprechpartners..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -449,7 +581,7 @@
     </div>
 </div>
 
-<!-- Modal: Änderungsdetails -->
+<!-- Modal: Notizen -->
 <div class="modal fade" id="notesModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -467,29 +599,44 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     let currentOrderId = null;
+    let selectedFiles = null;
+    const uploadModal  = new bootstrap.Modal(document.getElementById('uploadDesignModal'));
     const approvalModal = new bootstrap.Modal(document.getElementById('approvalModal'));
-    
-    // PDF-Upload Section ein-/ausblenden
-    document.querySelectorAll('input[name="approval_method"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            document.getElementById('pdfUploadSection').style.display = 
-                this.value === 'pdf' ? 'block' : 'none';
+
+    // ─── Design-Upload Modal öffnen ───────────────────────────────────────
+    document.querySelectorAll('.upload-design').forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentOrderId = this.dataset.orderId;
+            document.getElementById('uploadOrderNumber').textContent = this.dataset.orderNumber;
+            document.getElementById('designFileInput').value = '';
+            document.getElementById('filePreviewList').innerHTML = '';
+            document.getElementById('filePreviewList').style.display = 'none';
+            document.getElementById('uploadBtn').disabled = true;
+            selectedFiles = null;
+            uploadModal.show();
         });
     });
-    
-    // Freigabe senden
+
+    // Drag & Drop
+    const dropZone = document.getElementById('dropZone');
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.background = '#e8f4fd'; });
+    dropZone.addEventListener('dragleave', () => { dropZone.style.background = ''; });
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.style.background = '';
+        previewFiles(e.dataTransfer.files);
+    });
+
+    // ─── Freigabe senden ──────────────────────────────────────────────────
     document.querySelectorAll('.send-approval').forEach(btn => {
         btn.addEventListener('click', function() {
             const orderId = this.dataset.orderId;
             const orderNumber = this.dataset.orderNumber;
-            
-            if (!confirm(`Freigabe-PDF für Auftrag ${orderNumber} generieren und per E-Mail senden?`)) {
-                return;
-            }
-            
+            if (!confirm(`Freigabe-Link für Auftrag ${orderNumber} per E-Mail senden?`)) return;
+
             this.disabled = true;
             this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-            
+
             fetch(`/design-approval/api/send/${orderId}`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'}
@@ -500,7 +647,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('✅ ' + data.message);
                     location.reload();
                 } else {
-                    alert('❌ Fehler: ' + data.error);
+                    alert('❌ ' + data.error);
                     this.disabled = false;
                     this.innerHTML = '<i class="bi bi-send"></i> Senden';
                 }
@@ -512,33 +659,15 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
-    
-    // Nur PDF generieren
-    document.querySelectorAll('.generate-pdf').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const orderId = this.dataset.orderId;
-            
-            this.disabled = true;
-            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
-            
-            fetch(`/design-approval/api/generate-pdf/${orderId}`, {
-                method: 'POST'
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    // PDF Download starten
-                    window.open(data.download_url, '_blank');
-                } else {
-                    alert('Fehler: ' + data.error);
-                }
-                this.disabled = false;
-                this.innerHTML = '<i class="bi bi-file-pdf"></i>';
-            });
+
+    // ─── Freigabe eintragen Modal ─────────────────────────────────────────
+    document.querySelectorAll('input[name="approval_method"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.getElementById('pdfUploadSection').style.display =
+                this.value === 'pdf' ? 'block' : 'none';
         });
     });
-    
-    // Freigabe eintragen Modal öffnen
+
     document.querySelectorAll('.mark-approved').forEach(btn => {
         btn.addEventListener('click', function() {
             currentOrderId = this.dataset.orderId;
@@ -550,46 +679,38 @@ document.addEventListener('DOMContentLoaded', function() {
             approvalModal.show();
         });
     });
-    
-    // Freigabe speichern
+
     document.getElementById('approvalForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        
         const method = document.querySelector('input[name="approval_method"]:checked').value;
-        const notes = document.getElementById('approvalNotes').value;
+        const notes  = document.getElementById('approvalNotes').value;
         const pdfFile = document.getElementById('signedPdfFile').files[0];
-        
         const formData = new FormData();
         formData.append('method', method);
         formData.append('notes', notes);
-        if (pdfFile) {
-            formData.append('signed_pdf', pdfFile);
-        }
-        
+        if (pdfFile) formData.append('signed_pdf', pdfFile);
+
         fetch(`/design-approval/api/mark-approved/${currentOrderId}`, {
-            method: 'POST',
-            body: formData
+            method: 'POST', body: formData
         })
         .then(r => r.json())
         .then(data => {
             if (data.success) {
                 approvalModal.hide();
-                alert('✅ Freigabe wurde eingetragen');
+                alert('✅ Freigabe eingetragen');
                 location.reload();
             } else {
-                alert('Fehler: ' + data.error);
+                alert('❌ ' + data.error);
             }
         });
     });
-    
-    // Erneut senden
+
+    // ─── Erneut senden ────────────────────────────────────────────────────
     document.querySelectorAll('.resend-approval').forEach(btn => {
         btn.addEventListener('click', function() {
             if (!confirm('Erinnerungs-E-Mail senden?')) return;
-            
             const orderId = this.dataset.orderId;
             this.disabled = true;
-            
             fetch(`/design-approval/api/resend/${orderId}`, {method: 'POST'})
             .then(r => r.json())
             .then(data => {
@@ -598,15 +719,13 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
-    
-    // Nach Änderung neu senden
+
+    // ─── Nach Revision neu senden ─────────────────────────────────────────
     document.querySelectorAll('.resend-after-revision').forEach(btn => {
         btn.addEventListener('click', function() {
             if (!confirm('Design wurde angepasst - Neue Freigabe-Anfrage senden?')) return;
-            
             const orderId = this.dataset.orderId;
             this.disabled = true;
-            
             fetch(`/design-approval/api/send/${orderId}`, {method: 'POST'})
             .then(r => r.json())
             .then(data => {
@@ -620,8 +739,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
-    
-    // Notizen anzeigen
+
+    // ─── Notizen anzeigen ─────────────────────────────────────────────────
     document.querySelectorAll('.show-full-notes').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
@@ -630,5 +749,74 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+// ─── Datei-Vorschau ──────────────────────────────────────────────────────
+function previewFiles(files) {
+    if (!files || files.length === 0) return;
+    selectedFiles = files;
+    const list = document.getElementById('filePreviewList');
+    list.innerHTML = '';
+    list.style.display = 'flex';
+
+    const positions = ['Brust Mitte', 'Rücken', 'Ärmel links', 'Ärmel rechts', 'Weitere Position'];
+
+    Array.from(files).forEach((file, idx) => {
+        const col = document.createElement('div');
+        col.className = 'col-6 col-md-4 col-lg-3';
+
+        const isImage = file.type.startsWith('image/');
+        const pos = positions[idx] || `Position ${idx + 1}`;
+
+        col.innerHTML = `
+            <div class="card h-100">
+                <div class="card-body p-2 text-center">
+                    ${isImage
+                        ? `<img src="${URL.createObjectURL(file)}"
+                               style="max-height:80px;max-width:100%;object-fit:contain;border-radius:4px">`
+                        : `<i class="bi bi-file-earmark fs-1 text-muted"></i>`
+                    }
+                    <p class="small text-muted mb-0 mt-1" style="word-break:break-all">${file.name}</p>
+                    <span class="badge bg-secondary mt-1">${pos}</span>
+                </div>
+            </div>`;
+        list.appendChild(col);
+    });
+
+    document.getElementById('uploadBtn').disabled = false;
+}
+
+// ─── Upload durchführen ──────────────────────────────────────────────────
+function doUpload() {
+    if (!selectedFiles || !currentOrderId) return;
+
+    const btn = document.getElementById('uploadBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Wird hochgeladen...';
+
+    const formData = new FormData();
+    Array.from(selectedFiles).forEach(f => formData.append('design_files', f));
+
+    fetch(`/design-approval/api/upload-designs/${currentOrderId}`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('uploadDesignModal')).hide();
+            alert(`✅ ${data.message}`);
+            location.reload();
+        } else {
+            alert('❌ ' + data.error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-upload me-1"></i> Hochladen';
+        }
+    })
+    .catch(err => {
+        alert('Fehler: ' + err);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-upload me-1"></i> Hochladen';
+    });
+}
 </script>
 {% endblock %}

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datenschutz - StitchAdmin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}">
+    <style>
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #f8f9fa; }
+        .legal-nav { background: white; border-bottom: 1px solid #e9ecef; padding: 1rem 0; }
+        .legal-nav a { color: #1a6b5a; text-decoration: none; font-weight: 700; font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem; }
+        .legal-content { max-width: 800px; margin: 2rem auto; background: white; border-radius: 12px; padding: 3rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .legal-content h1 { font-size: 2rem; font-weight: 800; margin-bottom: 2rem; color: #1a6b5a; }
+        .legal-content h2 { font-size: 1.3rem; font-weight: 700; margin-top: 2rem; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="legal-nav">
+        <div class="container">
+            <a href="{{ url_for('landing.index') }}">
+                <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" style="height: 24px;">
+                StitchAdmin
+            </a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="legal-content">
+            <h1>Datenschutzerklaerung</h1>
+
+            <h2>1. Verantwortlicher</h2>
+            <p>
+                Hans Hahn / Hahn IT<br>
+                Wuppertal, Deutschland<br>
+                E-Mail: <a href="mailto:kontakt@hahn-it-wuppertal.de">kontakt@hahn-it-wuppertal.de</a>
+            </p>
+
+            <h2>2. Erhobene Daten</h2>
+            <p>Bei der Nutzung von StitchAdmin werden folgende Daten verarbeitet:</p>
+            <ul>
+                <li><strong>Registrierungsdaten:</strong> Firmenname, Name, E-Mail-Adresse, Telefonnummer, Passwort (gehasht)</li>
+                <li><strong>Nutzungsdaten:</strong> IP-Adresse, Zeitstempel, Browser-Informationen (fuer Login-Sicherheit)</li>
+                <li><strong>Geschaeftsdaten:</strong> Kunden, Auftraege, Rechnungen, Designs — vom Nutzer eingegebene Daten</li>
+            </ul>
+
+            <h2>3. Zweck der Verarbeitung</h2>
+            <ul>
+                <li>Bereitstellung der ERP-Software und ihrer Funktionen</li>
+                <li>Authentifizierung und Zugriffskontrolle</li>
+                <li>Sicherheit (Rate-Limiting, Login-Protokollierung)</li>
+                <li>Technischer Betrieb und Fehlerbehebung</li>
+            </ul>
+
+            <h2>4. Rechtsgrundlage</h2>
+            <p>
+                Die Verarbeitung erfolgt auf Grundlage von Art. 6 Abs. 1 lit. b DSGVO (Vertragsdurchfuehrung)
+                sowie Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an der Sicherheit des Systems).
+            </p>
+
+            <h2>5. Hosting und Datenspeicherung</h2>
+            <p>
+                Die Daten werden auf einem Server bei <strong>Hetzner Online GmbH</strong> in Deutschland gespeichert.
+                Es erfolgt keine Uebermittlung in Drittlaender.
+            </p>
+
+            <h2>6. Datenweitergabe</h2>
+            <p>
+                Eine Weitergabe personenbezogener Daten an Dritte erfolgt nicht, es sei denn, dies ist
+                fuer die Vertragserfuellung erforderlich (z.B. E-Mail-Versand ueber den konfigurierten SMTP-Server des Nutzers).
+            </p>
+
+            <h2>7. Cookies und Sessions</h2>
+            <p>
+                StitchAdmin verwendet ausschliesslich technisch notwendige Session-Cookies fuer die Anmeldung.
+                Es werden keine Tracking-Cookies, Analyse-Tools oder Werbecookies eingesetzt.
+            </p>
+
+            <h2>8. Ihre Rechte</h2>
+            <p>Sie haben das Recht auf:</p>
+            <ul>
+                <li>Auskunft ueber Ihre gespeicherten Daten (Art. 15 DSGVO)</li>
+                <li>Berichtigung unrichtiger Daten (Art. 16 DSGVO)</li>
+                <li>Loeschung Ihrer Daten (Art. 17 DSGVO)</li>
+                <li>Einschraenkung der Verarbeitung (Art. 18 DSGVO)</li>
+                <li>Datenportabilitaet (Art. 20 DSGVO)</li>
+                <li>Widerspruch gegen die Verarbeitung (Art. 21 DSGVO)</li>
+            </ul>
+            <p>Kontaktieren Sie uns: <a href="mailto:kontakt@hahn-it-wuppertal.de">kontakt@hahn-it-wuppertal.de</a></p>
+
+            <h2>9. Beta-Hinweis</h2>
+            <p>
+                StitchAdmin ist Beta-Software. Wir empfehlen regelmaessige Backups Ihrer Daten.
+                Fuer Datenverlust waehrend der Beta-Phase wird keine Haftung uebernommen.
+            </p>
+
+            <p class="text-muted mt-4 small">Stand: Maerz 2026</p>
+
+            <hr class="my-4">
+            <p class="text-center">
+                <a href="{{ url_for('landing.index') }}" class="text-decoration-none">
+                    <i class="bi bi-arrow-left me-1"></i> Zurueck zur Startseite
+                </a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

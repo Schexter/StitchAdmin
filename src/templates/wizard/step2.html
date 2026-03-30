@@ -159,11 +159,17 @@
                 <div class="card shadow-sm">
                     <div class="card-body d-flex justify-content-between">
                         <a href="{{ url_for('wizard.step1') }}" class="btn btn-outline-secondary">
-                            <i class="fas fa-arrow-left me-1"></i> Zurück
+                            <i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck
                         </a>
-                        <button type="submit" class="btn btn-primary btn-lg" id="weiterBtn">
-                            Weiter zu Veredelung <i class="fas fa-arrow-right ms-2"></i>
-                        </button>
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="kundenware" value="1" class="btn btn-outline-warning" id="kundenwareBtn"
+                                    onclick="document.getElementById('warenkorbDaten').value='[]';">
+                                <i class="bi bi-box-seam me-1"></i> Kundenware &mdash; ohne Artikel weiter
+                            </button>
+                            <button type="submit" class="btn btn-primary btn-lg" id="weiterBtn">
+                                Weiter zu Veredelung <i class="bi bi-arrow-right ms-2"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -259,18 +265,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                     
                     container.innerHTML = data.map(artikel => `
-                        <div class="artikel-item card mb-2" onclick="artikelDetails('${artikel.id}')">
+                        <div class="artikel-item card mb-2">
                             <div class="card-body py-2">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <div>
+                                    <div style="cursor:pointer;flex:1;" onclick="artikelDetails('${artikel.id}')">
                                         <strong>${artikel.name}</strong>
                                         <br>
                                         <small class="text-muted">${artikel.article_number} | ${artikel.brand || ''}</small>
                                     </div>
-                                    <div class="text-end">
-                                        <span class="badge bg-primary">${artikel.price.toFixed(2)} €</span>
-                                        <br>
-                                        ${artikel.has_variants ? '<small class="text-info"><i class="fas fa-palette"></i> Varianten</small>' : ''}
+                                    <div class="text-end d-flex align-items-center gap-2">
+                                        <span class="badge bg-primary">${artikel.price.toFixed(2)} \u20ac</span>
+                                        <button type="button" class="btn btn-success btn-sm" onclick="event.stopPropagation(); schnellHinzufuegen('${artikel.id}', '${artikel.name.replace(/'/g, "\\'")}', ${artikel.price}, '${(artikel.article_number || '').replace(/'/g, "\\'")}')" title="Zum Warenkorb">
+                                            <i class="bi bi-cart-plus"></i>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -301,9 +308,11 @@ document.addEventListener('DOMContentLoaded', function() {
         // Warenkorb-Daten sammeln
         aktualisiereWarenkorbDaten();
         
-        if (warenkorb.length === 0) {
+        // Bei Kundenware darf der Warenkorb leer sein
+        var isKundenware = e.submitter && e.submitter.name === 'kundenware';
+        if (warenkorb.length === 0 && !isKundenware) {
             e.preventDefault();
-            alert('Bitte fügen Sie mindestens einen Artikel hinzu.');
+            alert('Bitte f\u00fcgen Sie mindestens einen Artikel hinzu, oder klicken Sie "Kundenware".');
             return;
         }
         
@@ -321,10 +330,13 @@ function artikelDetails(artikelId) {
         .then(data => {
             const modal = new bootstrap.Modal(document.getElementById('artikelModal'));
             const body = document.getElementById('artikelModalBody');
-            
+            document.getElementById('artikelModalTitle').textContent = data.name || 'Artikel hinzufügen';
+
             // Modal-Inhalt erstellen
             let html = `
                 <input type="hidden" id="modalArtikelId" value="${artikelId}">
+                <input type="hidden" id="modalArtikelName" value="${(data.name || '').replace(/"/g, '&quot;')}">
+                <input type="hidden" id="modalArtikelNummer" value="${(data.artikelnummer || '').replace(/"/g, '&quot;')}">
                 <input type="hidden" id="modalArtikelPreis" value="${data.default_price}">
             `;
             
@@ -431,12 +443,38 @@ function artikelZumWarenkorb() {
         // Neu hinzufügen
         warenkorb.push({
             artikel_id: artikelId,
+            name: document.getElementById('modalArtikelName').value || artikelId,
+            artikelnummer: document.getElementById('modalArtikelNummer').value || '',
             groessen: groessen,
             gesamtmenge: gesamtmenge,
             einzelpreis: preis
         });
     }
     
+    aktualisiereWarenkorbAnzeige();
+}
+
+// Schnell-Hinzufuegen (direkt aus Suchergebnis, Menge 1, ohne Modal)
+function schnellHinzufuegen(artikelId, name, preis, artikelnummer) {
+    const existing = warenkorb.find(w => w.artikel_id === artikelId);
+    if (existing) {
+        // Menge erhoehen
+        if (existing.groessen['Standard']) {
+            existing.groessen['Standard'] += 1;
+        } else {
+            existing.groessen['Standard'] = 1;
+        }
+        existing.gesamtmenge = Object.values(existing.groessen).reduce((a, b) => a + b, 0);
+    } else {
+        warenkorb.push({
+            artikel_id: artikelId,
+            name: name,
+            artikelnummer: artikelnummer || '',
+            groessen: {'Standard': 1},
+            gesamtmenge: 1,
+            einzelpreis: preis
+        });
+    }
     aktualisiereWarenkorbAnzeige();
 }
 
@@ -483,7 +521,65 @@ function aktualisiereWarenkorbDaten() {
 }
 
 function aktualisiereWarenkorbAnzeige() {
-    // TODO: DOM neu rendern (vereinfacht - Seite neu laden wäre sauberer)
+    const container = document.getElementById('warenkorb');
+
+    if (warenkorb.length === 0) {
+        container.innerHTML = `
+            <div id="warenkorbLeer" class="text-center text-muted py-5">
+                <i class="fas fa-shopping-cart fa-3x mb-3 opacity-25"></i>
+                <p>Keine Artikel ausgewählt</p>
+                <p class="small">Suchen Sie links nach Artikeln und fügen Sie diese hinzu</p>
+            </div>`;
+    } else {
+        container.innerHTML = warenkorb.map(item => {
+            const groessen = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+            // Falls der Artikel Nicht-Standard-Größen hat, diese auch anzeigen
+            const alleGroessen = new Set([...groessen, ...Object.keys(item.groessen || {})]);
+            // Standard-Größen zuerst, dann Rest
+            const sortierteGroessen = groessen.filter(g => alleGroessen.has(g));
+            Object.keys(item.groessen || {}).forEach(g => {
+                if (!sortierteGroessen.includes(g)) sortierteGroessen.push(g);
+            });
+
+            const name = item.name || item.artikel_id;
+            const artikelnummer = item.artikelnummer || '';
+            const gesamtmenge = item.gesamtmenge || Object.values(item.groessen || {}).reduce((a, b) => a + b, 0);
+            const einzelpreis = item.einzelpreis || 0;
+
+            return `
+            <div class="warenkorb-item card mb-3" data-id="${item.artikel_id}">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="mb-1">${name}</h6>
+                            <small class="text-muted">${artikelnummer}</small>
+                        </div>
+                        <button type="button" class="btn btn-outline-danger btn-sm" onclick="artikelEntfernen('${item.artikel_id}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="groessen-eingabe mt-3">
+                        <label class="form-label small fw-bold">Größenstaffel:</label>
+                        <div class="row g-2">
+                            ${sortierteGroessen.map(g => `
+                            <div class="col">
+                                <label class="form-label small text-center d-block">${g}</label>
+                                <input type="number" class="form-control form-control-sm text-center groesse-input"
+                                       data-groesse="${g}"
+                                       value="${(item.groessen && item.groessen[g]) || 0}"
+                                       min="0" max="999">
+                            </div>`).join('')}
+                        </div>
+                    </div>
+                    <div class="mt-2 d-flex justify-content-between align-items-center">
+                        <span class="text-muted">Gesamt: <strong class="artikel-menge">${gesamtmenge}</strong> Stk.</span>
+                        <span class="text-primary">${einzelpreis.toFixed(2)} € / Stk.</span>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
     aktualisiereGesamtmenge();
     document.getElementById('warenkorbCount').textContent = warenkorb.length + ' Artikel';
 }

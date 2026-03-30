@@ -54,7 +54,10 @@
                                     <div class="d-flex justify-content-between align-items-start">
                                         <div>
                                             <h6 class="card-title mb-1">
-                                                <a href="{{ url_for('orders.show', order_id=item.order.id) }}">{{ item.order.id }}</a>
+                                                <a href="#" onclick="toggleOrderDetail('emb-{{ loop.index }}'); return false;" title="Details anzeigen">{{ item.order.id }}</a>
+                                                <a href="{{ url_for('orders.show', order_id=item.order.id) }}" class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" title="Zum Auftrag">
+                                                    <i class="bi bi-box-arrow-up-right" style="font-size: 0.7em;"></i>
+                                                </a>
                                                 {% if item.priority_weight == 1 %}
                                                 <span class="badge bg-danger ms-1">Eilig</span>
                                                 {% elif item.priority_weight == 2 %}
@@ -74,20 +77,54 @@
                                             </div>
                                         </div>
                                         <div class="text-end">
-                                            <form method="POST" action="{{ url_for('production.start_production', order_id=item.order.id) }}" class="d-inline">
-                                                <div class="mb-2">
-                                                    <select name="machine_id" class="form-select form-select-sm" required>
-                                                        <option value="">Maschine wählen</option>
-                                                        {% for machine_id, machine in machines.embroidery_machines.items() %}
-                                                        <option value="{{ machine_id }}">{{ machine.name }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
-                                                <button type="submit" class="btn btn-sm btn-success">Produktion starten</button>
-                                            </form>
+                                            <a href="{{ url_for('production.start_wizard', order_id=item.order.id) }}" class="btn btn-sm btn-success">
+                                                <i class="bi bi-play-circle me-1"></i>Produktion starten
+                                            </a>
                                         </div>
                                     </div>
-                                    
+
+                                    <!-- Auftragsdetails (aufklappbar) -->
+                                    <div id="order-detail-emb-{{ loop.index }}" class="mt-3 border-top pt-2" style="display: none;">
+                                        {% if item.order.design_description or item.order.description %}
+                                        <div class="small mb-1"><strong>Design:</strong> {{ item.order.design_description or item.order.description }}</div>
+                                        {% endif %}
+                                        {% if item.order.embroidery_position %}
+                                        <div class="small mb-1"><strong>Position:</strong> {{ item.order.embroidery_position }}</div>
+                                        {% endif %}
+                                        {% if item.order.embroidery_size %}
+                                        <div class="small mb-1"><strong>Groesse:</strong> {{ item.order.embroidery_size }}</div>
+                                        {% endif %}
+                                        {% if item.order.thread_colors %}
+                                        <div class="small mb-1"><strong>Garnfarben:</strong> {{ item.order.thread_colors }}</div>
+                                        {% endif %}
+                                        {% if item.order.special_instructions %}
+                                        <div class="small mb-1 text-danger"><strong>Hinweise:</strong> {{ item.order.special_instructions }}</div>
+                                        {% endif %}
+                                        {% if item.order.items.count() > 0 %}
+                                        <div class="small mt-2">
+                                            <strong>Positionen:</strong>
+                                            {% for oi in item.order.items %}
+                                            <div class="ms-2">{{ oi.quantity }}x {{ oi.article.name if oi.article else 'Artikel' }} {% if oi.textile_size %}({{ oi.textile_size }}){% endif %} {% if oi.textile_color %}<span class="text-muted">{{ oi.textile_color }}</span>{% endif %}</div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        {% if item.order.designs and item.order.designs.count() > 0 %}
+                                        <div class="small mt-2">
+                                            <strong>Design-Positionen:</strong>
+                                            {% for d in item.order.designs %}
+                                            <div class="ms-2">
+                                                {{ d.position_label or d.position_name or 'Position' }}
+                                                {% if d.design_type %}<span class="badge bg-light text-dark">{{ d.design_type }}</span>{% endif %}
+                                                {% if d.width_mm and d.height_mm %}{{ d.width_mm }}x{{ d.height_mm }}mm{% endif %}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        {% if item.order.due_date %}
+                                        <div class="small mt-1"><strong>Lieferdatum:</strong> {{ item.order.due_date.strftime('%d.%m.%Y') if item.order.due_date else '-' }}</div>
+                                        {% endif %}
+                                    </div>
+
                                     <!-- Garnbedarf -->
                                     {% if item.thread_requirements %}
                                     <div class="mt-3 border-top pt-2">
@@ -95,7 +132,7 @@
                                         {% for req in item.thread_requirements %}
                                         <div class="d-flex justify-content-between align-items-center mt-1">
                                             <span class="small">
-                                                {{ req.thread.color_name_de }} 
+                                                {{ req.thread.color_name_de }}
                                                 <span class="text-muted">({{ req.thread.manufacturer }} {{ req.thread.color_number }})</span>
                                             </span>
                                             <span class="small">
@@ -140,7 +177,10 @@
                                     <div class="d-flex justify-content-between align-items-start">
                                         <div>
                                             <h6 class="card-title mb-1">
-                                                <a href="{{ url_for('orders.show', order_id=item.order.id) }}">{{ item.order.id }}</a>
+                                                <a href="#" onclick="toggleOrderDetail('dtf-{{ loop.index }}'); return false;" title="Details anzeigen">{{ item.order.id }}</a>
+                                                <a href="{{ url_for('orders.show', order_id=item.order.id) }}" class="btn btn-sm btn-outline-secondary py-0 px-1 ms-1" title="Zum Auftrag">
+                                                    <i class="bi bi-box-arrow-up-right" style="font-size: 0.7em;"></i>
+                                                </a>
                                                 {% if item.priority_weight == 1 %}
                                                 <span class="badge bg-danger ms-1">Eilig</span>
                                                 {% elif item.priority_weight == 2 %}
@@ -160,21 +200,55 @@
                                             </div>
                                         </div>
                                         <div class="text-end">
-                                            <form method="POST" action="{{ url_for('production.start_production', order_id=item.order.id) }}" class="d-inline">
-                                                <div class="mb-2">
-                                                    <select name="machine_id" class="form-select form-select-sm" required>
-                                                        <option value="">Maschine wählen</option>
-                                                        {% for machine_id, machine in machines.dtf_machines.items() %}
-                                                        <option value="{{ machine_id }}">{{ machine.name }}</option>
-                                                        {% endfor %}
-                                                        {% for machine_id, machine in machines.printing_machines.items() %}
-                                                        <option value="{{ machine_id }}">{{ machine.name }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
-                                                <button type="submit" class="btn btn-sm btn-success">Produktion starten</button>
-                                            </form>
+                                            <a href="{{ url_for('production.start_wizard', order_id=item.order.id) }}" class="btn btn-sm btn-success">
+                                                <i class="bi bi-play-circle me-1"></i>Produktion starten
+                                            </a>
                                         </div>
+                                    </div>
+
+                                    <!-- Auftragsdetails (aufklappbar) -->
+                                    <div id="order-detail-dtf-{{ loop.index }}" class="mt-3 border-top pt-2" style="display: none;">
+                                        {% if item.order.design_description or item.order.description %}
+                                        <div class="small mb-1"><strong>Design:</strong> {{ item.order.design_description or item.order.description }}</div>
+                                        {% endif %}
+                                        {% if item.order.print_method %}
+                                        <div class="small mb-1"><strong>Verfahren:</strong> {{ item.order.print_method }}</div>
+                                        {% endif %}
+                                        {% if item.order.print_position %}
+                                        <div class="small mb-1"><strong>Position:</strong> {{ item.order.print_position }}</div>
+                                        {% endif %}
+                                        {% if item.order.print_width_cm and item.order.print_height_cm %}
+                                        <div class="small mb-1"><strong>Groesse:</strong> {{ item.order.print_width_cm }} x {{ item.order.print_height_cm }} cm</div>
+                                        {% endif %}
+                                        {% if item.order.print_colors %}
+                                        <div class="small mb-1"><strong>Farben:</strong> {{ item.order.print_colors }}</div>
+                                        {% endif %}
+                                        {% if item.order.special_instructions %}
+                                        <div class="small mb-1 text-danger"><strong>Hinweise:</strong> {{ item.order.special_instructions }}</div>
+                                        {% endif %}
+                                        {% if item.order.items.count() > 0 %}
+                                        <div class="small mt-2">
+                                            <strong>Positionen:</strong>
+                                            {% for oi in item.order.items %}
+                                            <div class="ms-2">{{ oi.quantity }}x {{ oi.article.name if oi.article else 'Artikel' }} {% if oi.textile_size %}({{ oi.textile_size }}){% endif %} {% if oi.textile_color %}<span class="text-muted">{{ oi.textile_color }}</span>{% endif %}</div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        {% if item.order.designs and item.order.designs.count() > 0 %}
+                                        <div class="small mt-2">
+                                            <strong>Design-Positionen:</strong>
+                                            {% for d in item.order.designs %}
+                                            <div class="ms-2">
+                                                {{ d.position_label or d.position_name or 'Position' }}
+                                                {% if d.design_type %}<span class="badge bg-light text-dark">{{ d.design_type }}</span>{% endif %}
+                                                {% if d.print_width_cm and d.print_height_cm %}{{ d.print_width_cm }}x{{ d.print_height_cm }}cm{% endif %}
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                        {% if item.order.due_date %}
+                                        <div class="small mt-1"><strong>Lieferdatum:</strong> {{ item.order.due_date.strftime('%d.%m.%Y') if item.order.due_date else '-' }}</div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
@@ -242,6 +316,13 @@
 </div>
 
 <script>
+function toggleOrderDetail(id) {
+    var el = document.getElementById('order-detail-' + id);
+    if (el) {
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
 // KI-Zeitvorhersagen laden (deaktiviert - API noch nicht implementiert)
 /*
 document.addEventListener('DOMContentLoaded', function() {

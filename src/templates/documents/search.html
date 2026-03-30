@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Dokumente suchen{% endblock %}
+{% block content %}
+<div class="container-fluid mt-4">
+    <h4><i class="bi bi-search me-2"></i>Dokumente durchsuchen</h4>
+
+    <form method="get" class="row g-2 mt-3 mb-4">
+        <div class="col-md-6">
+            <div class="input-group">
+                <input type="text" name="q" class="form-control"
+                       placeholder="Suchbegriff eingeben..."
+                       value="{{ request.args.get('q', '') }}">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-search"></i> Suchen
+                </button>
+            </div>
+        </div>
+    </form>
+
+    {% if results is defined and results %}
+    <p class="text-muted">{{ results|length }} Ergebnisse gefunden</p>
+    <div class="list-group">
+        {% for doc in results %}
+        <a href="{{ url_for('documents.view', id=doc.id) }}" class="list-group-item list-group-item-action">
+            <div class="d-flex justify-content-between">
+                <span>
+                    {% if doc.is_pdf() %}<i class="bi bi-file-pdf text-danger me-2"></i>
+                    {% elif doc.is_image() %}<i class="bi bi-file-image text-info me-2"></i>
+                    {% else %}<i class="bi bi-file-earmark me-2"></i>{% endif %}
+                    <strong>{{ doc.title }}</strong>
+                </span>
+                <small class="text-muted">{{ doc.created_at.strftime('%d.%m.%Y') }}</small>
+            </div>
+            {% if doc.customer %}
+            <small class="text-muted">{{ doc.customer.company_name or '' }}</small>
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+    {% elif request.args.get('q') %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>Keine Dokumente für "{{ request.args.get('q') }}" gefunden.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

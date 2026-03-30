@@ -232,6 +232,65 @@ def export_csv(bulk_id):
     )
 
 
+@shipping_bulk_bp.route('/<int:bulk_id>/export_dpd')
+@login_required
+def export_dpd(bulk_id):
+    """Exportiert Bulk als DPD-Format CSV für myDPD Business Portal"""
+    from src.utils.dpd_csv import generate_dpd_csv, parse_address_for_dpd
+    from src.models.company_settings import CompanySettings
+
+    bulk = ShippingBulk.query.get_or_404(bulk_id)
+    entries = PostEntry.query.filter_by(shipping_bulk_id=bulk_id).all()
+
+    if not entries:
+        flash('Keine Einträge zum Exportieren', 'warning')
+        return redirect(url_for('shipping_bulk.view', bulk_id=bulk_id))
+
+    rows = []
+    for entry in entries:
+        # Adresse parsen
+        address_lines = (entry.recipient_address or '').split('\n')
+        street_line = address_lines[0].strip() if len(address_lines) > 0 else ''
+        plz_ort = address_lines[1].strip() if len(address_lines) > 1 else ''
+        plz = plz_ort.split()[0] if plz_ort else ''
+        ort = ' '.join(plz_ort.split()[1:]) if plz_ort else ''
+
+        addr = parse_address_for_dpd(entry.recipient or '', street_line)
+
+        # Kunden-Daten falls verknüpft
+        customer = entry.customer if hasattr(entry, 'customer') and entry.customer else None
+
+        rows.append({
+            'firma': addr['firma'],
+            'vorname': addr['vorname'],
+            'nachname': addr['nachname'],
+            'strasse': addr['strasse'],
+            'hausnummer': addr['hausnummer'],
+            'plz': plz,
+            'ort': ort,
+            'land': 'DE',
+            'telefon': (customer.phone if customer else '') or '',
+            'email': (customer.email if customer else '') or '',
+            'gewicht': 0.5,
+            'referenz': entry.reference_number or entry.entry_number or '',
+            'inhalt': entry.subject or '',
+        })
+
+    csv_bytes = generate_dpd_csv(rows)
+    filename = f'{bulk.bulk_number}_dpd_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+
+    bulk.csv_exported = True
+    bulk.csv_export_date = datetime.utcnow()
+    db.session.commit()
+
+    return send_file(
+        io.BytesIO(csv_bytes),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=filename
+    )
+
+
 @shipping_bulk_bp.route('/<int:bulk_id>/mark_printed', methods=['POST'])
 @login_required
 def mark_printed(bulk_id):

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Zählerstand erfassen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-md-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('energie.index') }}">Stromzähler</a></li>
+                <li class="breadcrumb-item active">Neue Ablesung</li>
+            </ol>
+        </nav>
+        <h1><i class="bi bi-plus-circle"></i> Zählerstand erfassen</h1>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-lightning-charge"></i> Neue Ablesung</h5>
+            </div>
+            <div class="card-body">
+                {% if letzte_ablesung %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Letzter Stand: <strong>{{ letzte_ablesung.zaehlerstand }} kWh</strong>
+                    am {{ letzte_ablesung.ablesedatum.strftime('%d.%m.%Y') }}
+                </div>
+                {% endif %}
+
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Ablesedatum *</label>
+                        <input type="date" class="form-control" name="ablesedatum"
+                               value="{{ heute.isoformat() }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Zählerstand (kWh) *</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control form-control-lg" name="zaehlerstand"
+                                   step="0.1" min="0" placeholder="z.B. 12345.6" required autofocus>
+                            <span class="input-group-text">kWh</span>
+                        </div>
+                        {% if letzte_ablesung %}
+                        <small class="text-muted">Muss größer als {{ letzte_ablesung.zaehlerstand }} kWh sein</small>
+                        {% endif %}
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label">Kommentar (optional)</label>
+                        <input type="text" class="form-control" name="kommentar"
+                               placeholder="z.B. Monatliche Ablesung">
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-lg me-1"></i> Ablesung speichern
+                        </button>
+                        <a href="{{ url_for('energie.index') }}" class="btn btn-secondary">
+                            <i class="bi bi-x"></i> Abbrechen
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

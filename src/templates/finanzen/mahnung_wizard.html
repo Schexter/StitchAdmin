@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Mahnung erstellen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 850px;">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('finanzen.index') }}" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+        <div>
+            <h4 class="mb-0"><i class="bi bi-exclamation-triangle me-2 text-warning"></i>Mahnung erstellen</h4>
+            <small class="text-muted">&Uuml;berf&auml;llige Rechnung &rarr; Mahnstufe &rarr; Mahnung versenden</small>
+        </div>
+    </div>
+
+    <!-- Stepper -->
+    <div class="d-flex justify-content-center mb-4">
+        <div class="d-flex align-items-center gap-0">
+            {% for i, label in [(1, 'Rechnung'), (2, 'Mahnstufe'), (3, 'Versenden')] %}
+            <div class="text-center" id="si-{{ i }}">
+                <div class="rounded-circle {{ 'bg-warning text-dark' if (i == 1 and not selected_rechnung) or (i == 2 and selected_rechnung) else ('bg-success text-white' if selected_rechnung and i == 1 else 'bg-light text-muted border') }} d-flex align-items-center justify-content-center mx-auto" style="width:36px;height:36px;font-weight:bold;">
+                    {% if selected_rechnung and i == 1 %}<i class="bi bi-check-lg"></i>{% else %}{{ i }}{% endif %}
+                </div>
+                <small class="d-block mt-1 {{ 'fw-bold text-warning' if (i == 1 and not selected_rechnung) or (i == 2 and selected_rechnung) else 'text-muted' }}">{{ label }}</small>
+            </div>
+            {% if i < 3 %}<div style="width:80px;height:2px;background:#dee2e6;" class="align-self-start mt-3"></div>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if not selected_rechnung %}
+    <!-- STEP 1: Ueberfaellige Rechnung waehlen -->
+    <div class="card mb-3">
+        <div class="card-header bg-warning bg-opacity-10">
+            <h6 class="mb-0"><i class="bi bi-clock-history me-1"></i> &Uuml;berf&auml;llige Rechnungen ({{ ueberfaellige|length }})</h6>
+        </div>
+        <div class="card-body p-0">
+            {% if ueberfaellige %}
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr><th>Rechnung</th><th>Kunde</th><th class="text-end">Betrag</th><th class="text-center">F&auml;llig seit</th><th class="text-center">Stufe</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for r in ueberfaellige %}
+                    {% set tage = (today - r.faelligkeitsdatum).days if r.faelligkeitsdatum else 0 %}
+                    <tr>
+                        <td><strong>{{ r.rechnungsnummer }}</strong></td>
+                        <td>{{ r.kunde_name or '?' }}</td>
+                        <td class="text-end">{{ "%.2f"|format(r.brutto_gesamt or 0) }} &euro;</td>
+                        <td class="text-center">
+                            <span class="badge {{ 'bg-danger' if tage > 30 else ('bg-warning text-dark' if tage > 14 else 'bg-info') }}">
+                                {{ tage }} Tage
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-secondary">{{ r.mahnstufe or 0 }}</span>
+                        </td>
+                        <td class="text-end">
+                            <a href="{{ url_for('finanzen.mahnung_wizard', rechnung_id=r.id) }}" class="btn btn-sm btn-warning">
+                                <i class="bi bi-arrow-right"></i> Mahnen
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="p-4 text-center text-muted">
+                <i class="bi bi-check-circle fs-1 text-success"></i><br>
+                Keine &uuml;berf&auml;lligen Rechnungen vorhanden.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% else %}
+    <!-- STEP 2 + 3: Mahnstufe & Versenden -->
+    <form method="POST" action="{{ url_for('finanzen.mahnung_erstellen', rechnung_id=selected_rechnung.id) }}">
+
+        <div id="step-2">
+            <!-- Rechnungsinfo -->
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between">
+                    <h6 class="mb-0"><i class="bi bi-receipt me-1"></i> Rechnung {{ selected_rechnung.rechnungsnummer }}</h6>
+                    <a href="{{ url_for('finanzen.mahnung_wizard') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>Andere Rechnung
+                    </a>
+                </div>
+                <div class="card-body py-2">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <small class="text-muted">Kunde</small><br>
+                            <strong>{{ selected_rechnung.kunde_name }}</strong>
+                        </div>
+                        <div class="col-md-2">
+                            <small class="text-muted">Betrag</small><br>
+                            <strong>{{ "%.2f"|format(selected_rechnung.brutto_gesamt or 0) }} &euro;</strong>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">F&auml;llig seit</small><br>
+                            <strong class="text-danger">{{ vorschau.tage_ueberfaellig }} Tage</strong>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">Bisherige Mahnungen</small><br>
+                            <strong>{{ letzte_mahnung.mahnstufe if letzte_mahnung else 0 }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mahnstufe -->
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-layers me-1"></i> Mahnstufe {{ naechste_stufe }}</h6></div>
+                <div class="card-body">
+                    {% if naechste_stufe > 3 %}
+                    <div class="alert alert-danger mb-0">
+                        <i class="bi bi-exclamation-octagon me-1"></i>
+                        <strong>Maximale Mahnstufe erreicht!</strong> Bitte Inkasso einleiten.
+                    </div>
+                    {% else %}
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="card text-center py-3 {{ 'border-warning' if naechste_stufe == 1 else '' }}">
+                                <div class="fs-1">{{ naechste_stufe }}</div>
+                                <strong>
+                                    {% if naechste_stufe == 1 %}Zahlungserinnerung
+                                    {% elif naechste_stufe == 2 %}2. Mahnung
+                                    {% else %}Letzte Mahnung{% endif %}
+                                </strong>
+                                <small class="text-muted">
+                                    {% if naechste_stufe == 1 %}Freundlich, 7 Tage Frist
+                                    {% elif naechste_stufe == 2 %}Bestimmt, 7 Tage Frist
+                                    {% else %}Ultimatum, 5 Tage, Inkasso-Drohung{% endif %}
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <table class="table table-sm mb-0">
+                                <tr>
+                                    <td>Offener Rechnungsbetrag:</td>
+                                    <td class="text-end">{{ "%.2f"|format(vorschau.offener_betrag) }} &euro;</td>
+                                </tr>
+                                <tr>
+                                    <td>Mahngeb&uuml;hr (Stufe {{ naechste_stufe }}):</td>
+                                    <td class="text-end">+ {{ "%.2f"|format(vorschau.mahngebuehr) }} &euro;</td>
+                                </tr>
+                                <tr>
+                                    <td>Verzugszinsen ({{ vorschau.tage_ueberfaellig }} Tage):</td>
+                                    <td class="text-end">+ {{ "%.2f"|format(vorschau.verzugszinsen) }} &euro;</td>
+                                </tr>
+                                <tr class="fw-bold table-warning">
+                                    <td>Gesamtforderung:</td>
+                                    <td class="text-end">{{ "%.2f"|format(vorschau.gesamtforderung) }} &euro;</td>
+                                </tr>
+                                <tr>
+                                    <td>Neue Zahlungsfrist:</td>
+                                    <td class="text-end">{{ vorschau.zahlungsfrist_tage }} Tage</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if naechste_stufe <= 3 %}
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('finanzen.mahnung_wizard') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck
+                </a>
+                <button type="button" class="btn btn-warning" onclick="goStep(3)">
+                    Weiter: Best&auml;tigen <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- STEP 3: Bestaetigen -->
+        <div id="step-3" style="display:none;">
+            <div class="card mb-3 border-warning">
+                <div class="card-header bg-warning bg-opacity-10">
+                    <h6 class="mb-0"><i class="bi bi-send me-1"></i> Mahnung best&auml;tigen</h6>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <span class="badge bg-warning text-dark fs-6 px-3 py-2">Mahnstufe {{ naechste_stufe }}</span>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <small class="text-muted">Kunde</small><br>
+                            <strong>{{ selected_rechnung.kunde_name }}</strong>
+                        </div>
+                        <div class="col-md-4">
+                            <small class="text-muted">Rechnung</small><br>
+                            <strong>{{ selected_rechnung.rechnungsnummer }}</strong>
+                        </div>
+                        <div class="col-md-4">
+                            <small class="text-muted">Gesamtforderung</small><br>
+                            <strong class="text-danger fs-5">{{ "%.2f"|format(vorschau.gesamtforderung) }} &euro;</strong>
+                        </div>
+                    </div>
+                    <p class="text-muted small">Die Mahnung wird als Entwurf erstellt. Du kannst sie vor dem Versand noch bearbeiten.</p>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(2)">
+                    <i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck
+                </button>
+                <button type="submit" class="btn btn-warning btn-lg">
+                    <i class="bi bi-exclamation-triangle me-1"></i> Mahnung erstellen
+                </button>
+            </div>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<script>
+function goStep(n) {
+    document.getElementById('step-2').style.display = n === 2 ? 'block' : 'none';
+    document.getElementById('step-3').style.display = n === 3 ? 'block' : 'none';
+    for (var i = 1; i <= 3; i++) {
+        var si = document.getElementById('si-' + i), c = si.querySelector('div'), s = si.querySelector('small');
+        if (i < n) { c.className = 'rounded-circle bg-success text-white d-flex align-items-center justify-content-center mx-auto'; c.innerHTML = '<i class="bi bi-check-lg"></i>'; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-success'; }
+        else if (i === n) { c.className = 'rounded-circle bg-warning text-dark d-flex align-items-center justify-content-center mx-auto'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 fw-bold text-warning'; }
+        else { c.className = 'rounded-circle bg-light text-muted d-flex align-items-center justify-content-center mx-auto border'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-muted'; }
+    }
+    window.scrollTo(0, 0);
+}
+</script>
+{% endblock %}

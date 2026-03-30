@@ -27,7 +27,8 @@
                             <th>Typ</th>
                             <th>Details</th>
                             <th>Freigabe</th>
-                            <th style="width: 120px;">Aktionen</th>
+                            <th>Bestellung</th>
+                            <th style="width: 150px;">Aktionen</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -74,6 +75,15 @@
                                 {% else %}
                                     <small class="text-muted">Keine Details</small>
                                 {% endif %}
+                                {% set colors = design.get_thread_colors() %}
+                                {% if colors %}
+                                <div class="d-flex flex-wrap gap-1 mt-1">
+                                    {% for c in colors %}
+                                    <span class="d-inline-block rounded-circle border" title="{{ c.color or '' }}{% if c.madeira_nr %} (Madeira {{ c.madeira_nr }}){% endif %}{% if c.pantone %} (Pantone {{ c.pantone }}){% endif %}"
+                                          style="width:14px;height:14px;background:{{ c.hex or '#666' }};"></span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
                             </td>
                             <td>
                                 <span class="badge {{ design.get_approval_status_badge_class() }}">
@@ -81,10 +91,40 @@
                                 </span>
                             </td>
                             <td>
+                                {% if design.supplier_order_status and design.supplier_order_status != 'none' %}
+                                    <span class="badge {{ design.get_supplier_status_badge() }}">
+                                        {{ design.get_supplier_status_label() }}
+                                    </span>
+                                    {% if design.supplier and design.supplier.name %}
+                                        <br><small class="text-muted">{{ design.supplier.name }}</small>
+                                    {% endif %}
+                                    {% if design.supplier_reference %}
+                                        <br><small class="text-muted">Ref: {{ design.supplier_reference }}</small>
+                                    {% endif %}
+                                    {% if design.supplier_order_status == 'ordered' and design.supplier_expected_date %}
+                                        <br><small class="text-muted">Erw. {{ design.supplier_expected_date.strftime('%d.%m.') }}</small>
+                                    {% endif %}
+                                {% elif design.approval_status == 'approved' %}
+                                    <button type="button" class="btn btn-sm btn-success" onclick="openSupplierModal({{ design.id }})" title="Freigegeben - jetzt bestellen">
+                                        <i class="bi bi-cart-plus"></i> Bestellen
+                                    </button>
+                                {% else %}
+                                    <small class="text-muted">—</small>
+                                {% endif %}
+                            </td>
+                            <td>
                                 <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-secondary"
+                                            onclick="showDesignDetail({{ design.id }})" title="Stammblatt / Details">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
                                     <button type="button" class="btn btn-outline-primary"
                                             onclick="editDesignPosition({{ design.id }})" title="Bearbeiten">
                                         <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-warning"
+                                            onclick="openSupplierModal({{ design.id }})" title="Extern bestellen">
+                                        <i class="bi bi-truck"></i>
                                     </button>
                                     {% if design.is_personalized %}
                                     <button type="button" class="btn btn-outline-info"
@@ -137,36 +177,9 @@
                                 <label class="form-label" for="position">Position auf dem Textil *</label>
                                 <select class="form-select" id="position" name="position" required onchange="updatePositionLabel()">
                                     <option value="">Position wählen...</option>
-                                    <optgroup label="Allgemein">
-                                        <option value="vorne">Vorne</option>
-                                        <option value="hinten">Hinten</option>
-                                        <option value="seite_links">Seite links</option>
-                                        <option value="seite_rechts">Seite rechts</option>
-                                        <option value="rundum">Rundum / Umlaufend</option>
-                                    </optgroup>
-                                    <optgroup label="Vorderseite (Textil)">
-                                        <option value="brust_links">Brust links</option>
-                                        <option value="brust_rechts">Brust rechts</option>
-                                        <option value="brust_mitte">Brust Mitte</option>
-                                        <option value="bauch">Bauch</option>
-                                    </optgroup>
-                                    <optgroup label="Ärmel">
-                                        <option value="aermel_links">Ärmel links</option>
-                                        <option value="aermel_rechts">Ärmel rechts</option>
-                                    </optgroup>
-                                    <optgroup label="Rückseite (Textil)">
-                                        <option value="ruecken">Rücken</option>
-                                        <option value="ruecken_oben">Rücken oben</option>
-                                        <option value="ruecken_unten">Rücken unten</option>
-                                        <option value="kragen">Kragen/Nacken</option>
-                                    </optgroup>
-                                    <optgroup label="Sonstige">
-                                        <option value="hosenbein_links">Hosenbein links</option>
-                                        <option value="hosenbein_rechts">Hosenbein rechts</option>
-                                        <option value="kappe_vorne">Kappe vorne</option>
-                                        <option value="kappe_seite">Kappe Seite</option>
-                                        <option value="andere">Andere Position</option>
-                                    </optgroup>
+                                    {% for code, label in position_choices %}
+                                    <option value="{{ code }}">{{ label }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -176,9 +189,9 @@
                             <div class="mb-3">
                                 <label class="form-label" for="design_type">Design-Typ *</label>
                                 <select class="form-select" id="design_type" name="design_type" required onchange="toggleDesignTypeFields()">
-                                    <option value="stick">Stickerei</option>
-                                    <option value="druck">Druck</option>
-                                    <option value="flex">Flex/Flock</option>
+                                    {% for code, label in design_type_choices %}
+                                    <option value="{{ code }}">{{ label }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -275,10 +288,20 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label" for="thread_colors">Garnfarben (JSON)</label>
-                            <textarea class="form-control" id="thread_colors" name="thread_colors" rows="2"
-                                      placeholder='[{"color": "Rot", "madeira_nr": "1147"}]'></textarea>
+                        <!-- Garnfarben (Farbname, Madeira-Nr, Hex) -->
+                        <div class="mb-2">
+                            <label class="form-label fw-bold">Garnfarben</label>
+                            <div id="thread-color-list" class="d-flex flex-wrap gap-2 mb-2"></div>
+                            <div class="input-group input-group-sm">
+                                <input type="text" id="tc-name" class="form-control" placeholder="Farbname z.B. Rot">
+                                <input type="text" id="tc-madeira" class="form-control" placeholder="Madeira-Nr z.B. 1147" style="max-width:130px">
+                                <input type="color" id="tc-hex" class="form-control form-control-color" value="#000000" title="Hex-Farbe" style="max-width:50px">
+                                <button type="button" class="btn btn-outline-secondary" onclick="addThreadColor()">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">Farbname + Madeira-Nr (optional) + Hex-Farbe wählen, dann + klicken</small>
+                            <input type="hidden" id="thread_colors_json" name="thread_colors" value="[]">
                         </div>
                     </div>
 
@@ -347,6 +370,13 @@
                             </div>
                         </div>
                     </div>
+                    <!-- Notizen -->
+                    <div class="mb-3">
+                        <label class="form-label" for="design_notes"><i class="bi bi-journal-text"></i> Notizen / Kommentare</label>
+                        <textarea class="form-control" id="design_notes" name="notes" rows="2"
+                                  placeholder="Interne Hinweise, Produktions-Anweisungen, etc."></textarea>
+                    </div>
+
                     <!-- Kalkulations-Vorschau (intern) -->
                     <div id="price-suggestion-box" class="d-none mb-3">
                         <div class="border rounded p-3" style="background:#f0f9ff; border-color:#bee3f8 !important;">
@@ -418,6 +448,130 @@
     </div>
 </div>
 
+<!-- Modal: Design-Detail / Stammblatt -->
+<div class="modal fade" id="designDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-richtext"></i> <span id="detail-title">Design-Stammblatt</span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="design-detail-body">
+                <div class="text-center py-4"><i class="bi bi-hourglass-split"></i> Lade...</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary" onclick="printDesignDetail()">
+                    <i class="bi bi-printer"></i> Drucken
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Externe Bestellung -->
+<div class="modal fade" id="supplierOrderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-truck"></i> Externe Bestellung</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="supplier_design_id">
+
+                <div class="mb-3">
+                    <label class="form-label">Lieferant</label>
+                    <select class="form-select" id="supplier_id">
+                        <option value="">Kein Lieferant</option>
+                        {% for supplier in suppliers|default([]) %}
+                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Bestellstatus</label>
+                    <select class="form-select" id="supplier_order_status" onchange="onSupplierStatusChange()">
+                        <option value="none">Keine externe Bestellung</option>
+                        <option value="to_order">Zu bestellen</option>
+                        <option value="ordered">Bestellt</option>
+                        <option value="delivered">Geliefert</option>
+                    </select>
+                </div>
+
+                <div class="row" id="supplier_dates_section" style="display: none;">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Bestellt am</label>
+                        <input type="date" class="form-control form-control-sm" id="supplier_order_date">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Erwartet</label>
+                        <input type="date" class="form-control form-control-sm" id="supplier_expected_date">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Geliefert am</label>
+                        <input type="date" class="form-control form-control-sm" id="supplier_delivered_date">
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Einkaufspreis</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" class="form-control" id="supplier_cost" step="0.01" min="0" value="0">
+                            <span class="input-group-text">&euro;</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Lieferanten-Bestellnr.</label>
+                        <input type="text" class="form-control form-control-sm" id="supplier_reference"
+                               placeholder="z.B. Bestellnr. beim Lieferanten">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Notizen</label>
+                    <textarea class="form-control form-control-sm" id="supplier_order_notes" rows="2"></textarea>
+                </div>
+
+                <!-- Verknüpfte Bestellung -->
+                <div id="supplier_order_link" class="mb-3" style="display:none;">
+                    <div class="alert alert-success py-2 mb-0 small">
+                        <i class="bi bi-link-45deg"></i> Verknüpft mit Bestellung:
+                        <a href="#" id="supplier_order_link_href" target="_blank"><strong id="supplier_order_link_text"></strong></a>
+                    </div>
+                </div>
+
+                <hr>
+                <div class="mb-3">
+                    <label class="form-label"><i class="bi bi-file-earmark-arrow-up"></i> Druckdatei</label>
+                    <div id="print_file_display" style="display: none;" class="mb-2">
+                        <span class="badge bg-light text-dark border" id="print_file_name_display"></span>
+                        <button type="button" class="btn btn-sm btn-outline-danger ms-1" onclick="deletePrintFile()" title="Datei entfernen">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                    <input type="file" class="form-control form-control-sm" id="print_file_input"
+                           accept=".png,.jpg,.jpeg,.pdf,.ai,.svg,.tiff,.bmp,.eps">
+                    <small class="form-text text-muted">PNG, PDF, AI, SVG, TIFF etc.</small>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-success" id="btn_create_supplier_order" onclick="createSupplierOrder()" style="display:none;">
+                    <i class="bi bi-cart-plus"></i> Bestellung erstellen
+                </button>
+                <div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="button" class="btn btn-primary" onclick="saveSupplierStatus()">
+                        <i class="bi bi-check-lg"></i> Speichern
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 // Vorhandene Design-Datei des Auftrags
 const orderDesignFilePath = {{ (order.design_file_path or '') | tojson }};
@@ -456,7 +610,9 @@ function openAddDesignModal() {
     document.getElementById('design_id').value = '';
     document.getElementById('designPositionModalLabel').innerHTML = '<i class="bi bi-plus-circle"></i> Design-Position hinzufügen';
 
-    // Druckfarben mit Auftrags-Farben vorausfüllen (wenn vorhanden)
+    // Farben zurücksetzen
+    threadColors = [];
+    renderThreadColorList();
     printColors = orderPrintColors.length > 0 ? [...orderPrintColors] : [];
     renderPrintColorList();
 
@@ -500,17 +656,23 @@ function editDesignPosition(designId) {
                 document.getElementById('print_width_cm').value = design.print_width_cm || '';
                 document.getElementById('print_height_cm').value = design.print_height_cm || '';
 
-                // Druckfarben laden (thread_colors enthält JSON für Nicht-Stick-Designs)
-                if (design.design_type !== 'stick') {
-                    renderPrintColors(design.thread_colors || '[]');
-                } else {
+                // Farben laden
+                if (design.design_type === 'stick') {
+                    renderThreadColors(design.thread_colors || '[]');
                     printColors = [];
                     renderPrintColorList();
+                } else {
+                    renderPrintColors(design.thread_colors || '[]');
+                    threadColors = [];
+                    renderThreadColorList();
                 }
 
                 // Preise
                 document.getElementById('setup_price').value = design.setup_price || 0;
                 document.getElementById('price_per_piece').value = design.price_per_piece || 0;
+
+                // Notizen
+                document.getElementById('design_notes').value = design.notes || '';
 
                 // UI aktualisieren
                 toggleDesignTypeFields();
@@ -860,6 +1022,77 @@ function renderPrintColors(colorsData) {
     renderPrintColorList();
 }
 
+// ── Garnfarben (Stickerei) Verwaltung ──────────────────────────────────
+let threadColors = [];
+
+function addThreadColor() {
+    const name = document.getElementById('tc-name').value.trim();
+    const madeira = document.getElementById('tc-madeira').value.trim();
+    const hex = document.getElementById('tc-hex').value;
+
+    if (!name) {
+        alert('Bitte Farbname eingeben.');
+        return;
+    }
+
+    threadColors.push({ color: name, madeira_nr: madeira, hex: hex });
+    renderThreadColorList();
+
+    document.getElementById('tc-name').value = '';
+    document.getElementById('tc-madeira').value = '';
+    document.getElementById('tc-hex').value = '#000000';
+    document.getElementById('tc-name').focus();
+}
+
+function removeThreadColor(index) {
+    threadColors.splice(index, 1);
+    renderThreadColorList();
+}
+
+function renderThreadColorList() {
+    const container = document.getElementById('thread-color-list');
+    if (!container) return;
+    container.innerHTML = '';
+
+    threadColors.forEach((c, i) => {
+        const hex = c.hex || '#666666';
+        const light = isLightColor(hex);
+        const textColor = light ? '#222' : '#fff';
+        const label = [c.color, c.madeira_nr ? ('Madeira ' + c.madeira_nr) : ''].filter(Boolean).join(' | ');
+        const badge = document.createElement('span');
+        badge.className = 'badge d-inline-flex align-items-center gap-1 px-2 py-1';
+        badge.style.cssText = `background:${hex};color:${textColor};border:1px solid #bbb;font-size:0.8em;`;
+        badge.innerHTML = `
+            <span style="width:12px;height:12px;border-radius:2px;background:${hex};border:1px solid #aaa;flex-shrink:0;display:inline-block;"></span>
+            ${label}
+            <button type="button" onclick="removeThreadColor(${i})"
+                style="background:none;border:none;padding:0;margin-left:4px;cursor:pointer;color:${textColor};font-size:1em;line-height:1;"
+                title="Entfernen">&times;</button>
+        `;
+        container.appendChild(badge);
+    });
+
+    // Sync hidden input
+    const hiddenInput = document.getElementById('thread_colors_json');
+    if (hiddenInput) hiddenInput.value = JSON.stringify(threadColors);
+}
+
+function renderThreadColors(colorsData) {
+    try {
+        if (typeof colorsData === 'string' && colorsData) {
+            const parsed = JSON.parse(colorsData);
+            threadColors = Array.isArray(parsed) ? parsed : [];
+        } else if (Array.isArray(colorsData)) {
+            threadColors = colorsData;
+        } else {
+            threadColors = [];
+        }
+    } catch (e) {
+        threadColors = [];
+    }
+    renderThreadColorList();
+}
+
 // ===== Preis-Kalkulation =====
 let _priceSuggestion = null;
 
@@ -957,4 +1190,286 @@ document.getElementById('designPositionForm').addEventListener('submit', functio
         alert('Fehler beim Speichern');
     });
 });
+
+// =============================================
+// Design-Detail / Stammblatt
+// =============================================
+function showDesignDetail(designId) {
+    const body = document.getElementById('design-detail-body');
+    body.innerHTML = '<div class="text-center py-4"><i class="bi bi-hourglass-split"></i> Lade...</div>';
+    new bootstrap.Modal(document.getElementById('designDetailModal')).show();
+
+    fetch(`/orders/api/design/${designId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) { body.innerHTML = '<div class="alert alert-danger">Fehler</div>'; return; }
+            const d = data.design;
+            const typeLabels = { {% for code, label in design_type_choices %}'{{ code }}':'{{ label }}'{% if not loop.last %}, {% endif %}{% endfor %} };
+            const statusLabels = {pending:'Ausstehend', sent:'Gesendet', approved:'Freigegeben', rejected:'Abgelehnt', revision_requested:'Änderung gewünscht'};
+            const statusBadge = {pending:'secondary', sent:'warning', approved:'success', rejected:'danger', revision_requested:'info'};
+
+            let imgHtml = '';
+            if (d.design_file_path) {
+                imgHtml = `<img src="/orders/api/designs/${designId}/image" class="img-fluid rounded border"
+                           style="max-height:300px;object-fit:contain;background:#f8f9fa;"
+                           onerror="this.outerHTML='<div class=\\'bg-light p-4 text-center rounded\\'><i class=\\'bi bi-image text-muted\\' style=\\'font-size:3rem\\'></i><br><small class=\\'text-muted\\'>Vorschau nicht verfügbar</small></div>'">`;
+            } else {
+                imgHtml = '<div class="bg-light p-4 text-center rounded"><i class="bi bi-image text-muted" style="font-size:3rem"></i><br><small class="text-muted">Keine Design-Datei</small></div>';
+            }
+
+            // Farben rendern
+            let colorsHtml = '';
+            if (d.thread_colors) {
+                try {
+                    const colors = JSON.parse(d.thread_colors);
+                    if (Array.isArray(colors) && colors.length > 0) {
+                        colorsHtml = '<div class="d-flex flex-wrap gap-2 mt-1">';
+                        colors.forEach(c => {
+                            const hex = c.hex || '#666';
+                            const name = c.color || c.name || '';
+                            const pantone = c.pantone || c.madeira_nr || '';
+                            colorsHtml += `<span class="badge border d-flex align-items-center gap-1" style="background:${hex};color:${isLightColor(hex)?'#000':'#fff'}">
+                                <span style="width:12px;height:12px;border-radius:50%;background:${hex};border:1px solid rgba(0,0,0,0.2);display:inline-block"></span>
+                                ${name}${pantone ? ' ('+pantone+')' : ''}
+                            </span>`;
+                        });
+                        colorsHtml += '</div>';
+                    }
+                } catch(e) {}
+            }
+
+            let detailsHtml = '';
+            if (d.design_type === 'stick') {
+                detailsHtml = `
+                    ${d.stitch_count ? '<div class="col-md-4"><strong>Stichzahl</strong><br>'+d.stitch_count.toLocaleString()+'</div>' : ''}
+                    ${d.width_mm ? '<div class="col-md-4"><strong>Maße</strong><br>'+d.width_mm+' x '+d.height_mm+' mm</div>' : ''}
+                `;
+            } else {
+                detailsHtml = `
+                    ${d.print_width_cm ? '<div class="col-md-4"><strong>Maße</strong><br>'+d.print_width_cm+' x '+d.print_height_cm+' cm</div>' : ''}
+                `;
+            }
+
+            document.getElementById('detail-title').textContent = d.design_name || d.position_label || 'Design-Stammblatt';
+            body.innerHTML = `
+                <div class="row" id="design-detail-print">
+                    <div class="col-md-5 text-center mb-3">
+                        ${imgHtml}
+                    </div>
+                    <div class="col-md-7">
+                        <table class="table table-sm">
+                            <tr><th style="width:40%">Position</th><td>${d.position_label || d.position}</td></tr>
+                            <tr><th>Typ</th><td><span class="badge bg-${d.design_type==='stick'?'primary':'success'}">${typeLabels[d.design_type] || d.design_type}</span></td></tr>
+                            <tr><th>Freigabe</th><td><span class="badge bg-${statusBadge[d.approval_status]||'secondary'}">${statusLabels[d.approval_status]||d.approval_status}</span></td></tr>
+                            ${d.setup_price ? '<tr><th>Einrichtung</th><td>'+d.setup_price.toFixed(2)+' €</td></tr>' : ''}
+                            ${d.price_per_piece ? '<tr><th>Preis/Stück</th><td>'+d.price_per_piece.toFixed(2)+' €</td></tr>' : ''}
+                            ${d.design_name ? '<tr><th>Name</th><td>'+d.design_name+'</td></tr>' : ''}
+                        </table>
+                        ${detailsHtml ? '<div class="row mb-3">'+detailsHtml+'</div>' : ''}
+                        ${colorsHtml ? '<div class="mb-3"><strong>Farben</strong>'+colorsHtml+'</div>' : ''}
+                        ${d.notes ? '<div class="mb-3"><strong>Notizen</strong><div class="border rounded p-2 bg-light small">'+d.notes.replace(/\\n/g,'<br>')+'</div></div>' : ''}
+                    </div>
+                </div>
+            `;
+        });
+}
+
+function isLightColor(hex) {
+    hex = hex.replace('#','');
+    const r = parseInt(hex.substr(0,2),16), g = parseInt(hex.substr(2,2),16), b = parseInt(hex.substr(4,2),16);
+    return (r*299 + g*587 + b*114) / 1000 > 128;
+}
+
+function printDesignDetail() {
+    const content = document.getElementById('design-detail-print');
+    if (!content) return;
+    const win = window.open('', '_blank');
+    win.document.write(`<html><head><title>Design-Stammblatt</title>
+        <link rel="stylesheet" href="/static/css/bootstrap.min.css">
+        <style>body{padding:20px;font-family:Arial,sans-serif}img{max-width:100%}@media print{.no-print{display:none}}</style>
+        </head><body>${content.innerHTML}</body></html>`);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 500);
+}
+
+// =============================================
+// Externe Bestellung (Supplier Order)
+// =============================================
+function openSupplierModal(designId) {
+    document.getElementById('supplier_design_id').value = designId;
+    // Reset
+    document.getElementById('supplier_id').value = '';
+    document.getElementById('supplier_order_status').value = 'none';
+    document.getElementById('supplier_order_date').value = '';
+    document.getElementById('supplier_expected_date').value = '';
+    document.getElementById('supplier_delivered_date').value = '';
+    document.getElementById('supplier_cost').value = '0';
+    document.getElementById('supplier_reference').value = '';
+    document.getElementById('supplier_order_notes').value = '';
+    document.getElementById('print_file_display').style.display = 'none';
+    document.getElementById('print_file_input').value = '';
+    document.getElementById('supplier_dates_section').style.display = 'none';
+    document.getElementById('supplier_order_link').style.display = 'none';
+    document.getElementById('btn_create_supplier_order').style.display = 'none';
+
+    // Aktuelle Daten laden
+    fetch(`/orders/api/design/${designId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                const d = data.design;
+                document.getElementById('supplier_id').value = d.supplier_id || '';
+                document.getElementById('supplier_order_status').value = d.supplier_order_status || 'none';
+                document.getElementById('supplier_order_date').value = d.supplier_order_date || '';
+                document.getElementById('supplier_expected_date').value = d.supplier_expected_date || '';
+                document.getElementById('supplier_delivered_date').value = d.supplier_delivered_date || '';
+                document.getElementById('supplier_cost').value = d.supplier_cost || 0;
+                document.getElementById('supplier_reference').value = d.supplier_reference || '';
+                document.getElementById('supplier_order_notes').value = d.supplier_order_notes || '';
+                onSupplierStatusChange();
+                if (d.print_file_name) {
+                    document.getElementById('print_file_name_display').textContent = d.print_file_name;
+                    document.getElementById('print_file_display').style.display = 'inline-block';
+                }
+                // Verknüpfte Bestellung anzeigen
+                if (d.supplier_order_id) {
+                    document.getElementById('supplier_order_link').style.display = 'block';
+                    document.getElementById('supplier_order_link_text').textContent = 'Bestellung ' + d.supplier_order_id;
+                    document.getElementById('supplier_order_link_href').href = '/suppliers/all-orders';
+                } else if (d.supplier_id && (d.supplier_order_status === 'to_order' || d.supplier_order_status === 'none')) {
+                    // "Bestellung erstellen" Button zeigen wenn Lieferant gewählt aber noch keine Bestellung
+                    document.getElementById('btn_create_supplier_order').style.display = '';
+                }
+            }
+        });
+
+    new bootstrap.Modal(document.getElementById('supplierOrderModal')).show();
+}
+
+function onSupplierStatusChange() {
+    const status = document.getElementById('supplier_order_status').value;
+    document.getElementById('supplier_dates_section').style.display =
+        (status === 'ordered' || status === 'delivered') ? '' : 'none';
+    // "Bestellung erstellen" Button ein-/ausblenden
+    const supplierId = document.getElementById('supplier_id').value;
+    const hasOrder = document.getElementById('supplier_order_link').style.display === 'block';
+    document.getElementById('btn_create_supplier_order').style.display =
+        (supplierId && !hasOrder) ? '' : 'none';
+}
+
+function saveSupplierStatus() {
+    const designId = document.getElementById('supplier_design_id').value;
+    const payload = {
+        supplier_id: document.getElementById('supplier_id').value || null,
+        supplier_order_status: document.getElementById('supplier_order_status').value,
+        supplier_order_date: document.getElementById('supplier_order_date').value || null,
+        supplier_expected_date: document.getElementById('supplier_expected_date').value || null,
+        supplier_delivered_date: document.getElementById('supplier_delivered_date').value || null,
+        supplier_cost: document.getElementById('supplier_cost').value || 0,
+        supplier_reference: document.getElementById('supplier_reference').value || null,
+        supplier_order_notes: document.getElementById('supplier_order_notes').value || null
+    };
+
+    fetch(`/orders/api/design/${designId}/supplier-status`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Druckdatei hochladen falls ausgewählt
+            const fileInput = document.getElementById('print_file_input');
+            if (fileInput.files.length > 0) {
+                uploadPrintFile(designId, fileInput.files[0]);
+            }
+            bootstrap.Modal.getInstance(document.getElementById('supplierOrderModal')).hide();
+            location.reload();
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+        }
+    })
+    .catch(err => alert('Fehler beim Speichern: ' + err));
+}
+
+function uploadPrintFile(designId, file) {
+    const formData = new FormData();
+    formData.append('print_file', file);
+
+    fetch(`/orders/api/design/${designId}/print-file`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            alert('Fehler beim Datei-Upload: ' + (data.error || ''));
+        }
+    });
+}
+
+function createSupplierOrder() {
+    const designId = document.getElementById('supplier_design_id').value;
+    const supplierId = document.getElementById('supplier_id').value;
+    if (!supplierId) {
+        alert('Bitte zuerst einen Lieferanten auswählen.');
+        return;
+    }
+    if (!confirm('Lieferantenbestellung erstellen?')) return;
+
+    // Erst Lieferanten-Status speichern (ohne Reload)
+    const payload = {
+        supplier_id: supplierId,
+        supplier_order_status: document.getElementById('supplier_order_status').value,
+        supplier_order_date: document.getElementById('supplier_order_date').value || null,
+        supplier_expected_date: document.getElementById('supplier_expected_date').value || null,
+        supplier_delivered_date: document.getElementById('supplier_delivered_date').value || null,
+        supplier_cost: document.getElementById('supplier_cost').value || 0,
+        supplier_reference: document.getElementById('supplier_reference').value || null,
+        supplier_order_notes: document.getElementById('supplier_order_notes').value || null
+    };
+
+    fetch(`/orders/api/design/${designId}/supplier-status`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(saveData => {
+        if (!saveData.success) {
+            alert('Fehler beim Speichern: ' + (saveData.error || 'Unbekannt'));
+            return;
+        }
+        // Jetzt Bestellung erstellen
+        return fetch(`/orders/api/design/${designId}/create-supplier-order`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+    })
+    .then(r => r ? r.json() : null)
+    .then(data => {
+        if (data && data.success) {
+            alert('Bestellung ' + data.order_number + ' erstellt für ' + data.supplier_name);
+            bootstrap.Modal.getInstance(document.getElementById('supplierOrderModal')).hide();
+            location.reload();
+        } else if (data) {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+        }
+    })
+    .catch(err => alert('Fehler: ' + err));
+}
+
+function deletePrintFile() {
+    const designId = document.getElementById('supplier_design_id').value;
+    if (!confirm('Druckdatei wirklich entfernen?')) return;
+
+    fetch(`/orders/api/design/${designId}/print-file`, { method: 'DELETE' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('print_file_display').style.display = 'none';
+                document.getElementById('print_file_input').value = '';
+            }
+        });
+}
 </script>

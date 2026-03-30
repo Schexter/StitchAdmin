@@ -17,7 +17,10 @@
         
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1>Bestellung {{ order.id }}</h1>
-            <div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('orders.stammblatt_pdf', order_id=order.id) }}" class="btn btn-outline-secondary" target="_blank">
+                    <i class="bi bi-file-earmark-pdf"></i> Stammblatt
+                </a>
                 <a href="{{ url_for('orders.edit', order_id=order.id) }}" class="btn btn-primary">
                     <i class="bi bi-pencil"></i> Bearbeiten
                 </a>
@@ -53,6 +56,20 @@
                         {% endif %}
                     </div>
                 </div>
+                {% if order.billing_customer_id and order.billing_customer %}
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Rechnungsempfaenger:</strong></div>
+                    <div class="col-md-9">
+                        <span class="badge bg-info me-1"><i class="bi bi-receipt"></i> Abweichend</span>
+                        <a href="{{ url_for('customers.show', customer_id=order.billing_customer.id) }}">
+                            {{ order.billing_customer.display_name }}
+                        </a>
+                        {% if order.billing_customer.customer_number %}
+                            <small class="text-muted">({{ order.billing_customer.customer_number }})</small>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
                 <div class="row mb-2">
                     <div class="col-md-3"><strong>Status:</strong></div>
                     <div class="col-md-9">
@@ -67,6 +84,15 @@
                         {% endif %}
                     </div>
                 </div>
+                {% if order.is_kundenware %}
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Kundenware:</strong></div>
+                    <div class="col-md-9">
+                        <span class="badge bg-warning text-dark"><i class="bi bi-box-seam me-1"></i>Kundenware</span>
+                        <small class="text-muted ms-1">Artikel vom Kunden beigestellt</small>
+                    </div>
+                </div>
+                {% endif %}
                 <div class="row mb-2">
                     <div class="col-md-3"><strong>Erstellt am:</strong></div>
                     <div class="col-md-9">
@@ -120,9 +146,9 @@
                     </div>
                 </div>
                 {% if order.items.count() > 0 %}
-                <!-- Textil-Items Struktur -->
+                <!-- Artikel-Items Struktur -->
                 <div class="row mb-3">
-                    <div class="col-md-3"><strong>Textilien:</strong></div>
+                    <div class="col-md-3"><strong>Artikel:</strong></div>
                     <div class="col-md-9">
                         {% for item in order.items %}
                         <div class="border p-2 mb-2">
@@ -149,7 +175,7 @@
                 {% else %}
                 <!-- Legacy-Struktur für alte Aufträge -->
                 <div class="row mb-2">
-                    <div class="col-md-3"><strong>Textil:</strong></div>
+                    <div class="col-md-3"><strong>Artikel:</strong></div>
                     <div class="col-md-9">{{ order.textile_type|title or '-' }}</div>
                 </div>
                 <div class="row mb-2">
@@ -343,6 +369,9 @@
     </div>
 
     <div class="col-md-4">
+        <!-- Workflow-Timeline -->
+        {% include 'orders/includes/workflow_timeline.html' %}
+
         <!-- Status-Aktionen -->
         <div class="card mb-4">
             <div class="card-header">
@@ -365,6 +394,9 @@
                             <li><a class="dropdown-item" href="{{ url_for('orders.print_order_sheet', order_id=order.id) }}" target="_blank">
                                 <i class="bi bi-file-earmark-text"></i> Auftragsblatt (Vorschau)
                             </a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('orders.print_order_sheet', order_id=order.id) }}?production=1" target="_blank">
+                                <i class="bi bi-file-earmark-ruled"></i> Produktionsblatt (ohne Preise)
+                            </a></li>
                         </ul>
                     </div>
                     {% if order.status == 'accepted' %}
@@ -386,19 +418,41 @@
                     {% endif %}
                     
                     {% if order.status == 'ready' %}
+                    <div class="card border-warning mb-2">
+                        <div class="card-header bg-warning text-dark py-1 px-2">
+                            <small class="fw-bold"><i class="bi bi-clipboard-check me-1"></i>Versand-Checkliste</small>
+                        </div>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item py-1 px-2 small">
+                                <i class="bi bi-check-circle-fill text-success me-1"></i>Produktion abgeschlossen
+                            </li>
+                            <li class="list-group-item py-1 px-2 small">
+                                {% if order.invoice_id %}
+                                <i class="bi bi-check-circle-fill text-success me-1"></i>Rechnung erstellt
+                                {% else %}
+                                <i class="bi bi-x-circle-fill text-danger me-1"></i>Keine Rechnung —
+                                <a href="{{ url_for('rechnung.aus_auftrag', order_id=order.id) }}">Jetzt erstellen</a>
+                                {% endif %}
+                            </li>
+                        </ul>
+                    </div>
+                    {% if order.delivery_type == 'pickup' %}
+                    <a href="{{ url_for('shipping.abholung_unterschrift', order_id=order.id) }}"
+                       class="btn btn-warning w-100" target="_blank">
+                        <i class="bi bi-pen"></i> Abholung — Unterschrift erfassen
+                    </a>
+                    {% else %}
                     <a href="{{ url_for('shipping.new', order_id=order.id) }}" class="btn btn-primary w-100">
                         <i class="bi bi-truck"></i> Versand vorbereiten
                     </a>
                     {% endif %}
+                    {% endif %}
                     
                     {% if order.status != 'cancelled' and order.status != 'completed' %}
-                    <form method="POST" action="{{ url_for('orders.update_status', order_id=order.id) }}">
-                        <input type="hidden" name="status" value="cancelled">
-                        <button type="submit" class="btn btn-danger w-100" 
-                                onclick="return confirm('Auftrag wirklich stornieren?')">
-                            <i class="bi bi-x-circle"></i> Stornieren
-                        </button>
-                    </form>
+                    <button type="button" class="btn btn-danger w-100"
+                            data-bs-toggle="modal" data-bs-target="#cancelOrderModal">
+                        <i class="bi bi-x-circle"></i> Stornieren
+                    </button>
                     {% endif %}
                 </div>
             </div>
@@ -424,6 +478,163 @@
         </div>
         {% endif %}
 
+        <!-- Design-Freigabe Status + Änderungswünsche -->
+        {% if order.design_approval_status %}
+        <div class="card mb-4 {% if order.design_approval_status == 'revision_requested' %}border-warning{% elif order.design_approval_status == 'approved' %}border-success{% endif %}">
+            <div class="card-header {% if order.design_approval_status == 'revision_requested' %}bg-warning text-dark{% elif order.design_approval_status == 'approved' %}bg-success text-white{% else %}bg-light{% endif %}">
+                <h5 class="mb-0">
+                    <i class="bi bi-palette me-1"></i>Design-Freigabe
+                    {% if order.design_approval_status == 'revision_requested' %}
+                        <span class="badge bg-dark ms-1">Änderung gewünscht</span>
+                    {% elif order.design_approval_status == 'approved' %}
+                        <span class="badge bg-light text-success ms-1"><i class="bi bi-check-circle"></i> Freigegeben</span>
+                    {% elif order.design_approval_status == 'sent' %}
+                        <span class="badge bg-secondary ms-1">Warte auf Antwort</span>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if order.design_approval_status == 'revision_requested' and order.design_approval_notes %}
+                <div class="alert alert-warning mb-2">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <strong>Kundennachricht:</strong>
+                </div>
+                <div class="p-2 rounded bg-light" style="white-space: pre-wrap; font-size: 0.9em;">{{ order.design_approval_notes }}</div>
+                {% if order.design_approval_ip %}
+                <small class="text-muted mt-1 d-block"><i class="bi bi-geo-alt me-1"></i>IP: {{ order.design_approval_ip }}</small>
+                {% endif %}
+                {% elif order.design_approval_status == 'approved' %}
+                <p class="text-success mb-1"><i class="bi bi-check-circle me-1"></i>Kunde hat das Design freigegeben.</p>
+                {% if order.design_approval_date %}
+                <small class="text-muted">Am {{ order.design_approval_date.strftime('%d.%m.%Y %H:%M') }}</small>
+                {% endif %}
+                {% if order.design_approval_notes %}
+                <div class="mt-2 p-2 rounded bg-light" style="font-size:0.85em; white-space:pre-wrap;">{{ order.design_approval_notes }}</div>
+                {% endif %}
+                {% elif order.design_approval_status == 'sent' %}
+                <p class="text-muted mb-1">Freigabe-E-Mail wurde gesendet.</p>
+                {% if order.design_approval_sent_at %}
+                <small class="text-muted">Gesendet am {{ order.design_approval_sent_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                {% endif %}
+                {% endif %}
+                <div class="mt-2 d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('design_approval.admin_index') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-right me-1"></i>Zur Design-Freigabe
+                    </a>
+                    {% if order.design_approval_status != 'approved' %}
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#manualApprovalModal">
+                        <i class="bi bi-check-circle me-1"></i>Manuell freigeben
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <!-- Design-Freigabe - kein Status vorhanden, Button zum manuell freigeben -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="bi bi-palette me-1"></i>Design-Freigabe</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-2">Noch keine Freigabe versendet oder erteilt.</p>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ url_for('design_approval.admin_index') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-send me-1"></i>Freigabe versenden
+                    </a>
+                    <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#manualApprovalModal">
+                        <i class="bi bi-check-circle me-1"></i>Manuell freigeben
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Kunden-Benachrichtigungen -->
+        {% if order.customer and order.customer.email %}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-envelope me-1"></i>Benachrichtigungen</h5>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-send"></i> Senden
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <form method="POST" action="{{ url_for('orders.send_customer_notification', order_id=order.id) }}">
+                                <button type="submit" name="type" value="accepted" class="dropdown-item">
+                                    <i class="bi bi-check-circle text-success me-1"></i> Auftragsbestaetigung
+                                </button>
+                            </form>
+                        </li>
+                        <li>
+                            <form method="POST" action="{{ url_for('orders.send_customer_notification', order_id=order.id) }}">
+                                <button type="submit" name="type" value="confirmed" class="dropdown-item">
+                                    <i class="bi bi-truck text-info me-1"></i> Ware im Zulauf
+                                </button>
+                            </form>
+                        </li>
+                        <li>
+                            <form method="POST" action="{{ url_for('orders.send_customer_notification', order_id=order.id) }}">
+                                <button type="submit" name="type" value="in_progress" class="dropdown-item">
+                                    <i class="bi bi-gear text-warning me-1"></i> Produktion gestartet
+                                </button>
+                            </form>
+                        </li>
+                        <li>
+                            <form method="POST" action="{{ url_for('orders.send_customer_notification', order_id=order.id) }}">
+                                <button type="submit" name="type" value="ready" class="dropdown-item">
+                                    <i class="bi bi-box-seam text-primary me-1"></i> Auftrag fertig
+                                </button>
+                            </form>
+                        </li>
+                        <li>
+                            <form method="POST" action="{{ url_for('orders.send_customer_notification', order_id=order.id) }}">
+                                <button type="submit" name="type" value="shipped" class="dropdown-item">
+                                    <i class="bi bi-send text-success me-1"></i> Versendet
+                                </button>
+                            </form>
+                        </li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li>
+                            <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#customNotificationModal">
+                                <i class="bi bi-pencil-square text-secondary me-1"></i> Individuelle Nachricht
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            {% if notification_logs is defined and notification_logs %}
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for log in notification_logs %}
+                    <div class="list-group-item px-3 py-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small>
+                                {% if log.status == 'sent' %}
+                                    <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                {% elif log.status == 'failed' %}
+                                    <i class="bi bi-x-circle-fill text-danger me-1"></i>
+                                {% else %}
+                                    <i class="bi bi-clock text-muted me-1"></i>
+                                {% endif %}
+                                {{ log.subject or log.template_name or 'Benachrichtigung' }}
+                            </small>
+                            <small class="text-muted">
+                                {% if log.created_at %}{{ log.created_at.strftime('%d.%m. %H:%M') }}{% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="card-body">
+                <small class="text-muted">Noch keine Benachrichtigungen gesendet.</small>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
         <!-- CRM Aktivitäten (Telefonate, Besuche, E-Mails) -->
         {% if activities is defined and activities %}
         <div class="card mb-4">
@@ -446,6 +657,10 @@
                     <!-- Neue Aktivität erfassen -->
                     <a href="{{ url_for('production.calendar_new') }}?order={{ order.id }}{% if order.customer %}&customer={{ order.customer.id }}{% endif %}" class="btn btn-info">
                         <i class="bi bi-telephone-plus"></i> Telefonat / Aktivität erfassen
+                    </a>
+                    <!-- Material/Textilien bestellen -->
+                    <a href="{{ url_for('purchasing.new_manual_order') }}?linked_order={{ order.id }}" class="btn btn-warning">
+                        <i class="bi bi-cart-plus"></i> Material bestellen
                     </a>
                     <!-- Foto-Dokumentation -->
                     <a href="{{ url_for('orders.photos', order_id=order.id) }}" class="btn btn-primary">
@@ -499,8 +714,297 @@
     </div>
 </div>
 
+<!-- Produktionsjobs -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Produktionsjobs</h5>
+                <div class="d-flex gap-2">
+                    {% if order.status in ['new', 'accepted', 'in_progress'] %}
+                    <button class="btn btn-sm btn-outline-primary" onclick="autoCreateJobs()">
+                        <i class="bi bi-magic"></i> Auto-Erstellen
+                    </button>
+                    <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addJobModal">
+                        <i class="bi bi-plus-lg"></i> Job hinzufuegen
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="jobsContainer">
+                    <div class="text-center py-4 text-muted" id="noJobsMessage">
+                        <i class="bi bi-inbox fs-3"></i>
+                        <p class="mt-2 mb-0">Keine Produktionsjobs angelegt</p>
+                        <small>Klicken Sie "Auto-Erstellen" oder fuegen Sie manuell Jobs hinzu</small>
+                    </div>
+                </div>
+                <table class="table table-sm table-hover mb-0" id="jobsTable" style="display: none;">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 90px">Job-Nr</th>
+                            <th>Verfahren</th>
+                            <th>Beschreibung</th>
+                            <th style="width: 120px">Status</th>
+                            <th style="width: 100px">Dauer</th>
+                            <th style="width: 140px">Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobsTableBody"></tbody>
+                </table>
+                <div class="card-footer bg-light" id="jobsProgress" style="display: none;">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="progress flex-grow-1" style="height: 8px;">
+                            <div class="progress-bar bg-success" id="jobsProgressBar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <small class="text-muted" id="jobsProgressText">0/0 erledigt</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Job hinzufuegen Modal -->
+<div class="modal fade" id="addJobModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-lg me-2"></i>Produktionsjob hinzufuegen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Verfahren</label>
+                    <select class="form-select" id="newJobType">
+                        <option value="embroidery">Stickerei</option>
+                        <option value="dtf">DTF-Druck</option>
+                        <option value="sublimation">Sublimation</option>
+                        <option value="printing">Druck</option>
+                        <option value="laser">Laser</option>
+                        <option value="engraving">Gravur</option>
+                        <option value="cutting">Zuschnitt</option>
+                        <option value="other">Sonstiges</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Beschreibung</label>
+                    <input type="text" class="form-control" id="newJobDescription" placeholder="z.B. Logo Brust links">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Notizen (optional)</label>
+                    <textarea class="form-control" id="newJobNotes" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="createJob()">
+                    <i class="bi bi-plus-lg"></i> Erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const ORDER_ID = '{{ order.id }}';
+
+function loadJobs() {
+    fetch(`/production/jobs/${ORDER_ID}`)
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) return;
+        const jobs = data.jobs;
+        const tbody = document.getElementById('jobsTableBody');
+        const table = document.getElementById('jobsTable');
+        const noMsg = document.getElementById('noJobsMessage');
+        const progress = document.getElementById('jobsProgress');
+
+        if (jobs.length === 0) {
+            table.style.display = 'none';
+            noMsg.style.display = 'block';
+            progress.style.display = 'none';
+            return;
+        }
+
+        table.style.display = 'table';
+        noMsg.style.display = 'none';
+        progress.style.display = 'block';
+
+        tbody.innerHTML = '';
+        let completed = 0;
+        let total = 0;
+
+        jobs.forEach(j => {
+            if (j.status !== 'cancelled') total++;
+            if (j.status === 'completed') completed++;
+
+            let actions = '';
+            if (j.status === 'pending') {
+                actions = `<button class="btn btn-sm btn-success me-1" onclick="startJob(${j.id})" title="Starten"><i class="bi bi-play-fill"></i></button>
+                           <button class="btn btn-sm btn-outline-danger" onclick="deleteJob(${j.id})" title="Loeschen"><i class="bi bi-trash"></i></button>`;
+            } else if (j.status === 'in_progress') {
+                actions = `<button class="btn btn-sm btn-warning" onclick="completeJob(${j.id})" title="Abschliessen"><i class="bi bi-check-lg"></i></button>`;
+            } else if (j.status === 'completed') {
+                actions = `<i class="bi bi-check-circle text-success"></i>`;
+            }
+
+            let duration = '-';
+            if (j.duration_minutes) {
+                const h = Math.floor(j.duration_minutes / 60);
+                const m = j.duration_minutes % 60;
+                duration = h > 0 ? `${h}h ${m}m` : `${m}m`;
+            }
+
+            tbody.innerHTML += `<tr>
+                <td><small class="text-muted">${j.job_number}</small></td>
+                <td><i class="${j.type_icon} me-1"></i>${j.type_label}</td>
+                <td>${j.description || '-'}</td>
+                <td><span class="badge ${j.status_badge_class}">${j.status_label}</span></td>
+                <td><small>${duration}</small></td>
+                <td>${actions}</td>
+            </tr>`;
+        });
+
+        const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+        document.getElementById('jobsProgressBar').style.width = pct + '%';
+        document.getElementById('jobsProgressText').textContent = `${completed}/${total} erledigt`;
+    })
+    .catch(err => console.error('Jobs laden fehlgeschlagen:', err));
+}
+
+function createJob() {
+    const jobType = document.getElementById('newJobType').value;
+    const desc = document.getElementById('newJobDescription').value;
+    const notes = document.getElementById('newJobNotes').value;
+
+    fetch('/production/jobs/create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ order_id: ORDER_ID, job_type: jobType, description: desc, notes: notes })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('addJobModal')).hide();
+            document.getElementById('newJobDescription').value = '';
+            document.getElementById('newJobNotes').value = '';
+            loadJobs();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+function autoCreateJobs() {
+    if (!confirm('Jobs basierend auf Auftragstyp automatisch erstellen?')) return;
+    fetch('/production/jobs/auto-create', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ order_id: ORDER_ID })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadJobs();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+function startJob(jobId) {
+    fetch(`/production/jobs/${jobId}/start`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadJobs();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+function completeJob(jobId) {
+    fetch(`/production/jobs/${jobId}/complete`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            if (data.order_completed) {
+                alert(data.message);
+                location.reload();
+            } else {
+                loadJobs();
+            }
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+function deleteJob(jobId) {
+    if (!confirm('Job wirklich loeschen?')) return;
+    fetch(`/production/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadJobs();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', loadJobs);
+</script>
+
 <!-- Auftragspositionen mit Bestandsanzeige -->
 {% include 'orders/items_with_stock.html' %}
+
+<!-- Individuelle Benachrichtigung Modal -->
+<div class="modal fade" id="customNotificationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-envelope me-2"></i>Nachricht an Kunden</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('orders.send_customer_notification', order_id=order.id) }}">
+                <input type="hidden" name="type" value="custom">
+                <div class="modal-body">
+                    <div class="mb-2">
+                        <small class="text-muted">An: {{ order.customer.email if order.customer else '-' }}</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notifySubject" class="form-label">Betreff</label>
+                        <input type="text" class="form-control" id="notifySubject" name="subject"
+                               value="Ihr Auftrag {{ order.id }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="notifyBody" class="form-label">Nachricht</label>
+                        <textarea class="form-control" id="notifyBody" name="body" rows="6" required
+                                  placeholder="Ihre Nachricht an den Kunden..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send"></i> Senden
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- Upload Design Modal -->
 <div class="modal fade" id="uploadDesignModal" tabindex="-1">
@@ -536,4 +1040,71 @@
     </div>
 </div>
 
+<!-- Auftrag stornieren Modal -->
+<div class="modal fade" id="cancelOrderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-x-circle text-danger me-2"></i>Auftrag stornieren</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('orders.update_status', order_id=order.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="status" value="cancelled">
+                <div class="modal-body">
+                    <div class="alert alert-warning mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <strong>Achtung:</strong> Diese Aktion kann nicht rückgängig gemacht werden.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Stornierungsgrund <small class="text-muted">(optional)</small></label>
+                        <textarea class="form-control" name="comment" rows="3"
+                                  placeholder="z.B. Kundenwunsch, Lieferproblem, Doppelbestellung..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-x-circle"></i> Auftrag stornieren
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Manuelle Design-Freigabe -->
+<div class="modal fade" id="manualApprovalModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-check-circle me-1"></i> Design manuell freigeben</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('orders.manual_design_approval', order_id=order.id) }}">
+                <div class="modal-body">
+                    <p>Hiermit wird die Design-Freigabe <strong>ohne E-Mail-Versand</strong> erteilt.</p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Grund der Freigabe</label>
+                        <select class="form-select" name="approval_reason">
+                            <option value="telefon">Telefonische Zusage</option>
+                            <option value="persoenlich">Pers&ouml;nliche Absprache</option>
+                            <option value="email">E-Mail Best&auml;tigung</option>
+                            <option value="stammkunde">Stammkunde (ohne R&uuml;ckfrage)</option>
+                            <option value="intern">Intern freigegeben</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notiz (optional)</label>
+                        <textarea class="form-control" name="approval_notes" rows="2" placeholder="z.B. Kunde hat per WhatsApp zugesagt"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check-lg me-1"></i> Freigabe erteilen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}

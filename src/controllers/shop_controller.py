@@ -64,15 +64,28 @@ def index():
 
 @shop_bp.route('/textilien')
 def textilien():
-    """Textil-Katalog mit Filtern"""
+    """Textil-Katalog mit Smart-Filtern"""
     category_id = request.args.get('kategorie', type=int)
+    brand_filter = request.args.get('brand', '').strip()
+    material_filter = request.args.get('material', '').strip()
 
     query = Article.query.filter_by(show_in_shop=True, active=True)
     if category_id:
         query = query.filter_by(shop_category_id=category_id)
+    if brand_filter:
+        query = query.filter(Article.brand.ilike(f'%{brand_filter}%'))
+    if material_filter:
+        query = query.filter(Article.material == material_filter)
 
     articles = query.order_by(Article.shop_sort_order, Article.name).all()
     categories = ShopCategory.query.filter_by(is_active=True).order_by(ShopCategory.sort_order).all()
+
+    # Filter-Optionen nur von shop-sichtbaren Artikeln
+    shop_base = Article.query.filter_by(show_in_shop=True, active=True)
+    brands = [b[0] for b in shop_base.with_entities(Article.brand).distinct().filter(
+        Article.brand.isnot(None), Article.brand != '').order_by(Article.brand).all()]
+    materials = [m[0] for m in shop_base.with_entities(Article.material).distinct().filter(
+        Article.material.isnot(None), Article.material != '').order_by(Article.material).all()]
 
     company = None
     try:
@@ -84,7 +97,11 @@ def textilien():
     return render_template('shop/textilien.html',
                          articles=articles,
                          categories=categories,
+                         brands=brands,
+                         materials=materials,
                          selected_category=category_id,
+                         selected_brand=brand_filter,
+                         selected_material=material_filter,
                          company=company,
                          cart_count=get_cart_count())
 
@@ -342,20 +359,5 @@ def bestaetigung(token):
 
 @shop_bp.route('/status/<token>')
 def status(token):
-    """Auftragsstatus prüfen"""
-    order = get_order_by_tracking_token(token)
-    if not order:
-        flash('Bestellung nicht gefunden.', 'danger')
-        return redirect(url_for('shop.index'))
-
-    company = None
-    try:
-        from src.models.company_settings import CompanySettings
-        company = CompanySettings.get_settings()
-    except Exception:
-        pass
-
-    return render_template('shop/bestaetigung.html',
-                         order=order,
-                         company=company,
-                         cart_count=0)
+    """Weiterleitung auf einheitliche Tracking-Seite"""
+    return redirect(url_for('tracking.unified_status', token=token))

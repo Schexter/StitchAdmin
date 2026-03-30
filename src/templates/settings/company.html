@@ -41,6 +41,24 @@
                             <input type="text" class="form-control" id="owner_name" name="owner_name"
                                    value="{{ settings.owner_name or '' }}">
                         </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="contact_first_name" class="form-label">
+                                        Ansprechpartner Vorname <small class="text-muted">(erscheint auf Rechnungen als Bearbeiter)</small>
+                                    </label>
+                                    <input type="text" class="form-control" id="contact_first_name" name="contact_first_name"
+                                           value="{{ settings.contact_first_name or '' }}" placeholder="z.B. Hans">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="contact_last_name" class="form-label">Ansprechpartner Nachname</label>
+                                    <input type="text" class="form-control" id="contact_last_name" name="contact_last_name"
+                                           value="{{ settings.contact_last_name or '' }}" placeholder="z.B. Hahn">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -251,6 +269,35 @@
                     </div>
                 </div>
 
+                <!-- Besteuerungsart -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-calculator"></i> Besteuerungsart (Buchhaltung)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="radio" name="steuerart" id="soll_steuer"
+                                           value="soll" {% if not settings.steuerart or settings.steuerart == 'soll' %}checked{% endif %}>
+                                    <label class="form-check-label" for="soll_steuer">
+                                        <strong>Soll-Versteuerung</strong>
+                                        <div class="text-muted small">USt wird mit Rechnungsdatum fällig (Standardfall)</div>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="steuerart" id="ist_steuer"
+                                           value="ist" {% if settings.steuerart == 'ist' %}checked{% endif %}>
+                                    <label class="form-check-label" for="ist_steuer">
+                                        <strong>Ist-Versteuerung</strong>
+                                        <div class="text-muted small">USt wird erst bei Zahlungseingang fällig (§ 20 UStG, Finanzamt-Genehmigung nötig)</div>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Kleinunternehmer -->
                 <div class="card mb-3">
                     <div class="card-header">
@@ -273,6 +320,61 @@
                                 <textarea class="form-control" id="small_business_text" name="small_business_text" rows="2">{{ settings.small_business_text or 'Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.' }}</textarea>
                                 <small class="text-muted">Dieser Hinweis erscheint auf allen Rechnungen</small>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Express-Aufpreis -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-lightning-charge"></i> Express-Aufpreis</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Wird automatisch bei Express-Aufträgen berechnet.</p>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="express_surcharge_percent" class="form-label">Prozentualer Aufschlag (%)</label>
+                                <input type="number" class="form-control" id="express_surcharge_percent"
+                                       name="express_surcharge_percent" step="0.1" min="0"
+                                       value="{{ settings.express_surcharge_percent or 0 }}">
+                                <small class="text-muted">z.B. 25 = 25% Aufschlag auf den Gesamtpreis</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="express_surcharge_fixed" class="form-label">Fester Aufschlag (EUR)</label>
+                                <input type="number" class="form-control" id="express_surcharge_fixed"
+                                       name="express_surcharge_fixed" step="0.01" min="0"
+                                       value="{{ settings.express_surcharge_fixed or 0 }}">
+                                <small class="text-muted">Wird zusätzlich zum prozentualen Aufschlag berechnet</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="express_delivery_days" class="form-label">Express-Lieferzeit (Tage)</label>
+                                <input type="number" class="form-control" id="express_delivery_days"
+                                       name="express_delivery_days" min="1"
+                                       value="{{ settings.express_delivery_days or 1 }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rechtliche Texte -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5><i class="bi bi-shield-exclamation"></i> Rechtliche Texte</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="haftungsausschluss_kundenware" class="form-label">
+                                <strong>Haftungsausschluss Kundenware</strong>
+                            </label>
+                            <textarea class="form-control" id="haftungsausschluss_kundenware" name="haftungsausschluss_kundenware" rows="5">{{ settings.haftungsausschluss_kundenware or 'Bei der Veredelung von kundeneigenen Textilien (Kundenware) übernehmen wir keine Haftung für:\n- Vorhandene Mängel, Verschmutzungen oder Beschädigungen der angelieferten Ware\n- Materialbedingte Reaktionen auf den Veredelungsprozess (z.B. Schrumpfung, Verfärbung)\n- Qualitätsverlust durch ungeeignetes Material\n\nDer Kunde bestätigt, dass die angelieferten Textilien für den gewünschten Veredelungsprozess geeignet sind.' }}</textarea>
+                            <small class="text-muted">Wird automatisch an Angebote und Aufträge mit Kundenware angehängt</small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="agb_text" class="form-label">
+                                <strong>AGB (Allgemeine Geschäftsbedingungen)</strong>
+                            </label>
+                            <textarea class="form-control" id="agb_text" name="agb_text" rows="6">{{ settings.agb_text or '' }}</textarea>
+                            <small class="text-muted">Allgemeine Geschäftsbedingungen für Angebote und Aufträge</small>
                         </div>
                     </div>
                 </div>

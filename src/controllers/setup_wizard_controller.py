@@ -45,7 +45,7 @@ def is_setup_complete():
         settings = CompanySettings.query.first()
         if settings and settings.company_name and settings.company_name != 'Ihre Firma':
             return True
-    except:
+    except Exception:
         pass
     return False
 
@@ -153,9 +153,9 @@ def branding():
     try:
         from src.models.branding_settings import BrandingSettings
         branding = BrandingSettings.get_settings()
-    except:
+    except Exception:
         branding = None
-    
+
     from src.models.company_settings import CompanySettings
     company = CompanySettings.get_settings()
     
@@ -276,7 +276,7 @@ def bank():
         # Zahlungsziel
         try:
             settings.payment_terms_days = int(request.form.get('payment_terms_days', 14))
-        except:
+        except (ValueError, TypeError):
             settings.payment_terms_days = 14
         
         try:
@@ -402,15 +402,15 @@ def finish():
     try:
         from src.models.storage_settings import StorageSettings
         storage = StorageSettings.get_settings()
-    except:
+    except Exception:
         storage = None
-    
+
     try:
         from src.models.branding_settings import BrandingSettings
         branding = BrandingSettings.get_settings()
-    except:
+    except Exception:
         branding = None
-    
+
     from src.models.models import User
     admin = User.query.filter_by(is_admin=True).first()
     

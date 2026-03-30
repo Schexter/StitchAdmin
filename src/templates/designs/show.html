@@ -20,18 +20,34 @@
                 <span class="badge bg-{{ design.status_color }}">{{ design.status_display }}</span>
                 <span class="ms-2">{{ design.design_number }}</span>
                 {% if design.customer %}
-                <span class="ms-2">• <i class="bi bi-person"></i> {{ design.customer.display_name }}</span>
+                <span class="ms-2">· <i class="bi bi-person"></i> {{ design.customer.display_name }}</span>
+                {% endif %}
+                {% if design.is_approved %}
+                <span class="ms-2 badge bg-success"><i class="bi bi-check-circle"></i> Freigegeben</span>
                 {% endif %}
             </p>
         </div>
         <div class="d-flex gap-2">
+            {% if design.file_path %}
+            <a href="{{ url_for('designs.download', design_id=design.id) }}" class="btn btn-outline-success" title="Original herunterladen">
+                <i class="bi bi-download"></i> Download
+            </a>
+            {% endif %}
+            <form action="{{ url_for('designs.regenerate_thumbnail', design_id=design.id) }}" method="POST" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn-outline-info" title="Vorschau neu generieren">
+                    <i class="bi bi-image"></i>
+                </button>
+            </form>
             <form action="{{ url_for('designs.analyze', design_id=design.id) }}" method="POST" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-outline-info" title="Datei neu analysieren"
                         {% if design.design_type != 'embroidery' %}disabled{% endif %}>
                     <i class="bi bi-arrow-repeat"></i>
                 </button>
             </form>
             <form action="{{ url_for('designs.duplicate', design_id=design.id) }}" method="POST" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-outline-secondary" title="Duplizieren">
                     <i class="bi bi-copy"></i>
                 </button>
@@ -47,26 +63,38 @@
         <div class="col-lg-4">
             <!-- Vorschau -->
             <div class="card mb-4">
-                <div class="card-body text-center p-4" style="background: #f8f9fa;">
-                    {% if design.thumbnail_path %}
-                    <img src="{{ design.thumbnail_path }}" class="img-fluid" style="max-height: 300px;">
-                    {% elif design.preview_path %}
-                    <img src="{{ design.preview_path }}" class="img-fluid" style="max-height: 300px;">
+                <div class="card-body text-center p-4" style="background: #f8f9fa; min-height: 200px;">
+                    {% if design.preview_path or design.thumbnail_path %}
+                    <a href="{{ url_for('designs.preview_image', design_id=design.id) }}" target="_blank">
+                        <img src="{{ url_for('designs.preview_image', design_id=design.id) }}" class="img-fluid" style="max-height: 400px;"
+                             onerror="this.parentElement.innerHTML='<div class=\'py-5 text-center\'><span class=\'display-1 text-muted\'>{{ design.type_icon }}</span><p class=\'text-muted mt-3\'>Vorschau konnte nicht geladen werden</p></div>'">
+                    </a>
                     {% else %}
                     <div class="py-5">
                         <span class="display-1 text-muted">{{ design.type_icon }}</span>
-                        <p class="text-muted mt-3">Keine Vorschau verfügbar</p>
+                        <p class="text-muted mt-3 mb-2">Keine Vorschau verfuegbar</p>
+                        {% if design.file_path %}
+                        <form action="{{ url_for('designs.regenerate_thumbnail', design_id=design.id) }}" method="POST" class="d-inline">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-image me-1"></i> Vorschau generieren
+                            </button>
+                        </form>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
                 {% if design.file_path %}
-                <div class="card-footer">
+                <div class="card-footer d-flex justify-content-between align-items-center">
                     <small class="text-muted">
                         <i class="bi bi-file-earmark"></i> {{ design.file_name or 'Datei' }}
                         {% if design.file_size_kb %}
                         ({{ design.file_size_kb }} KB)
                         {% endif %}
                     </small>
+                    <a href="{{ url_for('designs.download', design_id=design.id) }}" class="btn btn-sm btn-outline-primary" title="Herunterladen">
+                        <i class="bi bi-download"></i>
+                    </a>
                 </div>
                 {% endif %}
             </div>
@@ -74,12 +102,12 @@
             <!-- Basis-Details -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <h6 class="mb-0">Details</h6>
+                    <h6 class="mb-0"><i class="bi bi-info-circle me-1"></i> Details</h6>
                 </div>
                 <div class="card-body">
                     <table class="table table-sm table-borderless mb-0">
                         <tr>
-                            <td class="text-muted">Typ:</td>
+                            <td class="text-muted" style="width:40%">Typ:</td>
                             <td>{{ design.type_display }}</td>
                         </tr>
                         <tr>
@@ -96,24 +124,85 @@
                             </td>
                         </tr>
                         <tr>
-                            <td class="text-muted">Erstellt:</td>
-                            <td>{{ design.created_at.strftime('%d.%m.%Y') }}</td>
+                            <td class="text-muted">Dateiformat:</td>
+                            <td>{{ (design.file_type or '-')|upper }}</td>
                         </tr>
-                        {% if design.creation_cost %}
+                        {% if design.tags %}
                         <tr>
-                            <td class="text-muted">Kosten:</td>
-                            <td>{{ "%.2f"|format(design.creation_cost) }} €</td>
+                            <td class="text-muted">Tags:</td>
+                            <td>
+                                {% for tag in design.get_tags() %}
+                                <span class="badge bg-light text-dark me-1">{{ tag }}</span>
+                                {% endfor %}
+                            </td>
                         </tr>
                         {% endif %}
                     </table>
                 </div>
             </div>
 
-            <!-- Qualität -->
+            <!-- Ersteller & Freigabe -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-person-badge me-1"></i> Ersteller & Freigabe</h6>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td class="text-muted" style="width:40%">Erstellt von:</td>
+                            <td>{{ design.created_by or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Erstellt am:</td>
+                            <td>{{ design.created_at.strftime('%d.%m.%Y %H:%M') if design.created_at else '-' }}</td>
+                        </tr>
+                        {% if design.updated_at %}
+                        <tr>
+                            <td class="text-muted">Zuletzt bearbeitet:</td>
+                            <td>{{ design.updated_at.strftime('%d.%m.%Y %H:%M') }} {% if design.updated_by %}({{ design.updated_by }}){% endif %}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">Freigabe:</td>
+                            <td>
+                                {% if design.is_approved %}
+                                <span class="text-success"><i class="bi bi-check-circle-fill me-1"></i>Freigegeben</span><br>
+                                <small class="text-muted">
+                                    {{ design.approved_at.strftime('%d.%m.%Y %H:%M') if design.approved_at else '' }}
+                                    {% if design.approved_by %} von {{ design.approved_by }}{% endif %}
+                                </small>
+                                {% else %}
+                                <span class="text-warning"><i class="bi bi-clock me-1"></i>Ausstehend</span>
+                                <form action="{{ url_for('designs.approve_design', design_id=design.id) }}" method="POST" class="d-inline ms-2">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-success">
+                                        <i class="bi bi-check"></i> Freigeben
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if design.supplier %}
+                        <tr>
+                            <td class="text-muted">Lieferant:</td>
+                            <td>{{ design.supplier.name }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if design.creation_cost %}
+                        <tr>
+                            <td class="text-muted">Erstellkosten:</td>
+                            <td>{{ "%.2f"|format(design.creation_cost) }} &euro;</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            <!-- Qualitaet -->
             {% if design.quality_rating or design.quality_notes %}
             <div class="card mb-4">
                 <div class="card-header">
-                    <h6 class="mb-0">Qualitätsbewertung</h6>
+                    <h6 class="mb-0"><i class="bi bi-star me-1"></i> Qualitaetsbewertung</h6>
                 </div>
                 <div class="card-body">
                     {% if design.quality_rating %}
@@ -136,16 +225,16 @@
             <!-- Technische Daten -->
             <div class="card mb-4">
                 <div class="card-header">
-                    <h6 class="mb-0">Technische Daten</h6>
+                    <h6 class="mb-0"><i class="bi bi-gear me-1"></i> Technische Daten</h6>
                 </div>
                 <div class="card-body">
                     {% if design.design_type == 'embroidery' %}
                     <div class="row g-4">
                         <div class="col-md-3 col-6">
-                            <div class="text-muted small">Größe</div>
+                            <div class="text-muted small">Groesse</div>
                             <div class="h5 mb-0">
                                 {% if design.width_mm and design.height_mm %}
-                                {{ design.width_mm|round(1) }} × {{ design.height_mm|round(1) }} mm
+                                {{ design.width_mm|round(1) }} x {{ design.height_mm|round(1) }} mm
                                 {% else %}-{% endif %}
                             </div>
                         </div>
@@ -162,7 +251,7 @@
                             <div class="h5 mb-0">{{ design.color_changes or '-' }}</div>
                         </div>
                         <div class="col-md-3 col-6">
-                            <div class="text-muted small">Geschätzte Zeit</div>
+                            <div class="text-muted small">Geschaetzte Zeit</div>
                             <div class="h5 mb-0">
                                 {% if design.estimated_time_minutes %}
                                 ca. {{ design.estimated_time_minutes }} min
@@ -173,15 +262,15 @@
                     {% else %}
                     <div class="row g-4">
                         <div class="col-md-3 col-6">
-                            <div class="text-muted small">Größe</div>
+                            <div class="text-muted small">Groesse</div>
                             <div class="h5 mb-0">
                                 {% if design.print_width_cm and design.print_height_cm %}
-                                {{ design.print_width_cm }} × {{ design.print_height_cm }} cm
+                                {{ design.print_width_cm }} x {{ design.print_height_cm }} cm
                                 {% else %}-{% endif %}
                             </div>
                         </div>
                         <div class="col-md-3 col-6">
-                            <div class="text-muted small">Auflösung</div>
+                            <div class="text-muted small">Aufloesung</div>
                             <div class="h5 mb-0">{{ design.dpi or '-' }} DPI</div>
                         </div>
                         <div class="col-md-3 col-6">
@@ -197,56 +286,119 @@
                 </div>
             </div>
 
-            <!-- Garnfarben (nur bei Stickerei) -->
-            {% if design.design_type == 'embroidery' and thread_colors %}
+            <!-- Farben -->
+            {% set all_colors = thread_colors or order_colors %}
+            {% if all_colors %}
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Garnfarben ({{ thread_colors|length }})</h6>
+                    <h6 class="mb-0">
+                        <i class="bi bi-palette me-1"></i>
+                        {% if thread_colors %}Garnfarben ({{ thread_colors|length }})
+                        {% else %}Farben aus Auftraegen ({{ order_colors|length }}){% endif %}
+                    </h6>
                     <a href="{{ url_for('designs.edit', design_id=design.id) }}#colors" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-pencil"></i> Bearbeiten
                     </a>
                 </div>
                 <div class="card-body">
+                    {% if thread_colors %}
                     <div class="row g-2">
                         {% for color in thread_colors %}
                         <div class="col-md-6 col-lg-4">
                             <div class="d-flex align-items-center p-2 border rounded">
-                                <div class="color-swatch me-3" 
-                                     style="width: 40px; height: 40px; background: {{ color.rgb or '#CCCCCC' }}; border-radius: 4px; border: 1px solid #ddd;">
-                                </div>
-                                <div class="flex-grow-1">
-                                    <div class="fw-bold small">{{ color.sequence }}. {{ color.color_name or 'Unbekannt' }}</div>
-                                    <div class="text-muted small">
-                                        {% if color.color_code %}{{ color.color_code }}{% endif %}
-                                        {% if color.thread_brand %}({{ color.thread_brand }}){% endif %}
+                                <div class="me-3" style="width: 40px; height: 40px; background: {{ color.rgb or color.hex or '#CCCCCC' }}; border-radius: 4px; border: 1px solid #ddd; flex-shrink: 0;"></div>
+                                <div class="flex-grow-1 overflow-hidden">
+                                    <div class="fw-bold small">{% if color.sequence %}{{ color.sequence }}. {% endif %}{{ color.color_name or color.color or 'Unbekannt' }}</div>
+                                    <div class="text-muted small text-truncate">
+                                        {{ color.rgb or color.hex or '' }}
+                                        {% if color.color_code %} · {{ color.color_code }}{% endif %}
+                                        {% if color.thread_brand %} ({{ color.thread_brand }}){% endif %}
+                                        {% if color.madeira_nr %} Madeira {{ color.madeira_nr }}{% endif %}
                                     </div>
+                                    {% if color.db_color %}
+                                    <div class="small">
+                                        <span class="badge bg-light text-dark">{{ color.db_color.display_name }}</span>
+                                        {% if color.db_color.stock_quantity is not none %}
+                                        <span class="badge {{ 'bg-danger' if color.db_color.is_low_stock else 'bg-success' }}">
+                                            Lager: {{ color.db_color.stock_quantity }}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
+                    {% elif order_colors %}
+                    <small class="text-muted d-block mb-2"><i class="bi bi-info-circle me-1"></i>Farben aus verknuepften Auftraegen:</small>
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for c in order_colors %}
+                        <span class="badge d-inline-flex align-items-center gap-1 px-2 py-1 border"
+                              style="background:{{ c.hex or '#666' }};color:{{ '#000' if c.hex and c.hex > '#888888' else '#fff' }};font-size:0.85em;">
+                            <span style="width:14px;height:14px;border-radius:3px;background:{{ c.hex or '#666' }};border:1px solid rgba(0,0,0,0.2);display:inline-block;"></span>
+                            {{ c.color or c.name or '' }}
+                            {% if c.pantone %}(Pantone {{ c.pantone }}){% endif %}
+                            {% if c.madeira_nr %}(Madeira {{ c.madeira_nr }}){% endif %}
+                        </span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-palette me-1"></i> Farben</h6>
+                </div>
+                <div class="card-body text-center py-4">
+                    <p class="text-muted mb-2">Keine Farbinformationen vorhanden.</p>
+                    {% if design.file_path and design.design_type == 'embroidery' %}
+                    <form action="{{ url_for('designs.analyze', design_id=design.id) }}" method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-arrow-repeat me-1"></i> Datei analysieren
+                        </button>
+                    </form>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}
 
-            <!-- Verwendungs-Historie -->
+            <!-- Verknuepfte Auftraege -->
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Verwendungs-Historie ({{ design.usage_count or 0 }}x)</h6>
+                    <h6 class="mb-0"><i class="bi bi-box-seam me-1"></i> Verknuepfte Auftraege</h6>
+                    <span class="badge bg-primary">{{ (linked_orders|length) + (recent_usage|length) }}</span>
                 </div>
                 <div class="card-body">
-                    {% if recent_usage %}
+                    {% if linked_orders or recent_usage %}
                     <div class="table-responsive">
                         <table class="table table-sm table-hover mb-0">
                             <thead>
                                 <tr>
                                     <th>Auftrag</th>
                                     <th>Position</th>
-                                    <th>Menge</th>
-                                    <th>Datum</th>
+                                    <th>Typ</th>
+                                    <th>Freigabe</th>
                                 </tr>
                             </thead>
                             <tbody>
+                                {% for lo in linked_orders %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('orders.show', order_id=lo.order.id) }}">
+                                            {{ lo.order.order_number }}
+                                        </a>
+                                        {% if lo.order.customer %}
+                                        <small class="text-muted d-block">{{ lo.order.customer.display_name }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ lo.position }}</td>
+                                    <td><span class="badge bg-light text-dark">{{ lo.design_type }}</span></td>
+                                    <td>{{ lo.approval_status }}</td>
+                                </tr>
+                                {% endfor %}
                                 {% for usage in recent_usage %}
                                 <tr>
                                     <td>
@@ -258,14 +410,14 @@
                                     </td>
                                     <td>{{ usage.position or '-' }}</td>
                                     <td>{{ usage.quantity }}x</td>
-                                    <td>{{ usage.used_at.strftime('%d.%m.%Y') }}</td>
+                                    <td>{{ usage.used_at.strftime('%d.%m.%Y') if usage.used_at else '-' }}</td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                     {% else %}
-                    <p class="text-muted mb-0">Dieses Design wurde noch nicht verwendet.</p>
+                    <p class="text-muted mb-0">Dieses Design wurde noch nicht in Auftraegen verwendet.</p>
                     {% endif %}
                 </div>
             </div>
@@ -273,22 +425,25 @@
             <!-- Versionen -->
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <h6 class="mb-0">Versionen ({{ versions|length }})</h6>
+                    <h6 class="mb-0"><i class="bi bi-clock-history me-1"></i> Versionen ({{ versions|length }})</h6>
                 </div>
                 <div class="card-body">
                     {% if versions %}
                     <div class="timeline">
                         {% for version in versions %}
-                        <div class="timeline-item d-flex mb-3">
-                            <div class="timeline-badge me-3">
-                                <span class="badge {{ 'bg-success' if version.is_active else 'bg-secondary' }}">
+                        <div class="d-flex mb-3 pb-3 {{ '' if loop.last else 'border-bottom' }}">
+                            <div class="me-3">
+                                <span class="badge {{ 'bg-success' if version.is_active else 'bg-secondary' }} fs-6">
                                     v{{ version.version_number }}
                                 </span>
                             </div>
                             <div class="flex-grow-1">
                                 <div class="d-flex justify-content-between">
                                     <strong>{{ version.version_name or 'Version ' ~ version.version_number }}</strong>
-                                    <small class="text-muted">{{ version.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+                                    <small class="text-muted">
+                                        {{ version.created_at.strftime('%d.%m.%Y %H:%M') if version.created_at else '' }}
+                                        {% if version.created_by %} · {{ version.created_by }}{% endif %}
+                                    </small>
                                 </div>
                                 {% if version.change_description %}
                                 <p class="small text-muted mb-0">{{ version.change_description }}</p>
@@ -298,7 +453,7 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="text-muted mb-0">Keine Versionshistorie verfügbar.</p>
+                    <p class="text-muted mb-0">Keine Versionshistorie verfuegbar.</p>
                     {% endif %}
                 </div>
             </div>
@@ -307,7 +462,7 @@
             {% if design.description %}
             <div class="card mb-4">
                 <div class="card-header">
-                    <h6 class="mb-0">Beschreibung</h6>
+                    <h6 class="mb-0"><i class="bi bi-text-left me-1"></i> Beschreibung</h6>
                 </div>
                 <div class="card-body">
                     <p class="mb-0">{{ design.description }}</p>
@@ -320,17 +475,25 @@
     <!-- Aktionen -->
     <div class="card">
         <div class="card-body d-flex justify-content-between">
-            <div>
+            <div class="d-flex gap-2">
+                <form action="{{ url_for('designs.archive', design_id=design.id) }}" method="POST" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-{{ 'success' if design.status == 'archived' else 'warning' }}">
+                        <i class="bi bi-{{ 'arrow-counterclockwise' if design.status == 'archived' else 'archive' }}"></i>
+                        {{ 'Wiederherstellen' if design.status == 'archived' else 'Archivieren' }}
+                    </button>
+                </form>
                 <form action="{{ url_for('designs.delete', design_id=design.id) }}" method="POST" class="d-inline"
-                      onsubmit="return confirm('Design wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.');">
+                      onsubmit="return confirm('Design wirklich loeschen? Diese Aktion kann nicht rueckgaengig gemacht werden.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn-outline-danger">
-                        <i class="bi bi-trash"></i> Löschen
+                        <i class="bi bi-trash"></i> Loeschen
                     </button>
                 </form>
             </div>
             <div>
                 <a href="{{ url_for('designs.index') }}" class="btn btn-secondary">
-                    <i class="bi bi-arrow-left"></i> Zurück zur Übersicht
+                    <i class="bi bi-arrow-left"></i> Zurueck zur Uebersicht
                 </a>
             </div>
         </div>

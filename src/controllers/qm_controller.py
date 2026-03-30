@@ -21,21 +21,10 @@ from src.models.qm import (
     QCChecklist, QCChecklistType, QCInspection, QCStatus,
     QCDefect, DefectCategory, DefectSeverity, QCRework, QCStatistics
 )
+from src.utils.activity_logger import log_activity
 
 # Blueprint erstellen
 qm_bp = Blueprint('qm', __name__, url_prefix='/qm')
-
-
-def log_activity(action, details):
-    """Aktivität protokollieren"""
-    activity = ActivityLog(
-        username=current_user.username,
-        action=action,
-        details=details,
-        ip_address=request.remote_addr
-    )
-    db.session.add(activity)
-    db.session.commit()
 
 
 # ==========================================

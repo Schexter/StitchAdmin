@@ -1,0 +1,673 @@
+{% extends "base.html" %}
+{% block title %}Aufgaben-Board - StitchAdmin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kanban-column {
+        min-height: 400px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 12px;
+    }
+    .kanban-column.drag-over {
+        background: #e8f4fd;
+        border: 2px dashed #0d6efd;
+    }
+    .kanban-card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 8px;
+        border-left: 4px solid #dee2e6;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        cursor: grab;
+        transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .kanban-card:active { cursor: grabbing; }
+    .kanban-card:hover {
+        box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+        transform: translateY(-1px);
+    }
+    .kanban-card.dragging {
+        opacity: 0.5;
+        transform: rotate(2deg);
+    }
+    .kanban-card[data-priority="urgent"] { border-left-color: #dc3545; }
+    .kanban-card[data-priority="high"] { border-left-color: #fd7e14; }
+    .kanban-card[data-priority="normal"] { border-left-color: #0d6efd; }
+    .kanban-card[data-priority="low"] { border-left-color: #6c757d; }
+
+    .kanban-header {
+        font-weight: 600;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        padding: 8px 4px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .kanban-count {
+        background: rgba(0,0,0,0.08);
+        border-radius: 12px;
+        padding: 2px 10px;
+        font-size: 0.8rem;
+    }
+    .task-type-badge {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+    .task-customer {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+    .task-due {
+        font-size: 0.75rem;
+    }
+    .task-due.overdue {
+        color: #dc3545;
+        font-weight: 600;
+    }
+    .stat-card {
+        border-radius: 10px;
+        padding: 16px;
+        text-align: center;
+    }
+    .stat-card .stat-number {
+        font-size: 1.8rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-card .stat-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 4px;
+    }
+    .filter-btn.active {
+        font-weight: 600;
+    }
+    #listView table th {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: #6c757d;
+        border-bottom: 2px solid #dee2e6;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0"><i class="bi bi-kanban me-2"></i>Aufgaben-Board</h4>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#newTaskModal">
+            <i class="bi bi-plus-lg me-1"></i>Neue Aufgabe
+        </button>
+    </div>
+
+    <!-- Statistik-Karten -->
+    <div class="row g-2 mb-3" id="statsRow">
+        <div class="col-6 col-md-3">
+            <div class="stat-card bg-white border">
+                <div class="stat-number text-primary" id="statOpen">-</div>
+                <div class="stat-label">Offen gesamt</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card bg-white border">
+                <div class="stat-number text-danger" id="statOverdue">-</div>
+                <div class="stat-label">Ueberfaellig</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card bg-white border">
+                <div class="stat-number text-warning" id="statDueToday">-</div>
+                <div class="stat-label">Heute faellig</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="stat-card bg-white border">
+                <div class="stat-number text-secondary" id="statUnassigned">-</div>
+                <div class="stat-label">Nicht zugewiesen</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter + Ansicht-Toggle -->
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <!-- Typ-Filter -->
+        <div class="btn-group btn-group-sm flex-wrap" role="group">
+            <button class="btn btn-outline-secondary filter-btn active" data-filter="type" data-value="all">Alle</button>
+            <button class="btn btn-outline-primary filter-btn" data-filter="type" data-value="task"><i class="bi bi-check2-square me-1"></i>Aufgaben</button>
+            <button class="btn btn-outline-warning filter-btn" data-filter="type" data-value="inquiry"><i class="bi bi-envelope-paper me-1"></i>Anfragen</button>
+            <button class="btn btn-outline-success filter-btn" data-filter="type" data-value="order"><i class="bi bi-bag me-1"></i>Auftraege</button>
+            <button class="btn btn-outline-info filter-btn" data-filter="type" data-value="approval"><i class="bi bi-palette me-1"></i>Freigaben</button>
+            <button class="btn btn-outline-danger filter-btn" data-filter="type" data-value="crm"><i class="bi bi-telephone me-1"></i>CRM</button>
+            <button class="btn btn-outline-dark filter-btn" data-filter="type" data-value="invoice"><i class="bi bi-receipt me-1"></i>Rechnungen</button>
+            <button class="btn btn-outline-secondary filter-btn" data-filter="type" data-value="purchase"><i class="bi bi-truck me-1"></i>Bestellungen</button>
+        </div>
+
+        <!-- Zustaendig-Filter -->
+        <select class="form-select form-select-sm" style="width: auto;" id="filterAssigned">
+            <option value="all">Alle Zustaendig</option>
+            <option value="me">Meine</option>
+            <option value="unassigned">Nicht zugewiesen</option>
+            {% for user in users %}
+            <option value="{{ user.username }}">{{ user.username }}</option>
+            {% endfor %}
+        </select>
+
+        <!-- Spacer -->
+        <div class="flex-grow-1"></div>
+
+        <!-- Ansicht-Toggle -->
+        <div class="btn-group btn-group-sm" role="group">
+            <button class="btn btn-outline-secondary active" id="btnKanban" onclick="switchView('kanban')">
+                <i class="bi bi-kanban"></i> Kanban
+            </button>
+            <button class="btn btn-outline-secondary" id="btnList" onclick="switchView('list')">
+                <i class="bi bi-list-ul"></i> Liste
+            </button>
+        </div>
+    </div>
+
+    <!-- KANBAN-ANSICHT -->
+    <div id="kanbanView">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <div class="kanban-column" data-status="open"
+                     ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'open')">
+                    <div class="kanban-header text-primary">
+                        <span><i class="bi bi-circle me-1"></i>Offen</span>
+                        <span class="kanban-count" id="countOpen">0</span>
+                    </div>
+                    <div id="colOpen"></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="kanban-column" data-status="in_progress"
+                     ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'in_progress')">
+                    <div class="kanban-header text-warning">
+                        <span><i class="bi bi-play-circle me-1"></i>In Arbeit</span>
+                        <span class="kanban-count" id="countInProgress">0</span>
+                    </div>
+                    <div id="colInProgress"></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="kanban-column" data-status="waiting"
+                     ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'waiting')">
+                    <div class="kanban-header text-secondary">
+                        <span><i class="bi bi-hourglass-split me-1"></i>Wartend</span>
+                        <span class="kanban-count" id="countWaiting">0</span>
+                    </div>
+                    <div id="colWaiting"></div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="kanban-column" data-status="completed"
+                     ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'completed')">
+                    <div class="kanban-header text-success">
+                        <span><i class="bi bi-check-circle me-1"></i>Erledigt</span>
+                        <span class="kanban-count" id="countCompleted">0</span>
+                    </div>
+                    <div id="colCompleted"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LISTEN-ANSICHT -->
+    <div id="listView" class="d-none">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th style="width:30px;"></th>
+                        <th>Aufgabe</th>
+                        <th>Typ</th>
+                        <th>Kunde</th>
+                        <th>Status</th>
+                        <th>Prioritaet</th>
+                        <th>Zustaendig</th>
+                        <th>Faellig</th>
+                    </tr>
+                </thead>
+                <tbody id="listBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Leer-Zustand -->
+    <div id="emptyState" class="text-center py-5 d-none">
+        <i class="bi bi-check-circle text-muted" style="font-size: 3rem;"></i>
+        <p class="text-muted mt-2">Keine offenen Aufgaben - alles erledigt!</p>
+    </div>
+
+    <!-- Lade-Zustand -->
+    <div id="loadingState" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Laden...</span>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Neue Aufgabe -->
+<div class="modal fade" id="newTaskModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>Neue Aufgabe</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="newTaskForm">
+                    <div class="mb-3">
+                        <label class="form-label">Titel <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung</label>
+                        <textarea class="form-control" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Typ</label>
+                            <select class="form-select" name="todo_type">
+                                <option value="general">Allgemein</option>
+                                <option value="production">Produktion</option>
+                                <option value="quality_check">Qualitaet</option>
+                                <option value="delivery">Versand</option>
+                                <option value="admin">Verwaltung</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Prioritaet</label>
+                            <select class="form-select" name="priority">
+                                <option value="low">Niedrig</option>
+                                <option value="normal" selected>Normal</option>
+                                <option value="high">Hoch</option>
+                                <option value="urgent">Dringend</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Fällig am</label>
+                            <input type="date" class="form-control" name="due_date">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Zuständig</label>
+                            <select class="form-select" name="assigned_to">
+                                <option value="">-- Nicht zugewiesen --</option>
+                                {% for user in users %}
+                                <option value="{{ user.username }}">{{ user.username }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-0">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="is_private" name="is_private" value="true" checked>
+                            <label class="form-check-label" for="is_private">
+                                <i class="bi bi-lock me-1"></i>Privat <small class="text-muted">(nur für mich sichtbar)</small>
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary btn-sm" onclick="createTask()">
+                    <i class="bi bi-plus-lg me-1"></i>Erstellen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CURRENT_USER = '{{ current_user.username }}';
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
+let allTasks = [];
+let activeFilters = { type: 'all', assigned: 'all' };
+
+// ════════════════════════════════════════════════════
+// DATEN LADEN
+// ════════════════════════════════════════════════════
+
+function loadTasks() {
+    fetch('/tasks/api/all')
+        .then(r => r.json())
+        .then(data => {
+            allTasks = data.tasks || [];
+            updateStats(data.stats || {});
+            renderBoard();
+            document.getElementById('loadingState').classList.add('d-none');
+        })
+        .catch(err => {
+            console.error('Laden fehlgeschlagen:', err);
+            document.getElementById('loadingState').innerHTML =
+                '<p class="text-danger"><i class="bi bi-exclamation-triangle me-1"></i>Fehler beim Laden</p>';
+        });
+}
+
+function updateStats(stats) {
+    document.getElementById('statOpen').textContent = stats.total_open || 0;
+    document.getElementById('statOverdue').textContent = stats.overdue || 0;
+    document.getElementById('statDueToday').textContent = stats.due_today || 0;
+    document.getElementById('statUnassigned').textContent = stats.unassigned || 0;
+}
+
+// ════════════════════════════════════════════════════
+// FILTER
+// ════════════════════════════════════════════════════
+
+function getFilteredTasks() {
+    return allTasks.filter(t => {
+        if (activeFilters.type !== 'all' && t.type !== activeFilters.type) return false;
+        if (activeFilters.assigned === 'me' && t.assigned_to !== CURRENT_USER) return false;
+        if (activeFilters.assigned === 'unassigned' && t.assigned_to) return false;
+        if (activeFilters.assigned !== 'all' && activeFilters.assigned !== 'me' && activeFilters.assigned !== 'unassigned') {
+            if (t.assigned_to !== activeFilters.assigned) return false;
+        }
+        return true;
+    });
+}
+
+document.querySelectorAll('.filter-btn[data-filter="type"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn[data-filter="type"]').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activeFilters.type = btn.dataset.value;
+        renderBoard();
+    });
+});
+
+document.getElementById('filterAssigned').addEventListener('change', function() {
+    activeFilters.assigned = this.value;
+    renderBoard();
+});
+
+// ════════════════════════════════════════════════════
+// RENDERING
+// ════════════════════════════════════════════════════
+
+function renderBoard() {
+    const tasks = getFilteredTasks();
+    renderKanban(tasks);
+    renderList(tasks);
+
+    const isEmpty = tasks.length === 0;
+    document.getElementById('emptyState').classList.toggle('d-none', !isEmpty);
+}
+
+function renderKanban(tasks) {
+    const cols = {open: [], in_progress: [], waiting: [], completed: []};
+    tasks.forEach(t => {
+        const s = t.status || 'open';
+        if (cols[s]) cols[s].push(t);
+        else cols.open.push(t);
+    });
+
+    document.getElementById('colOpen').innerHTML = cols.open.map(cardHtml).join('');
+    document.getElementById('colInProgress').innerHTML = cols.in_progress.map(cardHtml).join('');
+    document.getElementById('colWaiting').innerHTML = cols.waiting.map(cardHtml).join('');
+    document.getElementById('colCompleted').innerHTML = cols.completed.map(cardHtml).join('');
+
+    document.getElementById('countOpen').textContent = cols.open.length;
+    document.getElementById('countInProgress').textContent = cols.in_progress.length;
+    document.getElementById('countWaiting').textContent = cols.waiting.length;
+    document.getElementById('countCompleted').textContent = cols.completed.length;
+}
+
+function cardHtml(t) {
+    const typeColors = {task: 'primary', inquiry: 'warning', order: 'success', approval: 'info', crm: 'danger', invoice: 'dark', purchase: 'secondary'};
+    const typeLabels = {task: 'Aufgabe', inquiry: 'Anfrage', order: 'Auftrag', approval: 'Freigabe', crm: 'CRM', invoice: 'Rechnung', purchase: 'Bestellung'};
+    const draggable = t.type === 'task' ? 'draggable="true"' : '';
+    const dragAttr = t.type === 'task' ? `ondragstart="handleDragStart(event, '${t.id}')"` : '';
+
+    let dueHtml = '';
+    if (t.due_date) {
+        const cls = t.is_overdue ? 'overdue' : '';
+        const dt = formatDate(t.due_date);
+        dueHtml = `<span class="task-due ${cls}"><i class="bi bi-calendar3 me-1"></i>${dt}</span>`;
+    }
+
+    return `
+        <div class="kanban-card" data-id="${t.id}" data-priority="${t.priority}" ${draggable} ${dragAttr}>
+            <div class="d-flex justify-content-between align-items-start mb-1">
+                <span class="badge bg-${typeColors[t.type] || 'secondary'} task-type-badge">
+                    <i class="${t.type_icon} me-1"></i>${t.type_label || typeLabels[t.type] || t.type}
+                </span>
+                <div class="d-flex align-items-center gap-1">
+                ${t.type === 'task' && t.is_private ? `<span class="badge bg-light text-muted border" title="Privat" style="font-size:0.6rem;"><i class="bi bi-lock"></i></span>` : ''}
+                ${t.type === 'task' && !t.is_private ? `<span class="badge bg-light text-success border" title="Öffentlich" style="font-size:0.6rem;"><i class="bi bi-globe"></i></span>` : ''}
+                ${t.type === 'task' ? `<div class="dropdown">
+                    <button class="btn btn-sm p-0 text-muted" data-bs-toggle="dropdown"><i class="bi bi-three-dots"></i></button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="#" onclick="togglePrivate(${t.id.replace('todo_','')}, ${!t.is_private})"><i class="bi bi-${t.is_private ? 'globe' : 'lock'} me-1"></i>${t.is_private ? 'Öffentlich machen' : 'Privat machen'}</a></li>
+                        <li><a class="dropdown-item text-danger" href="#" onclick="deleteTask(${t.id.replace('todo_','')})"><i class="bi bi-trash me-1"></i>Löschen</a></li>
+                    </ul>
+                </div>` : ''}
+                </div>
+            </div>
+            <a href="${t.source_url || '#'}" class="text-decoration-none text-dark">
+                <div class="fw-semibold small">${escHtml(t.title)}</div>
+            </a>
+            ${t.customer_name ? `<div class="task-customer"><i class="bi bi-person me-1"></i>${escHtml(t.customer_name)}</div>` : ''}
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                ${dueHtml}
+                ${t.assigned_to ? `<span class="badge bg-light text-dark small"><i class="bi bi-person-fill me-1"></i>${escHtml(t.assigned_to)}</span>` : ''}
+            </div>
+        </div>`;
+}
+
+function renderList(tasks) {
+    const body = document.getElementById('listBody');
+    if (!tasks.length) {
+        body.innerHTML = '';
+        return;
+    }
+
+    const typeColors = {task: 'primary', inquiry: 'warning', order: 'success', approval: 'info', crm: 'danger', invoice: 'dark', purchase: 'secondary'};
+    const statusLabels = {open: 'Offen', in_progress: 'In Arbeit', waiting: 'Wartend', completed: 'Erledigt'};
+    const statusColors = {open: 'secondary', in_progress: 'warning', waiting: 'info', completed: 'success'};
+    const prioLabels = {low: 'Niedrig', normal: 'Normal', high: 'Hoch', urgent: 'Dringend'};
+    const prioColors = {low: 'secondary', normal: 'info', high: 'warning', urgent: 'danger'};
+
+    body.innerHTML = tasks.map(t => {
+        let dueHtml = '-';
+        if (t.due_date) {
+            const cls = t.is_overdue ? 'text-danger fw-bold' : '';
+            dueHtml = `<span class="${cls}">${formatDate(t.due_date)}</span>`;
+        }
+        return `<tr>
+            <td><i class="${t.type_icon} text-${typeColors[t.type] || 'secondary'}"></i></td>
+            <td><a href="${t.source_url || '#'}" class="text-decoration-none">${escHtml(t.title)}</a></td>
+            <td><span class="badge bg-${typeColors[t.type] || 'secondary'} task-type-badge">${t.type_label || t.type}</span></td>
+            <td class="task-customer">${escHtml(t.customer_name || '-')}</td>
+            <td><span class="badge bg-${statusColors[t.status] || 'secondary'}">${statusLabels[t.status] || t.status}</span></td>
+            <td><span class="badge bg-${prioColors[t.priority] || 'secondary'}">${prioLabels[t.priority] || t.priority}</span></td>
+            <td>${escHtml(t.assigned_to || '-')}</td>
+            <td>${dueHtml}</td>
+        </tr>`;
+    }).join('');
+}
+
+// ════════════════════════════════════════════════════
+// ANSICHT WECHSELN
+// ════════════════════════════════════════════════════
+
+function switchView(view) {
+    const kanban = document.getElementById('kanbanView');
+    const list = document.getElementById('listView');
+    const btnK = document.getElementById('btnKanban');
+    const btnL = document.getElementById('btnList');
+
+    if (view === 'kanban') {
+        kanban.classList.remove('d-none');
+        list.classList.add('d-none');
+        btnK.classList.add('active');
+        btnL.classList.remove('active');
+    } else {
+        kanban.classList.add('d-none');
+        list.classList.remove('d-none');
+        btnK.classList.remove('active');
+        btnL.classList.add('active');
+    }
+}
+
+// ════════════════════════════════════════════════════
+// DRAG & DROP (nur fuer manuelle Aufgaben)
+// ════════════════════════════════════════════════════
+
+let draggedTaskId = null;
+
+function handleDragStart(e, taskId) {
+    draggedTaskId = taskId;
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e) {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+    e.currentTarget.classList.remove('drag-over');
+}
+
+function handleDrop(e, newStatus) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+
+    if (!draggedTaskId || !draggedTaskId.startsWith('todo_')) return;
+    const todoId = draggedTaskId.replace('todo_', '');
+
+    const formData = new FormData();
+    formData.append('status', newStatus);
+
+    fetch(`/tasks/api/${todoId}/update`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadTasks();
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+        }
+    })
+    .catch(err => console.error('Status-Update fehlgeschlagen:', err));
+
+    draggedTaskId = null;
+}
+
+// ════════════════════════════════════════════════════
+// AUFGABE ERSTELLEN
+// ════════════════════════════════════════════════════
+
+function createTask() {
+    const form = document.getElementById('newTaskForm');
+    const formData = new FormData(form);
+
+    if (!formData.get('title').trim()) {
+        alert('Bitte Titel eingeben');
+        return;
+    }
+
+    // Checkbox-Wert korrekt setzen
+    const privCheckbox = document.getElementById('is_private');
+    formData.set('is_private', privCheckbox.checked ? 'true' : 'false');
+
+    fetch('/tasks/api/create', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('newTaskModal')).hide();
+            form.reset();
+            loadTasks();
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+        }
+    })
+    .catch(err => {
+        console.error('Erstellen fehlgeschlagen:', err);
+        alert('Fehler beim Erstellen');
+    });
+}
+
+// ════════════════════════════════════════════════════
+// AUFGABE LOESCHEN
+// ════════════════════════════════════════════════════
+
+function togglePrivate(todoId, makePrivate) {
+    const fd = new FormData();
+    fd.set('is_private', makePrivate ? 'true' : 'false');
+
+    fetch(`/tasks/api/${todoId}/update`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        body: fd
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) loadTasks();
+        else alert('Fehler: ' + (data.error || 'Unbekannt'));
+    })
+    .catch(err => console.error('Toggle fehlgeschlagen:', err));
+}
+
+function deleteTask(todoId) {
+    if (!confirm('Aufgabe wirklich löschen?')) return;
+
+    fetch(`/tasks/api/${todoId}/delete`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF_TOKEN }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadTasks();
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+        }
+    })
+    .catch(err => console.error('Loeschen fehlgeschlagen:', err));
+}
+
+// ════════════════════════════════════════════════════
+// HILFSFUNKTIONEN
+// ════════════════════════════════════════════════════
+
+function formatDate(isoDate) {
+    if (!isoDate) return '';
+    const parts = isoDate.split('-');
+    if (parts.length === 3) return `${parts[2]}.${parts[1]}.${parts[0]}`;
+    return isoDate;
+}
+
+function escHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Initialisierung
+document.addEventListener('DOMContentLoaded', loadTasks);
+</script>
+{% endblock %}

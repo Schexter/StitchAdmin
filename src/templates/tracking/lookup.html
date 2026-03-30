@@ -1,0 +1,39 @@
+{% extends "shop/base_shop.html" %}
+{% block title %}Auftragsstatus prüfen{% endblock %}
+{% block content %}
+<div style="padding-top: 80px;">
+    <section class="ws-section">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-6">
+                    <div class="text-center mb-4">
+                        <h2 class="fw-bold">Auftragsstatus prüfen</h2>
+                        <p class="text-muted">Geben Sie Ihre Anfragen-Nummer, Angebots-Nummer oder E-Mail-Adresse ein.</p>
+                    </div>
+
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body p-4">
+                            <form method="POST">
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" name="search" class="form-control form-control-lg"
+                                           placeholder="z.B. ANF-202602-0001 oder ihre@email.de" required autofocus>
+                                </div>
+                                <button type="submit" class="btn btn-lg w-100" style="background: var(--ws-primary, #1a6b5a); color: white;">
+                                    <i class="bi bi-search me-2"></i>Status prüfen
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <a href="{{ url_for('website.home') }}" class="btn btn-outline-dark">
+                            <i class="bi bi-arrow-left me-2"></i>Zurück zur Startseite
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}

@@ -2,11 +2,13 @@
 
 {% block title %}Finanzen-Übersicht - StitchAdmin{% endblock %}
 
+{% macro eur(val) %}{{ "{:,.2f}".format(val).replace(',', 'X').replace('.', ',').replace('X', '.') }} €{% endmacro %}
+
 {% block content %}
 <div class="row mb-4">
     <div class="col-md-12">
         <h1><i class="bi bi-cash-stack"></i> Finanzen-Übersicht</h1>
-        <p class="text-muted">Zentrale Übersicht über Liquidität, Forderungen und Zahlungseingänge</p>
+        <p class="text-muted">Forderungen, Verbindlichkeiten, Mahnwesen und Ratenzahlungen</p>
     </div>
 </div>
 
@@ -14,7 +16,6 @@
 <div class="row mb-4">
     <div class="col-md-12">
         <div class="d-flex flex-wrap gap-2">
-            <!-- Rechnungen erstellen -->
             <div class="btn-group" role="group">
                 <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-success">
                     <i class="bi bi-file-text"></i> Rechnungen
@@ -24,24 +25,21 @@
                 </button>
                 <ul class="dropdown-menu">
                     <li><a class="dropdown-item" href="{{ url_for('rechnung.neue_rechnung') }}">
-                        <i class="bi bi-plus-circle me-2"></i>Blanko-Rechnung erstellen
+                        <i class="bi bi-plus-circle me-2"></i>Ausgangsrechnung erstellen
                     </a></li>
                     <li><a class="dropdown-item" href="{{ url_for('rechnung.neue_rechnung_aus_auftrag') }}">
                         <i class="bi bi-file-earmark-text me-2"></i>Rechnung aus Auftrag
                     </a></li>
                     <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="{{ url_for('rechnung.neue_eingangsrechnung') }}">
+                    <li><a class="dropdown-item" href="{{ url_for('buchungen.eingangsrechnung_wizard') }}">
                         <i class="bi bi-box-arrow-in-left me-2"></i>Eingangsrechnung erfassen
                     </a></li>
                 </ul>
             </div>
 
-            <!-- Buchungen -->
             <a href="{{ url_for('buchungen.index') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-journal-text"></i> Buchungsjournal
             </a>
-
-            <!-- Offene Posten etc. -->
             <a href="{{ url_for('finanzen.offene_posten') }}" class="btn btn-primary">
                 <i class="bi bi-list-ul"></i> Offene Posten
             </a>
@@ -51,265 +49,723 @@
             <a href="{{ url_for('finanzen.ratenzahlungen') }}" class="btn btn-info">
                 <i class="bi bi-calendar-check"></i> Ratenzahlungen
             </a>
-            {% if current_user.is_admin %}
-            <a href="{{ url_for('finanzen.liquiditaet') }}" class="btn btn-outline-success">
-                <i class="bi bi-graph-up"></i> Liquidität
+            <a href="{{ url_for('finanzen.bwa') }}" class="btn btn-outline-primary">
+                <i class="bi bi-bar-chart-line"></i> BWA
             </a>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== TABS: FORDERUNGEN / VERBINDLICHKEITEN ===================== -->
+<ul class="nav nav-tabs mb-4" id="finanzTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="forderungen-tab" data-bs-toggle="tab" data-bs-target="#forderungen" type="button" role="tab">
+            <i class="bi bi-arrow-up-circle text-success"></i> Forderungen <span class="badge bg-success ms-1">{{ eur(forderungen_gesamt) }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="verbindlichkeiten-tab" data-bs-toggle="tab" data-bs-target="#verbindlichkeiten" type="button" role="tab">
+            <i class="bi bi-arrow-down-circle text-danger"></i> Verbindlichkeiten <span class="badge bg-danger ms-1">{{ eur(verbindlichkeiten_gesamt) }}</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="mahnwesen-tab" data-bs-toggle="tab" data-bs-target="#mahnwesen" type="button" role="tab">
+            <i class="bi bi-exclamation-triangle text-warning"></i> Mahnwesen
+            {% if naechste_mahnungen|length > 0 or inkasso_count > 0 %}
+            <span class="badge bg-warning text-dark ms-1">{{ naechste_mahnungen|length + inkasso_count }}</span>
+            {% endif %}
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="raten-tab" data-bs-toggle="tab" data-bs-target="#raten" type="button" role="tab">
+            <i class="bi bi-calendar-range text-info"></i> Ratenzahlungen
+            {% if raten_ueberfaellig|length > 0 %}
+            <span class="badge bg-danger ms-1">{{ raten_ueberfaellig|length }}</span>
+            {% endif %}
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="finanzTabContent">
+
+<!-- ===================== TAB 1: FORDERUNGEN (Ausgangsrechnungen) ===================== -->
+<div class="tab-pane fade show active" id="forderungen" role="tabpanel">
+
+    <!-- KPI Cards Forderungen -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <div class="d-flex align-items-center justify-content-center mb-2">
+                        <i class="bi bi-arrow-up-circle text-success me-2" style="font-size:1.5rem"></i>
+                        <small class="text-muted">Forderungen gesamt</small>
+                    </div>
+                    <h2 class="text-success mb-0">{{ eur(forderungen_gesamt) }}</h2>
+                    <small class="text-muted">Kunden schulden uns</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <div class="d-flex align-items-center justify-content-center mb-2">
+                        <i class="bi bi-exclamation-circle text-danger me-2" style="font-size:1.5rem"></i>
+                        <small class="text-muted">Überfällig</small>
+                    </div>
+                    <h2 class="text-danger mb-0">{{ eur(forderungen_ueberfaellig) }}</h2>
+                    <small class="text-muted">{{ ueberfaellige_rechnungen|length }} Rechnungen</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <small class="text-muted d-block mb-2">Fällig in 7 Tagen</small>
+                    <h2 class="text-warning mb-0">{{ eur(forderungen_faellig_7_tage) }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <small class="text-muted d-block mb-2">Umsatz (30 Tage)</small>
+                    <h2 class="text-info mb-0">{{ eur(umsatz_30_tage) }}</h2>
+                    <small class="text-muted">Eingang: {{ eur(zahlungseingang_30_tage) }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Überfällige Ausgangsrechnungen -->
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="bi bi-exclamation-circle"></i> Überfällige Ausgangsrechnungen</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if ueberfaellige_rechnungen %}
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Rechnung</th>
+                        <th>Kunde</th>
+                        <th>Tage überfällig</th>
+                        <th class="text-end">Offen</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rechnung in ueberfaellige_rechnungen %}
+                    <tr>
+                        <td><strong>{{ rechnung.rechnungsnummer }}</strong></td>
+                        <td>{{ rechnung.kunde_name }}</td>
+                        <td>
+                            {% set tage = (today - rechnung.faelligkeitsdatum).days if rechnung.faelligkeitsdatum else 0 %}
+                            <span class="badge bg-{% if tage > 30 %}danger{% elif tage > 14 %}warning text-dark{% else %}secondary{% endif %}">
+                                {{ tage }} Tage
+                            </span>
+                        </td>
+                        <td class="text-end fw-bold">{{ eur(rechnung.offener_betrag) }}</td>
+                        <td>
+                            <form method="POST" action="{{ url_for('finanzen.mahnung_erstellen', rechnung_id=rechnung.id) }}" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-warning" title="Mahnung erstellen">
+                                    <i class="bi bi-envelope-exclamation"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="p-3 text-center text-success">
+                <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                <p class="mb-0">Keine überfälligen Ausgangsrechnungen</p>
+            </div>
             {% endif %}
         </div>
     </div>
-</div>
 
-<!-- KPI Cards -->
-<div class="row mb-4">
-    <!-- Offene Forderungen -->
-    <div class="col-md-3">
-        <div class="card border-primary">
-            <div class="card-body text-center">
-                <h6 class="card-subtitle mb-2 text-muted">Forderungen Gesamt</h6>
-                <h2 class="card-title text-primary">{{ "{:,.2f}".format(forderungen_gesamt).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h2>
-                <p class="small text-muted mb-0">Alle offenen Rechnungen</p>
-            </div>
+    <!-- Angebote -->
+    {% if angebote_offen_count > 0 or angebote_follow_up_count > 0 %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Offene Angebote</h5>
         </div>
-    </div>
-
-    <!-- Überfällig -->
-    <div class="col-md-3">
-        <div class="card border-danger">
-            <div class="card-body text-center">
-                <h6 class="card-subtitle mb-2 text-muted">Überfällig</h6>
-                <h2 class="card-title text-danger">{{ "{:,.2f}".format(forderungen_ueberfaellig).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h2>
-                <p class="small text-muted mb-0">{{ ueberfaellige_rechnungen|length }} Rechnungen</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Umsatz 30 Tage -->
-    <div class="col-md-3">
-        <div class="card border-success">
-            <div class="card-body text-center">
-                <h6 class="card-subtitle mb-2 text-muted">Umsatz (30 Tage)</h6>
-                <h2 class="card-title text-success">{{ "{:,.2f}".format(umsatz_30_tage).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h2>
-                <p class="small text-muted mb-0">Eingang: {{ "{:,.2f}".format(zahlungseingang_30_tage).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</p>
-            </div>
-        </div>
-    </div>
-
-    <!-- Verkaufschancen -->
-    <div class="col-md-3">
-        <div class="card border-warning">
-            <div class="card-body text-center">
-                <h6 class="card-subtitle mb-2 text-muted">Verkaufschancen</h6>
-                <h2 class="card-title text-warning">{{ "{:,.2f}".format(gewichteter_umsatz).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h2>
-                <p class="small text-muted mb-0">{{ angebote_offen_count }} offene Angebote</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Überfällige Rechnungen & Nächste Mahnungen -->
-<div class="row mb-4">
-    <!-- Überfällige Rechnungen -->
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-danger text-white">
-                <h5 class="mb-0"><i class="bi bi-exclamation-circle"></i> Überfällige Rechnungen (Top 10)</h5>
-            </div>
-            <div class="card-body p-0">
-                {% if ueberfaellige_rechnungen %}
-                <table class="table table-sm table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>Rechnung</th>
-                            <th>Kunde</th>
-                            <th>Fällig</th>
-                            <th class="text-end">Betrag</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for rechnung in ueberfaellige_rechnungen %}
-                        <tr>
-                            <td><strong>{{ rechnung.rechnungsnummer }}</strong></td>
-                            <td>{{ rechnung.kunde_name }}</td>
-                            <td>
-                                <span class="badge bg-danger">
-                                    {{ (today - rechnung.faelligkeitsdatum).days }} Tage
-                                </span>
-                            </td>
-                            <td class="text-end">{{ "{:,.2f}".format(rechnung.offener_betrag).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
-                            <td>
-                                <form method="POST" action="{{ url_for('finanzen.mahnung_erstellen', rechnung_id=rechnung.id) }}" style="display: inline;">
-                                    <button type="submit" class="btn btn-sm btn-warning" title="Mahnung erstellen">
-                                        <i class="bi bi-envelope"></i>
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="p-3 text-center text-success">
-                    <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
-                    <p class="mb-0">Keine überfälligen Rechnungen!</p>
+        <div class="card-body">
+            <div class="row text-center">
+                <div class="col-md-4">
+                    <h3 class="text-warning">{{ angebote_offen_count }}</h3>
+                    <p class="text-muted">Offene Angebote</p>
                 </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Nächste Mahnungen -->
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-warning">
-                <h5 class="mb-0"><i class="bi bi-bell"></i> Fällige Mahnungen</h5>
-            </div>
-            <div class="card-body p-0">
-                {% if naechste_mahnungen %}
-                <table class="table table-sm table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>Rechnung</th>
-                            <th>Kunde</th>
-                            <th>Stufe</th>
-                            <th>Grund</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in naechste_mahnungen %}
-                        <tr>
-                            <td><strong>{{ item.rechnung.rechnungsnummer }}</strong></td>
-                            <td>{{ item.rechnung.kunde_name }}</td>
-                            <td>
-                                <span class="badge bg-{% if item.mahnstufe == 1 %}warning{% elif item.mahnstufe == 2 %}orange{% else %}danger{% endif %}">
-                                    {{ item.mahnstufe }}. Mahnung
-                                </span>
-                            </td>
-                            <td><small>{{ item.grund }}</small></td>
-                            <td>
-                                <form method="POST" action="{{ url_for('finanzen.mahnung_erstellen', rechnung_id=item.rechnung.id) }}" style="display: inline;">
-                                    <button type="submit" class="btn btn-sm btn-warning">
-                                        <i class="bi bi-envelope-plus"></i> Erstellen
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <div class="p-3 text-center text-muted">
-                    <i class="bi bi-inbox" style="font-size: 2rem;"></i>
-                    <p class="mb-0">Keine Mahnungen fällig</p>
+                <div class="col-md-4">
+                    <h3 class="text-primary">{{ eur(gewichteter_umsatz) }}</h3>
+                    <p class="text-muted">Gewichteter Umsatz</p>
                 </div>
-                {% endif %}
+                <div class="col-md-4">
+                    <h3 class="text-{% if angebote_follow_up_count > 0 %}danger{% else %}success{% endif %}">{{ angebote_follow_up_count }}</h3>
+                    <p class="text-muted">Follow-up nötig</p>
+                </div>
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 
-<!-- Mahnwesen-Statistik & Ratenzahlungen -->
-<div class="row mb-4">
-    <!-- Mahnwesen -->
-    <div class="col-md-6">
+<!-- ===================== TAB 2: VERBINDLICHKEITEN (Eingangsrechnungen) ===================== -->
+<div class="tab-pane fade" id="verbindlichkeiten" role="tabpanel">
+
+    <!-- KPI Cards Verbindlichkeiten -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <div class="d-flex align-items-center justify-content-center mb-2">
+                        <i class="bi bi-arrow-down-circle text-danger me-2" style="font-size:1.5rem"></i>
+                        <small class="text-muted">Verbindlichkeiten gesamt</small>
+                    </div>
+                    <h2 class="text-danger mb-0">{{ eur(verbindlichkeiten_gesamt) }}</h2>
+                    <small class="text-muted">Wir schulden Lieferanten</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <div class="d-flex align-items-center justify-content-center mb-2">
+                        <i class="bi bi-clock-history text-danger me-2" style="font-size:1.5rem"></i>
+                        <small class="text-muted">Überfällig</small>
+                    </div>
+                    <h2 class="text-danger mb-0">{{ eur(verbindlichkeiten_ueberfaellig) }}</h2>
+                    <small class="text-muted">{{ ueberfaellige_eingangsrechnungen|length }} Rechnungen</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <small class="text-muted d-block mb-2">Fällig in 7 Tagen</small>
+                    <h2 class="text-warning mb-0">{{ eur(verbindlichkeiten_faellig_7) }}</h2>
+                    <small class="text-muted">Bald überweisen!</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-secondary">
+                <div class="card-body text-center">
+                    <small class="text-muted d-block mb-2">Ausgaben (30 Tage)</small>
+                    <h2 class="text-secondary mb-0">{{ eur(ausgaben_30_tage) }}</h2>
+                    <small class="text-muted">Eingangsrechnungen</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Überfällige Eingangsrechnungen -->
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="bi bi-clock-history"></i> Überfällige Eingangsrechnungen – Sofort überweisen!</h5>
+        </div>
+        <div class="card-body p-0">
+            {% if ueberfaellige_eingangsrechnungen %}
+            <div class="alert alert-danger m-3 mb-0">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>Achtung:</strong> Überfällige Eingangsrechnungen können zu Mahnbescheiden, Verzugszinsen und Inkassokosten führen!
+            </div>
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Rechnung</th>
+                        <th>Lieferant</th>
+                        <th>Tage überfällig</th>
+                        <th class="text-end">Offen</th>
+                        <th>Risiko</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rechnung in ueberfaellige_eingangsrechnungen %}
+                    <tr class="{% if rechnung.faelligkeitsdatum and (today - rechnung.faelligkeitsdatum).days > 30 %}table-danger{% endif %}">
+                        <td><strong>{{ rechnung.rechnungsnummer }}</strong></td>
+                        <td>{{ rechnung.kunde_name }}</td>
+                        <td>
+                            {% set tage = (today - rechnung.faelligkeitsdatum).days if rechnung.faelligkeitsdatum else 0 %}
+                            <span class="badge bg-{% if tage > 30 %}danger{% elif tage > 14 %}warning text-dark{% else %}secondary{% endif %}">
+                                {{ tage }} Tage
+                            </span>
+                        </td>
+                        <td class="text-end fw-bold">{{ eur(rechnung.offener_betrag) }}</td>
+                        <td>
+                            {% if tage > 30 %}
+                            <span class="badge bg-danger"><i class="bi bi-exclamation-triangle-fill"></i> Mahnbescheid droht</span>
+                            {% elif tage > 14 %}
+                            <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle"></i> Mahnung erwartet</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Verzugszinsen</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div class="p-3 text-center text-success">
+                <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+                <p class="mb-0">Keine überfälligen Eingangsrechnungen</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Bald fällige Eingangsrechnungen -->
+    {% if verbindlichkeiten_faellig_7 > 0 %}
+    <div class="card">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="bi bi-calendar-event"></i> In den nächsten 7 Tagen fällig: {{ eur(verbindlichkeiten_faellig_7) }}</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted mb-0">
+                <a href="{{ url_for('finanzen.offene_posten', richtung='eingang', status='faellig_7_tage') }}" class="btn btn-sm btn-outline-warning">
+                    <i class="bi bi-list-ul"></i> Details anzeigen
+                </a>
+            </p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ===================== TAB 3: MAHNWESEN ===================== -->
+<div class="tab-pane fade" id="mahnwesen" role="tabpanel">
+
+    <div class="row mb-4">
+        <!-- Mahnstatistik -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Mahnwesen-Statistik</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center mb-3">
+                        <div class="col-4">
+                            <div class="border rounded p-2">
+                                <h3 class="text-warning mb-0">{{ mahnungen_1 }}</h3>
+                                <small class="text-muted">1. Mahnung</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-2">
+                                <h3 class="text-orange mb-0" style="color:#fd7e14">{{ mahnungen_2 }}</h3>
+                                <small class="text-muted">2. Mahnung</small>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="border rounded p-2">
+                                <h3 class="text-danger mb-0">{{ mahnungen_3 }}</h3>
+                                <small class="text-muted">3. Mahnung</small>
+                            </div>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row text-center">
+                        <div class="col-md-6">
+                            <p class="text-muted mb-1">Mahngebühren</p>
+                            <h5>{{ eur(mahngebuehren_gesamt) }}</h5>
+                        </div>
+                        <div class="col-md-6">
+                            <p class="text-muted mb-1">Verzugszinsen</p>
+                            <h5>{{ eur(verzugszinsen_gesamt) }}</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Nächste Mahnungen -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="bi bi-bell"></i> Fällige Mahnungen</h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if naechste_mahnungen %}
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Rechnung</th>
+                                <th>Kunde</th>
+                                <th>Stufe</th>
+                                <th>Grund</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in naechste_mahnungen %}
+                            <tr>
+                                <td><strong>{{ item.rechnung.rechnungsnummer }}</strong></td>
+                                <td>{{ item.rechnung.kunde_name }}</td>
+                                <td>
+                                    <span class="badge bg-{% if item.mahnstufe == 1 %}warning text-dark{% elif item.mahnstufe == 2 %}orange{% else %}danger{% endif %}">
+                                        {{ item.mahnstufe }}. Mahnung
+                                    </span>
+                                </td>
+                                <td><small>{{ item.grund }}</small></td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('finanzen.mahnung_erstellen', rechnung_id=item.rechnung.id) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-warning">
+                                            <i class="bi bi-envelope-plus"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div class="p-3 text-center text-muted">
+                        <i class="bi bi-check-circle text-success" style="font-size: 2rem;"></i>
+                        <p class="mb-0">Keine Mahnungen fällig</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inkasso-Fälle -->
+    {% if inkasso_count > 0 %}
+    <div class="card mb-4">
+        <div class="card-header bg-dark text-white">
+            <h5 class="mb-0"><i class="bi bi-shield-exclamation"></i> Inkasso / Gerichtlich ({{ inkasso_count }})</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Mahnung</th>
+                        <th>Rechnung</th>
+                        <th>Kunde</th>
+                        <th>Status</th>
+                        <th class="text-end">Gesamtbetrag</th>
+                        <th>Datum</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in inkasso_faelle %}
+                    <tr>
+                        <td><strong>{{ m.mahnungsnummer }}</strong></td>
+                        <td>{{ m.rechnung.rechnungsnummer if m.rechnung else '-' }}</td>
+                        <td>{{ m.kunde.name if m.kunde else '-' }}</td>
+                        <td>
+                            {% if m.status == 'inkasso' %}
+                            <span class="badge bg-dark"><i class="bi bi-building"></i> Inkasso</span>
+                            {% else %}
+                            <span class="badge bg-danger"><i class="bi bi-hammer"></i> Gerichtlich</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end fw-bold">{{ "{:,.2f}".format(m.gesamtbetrag or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                        <td>{{ m.mahndatum.strftime('%d.%m.%Y') if m.mahndatum else '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- ===================== TAB 4: RATENZAHLUNGEN ===================== -->
+<div class="tab-pane fade" id="raten" role="tabpanel">
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <h3 class="text-info">{{ ratenzahlungen_aktiv_count }}</h3>
+                    <p class="text-muted mb-0">Aktive Vereinbarungen</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h3 class="text-primary">{{ eur(raten_gesamt_offen) }}</h3>
+                    <p class="text-muted mb-0">Offen gesamt</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-danger">
+                <div class="card-body text-center">
+                    <h3 class="text-danger">{{ raten_ueberfaellig|length }}</h3>
+                    <p class="text-muted mb-0">Überfällige Raten</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <h3 class="text-warning">{{ raten_faellig_heute|length + raten_faellig_woche|length }}</h3>
+                    <p class="text-muted mb-0">Diese Woche fällig</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Überfällige Raten -->
+    {% if raten_ueberfaellig %}
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="bi bi-exclamation-octagon"></i> Überfällige Raten</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Vereinbarung</th>
+                        <th>Rate</th>
+                        <th>Fällig seit</th>
+                        <th class="text-end">Betrag</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rate in raten_ueberfaellig %}
+                    <tr class="table-danger">
+                        <td>{{ rate.ratenzahlung.vereinbarungsnummer }}</td>
+                        <td>Rate {{ rate.ratennummer }} von {{ rate.ratenzahlung.anzahl_raten }}</td>
+                        <td>
+                            <span class="badge bg-danger">{{ (today - rate.faelligkeitsdatum).days }} Tage</span>
+                            <small class="text-muted ms-1">{{ rate.faelligkeitsdatum.strftime('%d.%m.%Y') }}</small>
+                        </td>
+                        <td class="text-end fw-bold">{{ "{:,.2f}".format(rate.betrag).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Heute + Diese Woche fällig -->
+    {% if raten_faellig_heute or raten_faellig_woche %}
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="bi bi-calendar-event"></i> Demnächst fällige Raten</h5>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Vereinbarung</th>
+                        <th>Rate</th>
+                        <th>Fällig am</th>
+                        <th class="text-end">Betrag</th>
+                        <th>Erinnerung</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for rate in raten_faellig_heute %}
+                    <tr class="table-warning">
+                        <td>{{ rate.ratenzahlung.vereinbarungsnummer }}</td>
+                        <td>Rate {{ rate.ratennummer }} von {{ rate.ratenzahlung.anzahl_raten }}</td>
+                        <td><span class="badge bg-danger">Heute!</span></td>
+                        <td class="text-end fw-bold">{{ "{:,.2f}".format(rate.betrag).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                        <td><span class="badge bg-danger"><i class="bi bi-bell-fill"></i> Jetzt überweisen</span></td>
+                    </tr>
+                    {% endfor %}
+                    {% for rate in raten_faellig_woche %}
+                    <tr>
+                        <td>{{ rate.ratenzahlung.vereinbarungsnummer }}</td>
+                        <td>Rate {{ rate.ratennummer }} von {{ rate.ratenzahlung.anzahl_raten }}</td>
+                        <td>{{ rate.faelligkeitsdatum.strftime('%d.%m.%Y') }}
+                            <small class="text-muted">(in {{ (rate.faelligkeitsdatum - today).days }} Tagen)</small>
+                        </td>
+                        <td class="text-end fw-bold">{{ "{:,.2f}".format(rate.betrag).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                        <td><span class="badge bg-info"><i class="bi bi-bell"></i> Vorbereiten</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if ratenzahlungen_aktiv_count == 0 and not raten_ueberfaellig and not raten_faellig_heute and not raten_faellig_woche %}
+    <div class="card">
+        <div class="card-body text-center text-muted p-5">
+            <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
+            <p class="mt-2 mb-0">Keine aktiven Ratenzahlungen</p>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+</div><!-- /tab-content -->
+
+<!-- ===================== LIQUIDITÄTS-ÜBERSICHT (unter Tabs) ===================== -->
+<div class="row mt-4">
+    <div class="col-md-4">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Mahnwesen-Statistik</h5>
+                <h6 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Liquiditäts-Kennzahlen</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td class="text-muted">Forderungen</td>
+                        <td class="text-end text-success fw-bold">+ {{ eur(forderungen_gesamt) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Verbindlichkeiten</td>
+                        <td class="text-end text-danger fw-bold">- {{ eur(verbindlichkeiten_gesamt) }}</td>
+                    </tr>
+                    <tr class="border-top">
+                        <td class="text-muted fw-bold">Saldo</td>
+                        {% set saldo = forderungen_gesamt - verbindlichkeiten_gesamt %}
+                        <td class="text-end fw-bold text-{% if saldo >= 0 %}success{% else %}danger{% endif %}">
+                            {{ eur(saldo) }}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-calendar-month"></i> Cashflow (30 Tage)</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td class="text-muted">Umsatz (Ausgang)</td>
+                        <td class="text-end text-success">+ {{ eur(umsatz_30_tage) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Ausgaben (Eingang)</td>
+                        <td class="text-end text-danger">- {{ eur(ausgaben_30_tage) }}</td>
+                    </tr>
+                    <tr class="border-top">
+                        <td class="text-muted fw-bold">Rohertrag</td>
+                        {% set rohertrag = umsatz_30_tage - ausgaben_30_tage %}
+                        <td class="text-end fw-bold text-{% if rohertrag >= 0 %}success{% else %}danger{% endif %}">
+                            {{ eur(rohertrag) }}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-clipboard-check"></i> Verkaufschancen</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td class="text-muted">Offene Angebote</td>
+                        <td class="text-end">{{ angebote_offen_count }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Erwarteter Umsatz</td>
+                        <td class="text-end">{{ eur(erwarteter_umsatz) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Gewichtet</td>
+                        <td class="text-end fw-bold text-primary">{{ eur(gewichteter_umsatz) }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== WIEDERKEHRENDE KOSTEN (Verträge) ===================== -->
+{% if aktive_vertraege_count > 0 %}
+<div class="row mt-3">
+    <div class="col-md-6">
+        <div class="card border-info">
+            <div class="card-header bg-info bg-opacity-10">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0"><i class="bi bi-arrow-repeat me-1"></i> Wiederkehrende Kosten</h6>
+                    <a href="{{ url_for('contracts.index') }}" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-file-earmark-text me-1"></i>{{ aktive_vertraege_count }} Vertr&auml;ge
+                    </a>
+                </div>
             </div>
             <div class="card-body">
                 <div class="row text-center">
-                    <div class="col-md-4">
-                        <h3 class="text-warning">{{ mahnungen_1 }}</h3>
-                        <p class="text-muted">1. Mahnung</p>
+                    <div class="col-6">
+                        <div class="fs-4 fw-bold text-danger">{{ "%.2f"|format(vertrag_monatlich) }} &euro;</div>
+                        <small class="text-muted">monatlich</small>
                     </div>
-                    <div class="col-md-4">
-                        <h3 class="text-orange">{{ mahnungen_2 }}</h3>
-                        <p class="text-muted">2. Mahnung</p>
-                    </div>
-                    <div class="col-md-4">
-                        <h3 class="text-danger">{{ mahnungen_3 }}</h3>
-                        <p class="text-muted">3. Mahnung</p>
-                    </div>
-                </div>
-                <hr>
-                <div class="row text-center">
-                    <div class="col-md-6">
-                        <p class="text-muted mb-1">Mahngebühren</p>
-                        <h5>{{ "{:,.2f}".format(mahngebuehren_gesamt).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h5>
-                    </div>
-                    <div class="col-md-6">
-                        <p class="text-muted mb-1">Verzugszinsen</p>
-                        <h5>{{ "{:,.2f}".format(verzugszinsen_gesamt).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h5>
+                    <div class="col-6">
+                        <div class="fs-4 fw-bold text-warning">{{ "%.2f"|format(vertrag_jaehrlich) }} &euro;</div>
+                        <small class="text-muted">j&auml;hrlich</small>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Ratenzahlungen -->
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-calendar-range"></i> Ratenzahlungen</h5>
-            </div>
-            <div class="card-body">
-                <div class="row text-center mb-3">
-                    <div class="col-md-6">
-                        <h3 class="text-info">{{ ratenzahlungen_aktiv_count }}</h3>
-                        <p class="text-muted">Aktive Vereinbarungen</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h3 class="text-primary">{{ "{:,.2f}".format(raten_gesamt_offen).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</h3>
-                        <p class="text-muted">Offen</p>
-                    </div>
-                </div>
-                <hr>
-                <div class="row">
-                    <div class="col-md-6">
-                        <p class="text-muted mb-1">Heute fällig</p>
-                        <h5 class="text-danger">{{ raten_faellig_heute|length }} Raten</h5>
-                    </div>
-                    <div class="col-md-6">
-                        <p class="text-muted mb-1">Diese Woche</p>
-                        <h5 class="text-warning">{{ raten_faellig_woche|length }} Raten</h5>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Angebote mit Follow-up -->
-<div class="row mb-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Angebote - Follow-up erforderlich</h5>
+                <h6 class="mb-0"><i class="bi bi-exclamation-triangle me-1"></i> Vertrags-Warnungen</h6>
             </div>
             <div class="card-body p-0">
-                {% if angebote_follow_up_count > 0 %}
-                <div class="alert alert-info m-3">
-                    <strong>{{ angebote_follow_up_count }} Angebot(e)</strong> brauchen Nachverfolgung!
-                    <a href="{{ url_for('angebote.index') }}" class="alert-link">Angebote ansehen →</a>
+                {% if vertraege_kuendigung or vertraege_bald_faellig %}
+                <div class="list-group list-group-flush">
+                    {% for v in vertraege_kuendigung %}
+                    <a href="{{ url_for('contracts.detail', contract_id=v.id) }}" class="list-group-item list-group-item-action list-group-item-warning py-2">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <i class="bi {{ v.type_icon }} me-1"></i>
+                                <strong>{{ v.name }}</strong>
+                                <small class="text-muted ms-1">{{ v.provider_name or '' }}</small>
+                            </div>
+                            <span class="badge bg-warning text-dark">K&uuml;ndigung in {{ v.days_until_renewal }} Tagen</span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                    {% for v in vertraege_bald_faellig %}
+                    <a href="{{ url_for('contracts.detail', contract_id=v.id) }}" class="list-group-item list-group-item-action list-group-item-danger py-2">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <i class="bi {{ v.type_icon }} me-1"></i>
+                                <strong>{{ v.name }}</strong>
+                            </div>
+                            <span class="badge bg-danger">L&auml;uft aus in {{ v.days_until_end }} Tagen</span>
+                        </div>
+                    </a>
+                    {% endfor %}
                 </div>
                 {% else %}
-                <div class="p-3 text-center text-muted">
-                    <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
-                    <p class="mb-0">Alle Angebote sind aktuell</p>
+                <div class="text-center text-muted py-3">
+                    <i class="bi bi-check-circle text-success"></i> Keine Warnungen
                 </div>
                 {% endif %}
             </div>
         </div>
     </div>
 </div>
+{% endif %}
 
 <script>
 // Auto-Refresh alle 5 Minuten
-setTimeout(function() {
-    location.reload();
-}, 300000);
+setTimeout(function() { location.reload(); }, 300000);
+
+// Tab aus URL-Hash laden
+document.addEventListener('DOMContentLoaded', function() {
+    var hash = window.location.hash;
+    if (hash) {
+        var tab = document.querySelector('[data-bs-target="' + hash + '"]');
+        if (tab) new bootstrap.Tab(tab).show();
+    }
+    // Hash bei Tab-Wechsel setzen
+    document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function(t) {
+        t.addEventListener('shown.bs.tab', function(e) {
+            history.replaceState(null, null, e.target.dataset.bsTarget);
+        });
+    });
+});
 </script>
 
 {% endblock %}

@@ -115,34 +115,38 @@ class BuchungsService:
             
             username = current_user.username if current_user.is_authenticated else 'System'
             
-            # Buchung Netto
+            # Felder: netto_gesamt/mwst_gesamt (DB) statt summe_netto/summe_mwst
+            netto = Decimal(str(getattr(rechnung, 'netto_gesamt', 0) or getattr(rechnung, 'summe_netto', 0) or 0))
+            mwst = Decimal(str(getattr(rechnung, 'mwst_gesamt', 0) or getattr(rechnung, 'summe_mwst', 0) or 0))
+
+            # Buchung Netto (Forderung an Erloese)
             buchung_netto = Buchung(
                 buchungsdatum=rechnung.rechnungsdatum,
                 belegnummer=rechnung.rechnungsnummer,
                 konto_soll=konto_soll,
                 konto_haben=konto_haben_erloese,
-                betrag=Decimal(str(rechnung.summe_netto)),
-                steuer_betrag=Decimal(str(rechnung.summe_mwst)),
+                betrag=netto,
+                steuer_betrag=mwst,
                 buchungstext=f'Rechnung {rechnung.rechnungsnummer}',
                 beleg_typ='Rechnung',
                 beleg_id=rechnung.id,
-                beleg_tabelle='rechnung',
+                beleg_tabelle='rechnungen',
                 created_by=username
             )
             db.session.add(buchung_netto)
-            
-            # Buchung USt
-            if rechnung.summe_mwst > 0:
+
+            # Buchung USt (Forderung an USt)
+            if mwst > 0:
                 buchung_ust = Buchung(
                     buchungsdatum=rechnung.rechnungsdatum,
                     belegnummer=rechnung.rechnungsnummer,
                     konto_soll=konto_soll,
                     konto_haben=konto_haben_ust,
-                    betrag=Decimal(str(rechnung.summe_mwst)),
+                    betrag=mwst,
                     buchungstext=f'USt {rechnung.rechnungsnummer}',
                     beleg_typ='Steuer',
                     beleg_id=rechnung.id,
-                    beleg_tabelle='rechnung',
+                    beleg_tabelle='rechnungen',
                     created_by=username
                 )
                 db.session.add(buchung_ust)
@@ -267,7 +271,7 @@ class BuchungsService:
                 buchungstext=f'Zahlungseingang {rechnung.rechnungsnummer}',
                 beleg_typ='Zahlung',
                 beleg_id=rechnung.id,
-                beleg_tabelle='rechnung',
+                beleg_tabelle='rechnungen',
                 created_by=username
             )
             db.session.add(buchung)
@@ -420,7 +424,8 @@ class BuchungsService:
         return {
             'anzahl_buchungen': query.count(),
             'erloese_gesamt': float(erloese_summe),
-            'kasse_saldo': float(BuchungsService.get_konto_saldo('1000', datum_von, datum_bis)),
-            'bank_saldo': float(BuchungsService.get_konto_saldo('1200', datum_von, datum_bis)),
-            'forderungen_saldo': float(BuchungsService.get_konto_saldo('1400', datum_von, datum_bis)),
+            # Bestandskonten: kumulierter Gesamtsaldo (kein Datumsfilter!)
+            'kasse_saldo': float(BuchungsService.get_konto_saldo('1000')),
+            'bank_saldo': float(BuchungsService.get_konto_saldo('1200')),
+            'forderungen_saldo': float(BuchungsService.get_konto_saldo('1400')),
         }

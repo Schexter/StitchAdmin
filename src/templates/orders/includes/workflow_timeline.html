@@ -1,0 +1,32 @@
+{% if timeline and timeline|length > 1 %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-bottom">
+        <h6 class="mb-0"><i class="bi bi-diagram-3 me-1"></i>Workflow-Verlauf</h6>
+    </div>
+    <div class="card-body py-3">
+        {% for event in timeline %}
+        <div class="d-flex align-items-start {% if not loop.last %}mb-2{% endif %}">
+            <div class="me-3 text-center" style="min-width: 36px;">
+                <div class="rounded-circle bg-{{ event.color }} bg-opacity-10 text-{{ event.color }} d-inline-flex align-items-center justify-content-center"
+                     style="width: 32px; height: 32px; font-size: 0.85rem;">
+                    <i class="bi {{ event.icon }}"></i>
+                </div>
+                {% if not loop.last %}
+                <div style="width: 2px; height: 16px; background: #dee2e6; margin: 3px auto 0;"></div>
+                {% endif %}
+            </div>
+            <div style="padding-top: 4px;">
+                {% if event.url %}
+                <a href="{{ event.url }}" class="fw-semibold text-decoration-none" style="font-size: 0.85rem;">{{ event.label }}</a>
+                {% else %}
+                <span class="fw-semibold" style="font-size: 0.85rem;">{{ event.label }}</span>
+                {% endif %}
+                {% if event.date %}
+                <br><small class="text-muted">{{ event.date.strftime('%d.%m.%Y %H:%M') }}</small>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Plattform-Administration - StitchAdmin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .kpi-card {
+        border: none;
+        border-radius: 12px;
+        transition: transform 0.15s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); }
+    .kpi-icon {
+        width: 48px; height: 48px;
+        border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 1.4rem;
+    }
+    .kpi-value { font-size: 1.8rem; font-weight: 700; }
+    .kpi-label { font-size: 0.85rem; color: #6c757d; }
+    .tenant-row { cursor: pointer; transition: background 0.1s; }
+    .tenant-row:hover { background: var(--sa-primary-light, #f0faf7) !important; }
+    .plan-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 20px;
+    }
+    .plan-trial { background: #fff3cd; color: #856404; }
+    .plan-starter { background: #d1ecf1; color: #0c5460; }
+    .plan-professional { background: #d4edda; color: #155724; }
+    .plan-enterprise { background: #e2d9f3; color: #4a1d96; }
+    .billing-active { color: #198754; }
+    .billing-past_due { color: #dc3545; }
+    .billing-grace_period { color: #fd7e14; }
+    .billing-suspended { color: #6c757d; }
+    .billing-cancelled { color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-1"><i class="bi bi-shield-lock me-2"></i>Plattform-Administration</h1>
+        <p class="text-muted mb-0">Tenant-Verwaltung, Abrechnung & KPIs</p>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card kpi-card shadow-sm">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="kpi-icon" style="background: var(--sa-primary-light, #e8f5f1); color: var(--sa-primary, #1a6b5a);">
+                    <i class="bi bi-buildings"></i>
+                </div>
+                <div>
+                    <div class="kpi-value">{{ total_tenants }}</div>
+                    <div class="kpi-label">Tenants gesamt</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card kpi-card shadow-sm">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="kpi-icon" style="background: #d4edda; color: #198754;">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+                <div>
+                    <div class="kpi-value">{{ active_tenants }}</div>
+                    <div class="kpi-label">Aktive Tenants</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card kpi-card shadow-sm">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="kpi-icon" style="background: #fff3cd; color: #856404;">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+                <div>
+                    <div class="kpi-value">{{ trial_tenants }}</div>
+                    <div class="kpi-label">Testphase</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card kpi-card shadow-sm">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="kpi-icon" style="background: #e2d9f3; color: #4a1d96;">
+                    <i class="bi bi-currency-euro"></i>
+                </div>
+                <div>
+                    <div class="kpi-value">{{ mrr|format_currency }}</div>
+                    <div class="kpi-label">MRR (Monthly Revenue)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Tenant-Tabelle -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-buildings me-2"></i>Alle Tenants ({{ total_tenants }})</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Firma</th>
+                                <th>Subdomain</th>
+                                <th>Plan</th>
+                                <th>Billing</th>
+                                <th class="text-end">Preis/Monat</th>
+                                <th>Erstellt</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tenant in tenants %}
+                            <tr class="tenant-row" onclick="window.location='{{ url_for('platform_admin.tenant_detail', tenant_id=tenant.id) }}'">
+                                <td>
+                                    <div class="fw-semibold">{{ tenant.name }}</div>
+                                    <small class="text-muted">{{ tenant.contact_email }}</small>
+                                </td>
+                                <td>
+                                    <code>{{ tenant.subdomain }}</code>
+                                    {% if not tenant.is_active %}
+                                        <span class="badge bg-danger ms-1">Inaktiv</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="plan-badge plan-{{ tenant.plan_tier }}">
+                                        {{ plan_config[tenant.plan_tier]['label'] if tenant.plan_tier in plan_config else tenant.plan_tier }}
+                                    </span>
+                                    {% if tenant.plan_tier == 'trial' and tenant.trial_days_remaining is not none %}
+                                        <br><small class="text-muted">{{ tenant.trial_days_remaining }} Tage</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="billing-{{ tenant.billing_status }}">
+                                        {% if tenant.billing_status == 'active' %}
+                                            <i class="bi bi-check-circle-fill"></i> Aktiv
+                                        {% elif tenant.billing_status == 'past_due' %}
+                                            <i class="bi bi-exclamation-triangle-fill"></i> Ueberfaellig
+                                        {% elif tenant.billing_status == 'grace_period' %}
+                                            <i class="bi bi-clock-fill"></i> Karenzzeit
+                                        {% elif tenant.billing_status == 'suspended' %}
+                                            <i class="bi bi-pause-circle-fill"></i> Gesperrt
+                                        {% elif tenant.billing_status == 'cancelled' %}
+                                            <i class="bi bi-x-circle-fill"></i> Gekuendigt
+                                        {% else %}
+                                            {{ tenant.billing_status }}
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td class="text-end fw-semibold">
+                                    {% if tenant.price_monthly > 0 %}
+                                        {{ tenant.price_monthly }} &euro;
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>{{ tenant.created_at|format_date }}</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if not tenants %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    <i class="bi bi-buildings fs-1 d-block mb-2"></i>
+                                    Noch keine Tenants vorhanden.
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Letzte Zahlungen -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-receipt me-2"></i>Letzte Zahlungen</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_payments %}
+                <div class="list-group list-group-flush">
+                    {% for payment in recent_payments %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="fw-semibold">{{ payment.amount }} &euro;</div>
+                                <small class="text-muted">
+                                    {{ payment.tenant.name if payment.tenant else 'Unbekannt' }}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <small class="text-muted">{{ payment.created_at|format_date }}</small>
+                                <br>
+                                <span class="badge {% if payment.status == 'completed' %}bg-success{% elif payment.status == 'pending' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ payment.status }}
+                                </span>
+                            </div>
+                        </div>
+                        {% if payment.invoice_number %}
+                        <small class="text-muted"><i class="bi bi-receipt me-1"></i>{{ payment.invoice_number }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-receipt fs-1 d-block mb-2"></i>
+                    Noch keine Zahlungen erfasst.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Umsatz-Info -->
+        <div class="card shadow-sm mt-3">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Umsatz-Uebersicht</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Zahlende Kunden</span>
+                    <span class="fw-semibold">{{ paying_tenants }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">MRR</span>
+                    <span class="fw-semibold">{{ mrr|format_currency }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">ARR (hochgerechnet)</span>
+                    <span class="fw-semibold">{{ (mrr * 12)|format_currency }}</span>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <span class="text-muted">Conversion Rate</span>
+                    <span class="fw-semibold">
+                        {% if total_tenants > 0 %}
+                            {{ "%.1f"|format(paying_tenants / total_tenants * 100) }}%
+                        {% else %}
+                            0%
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

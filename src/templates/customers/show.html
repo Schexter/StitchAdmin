@@ -27,9 +27,20 @@
                 {{ customer.display_name or (customer.first_name ~ ' ' ~ customer.last_name) or customer.company_name }}
             </h1>
             <div>
-                <a href="{{ url_for('orders.new', customer_id=customer.id) }}" class="btn btn-success">
-                    <i class="bi bi-plus-circle"></i> Neuer Auftrag
-                </a>
+                <div class="btn-group">
+                    <a href="{{ url_for('orders.new', customer_id=customer.id) }}" class="btn btn-success">
+                        <i class="bi bi-plus-circle"></i> Neuer Auftrag
+                    </a>
+                    <button type="button" class="btn btn-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="visually-hidden">Weitere Optionen</span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="{{ url_for('orders.new', customer_id=customer.id) }}"><i class="bi bi-clipboard-plus me-2"></i>Neuer Auftrag</a></li>
+                        <li><a class="dropdown-item" href="{{ url_for('angebote.neu', kunde_id=customer.id) }}"><i class="bi bi-file-earmark-text me-2"></i>Neues Angebot</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('inquiry_admin.neue_anfrage', kunde_id=customer.id) }}"><i class="bi bi-envelope-paper me-2"></i>Neue Anfrage</a></li>
+                    </ul>
+                </div>
                 <a href="{{ url_for('customers.edit', customer_id=customer.id) }}" class="btn btn-primary">
                     <i class="bi bi-pencil"></i> Bearbeiten
                 </a>
@@ -283,6 +294,70 @@
         {% include 'crm/_activities_widget.html' %}
         {% endif %}
 
+        <!-- Anfragen -->
+        {% if inquiries %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-envelope-open me-2"></i>Anfragen</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for inq in inquiries %}
+                    <a href="{{ url_for('inquiry_admin.detail', id=inq.id) }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ inq.inquiry_number }}</strong>
+                                <span class="text-muted ms-2">{{ inq.type_label }}</span>
+                            </div>
+                            <div>
+                                <span class="badge bg-{{ inq.status_color }}">{{ inq.status_label }}</span>
+                                <small class="text-muted ms-2">{{ inq.created_at.strftime('%d.%m.%Y') if inq.created_at }}</small>
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Kontakthistorie -->
+        {% if contacts %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Kontakthistorie</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for contact in contacts[:10] %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                {% if contact.contact_type.value == 'WEBSITE_ANFRAGE' %}
+                                    <i class="bi bi-globe text-info me-1"></i>
+                                {% elif contact.contact_type.value == 'EMAIL_AUSGANG' %}
+                                    <i class="bi bi-envelope text-primary me-1"></i>
+                                {% elif contact.contact_type.value == 'EMAIL_EINGANG' %}
+                                    <i class="bi bi-envelope-open text-success me-1"></i>
+                                {% elif contact.contact_type.value == 'NOTIZ' %}
+                                    <i class="bi bi-sticky text-warning me-1"></i>
+                                {% else %}
+                                    <i class="bi bi-chat-dots text-secondary me-1"></i>
+                                {% endif %}
+                                <strong>{{ contact.subject or 'Kein Betreff' }}</strong>
+                            </div>
+                            <small class="text-muted">{{ contact.created_at.strftime('%d.%m.%Y %H:%M') if contact.created_at }}</small>
+                        </div>
+                        {% if contact.body_text %}
+                        <small class="text-muted d-block mt-1">{{ contact.body_text[:150] }}{{ '...' if contact.body_text|length > 150 }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Schnellaktionen -->
         <div class="card mb-4">
             <div class="card-header">
@@ -291,13 +366,14 @@
             <div class="card-body">
                 <div class="d-grid gap-2">
                     <a href="{{ url_for('orders.new') }}?customer_id={{ customer.id }}" class="btn btn-success">
-                        <i class="bi bi-plus-circle"></i> Neuer Auftrag
+                        <i class="bi bi-clipboard-plus"></i> Neuer Auftrag
                     </a>
-                    {% if customer.get('customer_type', 'private') == 'business' %}
+                    <a href="{{ url_for('angebote.neu') }}?kunde_id={{ customer.id }}" class="btn btn-outline-primary">
+                        <i class="bi bi-file-earmark-text"></i> Neues Angebot
+                    </a>
                     <a href="{{ url_for('rechnung.neue_rechnung') }}?kunde_id={{ customer.id }}" class="btn btn-outline-primary">
                         <i class="bi bi-receipt"></i> Neue Rechnung
                     </a>
-                    {% endif %}
                 </div>
             </div>
         </div>

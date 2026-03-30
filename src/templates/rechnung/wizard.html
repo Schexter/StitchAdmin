@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}Rechnung erstellen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('rechnung.rechnungs_index') }}" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+        <div>
+            <h4 class="mb-0"><i class="bi bi-receipt me-2"></i>Rechnung erstellen</h4>
+            <small class="text-muted">Wizard: Auftrag w&auml;hlen &rarr; Positionen pr&uuml;fen &rarr; Rechnung erstellen</small>
+        </div>
+    </div>
+
+    <!-- Stepper -->
+    <div class="d-flex justify-content-center mb-4">
+        <div class="d-flex align-items-center gap-0">
+            {% for i, label in [(1, 'Auftrag'), (2, 'Positionen'), (3, 'Erstellen')] %}
+            <div class="text-center" id="si-{{ i }}">
+                <div class="rounded-circle {{ 'bg-primary text-white' if (i == 1 and not selected_order) or (i == 2 and selected_order) else 'bg-light text-muted border' }} d-flex align-items-center justify-content-center mx-auto" style="width:36px;height:36px;font-weight:bold;">
+                    {% if selected_order and i == 1 %}<i class="bi bi-check-lg"></i>{% else %}{{ i }}{% endif %}
+                </div>
+                <small class="d-block mt-1 {{ 'fw-bold text-primary' if (i == 1 and not selected_order) or (i == 2 and selected_order) else 'text-muted' }}">{{ label }}</small>
+            </div>
+            {% if i < 3 %}<div style="width:80px;height:2px;background:#dee2e6;" class="align-self-start mt-3"></div>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if not selected_order %}
+    <!-- STEP 1: Auftrag waehlen -->
+    <div id="step-1">
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-search me-1"></i> Auftrag ausw&auml;hlen</h6></div>
+            <div class="card-body">
+                <input type="text" class="form-control mb-3" id="order-search" placeholder="Auftrag oder Kunde suchen..." oninput="filterOrders()">
+
+                {% if auftraege %}
+                <div class="table-responsive" style="max-height:400px; overflow-y:auto;">
+                    <table class="table table-sm table-hover mb-0" id="orders-table">
+                        <thead class="table-light sticky-top">
+                            <tr><th>Auftrag</th><th>Kunde</th><th>Status</th><th class="text-end">Wert</th><th></th></tr>
+                        </thead>
+                        <tbody>
+                            {% for o in auftraege %}
+                            <tr class="order-row">
+                                <td><strong>{{ o.order_number or o.id }}</strong></td>
+                                <td>{{ o.customer.display_name if o.customer else '?' }}</td>
+                                <td>
+                                    {% if o.status == 'completed' %}<span class="badge bg-success">Abgeschlossen</span>
+                                    {% elif o.status == 'ready' %}<span class="badge bg-info">Fertig</span>
+                                    {% elif o.status == 'in_progress' %}<span class="badge bg-warning">In Produktion</span>
+                                    {% else %}<span class="badge bg-secondary">{{ o.status }}</span>{% endif %}
+                                </td>
+                                <td class="text-end">{{ "%.2f"|format(o.total_price or 0) }} &euro;</td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('rechnung.rechnung_wizard', order_id=o.id) }}" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-arrow-right"></i> W&auml;hlen
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info mb-0">Keine abrechenbaren Auftr&auml;ge vorhanden.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- STEP 2 + 3: Positionen pruefen & Rechnung erstellen -->
+    <form method="POST" action="{{ url_for('rechnung.sammelrechnung_finalisieren') }}">
+        <input type="hidden" name="kunde_id" value="{{ kunde.id if kunde else '' }}">
+        <input type="hidden" name="auftrag_id" value="{{ selected_order.id }}">
+
+        <!-- STEP 2: Positionen -->
+        <div id="step-2">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between">
+                    <h6 class="mb-0"><i class="bi bi-person me-1"></i> Rechnungsempf&auml;nger</h6>
+                    <a href="{{ url_for('rechnung.rechnung_wizard') }}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i>Anderen Auftrag
+                    </a>
+                </div>
+                <div class="card-body py-2">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>{{ kunde.display_name if kunde else 'Unbekannt' }}</strong><br>
+                            {% if kunde %}
+                            <small class="text-muted">
+                                {{ kunde.street or '' }} {{ kunde.house_number or '' }}<br>
+                                {{ kunde.postal_code or '' }} {{ kunde.city or '' }}
+                                {% if kunde.email %}<br>{{ kunde.email }}{% endif %}
+                            </small>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <small class="text-muted">Auftrag:</small> <strong>{{ selected_order.order_number or selected_order.id }}</strong><br>
+                            <small class="text-muted">Wert:</small> <strong>{{ "%.2f"|format(selected_order.total_price or 0) }} &euro;</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-list-check me-1"></i> Rechnungspositionen</h6></div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:40px;">Pos</th>
+                                <th>Bezeichnung</th>
+                                <th class="text-end" style="width:70px;">Menge</th>
+                                <th class="text-end" style="width:100px;">Einzelpreis</th>
+                                <th class="text-end" style="width:70px;">MwSt</th>
+                                <th class="text-end" style="width:100px;">Netto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pos in positionen %}
+                            {% if not pos.get('is_header') %}
+                            <tr>
+                                <td class="text-center">{{ pos.position }}</td>
+                                <td>
+                                    <strong>{{ pos.artikel_name }}</strong>
+                                    {% if pos.beschreibung %}<br><small class="text-muted">{{ pos.beschreibung }}</small>{% endif %}
+                                </td>
+                                <td class="text-end">{{ pos.menge }} {{ pos.einheit }}</td>
+                                <td class="text-end">{{ "%.2f"|format(pos.einzelpreis_netto) }} &euro;</td>
+                                <td class="text-end">{{ pos.mwst_satz }}%</td>
+                                <td class="text-end fw-bold">{{ "%.2f"|format(pos.netto_betrag) }} &euro;</td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="5" class="text-end">Netto:</td>
+                                <td class="text-end fw-bold">{{ "%.2f"|format(netto_gesamt) }} &euro;</td>
+                            </tr>
+                            <tr>
+                                <td colspan="5" class="text-end">MwSt (19%):</td>
+                                <td class="text-end">{{ "%.2f"|format(mwst_gesamt) }} &euro;</td>
+                            </tr>
+                            <tr class="table-success">
+                                <td colspan="5" class="text-end"><strong>Brutto:</strong></td>
+                                <td class="text-end"><strong>{{ "%.2f"|format(brutto_gesamt) }} &euro;</strong></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-primary" onclick="goStep(3)">
+                    Weiter: Rechnungsdetails <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP 3: Rechnungsdetails & Erstellen -->
+        <div id="step-3" style="display:none;">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-gear me-1"></i> Rechnungsdetails</h6></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Rechnungsnummer</label>
+                            <input type="text" class="form-control" name="rechnungsnummer" value="{{ naechste_nummer }}" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Rechnungsdatum</label>
+                            <input type="date" class="form-control" name="rechnungsdatum" value="{{ today }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Zahlungsziel (Tage)</label>
+                            <input type="number" class="form-control" name="zahlungsziel_tage" value="14" min="0">
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="form-label">Interne Notiz (optional)</label>
+                        <input type="text" class="form-control" name="interne_notiz" placeholder="z.B. Express-Zuschlag bereits enthalten">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zusammenfassung -->
+            <div class="card mb-3 border-success">
+                <div class="card-header bg-success bg-opacity-10">
+                    <h6 class="mb-0"><i class="bi bi-check-circle me-1 text-success"></i> Zusammenfassung</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <small class="text-muted">Kunde</small><br>
+                            <strong>{{ kunde.display_name if kunde else '?' }}</strong>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">Auftrag</small><br>
+                            <strong>{{ selected_order.order_number or selected_order.id }}</strong>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">Positionen</small><br>
+                            <strong>{{ positionen|selectattr('is_header', 'undefined')|list|length }}</strong>
+                        </div>
+                        <div class="col-md-3">
+                            <small class="text-muted">Brutto</small><br>
+                            <strong class="text-success fs-5">{{ "%.2f"|format(brutto_gesamt) }} &euro;</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(2)">
+                    <i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck
+                </button>
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="bi bi-receipt me-1"></i> Rechnung erstellen
+                </button>
+            </div>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<script>
+function filterOrders() {
+    var q = document.getElementById('order-search').value.toLowerCase();
+    document.querySelectorAll('.order-row').forEach(function(row) {
+        row.style.display = row.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+    });
+}
+
+function goStep(n) {
+    document.getElementById('step-2').style.display = n === 2 ? 'block' : 'none';
+    document.getElementById('step-3').style.display = n === 3 ? 'block' : 'none';
+    // Stepper update
+    for (var i = 1; i <= 3; i++) {
+        var si = document.getElementById('si-' + i), c = si.querySelector('div'), s = si.querySelector('small');
+        if (i < n) { c.className = 'rounded-circle bg-success text-white d-flex align-items-center justify-content-center mx-auto'; c.innerHTML = '<i class="bi bi-check-lg"></i>'; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-success'; }
+        else if (i === n) { c.className = 'rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 fw-bold text-primary'; }
+        else { c.className = 'rounded-circle bg-light text-muted d-flex align-items-center justify-content-center mx-auto border'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-muted'; }
+    }
+    window.scrollTo(0, 0);
+}
+</script>
+{% endblock %}

@@ -4,7 +4,13 @@
       "Bash(python3:*)",
       "Bash(pip3 list:*)",
       "Bash(. .venv/bin/activate)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(ssh root@138.199.223.167 \"curl -s -o /dev/null -w ''%{http_code}'' https://stitchadmin.hahn-it-wuppertal.de/login && echo '' HTTPS OK''\")",
+      "Bash(ssh root@138.199.223.167 'curl -s -c /tmp/sa_cookies.txt -b /tmp/sa_cookies.txt -d \"\"username=admin&password=admin\"\" -X POST \"\"http://127.0.0.1:8000/login\"\" -o /dev/null -w \"\"%{http_code}\"\"')",
+      "Bash(ssh root@138.199.223.167 'curl -s -b /tmp/sa_cookies.txt \"\"http://127.0.0.1:8000/settings/email\"\" -o /dev/null -w \"\"%{http_code}\"\"')",
+      "Bash(scp:*)",
+      "Bash(ssh root@138.199.223.167 \"cd /opt/stitchadmin/app && python3 /opt/stitchadmin/screenshots_flask.py 2>&1\")",
+      "Bash(ssh root@138.199.223.167 \"sudo -u postgres psql -d stitchadmin -c \"\"ALTER TABLE rechnungen ADD COLUMN IF NOT EXISTS zahlungsart VARCHAR\\(20\\); ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS steuerart VARCHAR\\(10\\) DEFAULT ''soll'';\"\" && chown -R stitchadmin:stitchadmin /opt/stitchadmin/ && systemctl restart stitchadmin && sleep 1 && systemctl is-active stitchadmin\")"
     ],
     "deny": [],
     "ask": []

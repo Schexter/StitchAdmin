@@ -542,7 +542,7 @@
                         <th>Menge</th>
                         <th>Bestand</th>
                         <th>Status</th>
-                        <th>Preis</th>
+                        {% if not no_prices %}<th>Preis</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
@@ -586,7 +586,7 @@
                                 <span class="stock-badge stock-missing">NICHT GEFUNDEN</span>
                             {% endif %}
                         </td>
-                        <td>{{ ((item.unit_price or 0) * item.quantity)|round(2) }} €</td>
+                        {% if not no_prices %}<td>{{ ((item.unit_price or 0) * item.quantity)|round(2) }} €</td>{% endif %}
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -594,7 +594,7 @@
         </div>
         
         <!-- Preis -->
-        {% if order.total_price and order.total_price > 0 %}
+        {% if not no_prices and order.total_price and order.total_price > 0 %}
         <div class="price-box">
             <div class="price-main">{{ order.total_price|round(2) }} € netto</div>
             <div class="price-sub">

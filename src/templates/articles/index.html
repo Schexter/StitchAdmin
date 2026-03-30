@@ -17,6 +17,13 @@
             <a href="{{ url_for('articles.import_lshop') }}" class="btn btn-primary">
                 <i class="bi bi-file-earmark-excel"></i> L-Shop Import
             </a>
+            <button type="button" class="btn btn-outline-info" onclick="startMassImageImport()">
+                <i class="bi bi-images"></i> Bilder importieren
+            </button>
+            <button type="button" class="btn btn-outline-warning" onclick="importPrintequipment()">
+                <i class="bi bi-box-arrow-in-down"></i> Printequipment Import
+            </button>
+            <span id="image-import-status" class="ms-2"></span>
         </div>
     </div>
 </div>
@@ -24,41 +31,68 @@
 <!-- Filter -->
 <div class="card mb-3">
     <div class="card-body">
-        <form method="GET" class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label">Suche</label>
-                <input type="text" class="form-control" name="search" value="{{ search_query }}" 
-                       placeholder="Name, SKU oder Beschreibung">
+        <form method="GET">
+            <div class="row g-2 mb-2">
+                <div class="col-md-4">
+                    <label class="form-label">Suche</label>
+                    <input type="text" class="form-control" name="search" value="{{ search_query }}"
+                           placeholder="Name, SKU, Beschreibung, Lieferant...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Kategorie</label>
+                    <select class="form-select" name="category">
+                        <option value="">Alle</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}" {% if category_filter == cat %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Marke</label>
+                    <select class="form-select" name="brand">
+                        <option value="">Alle</option>
+                        {% for b in brands %}
+                        <option value="{{ b }}" {% if brand_filter == b %}selected{% endif %}>{{ b }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Lieferant</label>
+                    <select class="form-select" name="supplier">
+                        <option value="">Alle</option>
+                        {% for s in suppliers %}
+                        <option value="{{ s }}" {% if supplier_filter == s %}selected{% endif %}>{{ s }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Material</label>
+                    <select class="form-select" name="material">
+                        <option value="">Alle</option>
+                        {% for m in materials %}
+                        <option value="{{ m }}" {% if material_filter == m %}selected{% endif %}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Kategorie</label>
-                <select class="form-control" name="category">
-                    <option value="">Alle Kategorien</option>
-                    {% for category in categories %}
-                    <option value="{{ category }}" {% if category_filter == category %}selected{% endif %}>
-                        {{ category }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Lagerbestand</label>
-                <select class="form-control" name="stock">
-                    <option value="">Alle</option>
-                    <option value="out" {% if stock_filter == 'out' %}selected{% endif %}>Nicht vorrätig</option>
-                    <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Niedriger Bestand (≤10)</option>
-                    <option value="available" {% if stock_filter == 'available' %}selected{% endif %}>Vorrätig</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">&nbsp;</label>
-                <div>
+            <div class="row g-2 align-items-end">
+                <div class="col-md-2">
+                    <label class="form-label">Lagerbestand</label>
+                    <select class="form-select" name="stock">
+                        <option value="">Alle</option>
+                        <option value="available" {% if stock_filter == 'available' %}selected{% endif %}>Vorrätig</option>
+                        <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>Wenig (≤10)</option>
+                        <option value="out" {% if stock_filter == 'out' %}selected{% endif %}>Leer</option>
+                    </select>
+                </div>
+                <div class="col-md-10">
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-funnel"></i> Filtern
                     </button>
-                    <a href="{{ url_for('articles.index') }}" class="btn btn-secondary">
+                    <a href="{{ url_for('articles.index') }}" class="btn btn-outline-secondary">
                         <i class="bi bi-x-circle"></i> Reset
                     </a>
+                    <span class="text-muted ms-2 small">{{ articles|length }} Artikel gefunden</span>
                 </div>
             </div>
         </form>
@@ -72,6 +106,7 @@
             <table class="table table-striped table-hover">
                 <thead>
                     <tr>
+                        <th style="width: 50px;"></th>
                         <th>SKU</th>
                         <th>Name</th>
                         <th>Kategorie</th>
@@ -84,6 +119,13 @@
                 <tbody>
                     {% for article_id, article in articles.items() %}
                     <tr>
+                        <td class="text-center p-1">
+                            {% if article.image_thumbnail_path %}
+                            <img src="/uploads/{{ article.image_thumbnail_path }}" style="width: 40px; height: 40px; object-fit: contain; border-radius: 4px;">
+                            {% else %}
+                            <i class="bi bi-image text-muted" style="font-size: 1.2rem; opacity: 0.3;"></i>
+                            {% endif %}
+                        </td>
                         <td>
                             <small class="text-muted">{{ article.article_number or article.id }}</small>
                         </td>
@@ -308,5 +350,82 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Add to Order Modal direkt hier einfügen -->
 {% include 'includes/add_to_order_modal.html' %}
+
+<script>
+function startMassImageImport() {
+    if (!confirm('Bilder fuer alle Artikel ohne Bild vom L-Shop importieren?\n\nDas laeuft im Hintergrund und kann bei vielen Artikeln einige Stunden dauern.')) return;
+
+    const statusEl = document.getElementById('image-import-status');
+    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Wird gestartet...';
+
+    fetch('/articles/images/mass-import', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusEl.innerHTML = '<span class="badge bg-info">' + data.message + '</span>';
+            checkImageImportStatus();
+        } else {
+            statusEl.innerHTML = '<span class="badge bg-danger">Fehler: ' + data.error + '</span>';
+        }
+    })
+    .catch(() => {
+        statusEl.innerHTML = '<span class="badge bg-danger">Fehler beim Starten</span>';
+    });
+}
+
+function checkImageImportStatus() {
+    const statusEl = document.getElementById('image-import-status');
+    fetch('/articles/images/import-status')
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusEl.innerHTML = '<span class="badge bg-info"><i class="bi bi-images me-1"></i>' +
+                data.with_image + '/' + data.total + ' Bilder (' + data.percent + '%)</span>';
+            if (data.without_image > 0) {
+                setTimeout(checkImageImportStatus, 15000);
+            }
+        }
+    });
+}
+
+function importPrintequipment() {
+    if (!confirm('Sublimationsprodukte von Printequipment importieren?\n\nDas kann einige Minuten dauern. Neue Artikel werden mit Kategorie "Sublimation" und Lieferant "Printequipment" angelegt.')) return;
+
+    const statusEl = document.getElementById('image-import-status');
+    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Printequipment Import laeuft...';
+
+    fetch('/articles/import/printequipment', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            statusEl.innerHTML = '<span class="badge bg-warning">' + data.message + '</span>';
+        } else {
+            statusEl.innerHTML = '<span class="badge bg-danger">Fehler: ' + (data.error || 'Unbekannt') + '</span>';
+        }
+    })
+    .catch(() => {
+        statusEl.innerHTML = '<span class="badge bg-danger">Fehler beim Starten</span>';
+    });
+}
+
+// Beim Laden Status pruefen
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/articles/images/import-status')
+    .then(r => r.json())
+    .then(data => {
+        if (data.success && data.with_image > 0) {
+            document.getElementById('image-import-status').innerHTML =
+                '<small class="text-muted"><i class="bi bi-images me-1"></i>' +
+                data.with_image + '/' + data.total + ' mit Bild</small>';
+        }
+    }).catch(() => {});
+});
+</script>
 
 {% endblock %}

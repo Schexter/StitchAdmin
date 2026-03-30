@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}E-Mail-Archiv{% endblock %}
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4><i class="bi bi-archive me-2"></i>E-Mail-Archiv</h4>
+    </div>
+
+    {% if emails %}
+    <div class="table-responsive">
+        <table class="table table-hover table-sm">
+            <thead>
+                <tr>
+                    <th>Von</th>
+                    <th>Betreff</th>
+                    <th>Datum</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for email in emails %}
+                <tr class="{{ 'fw-bold' if not email.is_read else '' }}">
+                    <td><small>{{ email.from_address or '–' }}</small></td>
+                    <td>
+                        <small>{{ email.subject or '(kein Betreff)' }}</small>
+                        {% if not email.is_read %}
+                            <span class="badge bg-primary ms-1">Neu</span>
+                        {% endif %}
+                        {% if email.has_attachments %}
+                            <i class="bi bi-paperclip ms-1 text-muted"></i>
+                        {% endif %}
+                    </td>
+                    <td><small>{{ email.received_date.strftime('%d.%m.%Y %H:%M') if email.received_date else '–' }}</small></td>
+                    <td>
+                        {% if email.is_read %}
+                            <span class="badge bg-secondary">Gelesen</span>
+                        {% else %}
+                            <span class="badge bg-primary">Neu</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="text-center text-muted py-5">
+        <i class="bi bi-envelope-open display-3"></i>
+        <p class="mt-3">Noch keine E-Mails archiviert.</p>
+        <a href="{{ url_for('documents.email_accounts') }}" class="btn btn-outline-primary">
+            <i class="bi bi-gear"></i> E-Mail-Konto einrichten
+        </a>
+    </div>
+    {% endif %}
+
+    <a href="{{ url_for('documents.dashboard') }}" class="btn btn-secondary mt-3">
+        <i class="bi bi-arrow-left"></i> Zurück
+    </a>
+</div>
+{% endblock %}

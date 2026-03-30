@@ -88,6 +88,23 @@ class StorageSettings(db.Model):
     archive_after_years = db.Column(db.Integer, default=10)
     archive_path = db.Column(db.String(200), default='Archiv')
     
+    # === CLOUD-SPEICHER (WebDAV / Nextcloud) ===
+    cloud_enabled = db.Column(db.Boolean, default=False)
+    cloud_type = db.Column(db.String(20), default='nextcloud')  # nextcloud, webdav, hetzner_storage
+    cloud_url = db.Column(db.String(500), default='')  # z.B. https://cloud.example.de
+    cloud_username = db.Column(db.String(200), default='')
+    cloud_password = db.Column(db.String(500), default='')  # Verschluesselt speichern
+    cloud_base_path = db.Column(db.String(300), default='/StitchAdmin/Dokumente')  # Basispfad in der Cloud
+
+    # Was wird automatisch in die Cloud abgelegt?
+    cloud_sync_rechnungen = db.Column(db.Boolean, default=True)
+    cloud_sync_angebote = db.Column(db.Boolean, default=True)
+    cloud_sync_lieferscheine = db.Column(db.Boolean, default=True)
+    cloud_sync_auftraege = db.Column(db.Boolean, default=True)
+    cloud_sync_freigaben = db.Column(db.Boolean, default=True)
+    cloud_sync_mahnungen = db.Column(db.Boolean, default=False)
+    cloud_sync_backups = db.Column(db.Boolean, default=False)
+
     # === METADATEN ===
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
@@ -420,5 +437,63 @@ class StorageSettings(db.Model):
         
         if errors:
             print(f"Ordner-Fehler: {errors}")
-        
+
         return success
+
+    def should_cloud_sync(self, doc_type):
+        """Pruefen ob ein Dokumenttyp in die Cloud synchronisiert werden soll"""
+        if not self.cloud_enabled:
+            return False
+        sync_map = {
+            'rechnung': self.cloud_sync_rechnungen,
+            'rechnung_ausgang': self.cloud_sync_rechnungen,
+            'rechnung_eingang': self.cloud_sync_rechnungen,
+            'angebot': self.cloud_sync_angebote,
+            'lieferschein': self.cloud_sync_lieferscheine,
+            'auftrag': self.cloud_sync_auftraege,
+            'auftragsbestaetigung': self.cloud_sync_auftraege,
+            'freigabe': self.cloud_sync_freigaben,
+            'design_freigabe': self.cloud_sync_freigaben,
+            'mahnung': self.cloud_sync_mahnungen,
+            'backup': self.cloud_sync_backups,
+        }
+        return sync_map.get(doc_type, False)
+
+    def get_cloud_path(self, doc_type, kunde_name=None, datum=None):
+        """Cloud-Pfad fuer einen Dokumenttyp generieren (WebDAV-kompatibel mit /)"""
+        from datetime import date
+        if datum is None:
+            datum = date.today()
+
+        base = self.cloud_base_path.rstrip('/')
+
+        type_paths = {
+            'angebot': 'Angebote',
+            'auftrag': 'Auftragsbestaetigungen',
+            'auftragsbestaetigung': 'Auftragsbestaetigungen',
+            'lieferschein': 'Lieferscheine',
+            'rechnung': 'Rechnungen/Ausgang',
+            'rechnung_ausgang': 'Rechnungen/Ausgang',
+            'rechnung_eingang': 'Rechnungen/Eingang',
+            'gutschrift': 'Gutschriften',
+            'mahnung': 'Mahnungen',
+            'freigabe': 'Design-Freigaben',
+            'design_freigabe': 'Design-Freigaben',
+            'backup': 'Backups',
+        }
+        doc_folder = type_paths.get(doc_type, 'Sonstige')
+        path = f"{base}/{doc_folder}"
+
+        # Unterordner-Struktur
+        if self.folder_structure == 'year':
+            path = f"{path}/{datum.year}"
+        elif self.folder_structure == 'year_month':
+            path = f"{path}/{datum.year}/{datum.month:02d}"
+        elif self.folder_structure == 'customer' and kunde_name:
+            safe_name = self._sanitize_filename(kunde_name)
+            path = f"{path}/{safe_name}"
+        elif self.folder_structure == 'customer_year' and kunde_name:
+            safe_name = self._sanitize_filename(kunde_name)
+            path = f"{path}/{safe_name}/{datum.year}"
+
+        return path

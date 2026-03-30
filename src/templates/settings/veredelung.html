@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}Veredelungsverfahren - Einstellungen{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h1><i class="bi bi-brush"></i> Veredelungsverfahren</h1>
+        <p class="text-muted">Verfahren, Positionen und Parameter verwalten</p>
+    </div>
+    <div class="col-md-4 text-end">
+        <a href="{{ url_for('settings.index') }}" class="btn btn-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Einstellungen
+        </a>
+        <button class="btn btn-info btn-sm" onclick="importDruckparameter()">
+            <i class="bi bi-file-earmark-pdf"></i> Druckparameter aus PDF
+        </button>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#neuesVerfahrenModal">
+            <i class="bi bi-plus-lg"></i> Neues Verfahren
+        </button>
+    </div>
+</div>
+
+{% if not verfahren %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle me-1"></i>
+    Noch keine Veredelungsverfahren angelegt.
+    <button class="btn btn-sm btn-primary ms-2" onclick="seedDefaults()">
+        <i class="bi bi-magic"></i> Standard-Verfahren anlegen
+    </button>
+</div>
+{% endif %}
+
+<!-- Accordion fuer Verfahren -->
+<div class="accordion" id="verfahrenAccordion">
+{% for v in verfahren %}
+<div class="accordion-item" id="verfahren-{{ v.id }}">
+    <h2 class="accordion-header">
+        <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button"
+                data-bs-toggle="collapse" data-bs-target="#collapse-{{ v.id }}">
+            <i class="{{ v.icon }} me-2"></i>
+            <strong>{{ v.name }}</strong>
+            <span class="badge bg-secondary ms-2">{{ v.positionen|selectattr('active')|list|length }} Positionen</span>
+            <span class="badge bg-info ms-1">{{ v.parameter|selectattr('active')|list|length }} Parameter</span>
+            {% if not v.active %}
+            <span class="badge bg-warning text-dark ms-1">Inaktiv</span>
+            {% endif %}
+        </button>
+    </h2>
+    <div id="collapse-{{ v.id }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}"
+         data-bs-parent="#verfahrenAccordion">
+        <div class="accordion-body">
+            <!-- Verfahren-Header -->
+            <div class="row mb-3">
+                <div class="col-md-8">
+                    <small class="text-muted">Code: <code>{{ v.code }}</code></small>
+                    {% if v.beschreibung %}
+                    <br><small class="text-muted">{{ v.beschreibung }}</small>
+                    {% endif %}
+                </div>
+                <div class="col-md-4 text-end">
+                    <button class="btn btn-sm btn-outline-warning" onclick="toggleVerfahren({{ v.id }}, {{ 'false' if v.active else 'true' }})">
+                        <i class="bi bi-{{ 'eye-slash' if v.active else 'eye' }}"></i>
+                        {{ 'Deaktivieren' if v.active else 'Aktivieren' }}
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteVerfahren({{ v.id }}, '{{ v.name }}')">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- PREISKALKULATION -->
+            <div class="card border-success mb-3" id="preise-{{ v.id }}">
+                <div class="card-header bg-success bg-opacity-10 py-2">
+                    <h6 class="mb-0 text-success"><i class="bi bi-calculator"></i> Preiskalkulation</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        <div class="col-md-3">
+                            <label class="form-label small">Einrichtungspauschale</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" step="0.01" class="form-control"
+                                       id="preis_einrichtung_{{ v.id }}"
+                                       value="{{ v.einrichtungspauschale or 0 }}">
+                                <span class="input-group-text">EUR</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3 {{ '' if v.code == 'embroidery' else 'd-none' }}" id="stichpreis-wrap-{{ v.id }}">
+                            <label class="form-label small">Preis pro 1000 Stiche</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" step="0.01" class="form-control"
+                                       id="preis_stiche_{{ v.id }}"
+                                       value="{{ v.preis_pro_1000_stiche or 0 }}">
+                                <span class="input-group-text">EUR</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3 {{ 'd-none' if v.code == 'embroidery' else '' }}" id="cm2preis-wrap-{{ v.id }}">
+                            <label class="form-label small">Preis pro cm2</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" step="0.001" class="form-control"
+                                       id="preis_cm2_{{ v.id }}"
+                                       value="{{ v.preis_pro_cm2 or 0 }}">
+                                <span class="input-group-text">EUR</span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small">Mindestpreis/Stueck</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" step="0.01" class="form-control"
+                                       id="preis_min_{{ v.id }}"
+                                       value="{{ v.mindestpreis_pro_stueck or 0 }}">
+                                <span class="input-group-text">EUR</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Staffelpreise -->
+                    <div class="mt-2">
+                        <label class="form-label small">Staffelpreise</label>
+                        <div id="staffel-{{ v.id }}">
+                            {% set staffel_data = (v.staffelpreise or '[]')|string %}
+                        </div>
+                        <button class="btn btn-outline-secondary btn-sm mt-1" onclick="addStaffel({{ v.id }})">
+                            <i class="bi bi-plus"></i> Staffel
+                        </button>
+                    </div>
+                    <div class="mt-2 text-end">
+                        <button class="btn btn-success btn-sm" onclick="savePreise({{ v.id }})">
+                            <i class="bi bi-check-lg"></i> Preise speichern
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- POSITIONEN -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center py-2">
+                            <h6 class="mb-0"><i class="bi bi-geo-alt"></i> Positionen</h6>
+                            <button class="btn btn-sm btn-outline-primary" onclick="addPosition({{ v.id }})">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush" id="positionen-{{ v.id }}">
+                                {% for pos in v.positionen %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center py-2 {{ 'text-muted' if not pos.active }}"
+                                    id="pos-{{ pos.id }}">
+                                    <span>{{ pos.name }}{% if not pos.active %} <small>(inaktiv)</small>{% endif %}</span>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                onclick="editPosition({{ pos.id }}, '{{ pos.name }}')">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger py-0 px-1"
+                                                onclick="deletePosition({{ pos.id }})">
+                                            <i class="bi bi-x"></i>
+                                        </button>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PARAMETER -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center py-2">
+                            <h6 class="mb-0"><i class="bi bi-sliders"></i> Parameter</h6>
+                            <button class="btn btn-sm btn-outline-primary" onclick="showAddParam({{ v.id }})">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush" id="parameter-{{ v.id }}">
+                                {% for p in v.parameter %}
+                                <li class="list-group-item py-2 {{ 'text-muted' if not p.active }}" id="param-{{ p.id }}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ p.name }}</strong>
+                                            {% if p.einheit %}<small class="text-muted">({{ p.einheit }})</small>{% endif %}
+                                            <br>
+                                            <small class="text-muted">
+                                                Typ: {{ p.param_type }}
+                                                {% if p.default_value %} | Standard: {{ p.default_value }}{% endif %}
+                                                {% if p.optionen %} | Optionen: {{ p.optionen }}{% endif %}
+                                            </small>
+                                        </div>
+                                        <div>
+                                            <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                                                    onclick="editParam({{ p.id }}, {{ p.verfahren_id }}, '{{ p.name|e }}', '{{ (p.einheit or '')|e }}', '{{ p.param_type }}', '{{ (p.default_value or '')|e }}', '{{ (p.optionen or '')|e }}')">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-danger py-0 px-1"
+                                                    onclick="deleteParam({{ p.id }})">
+                                                <i class="bi bi-x"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+</div>
+
+<!-- Neues Verfahren Modal -->
+<div class="modal fade" id="neuesVerfahrenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Neues Veredelungsverfahren</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Name *</label>
+                    <input type="text" id="newVerfahrenName" class="form-control" placeholder="z.B. Lasergravur">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Code * <small class="text-muted">(eindeutig, ohne Leerzeichen)</small></label>
+                    <input type="text" id="newVerfahrenCode" class="form-control" placeholder="z.B. laser">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Icon</label>
+                    <input type="text" id="newVerfahrenIcon" class="form-control" value="bi-brush" placeholder="bi-...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Beschreibung</label>
+                    <textarea id="newVerfahrenBeschr" class="form-control" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="createVerfahren()">
+                    <i class="bi bi-plus-lg"></i> Anlegen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Parameter bearbeiten Modal -->
+<div class="modal fade" id="paramModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paramModalTitle">Parameter</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="paramId">
+                <input type="hidden" id="paramVerfahrenId">
+                <div class="mb-3">
+                    <label class="form-label">Name *</label>
+                    <input type="text" id="paramName" class="form-control" placeholder="z.B. Temperatur">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Einheit</label>
+                    <input type="text" id="paramEinheit" class="form-control" placeholder="z.B. °C, Sek, mm/s">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Typ</label>
+                    <select id="paramType" class="form-select">
+                        <option value="text">Text</option>
+                        <option value="number">Zahl</option>
+                        <option value="select">Auswahl</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Standardwert</label>
+                    <input type="text" id="paramDefault" class="form-control">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Optionen <small class="text-muted">(kommagetrennt, nur bei Typ "Auswahl")</small></label>
+                    <input type="text" id="paramOptionen" class="form-control" placeholder="Option1,Option2,Option3">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="saveParam()">Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const BASE = '/veredelung/api';
+
+function apiCall(url, method, data) {
+    return fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: data ? JSON.stringify(data) : undefined
+    }).then(r => r.json());
+}
+
+// === VERFAHREN ===
+function createVerfahren() {
+    const name = document.getElementById('newVerfahrenName').value.trim();
+    const code = document.getElementById('newVerfahrenCode').value.trim();
+    if (!name || !code) { alert('Name und Code sind Pflichtfelder'); return; }
+
+    apiCall(BASE + '/verfahren', 'POST', {
+        name, code,
+        icon: document.getElementById('newVerfahrenIcon').value.trim(),
+        beschreibung: document.getElementById('newVerfahrenBeschr').value.trim()
+    }).then(data => {
+        if (data.success) location.reload();
+        else alert(data.error || 'Fehler');
+    });
+}
+
+function toggleVerfahren(id, active) {
+    apiCall(BASE + '/verfahren/' + id, 'PUT', {active}).then(() => location.reload());
+}
+
+function deleteVerfahren(id, name) {
+    if (!confirm('Verfahren "' + name + '" und alle zugehoerigen Positionen/Parameter loeschen?')) return;
+    apiCall(BASE + '/verfahren/' + id, 'DELETE').then(() => location.reload());
+}
+
+function seedDefaults() {
+    fetch(BASE + '/seed', {method: 'POST', credentials: 'same-origin'})
+        .then(r => r.json())
+        .then(data => { if (data.success) location.reload(); else alert(data.error); });
+}
+
+// === POSITIONEN ===
+function addPosition(verfahrenId) {
+    const name = prompt('Name der neuen Position:');
+    if (!name) return;
+    apiCall(BASE + '/verfahren/' + verfahrenId + '/positionen', 'POST', {name})
+        .then(data => { if (data.success) location.reload(); else alert(data.error); });
+}
+
+function editPosition(posId, currentName) {
+    const name = prompt('Position umbenennen:', currentName);
+    if (!name || name === currentName) return;
+    apiCall(BASE + '/position/' + posId, 'PUT', {name})
+        .then(() => location.reload());
+}
+
+function deletePosition(posId) {
+    if (!confirm('Position loeschen?')) return;
+    apiCall(BASE + '/position/' + posId, 'DELETE').then(() => location.reload());
+}
+
+// === PARAMETER ===
+function showAddParam(verfahrenId) {
+    document.getElementById('paramModalTitle').textContent = 'Neuer Parameter';
+    document.getElementById('paramId').value = '';
+    document.getElementById('paramVerfahrenId').value = verfahrenId;
+    document.getElementById('paramName').value = '';
+    document.getElementById('paramEinheit').value = '';
+    document.getElementById('paramType').value = 'text';
+    document.getElementById('paramDefault').value = '';
+    document.getElementById('paramOptionen').value = '';
+    new bootstrap.Modal(document.getElementById('paramModal')).show();
+}
+
+function editParam(paramId, verfahrenId, name, einheit, paramType, defaultValue, optionen) {
+    document.getElementById('paramModalTitle').textContent = 'Parameter bearbeiten';
+    document.getElementById('paramId').value = paramId;
+    document.getElementById('paramVerfahrenId').value = verfahrenId;
+    document.getElementById('paramName').value = name;
+    document.getElementById('paramEinheit').value = einheit || '';
+    document.getElementById('paramType').value = paramType || 'text';
+    document.getElementById('paramDefault').value = defaultValue || '';
+    document.getElementById('paramOptionen').value = optionen || '';
+    new bootstrap.Modal(document.getElementById('paramModal')).show();
+}
+
+function saveParam() {
+    const id = document.getElementById('paramId').value;
+    const verfahrenId = document.getElementById('paramVerfahrenId').value;
+    const data = {
+        name: document.getElementById('paramName').value.trim(),
+        einheit: document.getElementById('paramEinheit').value.trim(),
+        param_type: document.getElementById('paramType').value,
+        default_value: document.getElementById('paramDefault').value.trim(),
+        optionen: document.getElementById('paramOptionen').value.trim()
+    };
+    if (!data.name) { alert('Name ist Pflichtfeld'); return; }
+
+    let url, method;
+    if (id) {
+        url = BASE + '/parameter/' + id;
+        method = 'PUT';
+    } else {
+        url = BASE + '/verfahren/' + verfahrenId + '/parameter';
+        method = 'POST';
+    }
+    apiCall(url, method, data).then(d => { if (d.success) location.reload(); else alert(d.error); });
+}
+
+function deleteParam(paramId) {
+    if (!confirm('Parameter loeschen?')) return;
+    apiCall(BASE + '/parameter/' + paramId, 'DELETE').then(() => location.reload());
+}
+
+// === PREISKALKULATION ===
+function savePreise(vid) {
+    const data = {
+        einrichtungspauschale: parseFloat(document.getElementById('preis_einrichtung_' + vid).value) || 0,
+        preis_pro_1000_stiche: parseFloat(document.getElementById('preis_stiche_' + vid).value) || 0,
+        preis_pro_cm2: parseFloat(document.getElementById('preis_cm2_' + vid).value) || 0,
+        mindestpreis_pro_stueck: parseFloat(document.getElementById('preis_min_' + vid).value) || 0,
+        staffelpreise: getStaffeln(vid)
+    };
+    apiCall(BASE + '/verfahren/' + vid, 'PUT', data).then(d => {
+        if (d.success) {
+            const btn = event.target.closest('button');
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Gespeichert!';
+            btn.classList.replace('btn-success', 'btn-outline-success');
+            setTimeout(() => {
+                btn.innerHTML = '<i class="bi bi-check-lg"></i> Preise speichern';
+                btn.classList.replace('btn-outline-success', 'btn-success');
+            }, 2000);
+        } else alert(d.error);
+    });
+}
+
+function getStaffeln(vid) {
+    const rows = document.querySelectorAll('#staffel-' + vid + ' .staffel-row');
+    const result = [];
+    rows.forEach(row => {
+        const menge = parseInt(row.querySelector('.staffel-menge').value) || 0;
+        const rabatt = parseFloat(row.querySelector('.staffel-rabatt').value) || 0;
+        if (menge > 0) result.push({ab_menge: menge, rabatt_prozent: rabatt});
+    });
+    return result;
+}
+
+function addStaffel(vid, menge, rabatt) {
+    const container = document.getElementById('staffel-' + vid);
+    const row = document.createElement('div');
+    row.className = 'staffel-row d-flex gap-2 align-items-center mb-1';
+    row.innerHTML = `
+        <span class="small text-muted">ab</span>
+        <input type="number" class="form-control form-control-sm staffel-menge" style="width:80px" value="${menge || ''}" placeholder="Menge">
+        <span class="small text-muted">Stk →</span>
+        <input type="number" step="0.1" class="form-control form-control-sm staffel-rabatt" style="width:80px" value="${rabatt || ''}" placeholder="Rabatt">
+        <span class="small text-muted">%</span>
+        <button class="btn btn-outline-danger btn-sm py-0 px-1" onclick="this.parentElement.remove()"><i class="bi bi-x"></i></button>
+    `;
+    container.appendChild(row);
+}
+
+// Staffelpreise beim Laden initialisieren
+document.addEventListener('DOMContentLoaded', function() {
+    {% for v in verfahren %}
+    {% if v.staffelpreise %}
+    try {
+        const staffeln_{{ v.id }} = JSON.parse('{{ v.staffelpreise|e }}');
+        if (Array.isArray(staffeln_{{ v.id }})) {
+            staffeln_{{ v.id }}.forEach(s => addStaffel({{ v.id }}, s.ab_menge, s.rabatt_prozent));
+        }
+    } catch(e) {}
+    {% endif %}
+    {% endfor %}
+});
+
+// === DRUCKPARAMETER IMPORT ===
+function importDruckparameter() {
+    if (!confirm('Druckparameter aus der Printequipment-PDF importieren und den Artikeln zuweisen?')) return;
+
+    const btn = event.target.closest('button');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Importiere...';
+
+    fetch('/veredelung/import-druckparameter', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        if (data.success) {
+            alert(
+                'Druckparameter erfolgreich importiert!\n\n' +
+                'PDF-Eintraege: ' + data.pdf_entries + '\n' +
+                'Artikel zugeordnet: ' + data.matched + '\n' +
+                'Parameter gesetzt: ' + data.assigned + '\n' +
+                'Uebersprungen (kein Match): ' + data.skipped + '\n' +
+                'Fehler: ' + data.errors
+            );
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        alert('Netzwerkfehler: ' + err.message);
+    });
+}
+</script>
+{% endblock %}

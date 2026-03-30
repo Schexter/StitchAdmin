@@ -7,6 +7,8 @@ Erstellt von: StitchAdmin
 Zweck: Verwaltung von Kundenangeboten
 """
 
+import uuid
+import secrets
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from src.models import db
@@ -32,11 +34,17 @@ class Angebot(db.Model):
     # Angebots-Identifikation
     angebotsnummer = db.Column(db.String(50), unique=True, nullable=False, index=True)
 
+    # Öffentliches Tracking (gleicher Token wie Anfrage/Auftrag im Flow)
+    tracking_token = db.Column(db.String(64), unique=True, index=True)
+
     # Kunde
     kunde_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=False)
     kunde_name = db.Column(db.String(200), nullable=False)
     kunde_adresse = db.Column(db.Text)
     kunde_email = db.Column(db.String(120))
+
+    # Auftragstyp (wird bei Umwandlung an Auftrag übergeben)
+    auftragstyp = db.Column(db.String(20), default='embroidery')  # embroidery, printing, dtf, combined
 
     # Status
     status = db.Column(db.String(20), default=AngebotStatus.ENTWURF, index=True)
@@ -66,6 +74,31 @@ class Angebot(db.Model):
     # Lieferbedingungen
     lieferzeit = db.Column(db.String(100))  # z.B. "2-3 Werktage"
     versandkosten = db.Column(db.Float, default=0.0)
+
+    # Kundenware (Kunde bringt eigene Textilien mit)
+    is_kundenware = db.Column(db.Boolean, default=False)
+
+    # Design-Status und Kosten
+    design_status = db.Column(db.String(30))  # logo_available, logo_needs_creation, logo_needs_adaptation
+    design_kosten = db.Column(db.Float, default=0.0)  # Kosten fuer Designerstellung
+    design_anpassung_kosten = db.Column(db.Float, default=0.0)  # Kosten fuer Anpassung
+    design_anforderungen = db.Column(db.Text)  # Anforderungen an Designer
+    design_anpassung_details = db.Column(db.Text)  # Details zur Anpassung
+
+    # Textbausteine (komma-separierte IDs + zusammengesetzter Text)
+    textbausteine_ids = db.Column(db.Text, default='')
+    textbausteine_text = db.Column(db.Text, default='')
+
+    # Angebots-Freigabe (aehnlich Design-Freigabe)
+    approval_token = db.Column(db.String(100), unique=True, index=True)
+    approval_status = db.Column(db.String(50))  # pending, sent, approved, rejected, revision_requested
+    approval_sent_at = db.Column(db.DateTime)
+    approval_date = db.Column(db.DateTime)
+    approval_signature = db.Column(db.Text)       # Base64 Unterschrift
+    approval_ip = db.Column(db.String(50))
+    approval_user_agent = db.Column(db.String(500))
+    approval_notes = db.Column(db.Text)
+    approved_by_name = db.Column(db.String(200))
 
     # Verknüpfung mit Auftrag
     auftrag_id = db.Column(db.String(50), db.ForeignKey('orders.id'))  # Wenn Angebot angenommen wurde
@@ -97,6 +130,10 @@ class Angebot(db.Model):
                 document_type=DocumentType.ANGEBOT,
                 created_by=self.created_by
             )
+
+        # Tracking-Token generieren (wenn nicht vom Flow geerbt)
+        if not self.tracking_token:
+            self.tracking_token = uuid.uuid4().hex
 
         # Gültigkeitsdatum berechnen
         if not self.gueltig_bis and self.angebotsdatum:
@@ -190,15 +227,17 @@ class Angebot(db.Model):
 
     def in_auftrag_umwandeln(self, created_by=None):
         """
-        Wandelt das Angebot in einen Auftrag um
+        Wandelt das Angebot in einen Auftrag um.
+        Veredelungs-Positionen werden als OrderDesign uebernommen.
 
         Args:
-            created_by: Benutzer der die Umwandlung durchführt
+            created_by: Benutzer der die Umwandlung durchfuehrt
 
         Returns:
             Order: Der erstellte Auftrag
         """
         from src.models.models import Order, OrderItem
+        from src.models.order_workflow import OrderDesign
 
         if self.status != AngebotStatus.ANGENOMMEN:
             raise ValueError("Nur angenommene Angebote können in Aufträge umgewandelt werden")
@@ -206,31 +245,81 @@ class Angebot(db.Model):
         if self.auftrag_id:
             raise ValueError("Angebot wurde bereits in Auftrag umgewandelt")
 
-        # Auftrag erstellen
+        # Auftrags-ID generieren
+        from src.controllers.order_controller_db import generate_order_id
+        order_id = generate_order_id()
+
+        # Auftrag erstellen - gleichen Tracking-Token + Auftragstyp weitergeben
         auftrag = Order(
+            id=order_id,
+            order_number=order_id,
             customer_id=self.kunde_id,
+            order_type=self.auftragstyp,
             description=self.beschreibung or self.titel,
             internal_notes=f"Erstellt aus Angebot {self.angebotsnummer}",
             customer_notes=self.bemerkungen,
             total_price=self.brutto_gesamt,
             discount_percent=self.rabatt_prozent,
+            tracking_token=self.tracking_token,
+            customer_email_for_tracking=self.kunde_email,
+            is_kundenware=self.is_kundenware,
+            created_by=created_by,
             status='confirmed'
         )
         db.session.add(auftrag)
-        db.session.flush()  # Um ID zu bekommen
+        db.session.flush()
 
-        # Positionen übertragen
+        # Artikel-Positionen uebertragen (keine Veredelungs-Positionen)
         for angebots_pos in self.positionen:
+            if angebots_pos.is_veredelung:
+                continue
             auftrag_item = OrderItem(
                 order_id=auftrag.id,
                 article_id=angebots_pos.artikel_id,
-                description=angebots_pos.beschreibung,
-                quantity=angebots_pos.menge,
-                unit_price=angebots_pos.einzelpreis,
-                total_price=angebots_pos.brutto_betrag,
-                notes=angebots_pos.bemerkungen
+                quantity=int(angebots_pos.menge or 1),
+                unit_price=angebots_pos.einzelpreis or 0,
+                position_details=angebots_pos.beschreibung or angebots_pos.artikel_name,
             )
             db.session.add(auftrag_item)
+
+        # Veredelungs-Positionen → OrderDesign
+        code_to_type = {
+            'embroidery': 'stick', 'printing': 'druck', 'dtf': 'dtf',
+            'sublimation': 'sublimation', 'flex': 'flex', 'laser': 'laser'
+        }
+        has_designs = False
+        for pos in self.positionen:
+            if not pos.is_veredelung:
+                continue
+            has_designs = True
+            verfahren = pos.veredelung_verfahren if pos.veredelung_verfahren_id else None
+            if verfahren:
+                design_type = code_to_type.get(verfahren.code, 'sonstiges')
+            else:
+                # Fallback: Auftragstyp des Angebots nutzen
+                design_type = code_to_type.get(self.auftragstyp, 'sonstiges')
+            design = OrderDesign(
+                order_id=auftrag.id,
+                position=pos.design_position,
+                position_label=pos.design_position_label,
+                design_type=design_type,
+                stitch_count=pos.stichzahl,
+                width_mm=pos.design_breite_mm,
+                height_mm=pos.design_hoehe_mm,
+                thread_colors=pos.fadenfarben,
+                design_file_path=pos.design_file_path,
+                design_thumbnail_path=pos.design_thumbnail_path,
+                setup_price=pos.einrichtungskosten or 0,
+                price_per_piece=pos.einzelpreis or 0,
+                approval_status='approved',
+                approved_at=datetime.utcnow(),
+                created_by=created_by,
+            )
+            db.session.add(design)
+
+        # Wenn Designs vorhanden und schon mit Angebot freigegeben → direkt produktionsbereit
+        if has_designs and self.is_approved:
+            auftrag.workflow_status = 'design_approved'
 
         # Angebot aktualisieren
         self.auftrag_id = auftrag.id
@@ -306,6 +395,92 @@ class Angebot(db.Model):
 
         return angebot
 
+    @classmethod
+    def von_anfrage_erstellen(cls, anfrage, created_by=None, gueltig_tage=30):
+        """
+        Erstellt ein Angebot aus einer Anfrage (Inquiry).
+
+        Args:
+            anfrage: Inquiry-Objekt
+            created_by: Benutzer
+            gueltig_tage: Gültigkeit in Tagen
+
+        Returns:
+            Angebot: Das erstellte Angebot
+        """
+        from src.models.crm_activities import Activity, ActivityType, AngebotTracking
+
+        # Kundendaten aus Anfrage oder CRM-Kunde
+        kunde_name = anfrage.full_name
+        kunde_email = anfrage.email
+        kunde_adresse = ''
+        kunde_id = anfrage.customer_id
+
+        if anfrage.customer:
+            c = anfrage.customer
+            kunde_name = c.display_name or kunde_name
+            kunde_email = c.email or kunde_email
+            kunde_adresse = f"{c.street or ''}\n{c.postal_code or ''} {c.city or ''}".strip()
+
+        if not kunde_id:
+            raise ValueError("Anfrage hat keinen verknüpften Kunden. Bitte zuerst Kunden anlegen.")
+
+        # Titel aus Anfrage-Daten zusammenbauen
+        type_labels = {
+            'stickerei': 'Stickerei',
+            'textildruck': 'Textildruck',
+            'sonstiges': 'Sonstiges'
+        }
+        typ = type_labels.get(anfrage.inquiry_type, anfrage.inquiry_type or 'Anfrage')
+        titel = f"Angebot {typ}"
+        if anfrage.quantity:
+            titel += f" ({anfrage.quantity} Stk.)"
+
+        beschreibung = anfrage.description or ''
+        if anfrage.textile_type:
+            beschreibung += f"\nTextilart: {anfrage.textile_type}"
+        if anfrage.desired_date:
+            beschreibung += f"\nWunschtermin: {anfrage.desired_date.strftime('%d.%m.%Y')}"
+
+        angebot = cls(
+            kunde_id=kunde_id,
+            kunde_name=kunde_name,
+            kunde_adresse=kunde_adresse,
+            kunde_email=kunde_email,
+            titel=titel,
+            beschreibung=beschreibung.strip(),
+            gueltig_tage=gueltig_tage,
+            tracking_token=anfrage.tracking_token,  # Gleicher Token wie Anfrage!
+            created_by=created_by
+        )
+
+        db.session.add(angebot)
+        db.session.flush()
+
+        # Anfrage verknüpfen und Status aktualisieren
+        anfrage.angebot_id = angebot.id
+        anfrage.status = 'angebot_erstellt'
+
+        # CRM-Tracking erstellen
+        tracking = AngebotTracking(
+            angebot_id=angebot.id,
+            erwarteter_abschluss_datum=date.today() + timedelta(days=gueltig_tage)
+        )
+        db.session.add(tracking)
+
+        # Aktivität erstellen
+        Activity.create_activity(
+            activity_type=ActivityType.NOTE,
+            titel=f"Angebot {angebot.angebotsnummer} aus Anfrage {anfrage.inquiry_number} erstellt",
+            beschreibung=f"Angebot basiert auf Anfrage {anfrage.inquiry_number} ({typ})",
+            kunde_id=kunde_id,
+            angebot_id=angebot.id,
+            created_by=created_by
+        )
+
+        db.session.commit()
+        return angebot
+
     def versenden_und_tracken(self, created_by=None, naechster_kontakt_tage=7):
         """
         Versendet Angebot und aktiviert Tracking
@@ -351,6 +526,50 @@ class Angebot(db.Model):
 
         return tracking
 
+    # --- Freigabe-Methoden ---
+
+    def generate_approval_token(self):
+        """Generiert einen einzigartigen Token fuer die Freigabe"""
+        self.approval_token = secrets.token_urlsafe(32)
+        return self.approval_token
+
+    def send_approval_request(self):
+        """Markiert als gesendet und generiert Token falls noetig"""
+        self.approval_status = 'sent'
+        self.approval_sent_at = datetime.utcnow()
+        if not self.approval_token:
+            self.generate_approval_token()
+        # Auch Angebots-Status auf verschickt setzen
+        if self.status == AngebotStatus.ENTWURF:
+            self.status = AngebotStatus.VERSCHICKT
+        return self.approval_token
+
+    def approve_quote(self, signature=None, ip_address=None, user_agent=None, notes=None, name=None):
+        """Kunde nimmt Angebot an"""
+        self.approval_status = 'approved'
+        self.approval_date = datetime.utcnow()
+        self.approval_signature = signature
+        self.approval_ip = ip_address
+        self.approval_user_agent = user_agent
+        self.approval_notes = notes
+        self.approved_by_name = name
+        self.status = AngebotStatus.ANGENOMMEN
+
+    def reject_quote(self, notes=None, ip_address=None, name=None):
+        """Kunde lehnt ab oder wuenscht Aenderungen"""
+        self.approval_status = 'revision_requested'
+        self.approval_notes = notes
+        self.approval_ip = ip_address
+        self.approved_by_name = name
+
+    @property
+    def is_approval_pending(self):
+        return self.approval_status in ['pending', 'sent']
+
+    @property
+    def is_approved(self):
+        return self.approval_status == 'approved'
+
     def __repr__(self):
         return f'<Angebot {self.angebotsnummer}>'
 
@@ -390,9 +609,23 @@ class AngebotsPosition(db.Model):
     mwst_betrag = db.Column(db.Float)
     brutto_betrag = db.Column(db.Float)
 
+    # Veredelungs-Details (nur bei Veredelungs-Positionen)
+    is_veredelung = db.Column(db.Boolean, default=False)
+    veredelung_verfahren_id = db.Column(db.Integer, db.ForeignKey('veredelungsverfahren.id'))
+    design_position = db.Column(db.String(50))          # z.B. 'brust_links'
+    design_position_label = db.Column(db.String(100))   # z.B. 'Brust links'
+    stichzahl = db.Column(db.Integer)
+    design_breite_mm = db.Column(db.Float)
+    design_hoehe_mm = db.Column(db.Float)
+    fadenfarben = db.Column(db.Text)                    # JSON: [{"farbe": "Rot", "nr": "1147"}]
+    design_file_path = db.Column(db.String(500))
+    design_thumbnail_path = db.Column(db.String(500))
+    einrichtungskosten = db.Column(db.Float, default=0)  # Setup-Kosten fuer diese Position
+
     # Beziehungen
     angebot = db.relationship('Angebot', back_populates='positionen')
     artikel = db.relationship('Article', foreign_keys=[artikel_id])
+    veredelung_verfahren = db.relationship('VeredelungsVerfahren', foreign_keys=[veredelung_verfahren_id])
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

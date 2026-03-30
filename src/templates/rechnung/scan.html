@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block title %}Rechnung scannen - StitchAdmin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .scan-container {
+        max-width: 600px;
+        margin: 0 auto;
+    }
+    .camera-area {
+        position: relative;
+        border: 2px dashed #dee2e6;
+        border-radius: 12px;
+        min-height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        overflow: hidden;
+        background: #f8f9fa;
+    }
+    .camera-area:hover {
+        border-color: #0d6efd;
+        background: #e7f1ff;
+    }
+    .camera-area.has-image {
+        border-style: solid;
+        border-color: #198754;
+        background: #fff;
+    }
+    .camera-area img {
+        max-width: 100%;
+        max-height: 400px;
+        object-fit: contain;
+    }
+    .camera-placeholder {
+        text-align: center;
+        padding: 40px 20px;
+        color: #6c757d;
+    }
+    .camera-placeholder i {
+        font-size: 3rem;
+        display: block;
+        margin-bottom: 10px;
+    }
+    .scan-result {
+        display: none;
+    }
+    .scan-result.show {
+        display: block;
+    }
+    #fileInput {
+        display: none;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+    <div class="scan-container">
+
+        <!-- Header -->
+        <div class="d-flex align-items-center mb-3">
+            <a href="{{ url_for('rechnung.rechnungs_index', tab='eingang') }}" class="btn btn-outline-secondary btn-sm me-3">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <div>
+                <h5 class="mb-0"><i class="bi bi-camera me-2"></i>Rechnung scannen</h5>
+                <small class="text-muted">Foto aufnehmen und Eingangsrechnung erstellen</small>
+            </div>
+        </div>
+
+        <!-- Kamera / Foto-Bereich -->
+        <div class="camera-area mb-3" id="cameraArea" onclick="document.getElementById('fileInput').click()">
+            <div class="camera-placeholder" id="cameraPlaceholder">
+                <i class="bi bi-camera"></i>
+                <div class="fw-semibold">Foto aufnehmen</div>
+                <small>Tippen um Kamera zu öffnen oder Datei auszuwählen</small>
+            </div>
+            <img id="previewImg" style="display:none;" alt="Vorschau">
+        </div>
+        <input type="file" id="fileInput" accept="image/*,.pdf" capture="environment">
+
+        <!-- Buttons unter Kamera -->
+        <div class="d-flex gap-2 mb-4">
+            <button class="btn btn-outline-primary btn-sm flex-fill" onclick="document.getElementById('fileInput').click()">
+                <i class="bi bi-camera me-1"></i>Neues Foto
+            </button>
+            <button class="btn btn-outline-secondary btn-sm flex-fill" id="btnGallery" onclick="openGallery()">
+                <i class="bi bi-image me-1"></i>Aus Galerie
+            </button>
+        </div>
+
+        <!-- Formular -->
+        <form id="scanForm">
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="card-body">
+                    <h6 class="card-title mb-3"><i class="bi bi-info-circle me-1"></i>Rechnungsdaten</h6>
+
+                    <!-- Lieferant -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm">Lieferant</label>
+                        <select class="form-select form-select-sm" id="lieferantSelect" name="lieferant_id">
+                            <option value="">-- Lieferant wählen oder unten eingeben --</option>
+                            {% for s in suppliers %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm">oder Name eingeben</label>
+                        <input type="text" class="form-control form-control-sm" id="lieferantName" name="lieferant_name" placeholder="z.B. Madeira GmbH">
+                    </div>
+
+                    <!-- Rechnungsnummer + Datum -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Ext. Rechnungsnr.</label>
+                            <input type="text" class="form-control form-control-sm" name="rechnungsnummer" placeholder="RE-12345">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label form-label-sm">Rechnungsdatum</label>
+                            <input type="date" class="form-control form-control-sm" name="datum" value="{{ today }}">
+                        </div>
+                    </div>
+
+                    <!-- Betrag -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm">Betrag (brutto)</label>
+                        <div class="input-group input-group-sm">
+                            <input type="text" class="form-control" name="betrag" placeholder="0,00" inputmode="decimal">
+                            <span class="input-group-text">&euro;</span>
+                        </div>
+                    </div>
+
+                    <!-- Bemerkungen -->
+                    <div class="mb-0">
+                        <label class="form-label form-label-sm">Bemerkungen</label>
+                        <textarea class="form-control form-control-sm" name="bemerkungen" rows="2" placeholder="Optional..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" class="btn btn-success w-100 mb-2" id="btnSubmit" disabled>
+                <i class="bi bi-check-circle me-1"></i>Eingangsrechnung erstellen
+            </button>
+            <div class="text-center">
+                <small class="text-muted">Die Rechnung wird als Entwurf gespeichert</small>
+            </div>
+        </form>
+
+        <!-- Erfolgs-Meldung -->
+        <div class="scan-result mt-3" id="scanResult">
+            <div class="alert alert-success">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                <strong id="resultMessage"></strong>
+                <div class="mt-2">
+                    <a id="resultLink" href="#" class="btn btn-sm btn-outline-success me-2">
+                        <i class="bi bi-eye me-1"></i>Anzeigen
+                    </a>
+                    <button class="btn btn-sm btn-outline-primary" onclick="resetForm()">
+                        <i class="bi bi-camera me-1"></i>Weitere scannen
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const fileInput = document.getElementById('fileInput');
+const previewImg = document.getElementById('previewImg');
+const cameraArea = document.getElementById('cameraArea');
+const cameraPlaceholder = document.getElementById('cameraPlaceholder');
+const btnSubmit = document.getElementById('btnSubmit');
+const scanForm = document.getElementById('scanForm');
+
+let selectedFile = null;
+
+// Datei ausgewählt (Kamera oder Galerie)
+fileInput.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    selectedFile = file;
+    btnSubmit.disabled = false;
+
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            previewImg.src = ev.target.result;
+            previewImg.style.display = 'block';
+            cameraPlaceholder.style.display = 'none';
+            cameraArea.classList.add('has-image');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        // PDF
+        cameraPlaceholder.innerHTML = '<i class="bi bi-file-pdf" style="font-size:3rem;color:#dc3545;"></i>' +
+            '<div class="fw-semibold mt-2">' + file.name + '</div>' +
+            '<small class="text-muted">PDF ausgewählt</small>';
+        cameraArea.classList.add('has-image');
+    }
+});
+
+// Galerie öffnen (ohne capture)
+function openGallery() {
+    fileInput.removeAttribute('capture');
+    fileInput.click();
+    // capture wieder setzen für nächstes Mal
+    setTimeout(() => fileInput.setAttribute('capture', 'environment'), 500);
+}
+
+// Formular absenden
+scanForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!selectedFile) return;
+
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Wird gespeichert...';
+
+    const formData = new FormData(scanForm);
+    formData.append('foto', selectedFile);
+
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+    fetch('{{ url_for("rechnung.scan_upload") }}', {
+        method: 'POST',
+        body: formData,
+        headers: csrfToken ? {'X-CSRFToken': csrfToken} : {}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('resultMessage').textContent = data.message;
+            document.getElementById('resultLink').href = '{{ url_for("rechnung.rechnungs_index", tab="eingang") }}';
+            document.getElementById('scanResult').classList.add('show');
+            scanForm.style.display = 'none';
+            cameraArea.style.display = 'none';
+            document.querySelector('.d-flex.gap-2').style.display = 'none';
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = '<i class="bi bi-check-circle me-1"></i>Eingangsrechnung erstellen';
+        }
+    })
+    .catch(err => {
+        alert('Netzwerkfehler: ' + err.message);
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = '<i class="bi bi-check-circle me-1"></i>Eingangsrechnung erstellen';
+    });
+});
+
+function resetForm() {
+    selectedFile = null;
+    fileInput.value = '';
+    previewImg.style.display = 'none';
+    previewImg.src = '';
+    cameraPlaceholder.style.display = 'block';
+    cameraPlaceholder.innerHTML = '<i class="bi bi-camera" style="font-size:3rem;"></i>' +
+        '<div class="fw-semibold">Foto aufnehmen</div>' +
+        '<small>Tippen um Kamera zu öffnen oder Datei auszuwählen</small>';
+    cameraArea.classList.remove('has-image');
+    cameraArea.style.display = 'flex';
+    document.querySelector('.d-flex.gap-2').style.display = 'flex';
+    scanForm.reset();
+    scanForm.style.display = 'block';
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<i class="bi bi-check-circle me-1"></i>Eingangsrechnung erstellen';
+    document.getElementById('scanResult').classList.remove('show');
+}
+</script>
+{% endblock %}

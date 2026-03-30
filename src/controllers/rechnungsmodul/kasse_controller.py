@@ -31,6 +31,7 @@ def _map_zahlungsart_to_enum(zahlungsart_str):
     mapping = {
         'BAR': ZahlungsArt.BAR,
         'EC': ZahlungsArt.EC_KARTE,
+        'EC_KARTE': ZahlungsArt.EC_KARTE,
         'SUMUP': ZahlungsArt.SUMUP,
         'KARTE': ZahlungsArt.EC_KARTE,
         'RECHNUNG': ZahlungsArt.RECHNUNG,
@@ -38,7 +39,7 @@ def _map_zahlungsart_to_enum(zahlungsart_str):
     }
     return mapping.get(zahlungsart_str, ZahlungsArt.BAR)
 
-def _finalize_sale(warenkorb, zahlungsart, gegeben=None, rueckgeld=None, transaction_info=None):
+def _finalize_sale(warenkorb, zahlungsart, gegeben=None, rueckgeld=None, transaction_info=None, rabatt_type=None, rabatt_value=0):
     """
     Interne Funktion, um einen Verkauf abzuschließen.
     Wird von Barverkäufen und SumUp-Webhooks aufgerufen.
@@ -50,16 +51,41 @@ def _finalize_sale(warenkorb, zahlungsart, gegeben=None, rueckgeld=None, transac
         # Berechne Summen
         warenkorb_summen = calculate_warenkorb_totals(warenkorb)
 
+        # Rabatt anwenden
+        rabatt_betrag = 0
+        rabatt_prozent = 0
+        brutto_original = warenkorb_summen['brutto_gesamt']
+
+        if rabatt_value and rabatt_value > 0:
+            if rabatt_type == 'percent':
+                rabatt_prozent = min(rabatt_value, 100)
+                rabatt_betrag = round(brutto_original * (rabatt_prozent / 100), 2)
+            else:  # fixed
+                rabatt_betrag = min(round(rabatt_value, 2), brutto_original)
+
+        # Reduzierte Betraege berechnen
+        if rabatt_betrag > 0:
+            factor = (brutto_original - rabatt_betrag) / brutto_original if brutto_original > 0 else 0
+            netto_final = round(warenkorb_summen['netto_gesamt'] * factor, 2)
+            mwst_final = round(warenkorb_summen['mwst_gesamt'] * factor, 2)
+            brutto_final = round(brutto_original - rabatt_betrag, 2)
+        else:
+            netto_final = warenkorb_summen['netto_gesamt']
+            mwst_final = warenkorb_summen['mwst_gesamt']
+            brutto_final = brutto_original
+
         # Erstelle Kassenbeleg
         beleg = KassenBeleg(
             belegnummer=f"B-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             kunde_id=session.get('customer_id'),
-            netto_gesamt=warenkorb_summen['netto_gesamt'],
-            brutto_gesamt=warenkorb_summen['brutto_gesamt'],
-            mwst_gesamt=warenkorb_summen['mwst_gesamt'],
+            netto_gesamt=netto_final,
+            brutto_gesamt=brutto_final,
+            mwst_gesamt=mwst_final,
             zahlungsart=_map_zahlungsart_to_enum(zahlungsart),
             gegeben=gegeben,
             rueckgeld=rueckgeld,
+            rabatt_betrag=rabatt_betrag,
+            rabatt_prozent=rabatt_prozent,
             storniert=False
         )
 
@@ -68,14 +94,18 @@ def _finalize_sale(warenkorb, zahlungsart, gegeben=None, rueckgeld=None, transac
 
         # Erstelle Belegpositionen
         for idx, item in enumerate(warenkorb, 1):
+            menge = item.get('menge', 1)
+            # Einzelpreise aus bereits berechneten Beträgen ableiten
+            einzelpreis_netto = round(item.get('netto_betrag', 0) / menge, 2) if menge else 0
+            einzelpreis_brutto = round(item.get('brutto_betrag', 0) / menge, 2) if menge else 0
             position = BelegPosition(
                 beleg_id=beleg.id,
                 position=idx,
                 artikel_id=item.get('artikel_id'),
                 artikel_name=item.get('name'),
-                menge=item.get('menge', 1),
-                einzelpreis_netto=item.get('preis', 0),
-                einzelpreis_brutto=item.get('preis', 0) * (1 + item.get('mwst_satz', 19) / 100),
+                menge=menge,
+                einzelpreis_netto=einzelpreis_netto,
+                einzelpreis_brutto=einzelpreis_brutto,
                 netto_betrag=item.get('netto_betrag', 0),
                 mwst_betrag=item.get('mwst_betrag', 0),
                 brutto_betrag=item.get('brutto_betrag', 0),
@@ -107,12 +137,109 @@ def _finalize_sale(warenkorb, zahlungsart, gegeben=None, rueckgeld=None, transac
 
         logger.info(f"Verkauf erfolgreich abgeschlossen: Beleg {beleg.belegnummer}")
 
-        return {
+        # Bei RECHNUNG-Zahlung: Auch Rechnung im Rechnungsmodul anlegen
+        rechnung_id = None
+        rechnung_nummer = None
+        if zahlungsart == 'RECHNUNG':
+            try:
+                from src.models.rechnungsmodul.models import (
+                    Rechnung, RechnungsPosition, RechnungsStatus, RechnungsRichtung,
+                    ZugpferdProfil
+                )
+                from decimal import Decimal
+                from datetime import timedelta
+
+                # Rechnungsnummer generieren (RE-YYYYMM-NNNN)
+                from datetime import datetime as dt
+                jahr = dt.now().year
+                monat = dt.now().month
+                count = Rechnung.query.filter(
+                    Rechnung.rechnungsnummer.like(f"RE-{jahr:04d}{monat:02d}-%")
+                ).count()
+                rechnung_nummer = f"RE-{jahr:04d}{monat:02d}-{count + 1:04d}"
+
+                # Kunden-Snapshot
+                kunde_id = session.get('customer_id')
+                kunde_name = session.get('customer_name', 'Laufkunde')
+                kunde_adresse = None
+                kunde_email = None
+                if kunde_id:
+                    k = Customer.query.get(kunde_id)
+                    if k:
+                        kunde_name = k.display_name
+                        kunde_email = k.email if hasattr(k, 'email') else None
+                        parts = [k.street, k.house_number, k.postal_code, k.city]
+                        kunde_adresse = ' '.join(p for p in parts if p)
+
+                rechnung = Rechnung(
+                    rechnungsnummer=rechnung_nummer,
+                    richtung=RechnungsRichtung.AUSGANG,
+                    status=RechnungsStatus.OFFEN,
+                    kunde_id=kunde_id,
+                    kunde_name=kunde_name,
+                    kunde_adresse=kunde_adresse,
+                    kunde_email=kunde_email,
+                    netto_gesamt=Decimal(str(netto_final)),
+                    mwst_gesamt=Decimal(str(mwst_final)),
+                    brutto_gesamt=Decimal(str(brutto_final)),
+                    rechnungsdatum=date.today(),
+                    faelligkeitsdatum=date.today() + timedelta(days=30),
+                    zahlungsbedingungen='Zahlbar innerhalb 30 Tagen',
+                    zugpferd_profil=ZugpferdProfil.BASIC,
+                    bemerkungen=f'Erstellt aus Kasse, Beleg: {beleg.belegnummer}',
+                    erstellt_von='Kasse'
+                )
+                db.session.add(rechnung)
+                db.session.flush()
+
+                # Positionen anlegen
+                for idx, item in enumerate(warenkorb, 1):
+                    menge = item.get('menge', 1)
+                    netto_b = Decimal(str(item.get('netto_betrag', 0)))
+                    netto_ep = round(netto_b / Decimal(str(menge)), 2) if menge else netto_b
+                    pos = RechnungsPosition(
+                        rechnung_id=rechnung.id,
+                        position=idx,
+                        artikel_id=item.get('artikel_id'),
+                        artikel_name=item.get('name', ''),
+                        menge=Decimal(str(menge)),
+                        einzelpreis=netto_ep,
+                        mwst_satz=Decimal(str(item.get('mwst_satz', 19))),
+                        netto_betrag=netto_b,
+                        mwst_betrag=Decimal(str(item.get('mwst_betrag', 0))),
+                        brutto_betrag=Decimal(str(item.get('brutto_betrag', 0)))
+                    )
+                    db.session.add(pos)
+
+                db.session.commit()
+                rechnung_id = rechnung.id
+                logger.info(f"Rechnung {rechnung_nummer} aus Kasse erstellt (Beleg {beleg.belegnummer})")
+
+                # Aufträge im Warenkorb als completed markieren + archivieren
+                from src.models.models import Order
+                auftrag_ids = {item['auftrag_id'] for item in warenkorb if item.get('auftrag_id')}
+                for aid in auftrag_ids:
+                    o = Order.query.get(aid)
+                    if o and o.workflow_status not in ('completed', 'cancelled'):
+                        o.workflow_status = 'completed'
+                        o.archive(user='Kasse', reason='invoiced')
+                if auftrag_ids:
+                    db.session.commit()
+                    logger.info(f"Aufträge {auftrag_ids} als completed archiviert (Rechnung {rechnung_nummer})")
+            except Exception as re:
+                db.session.rollback()
+                logger.warning(f"Rechnung konnte nicht aus Kasse erstellt werden: {re}")
+
+        result = {
             'success': True,
             'beleg_id': beleg.id,
             'beleg_nummer': beleg.belegnummer,
             'message': f'Verkauf erfolgreich! Beleg-Nr.: {beleg.belegnummer}'
         }
+        if rechnung_id:
+            result['rechnung_id'] = rechnung_id
+            result['rechnung_nummer'] = rechnung_nummer
+        return result
 
     except SQLAlchemyError as e:
         db.session.rollback()
@@ -139,8 +266,8 @@ def verkauf_abschliessen():
 
     logger.info(f"Verkauf abschliessen - Zahlungsart: '{zahlungsart}', Data: {data}")
 
-    # Akzeptiere BAR, EC, SUMUP und RECHNUNG
-    allowed_payment_types = ['BAR', 'EC', 'SUMUP', 'RECHNUNG']
+    # Akzeptiere BAR, EC, EC_KARTE, SUMUP und RECHNUNG
+    allowed_payment_types = ['BAR', 'EC', 'EC_KARTE', 'SUMUP', 'RECHNUNG']
     if zahlungsart not in allowed_payment_types:
         logger.error(f"Ungültige Zahlungsart: '{zahlungsart}' - Erlaubt: {allowed_payment_types}")
         return jsonify({'success': False, 'error': f'Ungültige Zahlungsart: {zahlungsart}'}), 400
@@ -149,8 +276,10 @@ def verkauf_abschliessen():
     result = _finalize_sale(
         warenkorb,
         zahlungsart=zahlungsart,
-        gegeben=None,  # Keine Rückgeld-Berechnung bei manueller Zahlung
-        rueckgeld=None
+        gegeben=data.get('gegeben'),
+        rueckgeld=data.get('rueckgeld'),
+        rabatt_type=data.get('rabatt_type'),
+        rabatt_value=float(data.get('rabatt_value', 0) or 0)
     )
 
     if result.get('success'):
@@ -237,6 +366,66 @@ def get_payment_status(checkout_id):
         return jsonify({'status': 'PAID'})
 
 # ==========================================
+# SUMUP TERMINAL API ROUTEN
+# ==========================================
+
+@kasse_bp.route('/sumup/terminals')
+def sumup_terminals():
+    """Listet alle verbundenen SumUp-Terminals"""
+    try:
+        result = sumup_service.list_readers()
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Fehler beim Laden der SumUp Terminals: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@kasse_bp.route('/sumup/terminal/<reader_id>/checkout', methods=['POST'])
+def sumup_terminal_checkout(reader_id):
+    """Sendet eine Zahlung an ein bestimmtes SumUp-Terminal"""
+    warenkorb = get_warenkorb()
+    if not warenkorb:
+        return jsonify({'success': False, 'error': 'Warenkorb ist leer'}), 400
+
+    warenkorb_summen = calculate_warenkorb_totals(warenkorb)
+    amount = warenkorb_summen['brutto_gesamt']
+
+    result = sumup_service.create_reader_checkout(
+        reader_id=reader_id,
+        amount=amount,
+        description=f"StitchAdmin Kassenverkauf"
+    )
+
+    if result.get('success'):
+        session['pending_terminal_sale'] = {
+            'reader_id': reader_id,
+            'checkout_id': result.get('checkout_id', ''),
+            'amount': amount,
+        }
+        session.modified = True
+
+    return jsonify(result)
+
+@kasse_bp.route('/sumup/terminal/<reader_id>/status')
+def sumup_terminal_status(reader_id):
+    """Prueft den Status eines Terminals (ob Zahlung abgeschlossen)"""
+    try:
+        result = sumup_service.get_reader_status(reader_id)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@kasse_bp.route('/sumup/terminal/<reader_id>/terminate', methods=['POST'])
+def sumup_terminal_terminate(reader_id):
+    """Bricht eine laufende Zahlung am Terminal ab"""
+    try:
+        result = sumup_service.terminate_reader_checkout(reader_id)
+        session.pop('pending_terminal_sale', None)
+        session.modified = True
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==========================================
 # WARENKORB-HILFSFUNKTIONEN
 # ==========================================
 
@@ -250,7 +439,12 @@ def save_warenkorb(warenkorb):
     session.modified = True
 
 def calculate_warenkorb_totals(warenkorb):
-    """Berechnet die Summen für den Warenkorb"""
+    """Berechnet die Summen für den Warenkorb.
+
+    Unterscheidet zwischen Netto- und Brutto-Preisen:
+    - Artikel: preis ist Netto (ohne MwSt) → MwSt wird aufgeschlagen
+    - Aufträge: preis ist Brutto (Endpreis inkl. MwSt) → MwSt wird herausgerechnet
+    """
     netto_gesamt = 0
     mwst_gesamt = 0
     brutto_gesamt = 0
@@ -260,9 +454,16 @@ def calculate_warenkorb_totals(warenkorb):
         preis = item.get('preis', 0)
         mwst_satz = item.get('mwst_satz', 19) / 100
 
-        netto_betrag = preis * menge
-        mwst_betrag = netto_betrag * mwst_satz
-        brutto_betrag = netto_betrag + mwst_betrag
+        if item.get('preis_ist_brutto', False) or item.get('auftrag_id'):
+            # Preis ist Brutto (z.B. Aufträge) → Netto herausrechnen
+            brutto_betrag = preis * menge
+            netto_betrag = round(brutto_betrag / (1 + mwst_satz), 2)
+            mwst_betrag = round(brutto_betrag - netto_betrag, 2)
+        else:
+            # Preis ist Netto (z.B. Artikel) → MwSt aufschlagen
+            netto_betrag = preis * menge
+            mwst_betrag = round(netto_betrag * mwst_satz, 2)
+            brutto_betrag = netto_betrag + mwst_betrag
 
         item['netto_betrag'] = round(netto_betrag, 2)
         item['mwst_betrag'] = round(mwst_betrag, 2)
@@ -321,6 +522,13 @@ def kassen_index():
 def verkauf_interface():
     """Verkaufs-Interface mit Warenkorb"""
     try:
+        # SumUp-Status pruefen
+        sumup_available = False
+        try:
+            sumup_available = sumup_service.is_configured()
+        except Exception:
+            pass
+
         # Zahlungsarten definieren
         zahlungsarten = [
             {'id': 'BAR', 'name': 'Barzahlung', 'icon': 'bi-cash-coin'},
@@ -328,7 +536,22 @@ def verkauf_interface():
             {'id': 'RECHNUNG', 'name': 'Auf Rechnung', 'icon': 'bi-receipt'}
         ]
 
-        return render_template('kasse/verkauf.html', zahlungsarten=zahlungsarten)
+        # Kunde aus Session laden
+        kunde_id = session.get('customer_id')
+        kunde_name = session.get('customer_name')
+        kunde_email = None
+        if kunde_id:
+            kunde = Customer.query.get(kunde_id)
+            if kunde:
+                kunde_name = kunde.display_name
+                kunde_email = kunde.email if hasattr(kunde, 'email') else None
+
+        return render_template('kasse/verkauf.html',
+                             zahlungsarten=zahlungsarten,
+                             sumup_available=sumup_available,
+                             kunde_id=kunde_id,
+                             kunde_name=kunde_name,
+                             kunde_email=kunde_email)
     except Exception as e:
         logger.error(f"Fehler in verkauf_interface: {e}")
         return render_template('kasse/error.html', error=str(e))
@@ -400,6 +623,97 @@ def artikel_suchen():
         logger.error(f"Fehler bei Artikel-Suche: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
+def _build_order_details(order):
+    """Baut die Aufschluesselung eines Auftrags fuer die Kasse auf.
+
+    Berechnet den Preis aus den echten Komponenten (OrderItems + OrderDesigns + design_cost),
+    NICHT aus total_price (der oft falsch/unvollstaendig ist).
+
+    Returns: (details_list, calculated_total)
+    """
+    from src.models.order_workflow import OrderDesign
+
+    details = []
+    calculated_total = 0
+    veredelung_types = {
+        'embroidery': 'Stickerei', 'printing': 'Druck', 'dtf': 'DTF-Druck',
+        'sublimation': 'Sublimation', 'combined': 'Kombi-Veredelung'
+    }
+
+    # 1. Artikel/Textilien aus OrderItems
+    artikel_kosten = 0
+    total_qty = 0
+    for item in order.items.all():
+        artikel_name = item.article.name if item.article else 'Artikel'
+        detail_text = f"{item.quantity}x {artikel_name}"
+        if item.textile_color:
+            detail_text += f" ({item.textile_color}"
+            if item.textile_size:
+                detail_text += f"/{item.textile_size}"
+            detail_text += ")"
+        item_total = float(item.unit_price or 0) * (item.quantity or 1)
+        artikel_kosten += item_total
+        total_qty += (item.quantity or 0)
+        details.append({'label': detail_text, 'betrag': round(item_total, 2) if item_total > 0 else 0, 'typ': 'artikel'})
+
+    total_qty = max(total_qty, 1)
+    calculated_total += artikel_kosten
+
+    # 2. Veredelung/Produktion aus OrderDesign-Positionen (echte DB-Daten)
+    designs = OrderDesign.query.filter_by(order_id=order.id).all()
+    veredelung_kosten = 0
+    erstellkosten = 0
+    for design in designs:
+        veredelung_kosten += float(design.setup_price or 0) + float(design.price_per_piece or 0) * total_qty
+        # supplier_cost = Design-Erstellkosten (beim Lieferanten bestellt)
+        if design.supplier_cost and float(design.supplier_cost) > 0:
+            erstellkosten += float(design.supplier_cost)
+
+    if order.order_type and order.order_type in veredelung_types:
+        veredelung_label = veredelung_types[order.order_type]
+
+        # Details hinzufuegen (Stichzahl, Druckflaeche)
+        extra = []
+        if order.order_type in ['embroidery', 'combined'] and order.stitch_count:
+            extra.append(f"{order.stitch_count:,} Stiche".replace(',', '.'))
+        if order.order_type in ['printing', 'dtf', 'sublimation', 'combined']:
+            if order.print_width_cm and order.print_height_cm:
+                extra.append(f"{order.print_width_cm}x{order.print_height_cm}cm")
+        if extra:
+            veredelung_label += f" ({', '.join(extra)})"
+
+        details.append({
+            'label': veredelung_label,
+            'betrag': round(veredelung_kosten, 2),
+            'typ': 'veredelung',
+            'inkl': veredelung_kosten < 0.01
+        })
+
+    calculated_total += veredelung_kosten
+
+    # 3. Design-Erstellkosten aus OrderDesign.supplier_cost
+    if erstellkosten > 0:
+        details.append({'label': 'Design-Erstellung', 'betrag': round(erstellkosten, 2), 'typ': 'design'})
+        calculated_total += erstellkosten
+
+    # 4. Zusätzliche Design-Kosten vom Order (falls separat eingetragen)
+    design_erstellung = float(order.design_cost or 0)
+    if design_erstellung > 0:
+        details.append({'label': 'Design-Kosten', 'betrag': round(design_erstellung, 2), 'typ': 'design'})
+        calculated_total += design_erstellung
+
+    adaptation = float(order.adaptation_cost or 0)
+    if adaptation > 0:
+        details.append({'label': 'Design-Anpassung', 'betrag': round(adaptation, 2), 'typ': 'design'})
+        calculated_total += adaptation
+
+    # Fallback: Wenn keine Positionen vorhanden, total_price verwenden
+    if calculated_total < 0.01 and float(order.total_price or 0) > 0:
+        calculated_total = float(order.total_price)
+
+    return details, round(calculated_total, 2)
+
+
 @kasse_bp.route('/auftraege/suchen')
 def auftraege_suchen():
     """Auftrags-Suche für Kassenverkauf"""
@@ -425,14 +739,23 @@ def auftraege_suchen():
         # Limitiere auf 50 Aufträge, sortiere nach neuesten
         auftraege = query_filter.order_by(Order.created_at.desc()).limit(50).all()
 
-        result = [{
-            'id': order.id,
-            'order_number': order.order_number,
-            'beschreibung': order.description or 'Keine Beschreibung',
-            'preis': float(order.total_price) if order.total_price else 0.0,
-            'kunde': order.customer.display_name if order.customer else 'Kein Kunde',
-            'status': order.status
-        } for order in auftraege]
+        result = []
+        for order in auftraege:
+            details, calculated_total = _build_order_details(order)
+
+            billing = order.get_billing_customer() if hasattr(order, 'get_billing_customer') else order.customer
+            result.append({
+                'id': order.id,
+                'order_number': order.order_number,
+                'beschreibung': order.description or 'Keine Beschreibung',
+                'preis': calculated_total,
+                'kunde': billing.display_name if billing else 'Kein Kunde',
+                'kunde_id': billing.id if billing else order.customer_id,
+                'kunde_name': billing.display_name if billing else None,
+                'status': order.status,
+                'order_type': order.order_type or '',
+                'details': details
+            })
 
         return jsonify({'success': True, 'auftraege': result})
     except Exception as e:
@@ -461,7 +784,7 @@ def kunden_suchen():
 
         result = [{
             'id': k.id,
-            'name': f"{k.first_name} {k.last_name}".strip(),
+            'name': k.display_name,
             'customer_number': k.customer_number,
             'email': k.email or '',
             'barcode': k.barcode if hasattr(k, 'barcode') else ''
@@ -483,7 +806,7 @@ def kunde_setzen():
         kunde = Customer.query.get(customer_id)
         if kunde:
             session['customer_id'] = customer_id
-            session['customer_name'] = f"{kunde.first_name} {kunde.last_name}".strip()
+            session['customer_name'] = kunde.display_name
             session.modified = True
             return jsonify({
                 'success': True,
@@ -505,7 +828,7 @@ def kunde_setzen():
 
 @kasse_bp.route('/auftrag/uebernehmen/<order_id>', methods=['POST'])
 def auftrag_uebernehmen(order_id):
-    """Übernimmt einen Auftrag zur Kasse/Rechnung"""
+    """Übernimmt einen Auftrag als Ganzes zur Kasse (mit Aufschlüsselung)"""
     try:
         from src.models.models import Order
 
@@ -514,39 +837,41 @@ def auftrag_uebernehmen(order_id):
         if not order:
             return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'}), 404
 
-        # Setze Kunde
-        if order.customer_id:
-            session['customer_id'] = order.customer_id
-            kunde = Customer.query.get(order.customer_id)
-            if kunde:
-                session['customer_name'] = f"{kunde.first_name} {kunde.last_name}".strip()
+        # Setze Rechnungsempfaenger (billing_customer wenn vorhanden, sonst Hauptkunde)
+        billing = order.get_billing_customer() if hasattr(order, 'get_billing_customer') else order.customer
+        if billing:
+            session['customer_id'] = billing.id
+            session['customer_name'] = billing.display_name
 
-        # Füge alle Auftragspositionen zum Warenkorb hinzu
         warenkorb = get_warenkorb()
 
-        # Wenn Artikel vorhanden, füge sie hinzu
-        if hasattr(order, 'items') and order.items:
-            for item in order.items:
-                artikel = Article.query.get(item.article_id)
-                if artikel:
-                    warenkorb.append({
-                        'warenkorb_id': str(uuid.uuid4()),
-                        'artikel_id': artikel.id,
-                        'name': artikel.name,
-                        'preis': float(item.unit_price or artikel.price or 0),
-                        'menge': item.quantity or 1,
-                        'mwst_satz': 19
-                    })
-        else:
-            # Fallback: Füge Gesamtpreis als Position hinzu
-            warenkorb.append({
-                'warenkorb_id': str(uuid.uuid4()),
-                'artikel_id': None,
-                'name': f"Auftrag {order.order_number}: {order.description or 'Auftrag'}",
-                'preis': float(order.total_price or 0),
-                'menge': 1,
-                'mwst_satz': 19
-            })
+        # Prüfe ob Auftrag schon im Warenkorb
+        existing = next((item for item in warenkorb if item.get('auftrag_id') == order.id), None)
+        if existing:
+            return jsonify({'success': False, 'error': f'Auftrag {order.order_number} ist bereits im Warenkorb'}), 400
+
+        # Aufschlüsselung erstellen (Artikel, Veredelung, Design) + berechneter Preis
+        details, calculated_total = _build_order_details(order)
+
+        # Auftrag als EIN Item mit berechnetem Gesamtpreis hinzufügen
+        beschreibung = order.description or ''
+        name = f"Auftrag {order.order_number}"
+        if beschreibung and beschreibung != 'Keine Beschreibung':
+            name += f" - {beschreibung}"
+
+        warenkorb.append({
+            'warenkorb_id': str(uuid.uuid4()),
+            'artikel_id': None,
+            'auftrag_id': order.id,
+            'name': name,
+            'preis': calculated_total,
+            'preis_ist_brutto': True,  # Auftragspreise sind Endpreise (inkl. MwSt)
+            'menge': 1,
+            'mwst_satz': 19,
+            'details': details,
+            'kunde_id': billing.id if billing else order.customer_id,
+            'kunde_name': billing.display_name if billing else None
+        })
 
         save_warenkorb(warenkorb)
         warenkorb_summen = calculate_warenkorb_totals(warenkorb)
@@ -588,15 +913,29 @@ def warenkorb_hinzufuegen():
             # Füge neuen Auftrag hinzu
             auftrag = Order.query.get(auftrag_id)
             if auftrag:
+                # Details + berechneten Preis aus DB-Komponenten holen
+                details, calculated_total = _build_order_details(auftrag)
+
+                billing_k = auftrag.get_billing_customer() if hasattr(auftrag, 'get_billing_customer') else auftrag.customer
                 warenkorb.append({
                     'warenkorb_id': str(uuid.uuid4()),
                     'artikel_id': None,  # Kein Artikel
                     'auftrag_id': auftrag.id,
                     'name': data.get('name', f'Auftrag {auftrag.order_number}'),
-                    'preis': float(data.get('preis', auftrag.total_price or 0)),
+                    'preis': calculated_total,
+                    'preis_ist_brutto': True,  # Auftragspreise sind Endpreise (inkl. MwSt)
                     'menge': data.get('menge', 1),
-                    'mwst_satz': 19
+                    'mwst_satz': 19,
+                    'details': details,
+                    'kunde_id': billing_k.id if billing_k else auftrag.customer_id,
+                    'kunde_name': billing_k.display_name if billing_k else None
                 })
+
+                # Rechnungsempfaenger aus Auftrag uebernehmen
+                if billing_k and not session.get('customer_id'):
+                    session['customer_id'] = billing_k.id
+                    session['customer_name'] = billing_k.display_name
+                    session.modified = True
 
     # Fall 2: Artikel hinzufügen
     elif artikel_id:
@@ -626,7 +965,9 @@ def warenkorb_hinzufuegen():
     return jsonify({
         'success': True,
         'warenkorb': warenkorb,
-        'warenkorb_summen': warenkorb_summen
+        'warenkorb_summen': warenkorb_summen,
+        'customer_id': session.get('customer_id'),
+        'customer_name': session.get('customer_name')
     })
 
 @kasse_bp.route('/warenkorb/aktualisieren', methods=['POST'])

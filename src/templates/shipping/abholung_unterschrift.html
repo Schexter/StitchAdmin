@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Unterschrift – Auftrag {{ order.order_number or order.id }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            touch-action: none;
+        }
+        .header {
+            background: #16213e;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #0f3460;
+            flex-shrink: 0;
+        }
+        .header-info { line-height: 1.3; }
+        .header-info h2 { font-size: 1.1rem; font-weight: 700; color: #e94560; }
+        .header-info p { font-size: 0.8rem; color: #aaa; }
+        .name-section {
+            background: #16213e;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+            border-bottom: 1px solid #0f3460;
+        }
+        .name-section label { font-size: 0.85rem; color: #aaa; white-space: nowrap; }
+        .name-section input {
+            flex: 1;
+            background: #0f3460;
+            border: 1px solid #e94560;
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: #fff;
+            font-size: 1rem;
+        }
+        .canvas-wrapper {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+        }
+        #signatureCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        .canvas-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ccc;
+            font-size: 1rem;
+            pointer-events: none;
+            text-align: center;
+            user-select: none;
+        }
+        .canvas-hint.hidden { display: none; }
+        .actions {
+            background: #16213e;
+            padding: 12px 16px;
+            display: flex;
+            gap: 12px;
+            justify-content: space-between;
+            flex-shrink: 0;
+            border-top: 2px solid #0f3460;
+        }
+        .btn {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-clear { background: #333; color: #fff; }
+        .btn-back  { background: #555; color: #fff; }
+        .btn-save  { background: #28a745; color: #fff; flex: 2; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        #successOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 16px;
+            z-index: 999;
+        }
+        #successOverlay.show { display: flex; }
+        #successOverlay svg { width: 80px; height: 80px; }
+        #successOverlay p { font-size: 1.2rem; color: #fff; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-info">
+        <h2>Auftrag {{ order.order_number or order.id }}</h2>
+        <p>{{ order.description or 'Abholung bestaetigen' }} &bull;
+           {{ "%.2f"|format(order.total_price or 0) }} EUR</p>
+    </div>
+    <div style="text-align:right; font-size:0.75rem; color:#aaa; line-height:1.4;">
+        {% if order.customer %}
+        <strong style="color:#fff;">{{ order.customer.first_name }} {{ order.customer.last_name }}</strong><br>
+        {% endif %}
+        Bitte hier unterschreiben
+    </div>
+</div>
+
+<div class="name-section">
+    <label for="abholerName">Abholer:</label>
+    <input type="text" id="abholerName" placeholder="Name des Abholers (optional)"
+           autocomplete="name" autocorrect="off">
+</div>
+
+<div class="canvas-wrapper" id="canvasWrapper">
+    <canvas id="signatureCanvas"></canvas>
+    <div class="canvas-hint" id="canvasHint">Hier unterschreiben</div>
+</div>
+
+<div class="actions">
+    <button class="btn btn-back" onclick="goBack()">Zurueck</button>
+    <button class="btn btn-clear" id="btnClear" onclick="clearCanvas()" disabled>Loeschen</button>
+    <button class="btn btn-save" id="btnSave" onclick="saveSignature()" disabled>Abholung bestaetigen</button>
+</div>
+
+<div id="successOverlay">
+    <svg viewBox="0 0 52 52" fill="none">
+        <circle cx="26" cy="26" r="25" stroke="#28a745" stroke-width="2"/>
+        <path d="M14 26l8 8 16-16" stroke="#28a745" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+    <p>Abholung bestaetigt!</p>
+    <p style="font-size:0.85rem; color:#aaa;">Weiterleitung...</p>
+</div>
+
+<script>
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').content;
+const canvas = document.getElementById('signatureCanvas');
+const ctx = canvas.getContext('2d');
+const hint = document.getElementById('canvasHint');
+const btnClear = document.getElementById('btnClear');
+const btnSave = document.getElementById('btnSave');
+let drawing = false;
+let hasDrawn = false;
+
+function resizeCanvas() {
+    const wrapper = document.getElementById('canvasWrapper');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = wrapper.clientWidth * dpr;
+    canvas.height = wrapper.clientHeight * dpr;
+    canvas.style.width = wrapper.clientWidth + 'px';
+    canvas.style.height = wrapper.clientHeight + 'px';
+    ctx.scale(dpr, dpr);
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+}
+resizeCanvas();
+window.addEventListener('resize', () => { if (!hasDrawn) resizeCanvas(); });
+
+function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    if (e.touches) {
+        return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    }
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+}
+
+function startDraw(e) {
+    e.preventDefault();
+    drawing = true;
+    const pos = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(pos.x, pos.y);
+    if (!hasDrawn) {
+        hasDrawn = true;
+        hint.classList.add('hidden');
+        btnClear.disabled = false;
+        btnSave.disabled = false;
+    }
+}
+function draw(e) {
+    e.preventDefault();
+    if (!drawing) return;
+    const pos = getPos(e);
+    ctx.lineTo(pos.x, pos.y);
+    ctx.stroke();
+}
+function endDraw(e) {
+    e.preventDefault();
+    drawing = false;
+    ctx.beginPath();
+}
+
+canvas.addEventListener('touchstart', startDraw, { passive: false });
+canvas.addEventListener('touchmove', draw, { passive: false });
+canvas.addEventListener('touchend', endDraw, { passive: false });
+canvas.addEventListener('mousedown', startDraw);
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseup', endDraw);
+canvas.addEventListener('mouseleave', endDraw);
+
+function clearCanvas() {
+    const wrapper = document.getElementById('canvasWrapper');
+    ctx.clearRect(0, 0, wrapper.clientWidth, wrapper.clientHeight);
+    hasDrawn = false;
+    hint.classList.remove('hidden');
+    btnClear.disabled = true;
+    btnSave.disabled = true;
+}
+
+function goBack() { history.back(); }
+
+async function saveSignature() {
+    if (!hasDrawn) { alert('Bitte zuerst unterschreiben.'); return; }
+    btnSave.disabled = true;
+    btnSave.textContent = 'Wird gespeichert...';
+
+    const signatureData = canvas.toDataURL('image/png');
+    const abholerName = document.getElementById('abholerName').value;
+
+    try {
+        {% if extern and token %}
+        const saveUrl = '{{ url_for("shipping.abholung_unterschrift_extern_speichern", order_id=order.id, token=token) }}';
+        {% else %}
+        const saveUrl = '{{ url_for("shipping.abholung_unterschrift_speichern", order_id=order.id) }}';
+        {% endif %}
+        const resp = await fetch(saveUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': CSRF_TOKEN
+            },
+            body: new URLSearchParams({
+                signature: signatureData,
+                abholer_name: abholerName
+            })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('successOverlay').classList.add('show');
+            setTimeout(() => { window.location.href = data.redirect || '/shipping/'; }, 1500);
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+            btnSave.disabled = false;
+            btnSave.textContent = 'Abholung bestaetigen';
+        }
+    } catch (err) {
+        alert('Verbindungsfehler: ' + err);
+        btnSave.disabled = false;
+        btnSave.textContent = 'Abholung bestaetigen';
+    }
+}
+</script>
+</body>
+</html>

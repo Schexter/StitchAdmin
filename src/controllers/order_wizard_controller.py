@@ -203,6 +203,20 @@ def step1():
         return redirect(url_for('wizard.step2'))
     
     # GET: Formular anzeigen
+    # Kunde aus URL-Parameter vorausfuellen (z.B. von Kunden-Detailseite)
+    prefill_customer_id = request.args.get('customer_id')
+    if prefill_customer_id and not data.get('kunde', {}).get('id'):
+        prefill_customer = Customer.query.get(prefill_customer_id)
+        if prefill_customer:
+            data['kunde'] = {
+                'id': prefill_customer.id,
+                'name': prefill_customer.display_name,
+                'email': prefill_customer.email,
+                'phone': prefill_customer.phone,
+                'type': prefill_customer.customer_type
+            }
+            save_wizard_data(data)
+
     # Letzte Kunden für Schnellauswahl
     recent_customers = Customer.query.order_by(Customer.updated_at.desc()).limit(10).all()
     
@@ -247,10 +261,20 @@ def step2():
                 flash('Fehler beim Verarbeiten der Textilien-Daten.', 'danger')
                 return redirect(url_for('wizard.step2'))
         
+        # Kundenware: ohne Artikel weiter zu Veredelung
+        is_kundenware = request.form.get('kundenware') == '1'
+        if is_kundenware:
+            data['textilien'] = []
+            data['is_kundenware'] = True
+            data['current_step'] = 3
+            save_wizard_data(data)
+            flash('Kundenware: Weiter zu Veredelung.', 'info')
+            return redirect(url_for('wizard.step3'))
+
         if not textilien:
-            flash('Bitte wählen Sie mindestens einen Artikel aus.', 'warning')
+            flash('Bitte waehlen Sie mindestens einen Artikel aus, oder klicken Sie "Kundenware".', 'warning')
             return render_template('wizard/step2.html', data=data, step=2)
-        
+
         # Validierung und Anreicherung
         for item in textilien:
             artikel = Article.query.get(item.get('artikel_id'))
@@ -297,9 +321,9 @@ def step3():
     """Step 3: Veredelung (Stickerei/Druck) definieren"""
     data = get_wizard_data()
     
-    # Prüfen ob Step 2 abgeschlossen
-    if not data.get('textilien'):
-        flash('Bitte wählen Sie zuerst Artikel aus.', 'warning')
+    # Prüfen ob Step 2 abgeschlossen (Kundenware darf ohne Textilien weiter)
+    if not data.get('textilien') and not data.get('is_kundenware'):
+        flash('Bitte waehlen Sie zuerst Artikel aus.', 'warning')
         return redirect(url_for('wizard.step2'))
     
     if request.method == 'POST':
@@ -366,30 +390,52 @@ def step4():
     data = get_wizard_data()
     
     # Prüfen ob Step 2 abgeschlossen (Step 3 ist optional)
-    if not data.get('textilien'):
-        flash('Bitte wählen Sie zuerst Artikel aus.', 'warning')
+    if not data.get('textilien') and not data.get('is_kundenware'):
+        flash('Bitte waehlen Sie zuerst Artikel aus.', 'warning')
         return redirect(url_for('wizard.step2'))
     
     if request.method == 'POST':
-        # Kalkulations-Anpassungen verarbeiten
-        kalkulation = {
-            'rabatt_prozent': float(request.form.get('rabatt_prozent', 0)),
-            'zahlungsbedingung_id': request.form.get('zahlungsbedingung_id'),
-            'manuell_angepasst': request.form.get('manuell_angepasst') == 'on',
-            'positionen': []  # Wird unten befüllt
-        }
-        
-        # Manuelle Preisanpassungen
+        manuell_angepasst = request.form.get('manuell_angepasst') == 'on'
+        rabatt_prozent = float(request.form.get('rabatt_prozent', 0))
+
+        # Positionen aus dem Frontend übernehmen
         pos_json = request.form.get('positionen_json')
+        positionen_list = []
         if pos_json:
             try:
-                kalkulation['positionen'] = json.loads(pos_json)
+                positionen_list = json.loads(pos_json)
             except json.JSONDecodeError:
                 pass
-        
-        # Summen neu berechnen
-        summen = berechne_summen(data, kalkulation)
-        kalkulation.update(summen)
+
+        # Falls keine manuellen Änderungen, frisch berechnen
+        if not manuell_angepasst or not positionen_list:
+            basis = berechne_kalkulation(data)
+            positionen_list = basis['positionen']
+
+        # Summen aus den Positionen berechnen
+        summe_netto = sum(float(p.get('gesamt_netto', 0)) for p in positionen_list)
+        rabatt_betrag = summe_netto * rabatt_prozent / 100
+        netto_nach_rabatt = summe_netto - rabatt_betrag
+        mwst_betrag = round(netto_nach_rabatt * 0.19, 2)
+        summe_brutto = netto_nach_rabatt + mwst_betrag
+
+        gesamtmenge = sum(
+            int(p.get('menge', 0)) for p in positionen_list if p.get('typ') == 'textil'
+        )
+
+        kalkulation = {
+            'rabatt_prozent': rabatt_prozent,
+            'zahlungsbedingung_id': request.form.get('zahlungsbedingung_id'),
+            'manuell_angepasst': manuell_angepasst,
+            'positionen': positionen_list,
+            'summe_netto': round(summe_netto, 2),
+            'rabatt_betrag': round(rabatt_betrag, 2),
+            'netto_nach_rabatt': round(netto_nach_rabatt, 2),
+            'mwst_satz': 19.0,
+            'mwst_betrag': mwst_betrag,
+            'summe_brutto': round(summe_brutto, 2),
+            'gesamtmenge': gesamtmenge
+        }
         
         data['kalkulation'] = kalkulation
         data['current_step'] = 5
@@ -426,7 +472,7 @@ def step5():
     data = get_wizard_data()
     
     # Prüfen ob Daten vorhanden
-    if not data.get('kunde', {}).get('id') or not data.get('textilien'):
+    if not data.get('kunde', {}).get('id') or (not data.get('textilien') and not data.get('is_kundenware')):
         flash('Bitte vervollständigen Sie zunächst alle Schritte.', 'warning')
         return redirect(url_for('wizard.step1'))
     
@@ -572,6 +618,8 @@ def api_artikel_varianten(artikel_id):
     
     return jsonify({
         'artikel_id': artikel_id,
+        'name': artikel.name,
+        'artikelnummer': artikel.article_number,
         'farben': farben,
         'groessen': sorted_groessen,
         'default_price': float(artikel.price or 0)
@@ -959,7 +1007,8 @@ def erstelle_dokument(data, typ='angebot'):
             # === LEGACY SYSTEM: Order Model ===
             
             # Auftragsnummer generieren
-            from src.controllers.order_controller_db import generate_order_id
+            from src.services.id_generator_service import IdGenerator
+            generate_order_id = IdGenerator.order
             order_id = generate_order_id()
             
             order = Order(

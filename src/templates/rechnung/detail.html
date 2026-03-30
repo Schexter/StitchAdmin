@@ -51,8 +51,19 @@
                         <div class="col-md-6">
                             <table class="table table-borderless">
                                 <tr>
-                                    <th class="text-muted" style="width: 40%;">Rechnungsnummer:</th>
-                                    <td><strong>{{ rechnung.rechnungsnummer }}</strong></td>
+                                    <th class="text-muted" style="width: 40%;">
+                                        {% if rechnung.status.value == 'ENTWURF' %}
+                                            Arbeitsnummer:
+                                        {% else %}
+                                            Rechnungsnummer:
+                                        {% endif %}
+                                    </th>
+                                    <td>
+                                        <strong>{{ rechnung.rechnungsnummer }}</strong>
+                                        {% if rechnung.status.value == 'ENTWURF' %}
+                                            <small class="text-muted ms-1">(RE-Nummer wird beim Buchen vergeben)</small>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th class="text-muted">Rechnungsdatum:</th>
@@ -103,20 +114,24 @@
                                     <td>{{ rechnung.erstellt_von or '-' }}</td>
                                 </tr>
                                 <tr>
-                                    <th class="text-muted">Verknüpfter Auftrag:</th>
+                                    <th class="text-muted">Verknüpfte Aufträge:</th>
                                     <td>
-                                        {% if rechnung.auftrag %}
-                                            <a href="{{ url_for('orders.show', order_id=rechnung.auftrag_id) }}" 
+                                        {% if verknuepfte_auftraege %}
+                                            {% for auftrag in verknuepfte_auftraege %}
+                                            <a href="{{ url_for('orders.show', order_id=auftrag.id) }}"
+                                               class="badge bg-primary text-decoration-none me-1">
+                                                <i class="bi bi-box-seam"></i>
+                                                {{ auftrag.order_number }}
+                                            </a>
+                                            {% endfor %}
+                                        {% elif rechnung.auftrag %}
+                                            <a href="{{ url_for('orders.show', order_id=rechnung.auftrag_id) }}"
                                                class="badge bg-primary text-decoration-none">
                                                 <i class="bi bi-box-seam"></i>
                                                 {{ rechnung.auftrag.order_number }}
                                             </a>
                                         {% else %}
                                             <span class="text-muted">- Keine Verknüpfung -</span>
-                                            <a href="{{ url_for('rechnung.rechnung_verknuepfen', rechnung_id=rechnung.id) }}" 
-                                               class="btn btn-sm btn-outline-primary ms-2">
-                                                <i class="bi bi-link"></i> Verknüpfen
-                                            </a>
                                         {% endif %}
                                     </td>
                                 </tr>
@@ -127,7 +142,7 @@
             </div>
 
             <!-- Positionen (nur für Ausgangsrechnungen) -->
-            {% if rechnung.positionen and rechnung.positionen|length > 0 %}
+            {% if rechnung.positionen and rechnung.positionen|list|length > 0 %}
             <div class="card mb-4">
                 <div class="card-header">
                     <h5 class="mb-0"><i class="bi bi-list-ol"></i> Positionen</h5>
@@ -156,9 +171,9 @@
                                         {% endif %}
                                     </td>
                                     <td class="text-end">{{ pos.menge }} {{ pos.einheit }}</td>
-                                    <td class="text-end">{{ "%.2f"|format(pos.einzelpreis_netto|float) }} EUR</td>
+                                    <td class="text-end">{{ "%.2f"|format(pos.einzelpreis|float) }} €</td>
                                     <td class="text-end">{{ pos.mwst_satz|int }}%</td>
-                                    <td class="text-end"><strong>{{ "%.2f"|format(pos.gesamt_brutto|float) }} EUR</strong></td>
+                                    <td class="text-end"><strong>{{ "%.2f"|format(pos.brutto_betrag|float) }} €</strong></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -245,17 +260,25 @@
                     {% endif %}
                     {% endif %}
 
-                    {% if rechnung.status.value in ['ENTWURF', 'OFFEN'] %}
-                    <button class="btn btn-success" onclick="markAsPaid({{ rechnung.id }})">
+                    {% if rechnung.status.value in ['ENTWURF', 'OFFEN', 'TEILBEZAHLT', 'UEBERFAELLIG'] %}
+                    <button class="btn btn-success" onclick="markAsPaid({{ rechnung.id }}, {{ rechnung.brutto_gesamt|default(0)|float }})">
                         <i class="bi bi-check-circle"></i> Als bezahlt markieren
                     </button>
                     {% endif %}
 
                     {% if rechnung.status.value == 'ENTWURF' %}
-                    <a href="{{ url_for('rechnung.rechnung_bearbeiten', rechnung_id=rechnung.id) }}"
-                       class="btn btn-outline-secondary">
-                        <i class="bi bi-pencil"></i> Bearbeiten
-                    </a>
+                    <form method="POST" action="{{ url_for('rechnung.rechnung_versenden', rechnung_id=rechnung.id) }}" class="d-grid"
+                          onsubmit="return confirm('Rechnung jetzt buchen? Eine echte Rechnungsnummer (RE-...) wird vergeben und kann nicht mehr geändert werden.')">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check2-circle"></i> Buchen und versenden
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('rechnung.rechnung_loeschen', rechnung_id=rechnung.id) }}" class="d-grid"
+                          onsubmit="return confirm('Entwurf wirklich löschen?')">
+                        <button type="submit" class="btn btn-outline-danger">
+                            <i class="bi bi-trash"></i> Entwurf löschen
+                        </button>
+                    </form>
                     {% endif %}
 
                     <hr>
@@ -276,12 +299,11 @@
                         {% endif %}
                     </div>
 
-                    <!-- Storno-Button (nur wenn nicht bereits storniert) -->
-                    <!-- Auftrags-Verknüpfung -->
-                    <a href="{{ url_for('rechnung.rechnung_verknuepfen', rechnung_id=rechnung.id) }}" 
-                       class="btn btn-outline-primary">
-                        <i class="bi bi-link-45deg"></i> 
-                        {% if rechnung.auftrag_id %}Auftrag ändern{% else %}Mit Auftrag verknüpfen{% endif %}
+                    <!-- Auftrags-Verknüpfung (manuell nachträglich) -->
+                    <a href="{{ url_for('rechnung.rechnung_verknuepfen', rechnung_id=rechnung.id) }}"
+                       class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-link-45deg"></i>
+                        {% if verknuepfte_auftraege or rechnung.auftrag_id %}Aufträge verwalten{% else %}Mit Auftrag verknüpfen{% endif %}
                     </a>
 
                     {% if rechnung.status.value != 'STORNIERT' %}
@@ -322,21 +344,49 @@
 </div>
 
 <script>
-function markAsPaid(rechnungId) {
-    if (confirm('Rechnung als bezahlt markieren?')) {
-        fetch(`/rechnung/api/${rechnungId}/bezahlt`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Fehler: ' + data.error);
-            }
-        });
-    }
+function markAsPaid(rechnungId, bruttoBetrag) {
+    // Dialog: Zahlungsart + Betrag
+    var ov = document.createElement('div');
+    ov.id = 'pay-overlay';
+    ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    ov.innerHTML = '<div class="card shadow-lg" style="width:400px;max-width:90vw;">' +
+        '<div class="card-header d-flex justify-content-between"><h6 class="mb-0"><i class="bi bi-check-circle text-success me-1"></i> Zahlung erfassen</h6><button type="button" class="btn-close" onclick="document.getElementById(\'pay-overlay\').remove()"></button></div>' +
+        '<div class="card-body">' +
+        '<div class="mb-3"><label class="form-label">Zahlungsart</label><select class="form-select" id="pay-art">' +
+        '<option value="ueberweisung">Überweisung</option><option value="bar">Bar</option><option value="ec">EC-Karte</option><option value="paypal">PayPal</option><option value="lastschrift">Lastschrift</option><option value="sumup">SumUp</option></select></div>' +
+        '<div class="mb-3"><label class="form-label">Betrag</label><div class="input-group"><input type="number" class="form-control" id="pay-betrag" step="0.01" min="0" value="' + (bruttoBetrag || 0).toFixed(2) + '"><span class="input-group-text">&euro;</span></div>' +
+        '<small class="form-text text-muted">Gesamtbetrag: ' + (bruttoBetrag || 0).toFixed(2) + ' &euro; &mdash; weniger = Teilzahlung</small></div>' +
+        '<div id="pay-error" class="alert alert-danger d-none mb-3"></div>' +
+        '<button type="button" class="btn btn-success w-100" onclick="submitPayment(' + rechnungId + ')"><i class="bi bi-check-lg me-1"></i> Zahlung buchen</button>' +
+        '</div></div>';
+    document.body.appendChild(ov);
+}
+
+function submitPayment(rechnungId) {
+    var art = document.getElementById('pay-art').value;
+    var betrag = parseFloat(document.getElementById('pay-betrag').value) || 0;
+    var errBox = document.getElementById('pay-error');
+    if (betrag <= 0) { errBox.textContent = 'Betrag muss > 0 sein'; errBox.classList.remove('d-none'); return; }
+
+    fetch('/rechnung/api/' + rechnungId + '/bezahlt', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({zahlungsart: art, betrag: betrag})
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+        if (data.success) {
+            document.getElementById('pay-overlay').remove();
+            location.reload();
+        } else {
+            errBox.textContent = data.message || 'Fehler';
+            errBox.classList.remove('d-none');
+        }
+    })
+    .catch(function(err) {
+        errBox.textContent = 'Netzwerkfehler: ' + err;
+        errBox.classList.remove('d-none');
+    });
 }
 
 function sendInvoiceEmail(rechnungId) {

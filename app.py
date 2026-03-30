@@ -8,9 +8,12 @@ Hauptanwendung mit Flask Application Factory Pattern
 
 import os
 import sys
-from datetime import timedelta
+from datetime import datetime, date, timedelta
 from flask import Flask, render_template, redirect, url_for, flash, request, send_from_directory, g
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+import logging
+
+logger = logging.getLogger(__name__)
 
 # UTF-8 Encoding für Windows
 if sys.platform == 'win32':
@@ -105,6 +108,12 @@ def create_app():
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
     app.config['TEMPLATES_AUTO_RELOAD'] = True
+    # Session-Cookie Sicherheit
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = not app.config.get('DEBUG', False)
+    app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+    app.config['REMEMBER_COOKIE_SECURE'] = not app.config.get('DEBUG', False)
 
     # Upload-Konfiguration
     app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
@@ -165,32 +174,112 @@ def create_app():
     # GLOBALER LOGIN-SCHUTZ (Vorgelagerte Loginseite)
     # ==========================================
     @app.before_request
+    def block_demo_writes():
+        """Demo-User duerfen nichts aendern — nur GET-Requests erlaubt"""
+        if request.method in ('POST', 'PUT', 'DELETE', 'PATCH') and current_user.is_authenticated:
+            if getattr(current_user, 'is_demo', False):
+                # Logout erlauben
+                if request.endpoint == 'auth.logout':
+                    return
+                from flask import jsonify as jr
+                if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jr({'success': False, 'error': 'Demo-Modus: Aenderungen sind nicht moeglich.'}), 403
+                flash('Demo-Modus: Aenderungen sind nicht moeglich. Registrieren Sie sich fuer einen eigenen Account.', 'warning')
+                return redirect(request.referrer or url_for('dashboard'))
+
+    @app.after_request
+    def set_security_headers(response):
+        """Sicherheits-HTTP-Header fuer alle Antworten"""
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+        return response
+
+    @app.before_request
+    def resolve_tenant():
+        """Tenant aus Subdomain oder Custom-Domain ermitteln"""
+        g.current_tenant = None
+        g.current_tenant_id = None
+
+        main_domain = app.config.get('MAIN_DOMAIN', 'stitchadmin.hahn-it-wuppertal.de')
+        host = request.host.split(':')[0]  # Port ignorieren
+
+        if host in ('localhost', '127.0.0.1'):
+            return  # Lokal: kein Tenant-Routing
+
+        # Subdomain erkennen: tenant-slug.stitchadmin.hahn-it-wuppertal.de
+        if host.endswith('.' + main_domain):
+            subdomain = host.replace('.' + main_domain, '')
+            if subdomain and subdomain not in ('www', 'api'):
+                try:
+                    from src.models.tenant import Tenant
+                    tenant = Tenant.query.filter_by(subdomain=subdomain, is_active=True).first()
+                    if tenant:
+                        g.current_tenant = tenant
+                        g.current_tenant_id = tenant.id
+                except Exception:
+                    pass
+                # Root auf Tenant-Website weiterleiten
+                if request.path == '/' and g.current_tenant:
+                    return redirect('/site/', code=302)
+            return
+
+        # Custom-Domain erkennen
+        if host != main_domain:
+            try:
+                from src.models.tenant import Tenant
+                tenant = Tenant.query.filter_by(custom_domain=host, is_active=True).first()
+                if tenant:
+                    g.current_tenant = tenant
+                    g.current_tenant_id = tenant.id
+            except Exception:
+                pass
+            if request.path == '/':
+                return redirect('/site/', code=302)
+
+    @app.before_request
     def require_login():
         """Alle Seiten erfordern Login - kein Zugang ohne Anmeldung"""
         # Erlaubte Endpunkte ohne Login
+        public_prefixes = (
+            'setup.', 'landing.', 'website.', 'shop.', 'inquiry.', 'tracking.',
+        )
         if request.endpoint and (
-            request.endpoint == 'auth.login' or
-            request.endpoint == 'static' or
-            request.endpoint == 'root' or
-            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('setup.')) or
-            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('landing.')) or
-            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('website.')) or
-            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('shop.')) or
-            (hasattr(request, 'endpoint') and request.endpoint and request.endpoint.startswith('inquiry.')) or
-            request.endpoint == 'calendar_sync.callback_microsoft' or
-            request.endpoint == 'social_media.callback_facebook'
+            request.endpoint in ('auth.login', 'auth.verify_2fa', 'static', 'root',
+                                 'favicon', 'manifest', 'apple_touch_icon',
+                                 'calendar_sync.callback_microsoft',
+                                 'social_media.callback_facebook') or
+            any(request.endpoint.startswith(p) for p in public_prefixes) or
+            (request.endpoint.startswith('design_approval.') and
+             not request.endpoint.startswith('design_approval.admin') and
+             not request.endpoint.startswith('design_approval.api_') and
+             request.endpoint not in ('design_approval.freigabe_pdf', 'design_approval.download_generated_pdf', 'design_approval.scan_incoming_emails')) or
+            (request.endpoint.startswith('quote_approval.') and
+             not request.endpoint.startswith('quote_approval.api_'))
         ):
             return
+
         if not current_user.is_authenticated:
             return redirect(url_for('auth.login'))
 
-        # Tenant-Kontext setzen (Phase 1: Default-Tenant fuer alle User)
-        if app.config.get('MULTI_TENANT_ENABLED'):
-            from src.models.tenant import Tenant
-            default_tenant = Tenant.query.filter_by(slug='default').first()
-            if default_tenant:
-                g.current_tenant_id = default_tenant.id
-                g.current_tenant = default_tenant
+        # Tenant-Zugehoerigkeit pruefen: User darf nur in seinem Tenant arbeiten
+        if g.get('current_tenant'):
+            try:
+                from src.models.tenant import UserTenant
+                membership = UserTenant.query.filter_by(
+                    user_id=current_user.id,
+                    tenant_id=g.current_tenant.id,
+                    is_active=True
+                ).first()
+                if not membership and not current_user.is_system_admin:
+                    from flask_login import logout_user
+                    logout_user()
+                    flash('Sie haben keinen Zugang zu diesem Bereich.', 'danger')
+                    return redirect(url_for('auth.login'))
+            except Exception:
+                pass
 
     # ==========================================
     # BLUEPRINT REGISTRIERUNG
@@ -336,6 +425,9 @@ def create_app():
     # Oeffentliches Anfrage-Formular (ohne Login)
     register_blueprint_safe('src.controllers.inquiry_controller', 'inquiry_bp', 'Anfragen (öffentlich)')
 
+    # Einheitliches Tracking (öffentlich)
+    register_blueprint_safe('src.controllers.inquiry_controller', 'tracking_bp', 'Auftrags-Tracking (öffentlich)')
+
     # Anfragen-Verwaltung (Admin-Bereich, Login erforderlich)
     register_blueprint_safe('src.controllers.inquiry_admin_controller', 'inquiry_admin_bp', 'Anfragen-Verwaltung')
 
@@ -354,6 +446,12 @@ def create_app():
     # Landing Page & Registrierung (oeffentlich)
     register_blueprint_safe('src.controllers.landing_controller', 'landing_bp', 'Landing Page')
 
+    # Plattform-Administration (SaaS Tenant-Verwaltung)
+    register_blueprint_safe('src.controllers.platform_admin_controller', 'platform_admin_bp', 'Plattform-Admin')
+
+    # Billing Dashboard (Tenant-seitig: Plan, Nutzung, Zahlungen)
+    register_blueprint_safe('src.controllers.billing_controller', 'billing_bp', 'Billing')
+
     # Banking
     register_blueprint_safe('src.controllers.banking_controller', 'banking_bp', 'Bankkonten')
 
@@ -366,11 +464,110 @@ def create_app():
     # Social Media
     register_blueprint_safe('src.controllers.social_media_controller', 'social_media_bp', 'Social Media')
 
-    # CSRF-Ausnahmen fuer oeffentliche Blueprints (Shop, Anfragen, Website)
-    for bp_name in ['shop', 'inquiry', 'website', 'design_approval']:
+    # Aufgaben-Board (Zentrale Aufgabenverwaltung)
+    register_blueprint_safe('src.controllers.taskboard_controller', 'taskboard_bp', 'Aufgaben-Board')
+
+    # Angebots-Freigabe (oeffentlich + Admin)
+    register_blueprint_safe('src.controllers.quote_approval_controller', 'quote_approval_bp', 'Angebots-Freigabe')
+
+    # Veredelungsverfahren (Einstellungen + API)
+    register_blueprint_safe('src.controllers.veredelung_controller', 'veredelung_bp', 'Veredelung')
+
+    # Energie / Stromzähler
+    register_blueprint_safe('src.controllers.energie_controller', 'energie_bp', 'Stromzähler')
+
+    # Feedback / Bug-Melder
+    register_blueprint_safe('src.controllers.feedback_controller', 'feedback_bp', 'Feedback')
+
+    # Dashboard ist als Thin-Wrapper in app.py, Logik in src/controllers/dashboard_controller.py
+
+    # CSRF-Ausnahmen fuer oeffentliche Blueprints und JSON-APIs
+    for bp_name in ['shop', 'inquiry', 'tracking', 'website', 'design_approval', 'quote_approval', 'production_time', 'kasse', 'rechnung']:
         bp = app.blueprints.get(bp_name)
         if bp:
             csrf.exempt(bp)
+
+    # Einzelne externe Routen von CSRF ausnehmen (Token-basierte Auth / JSON-APIs)
+    for view_name in ['shipping.abholung_unterschrift_extern_speichern',
+                      'customers.api_search', 'customers.api_quick_create',
+                      'customers.api_customers', 'settings.test_cloud_connection',
+                      'wizard.api_artikel_suche', 'wizard.api_artikel_varianten',
+                      'feedback.submit', 'feedback.update_status']:
+        if view_name in app.view_functions:
+            csrf.exempt(app.view_functions[view_name])
+
+    # ==========================================
+    # FAVICON - Dynamisch aus Firmenlogo
+    # ==========================================
+    @app.route('/favicon.ico')
+    def favicon():
+        """Favicon aus Branding-Logo oder Default"""
+        try:
+            from src.models.branding_settings import BrandingSettings
+            branding = BrandingSettings.get_settings()
+            if branding and branding.logo_path:
+                logo_dir = os.path.dirname(branding.logo_path)
+                logo_file = os.path.basename(branding.logo_path)
+                return send_from_directory(
+                    os.path.join(app.static_folder, logo_dir),
+                    logo_file, max_age=86400
+                )
+        except Exception:
+            pass
+        return send_from_directory(app.static_folder, 'favicon.ico', max_age=86400)
+
+    @app.route('/manifest.json')
+    def manifest():
+        """PWA Web App Manifest - dynamisch aus Branding"""
+        from flask import jsonify as json_response
+        try:
+            from src.models.branding_settings import BrandingSettings
+            from src.models.company_settings import CompanySettings
+            branding = BrandingSettings.get_settings()
+            company = CompanySettings.get_settings()
+            name = company.company_name if company and company.company_name else 'StitchAdmin'
+            color = branding.primary_color if branding and branding.primary_color else '#1a6b5a'
+            icons = []
+            if branding and branding.logo_path:
+                logo_url = url_for('static', filename=branding.logo_path, _external=True)
+                icons = [
+                    {'src': logo_url, 'sizes': '192x192', 'type': 'image/png'},
+                    {'src': logo_url, 'sizes': '512x512', 'type': 'image/png'},
+                ]
+        except Exception:
+            name = 'StitchAdmin'
+            color = '#1a6b5a'
+            icons = []
+
+        manifest_data = {
+            'name': name,
+            'short_name': name[:12],
+            'start_url': '/',
+            'display': 'standalone',
+            'background_color': '#ffffff',
+            'theme_color': color,
+            'icons': icons,
+        }
+        response = json_response(manifest_data)
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+        return response
+
+    @app.route('/apple-touch-icon.png')
+    def apple_touch_icon():
+        """Apple Touch Icon aus Branding-Logo"""
+        try:
+            from src.models.branding_settings import BrandingSettings
+            branding = BrandingSettings.get_settings()
+            if branding and branding.logo_path:
+                logo_dir = os.path.dirname(branding.logo_path)
+                logo_file = os.path.basename(branding.logo_path)
+                return send_from_directory(
+                    os.path.join(app.static_folder, logo_dir),
+                    logo_file, max_age=86400
+                )
+        except Exception:
+            pass
+        return send_from_directory(app.static_folder, 'favicon.ico', max_age=86400)
 
     # ==========================================
     # HAUPT-ROUTEN
@@ -382,128 +579,12 @@ def create_app():
             return redirect(url_for('dashboard'))
         return redirect(url_for('landing.index'))
 
-    @app.route('/dashboard')
+    # Dashboard-Route: Weiterleitung zum ausgelagerten Blueprint
+    @app.route('/dashboard', endpoint='dashboard')
     @login_required
     def dashboard():
-        """Dashboard Hauptseite mit personalisierten Modulen"""
-        from src.models.models import Order, Customer, Article, Thread, db
-        from src.utils.permissions import get_user_dashboard_modules
-        from datetime import datetime, date
-        from sqlalchemy import func
-
-        # Hole Module basierend auf Berechtigungen & Layout
-        try:
-            user_modules = get_user_dashboard_modules(current_user)
-        except Exception as e:
-            print(f"[FEHLER] Dashboard Module konnten nicht geladen werden: {e}")
-            import traceback
-            traceback.print_exc()
-            user_modules = []
-
-        # Berechne Statistiken
-        stats = {
-            # Produktion
-            'open_orders': Order.query.filter(
-                Order.status.in_(['pending', 'approved', 'in_progress'])
-            ).count(),
-            'in_production': Order.query.filter_by(status='in_progress').count(),
-            'ready_pickup': Order.query.filter_by(status='ready_for_pickup').count(),
-            'today_revenue': 0,
-
-            # CRM
-            'total_customers': Customer.query.count(),
-            'open_leads': 0,
-
-            # Dokumente & Post
-            'document_count': 0,
-            'open_post': 0,
-            'unread_emails': 0,
-
-            # Buchhaltung
-            'open_invoices': 0,
-            'overdue_payments': 0,
-            'today_transactions': 0,
-
-            # Verwaltung
-            'user_count': 0,
-            'article_count': Article.query.count(),
-
-            # Lager
-            'thread_count': Thread.query.count(),
-            'low_stock': 0,
-
-            # Design
-            'design_count': 0,
-            'dst_count': 0,
-
-            # Einkauf/Bestellungen
-            'pending_supplier_orders': 0,
-            'items_to_order': 0
-        }
-
-        # Einkauf-Statistiken berechnen
-        try:
-            from src.models.models import SupplierOrder, OrderItem
-            stats['pending_supplier_orders'] = SupplierOrder.query.filter(
-                SupplierOrder.status.in_(['draft', 'ordered'])
-            ).count()
-            # Items die bestellt werden müssen (Bestand < Auftragsmenge)
-            stats['items_to_order'] = OrderItem.query.filter(
-                OrderItem.supplier_order_status.in_(['none', 'to_order'])
-            ).join(Article).filter(
-                OrderItem.quantity > Article.stock
-            ).count()
-        except Exception:
-            pass
-
-        # Tagesumsatz berechnen
-        try:
-            from src.controllers.rechnungsmodul.models import KassenBeleg
-            today = date.today()
-            today_start = datetime.combine(today, datetime.min.time())
-            today_end = datetime.combine(today, datetime.max.time())
-
-            today_sum = db.session.query(func.sum(KassenBeleg.summe_brutto)).filter(
-                KassenBeleg.datum >= today_start,
-                KassenBeleg.datum <= today_end
-            ).scalar()
-
-            stats['today_revenue'] = round(today_sum or 0, 2)
-            stats['today_transactions'] = KassenBeleg.query.filter(
-                KassenBeleg.datum >= today_start,
-                KassenBeleg.datum <= today_end
-            ).count()
-        except (ImportError, Exception):
-            pass
-
-        # Dokumente-Statistiken
-        try:
-            from src.models.document import Document, PostEntry, ArchivedEmail
-            stats['document_count'] = Document.query.filter_by(is_latest_version=True).count()
-            stats['open_post'] = PostEntry.query.filter_by(status='open').count()
-            stats['unread_emails'] = ArchivedEmail.query.filter_by(is_read=False).count()
-        except (ImportError, Exception):
-            pass
-
-        # Online-Statistiken (Website-CMS, Shop, Anfragen)
-        try:
-            from src.models.website_content import WebsiteContent
-            stats['website_content_count'] = WebsiteContent.query.count()
-        except (ImportError, Exception):
-            pass
-        try:
-            from src.models.inquiry import Inquiry
-            stats['new_inquiries'] = Inquiry.query.filter_by(status='NEU').count()
-        except (ImportError, Exception):
-            pass
-        try:
-            stats['shop_orders'] = Order.query.filter_by(source='shop').count()
-        except Exception:
-            pass
-
-        return render_template('dashboard_personalized.html',
-                             user_modules=user_modules,
-                             stats=stats)
+        from src.controllers.dashboard_controller import dashboard as _dashboard_view
+        return _dashboard_view()
 
     @app.route('/uploads/<path:filename>')
     def uploaded_file(filename):
@@ -520,7 +601,6 @@ def create_app():
             return '-'
         try:
             if isinstance(date_obj, str):
-                from datetime import datetime
                 date_obj = datetime.fromisoformat(date_obj.replace('Z', '+00:00'))
             return date_obj.strftime(format_string)
         except (AttributeError, ValueError):
@@ -533,7 +613,6 @@ def create_app():
             return '-'
         try:
             if isinstance(date_obj, str):
-                from datetime import datetime
                 date_obj = datetime.fromisoformat(date_obj.replace('Z', '+00:00'))
             return date_obj.strftime(format_string)
         except (AttributeError, ValueError):
@@ -553,9 +632,7 @@ def create_app():
         if not birth_date:
             return None
         try:
-            from datetime import date
             if isinstance(birth_date, str):
-                from datetime import datetime
                 birth_date = datetime.fromisoformat(birth_date.replace('Z', '+00:00')).date()
             today = date.today()
             age = today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
@@ -604,6 +681,43 @@ def create_app():
             # Bei Fehler: Grafikmanager NICHT anzeigen
             return False
 
+    @app.template_filter('basename')
+    def basename_filter(value):
+        """Gibt den Dateinamen aus einem Pfad zurück"""
+        if not value:
+            return ''
+        return os.path.basename(str(value))
+
+    @app.template_filter('file_url')
+    def file_url_filter(relative_path):
+        """Generiert file:// URL aus relativem DB-Pfad fuer Hyperlinks"""
+        if not relative_path:
+            return '#'
+        try:
+            from src.services.file_storage_service import FileStorageService
+            return FileStorageService().get_file_url(relative_path)
+        except Exception:
+            return '#'
+
+    @app.template_filter('file_open_url')
+    def file_open_url_filter(relative_path):
+        """Generiert /file_browser/open?path=... URL zum Oeffnen via Server"""
+        if not relative_path:
+            return '#'
+        from urllib.parse import quote
+        return f"/file_browser/open?path={quote(str(relative_path))}"
+
+    @app.template_filter('file_exists')
+    def file_exists_filter(relative_path):
+        """Prueft ob eine Datei existiert (fuer bedingte Anzeige)"""
+        if not relative_path:
+            return False
+        try:
+            from src.services.file_storage_service import FileStorageService
+            return FileStorageService().file_exists(relative_path)
+        except Exception:
+            return False
+
     # ==========================================
     # CONTEXT PROCESSORS
     # ==========================================
@@ -626,11 +740,41 @@ def create_app():
         except (ImportError, Exception):
             pass
 
+        # Tenant-Plan-Info fuer Templates (Trial-Banner, etc.)
+        tenant_plan = None
+        try:
+            from src.utils.plan_gate import get_tenant_plan_info
+            tenant_plan = get_tenant_plan_info()
+        except (ImportError, Exception):
+            pass
+
+        # Dynamische Position/Veredelungs-Choices
+        position_choices = []
+        design_type_choices = []
+        try:
+            from src.models.order_workflow import OrderDesign
+            position_choices = OrderDesign.get_position_choices_dynamic()
+            design_type_choices = OrderDesign.get_design_type_choices_dynamic()
+        except Exception:
+            pass
+
+        # Demo-Modus: Branding ueberschreiben
+        if current_user.is_authenticated and getattr(current_user, 'is_demo', False):
+            class DemoBranding:
+                company_name = 'Muster Stickerei GmbH'
+                logo_path = None
+                primary_color = '#1a6b5a'
+                secondary_color = '#6c757d'
+            branding_settings = DemoBranding()
+
         return {
             'app_name': 'StitchAdmin 2.0',
             'app_version': '2.0.2',
             'branding': branding_settings,
-            'today': date.today()
+            'today': date.today(),
+            'tenant_plan': tenant_plan,
+            'position_choices': position_choices,
+            'design_type_choices': design_type_choices,
         }
 
     # ==========================================
@@ -644,18 +788,30 @@ def create_app():
     with app.app_context():
         from src.models.models import db as _db, User
         # Tenant-Models importieren damit create_all() die Tabellen kennt
-        from src.models.tenant import Tenant, UserTenant  # noqa: F401
+        from src.models.tenant import Tenant, UserTenant, TenantPayment  # noqa: F401
         from src.models.csv_import import CSVImportJob  # noqa: F401
         from src.models.contracts import Contract, ContractContact, ContractCommunication  # noqa: F401
         from src.models.email_automation import EmailAutomationRule, EmailAutomationLog  # noqa: F401
         from src.models.banking import BankAccount, BankTransaction  # noqa: F401
         from src.models.calendar_sync import CalendarConnection, CalendarSyncMapping  # noqa: F401
         from src.models.social_media import SocialMediaAccount, SocialMediaPost  # noqa: F401
+        from src.models.order_workflow import VeredelungsArt, PositionTyp  # noqa: F401
+        from src.models.veredelung import VeredelungsVerfahren, VeredelungsPosition, VeredelungsParameter, ArtikelVeredelung  # noqa: F401
+        from src.models.production_job import ProductionJob  # noqa: F401
+        from src.models.energie import StromAblesung, StromTarif  # noqa: F401
         try:
             _db.create_all()
         except Exception as e:
             _db.session.rollback()
             print(f"[WARN] create_all() Worker-Race-Condition: {e}")
+
+        # Standard-Veredelungsarten und Positionstypen erstellen
+        try:
+            VeredelungsArt.ensure_defaults()
+            PositionTyp.ensure_defaults()
+        except Exception as e:
+            _db.session.rollback()
+            print(f"[INFO] ensure_defaults: {e}")
 
         # APScheduler fuer Hintergrund-Jobs (Social Media, E-Mail, Bank-Sync)
         try:
@@ -684,6 +840,38 @@ def create_app():
         except Exception:
             _db.session.rollback()  # Spalte existiert bereits
 
+        # Migriere Billing-Spalten fuer Tenants
+        billing_columns = [
+            ("tenants", "billing_status", "VARCHAR(30) DEFAULT 'active'"),
+            ("tenants", "billing_cycle", "VARCHAR(20) DEFAULT 'monthly'"),
+            ("tenants", "next_billing_date", "DATE"),
+            ("tenants", "last_payment_date", "DATE"),
+            ("tenants", "last_payment_amount", "NUMERIC(10,2)"),
+            ("tenants", "stripe_customer_id", "VARCHAR(100)"),
+            ("tenants", "stripe_subscription_id", "VARCHAR(100)"),
+            ("tenants", "tax_id", "VARCHAR(50)"),
+        ]
+        for table, col, col_type in billing_columns:
+            try:
+                _db.session.execute(_db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                _db.session.commit()
+            except Exception:
+                _db.session.rollback()
+
+        # Migriere Auftrags-Feature-Spalten (Rechnungsempfaenger, Sublimation etc.)
+        feature_columns = [
+            ("orders", "billing_customer_id", "VARCHAR(50)"),
+            ("order_items", "sublimation_position", "VARCHAR(50)"),
+            ("order_items", "is_non_textile", "BOOLEAN DEFAULT FALSE"),
+            ("order_items", "non_textile_type", "VARCHAR(100)"),
+        ]
+        for table, col, col_type in feature_columns:
+            try:
+                _db.session.execute(_db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                _db.session.commit()
+            except Exception:
+                _db.session.rollback()
+
         # Migriere neue Spalten fuer Shop + Anfragen
         shop_columns = [
             ("orders", "source", "VARCHAR(20)"),
@@ -705,6 +893,282 @@ def create_app():
                 _db.session.commit()
             except Exception:
                 _db.session.rollback()
+
+        # Migriere OrderDesign: Notizen + Externe Bestellung + Druckdatei
+        design_supplier_columns = [
+            ("order_designs", "notes", "TEXT"),
+            ("order_designs", "supplier_id", "VARCHAR(50)"),
+            ("order_designs", "supplier_order_status", "VARCHAR(50) DEFAULT 'none'"),
+            ("order_designs", "supplier_order_date", "DATE"),
+            ("order_designs", "supplier_expected_date", "DATE"),
+            ("order_designs", "supplier_delivered_date", "DATE"),
+            ("order_designs", "supplier_order_notes", "TEXT"),
+            ("order_designs", "supplier_cost", "FLOAT"),
+            ("order_designs", "supplier_order_id", "VARCHAR(50)"),
+            ("order_designs", "supplier_reference", "VARCHAR(100)"),
+            ("order_designs", "print_file_path", "VARCHAR(255)"),
+            ("order_designs", "print_file_name", "VARCHAR(255)"),
+        ]
+        for table, col, col_type in design_supplier_columns:
+            try:
+                _db.session.execute(_db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                _db.session.commit()
+            except Exception:
+                _db.session.rollback()
+
+        # SumUp-Felder in CompanySettings
+        sumup_columns = [
+            ("company_settings", "sumup_api_key", "VARCHAR(500)"),
+            ("company_settings", "sumup_merchant_code", "VARCHAR(100)"),
+        ]
+        for table, col, col_type in sumup_columns:
+            try:
+                _db.session.execute(_db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                _db.session.commit()
+            except Exception:
+                _db.session.rollback()
+
+        # Artikelbild-Felder + Google API Keys
+        image_columns = [
+            ("articles", "image_url", "VARCHAR(500)"),
+            ("articles", "image_path", "VARCHAR(255)"),
+            ("articles", "image_thumbnail_path", "VARCHAR(255)"),
+            ("company_settings", "google_api_key", "VARCHAR(200)"),
+            ("company_settings", "google_search_cx", "VARCHAR(100)"),
+        ]
+        for table, col, col_type in image_columns:
+            try:
+                _db.session.execute(_db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                _db.session.commit()
+            except Exception:
+                _db.session.rollback()
+
+        # Lieferantenbestellungen: Wareneingang-Felder
+        so_columns = [
+            ("supplier_orders", "delivery_note_photo", "VARCHAR(500)"),
+            ("supplier_orders", "actual_delivery_date", "DATE"),
+            ("supplier_orders", "receiving_notes", "TEXT"),
+        ]
+        for table, col, col_type in so_columns:
+            try:
+                _db.session.execute(_db.text(f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"))
+                _db.session.commit()
+            except Exception:
+                _db.session.rollback()
+
+        # Performance-Indexes fuer haeufig gefilterte Spalten
+        order_indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_order_workflow_status ON orders (workflow_status)",
+            "CREATE INDEX IF NOT EXISTS idx_order_design_approval_status ON orders (design_approval_status)",
+            "CREATE INDEX IF NOT EXISTS idx_order_payment_status ON orders (payment_status)",
+            "CREATE INDEX IF NOT EXISTS idx_order_archived_at ON orders (archived_at)",
+            "CREATE INDEX IF NOT EXISTS idx_order_active ON orders (archived_at, workflow_status)",
+            "CREATE INDEX IF NOT EXISTS idx_order_customer_created ON orders (customer_id, created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_inquiry_status ON inquiries (status)",
+            "CREATE INDEX IF NOT EXISTS idx_inquiry_created ON inquiries (created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_supplier_order_status ON supplier_orders (status)",
+            "CREATE INDEX IF NOT EXISTS idx_supplier_order_delivery ON supplier_orders (delivery_date)",
+        ]
+        for idx_sql in order_indexes:
+            try:
+                _db.session.execute(_db.text(idx_sql))
+                _db.session.commit()
+            except Exception:
+                _db.session.rollback()
+
+        # scan_foto Spalte fuer Rechnungs-Scanner
+        try:
+            _db.session.execute(_db.text("ALTER TABLE rechnungen ADD COLUMN scan_foto VARCHAR(500)"))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # DPD-Kundennummer in CompanySettings
+        try:
+            _db.session.execute(_db.text("ALTER TABLE company_settings ADD COLUMN dpd_customer_number VARCHAR(20)"))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Angebots-Verknüpfung in Inquiries
+        try:
+            _db.session.execute(_db.text("ALTER TABLE inquiries ADD COLUMN angebot_id INTEGER REFERENCES angebote(id)"))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Aufgaben: Privat/Öffentlich Sichtbarkeit
+        try:
+            _db.session.execute(_db.text("ALTER TABLE todos ADD COLUMN is_private BOOLEAN DEFAULT TRUE"))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Tracking-Token für Angebote (einheitliches Tracking)
+        try:
+            _db.session.execute(_db.text("ALTER TABLE angebote ADD COLUMN tracking_token VARCHAR(64) UNIQUE"))
+            _db.session.execute(_db.text("CREATE INDEX idx_angebote_tracking_token ON angebote(tracking_token)"))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Bestehende Angebote ohne Token mit Token versehen
+        try:
+            import uuid as _uuid
+            result = _db.session.execute(_db.text("SELECT id FROM angebote WHERE tracking_token IS NULL"))
+            for row in result.fetchall():
+                _db.session.execute(_db.text("UPDATE angebote SET tracking_token = :token WHERE id = :id"),
+                                    {'token': _uuid.uuid4().hex, 'id': row[0]})
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Kundenware-Felder
+        try:
+            _db.session.execute(_db.text("ALTER TABLE orders ADD COLUMN is_kundenware BOOLEAN DEFAULT FALSE"))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        try:
+            _db.session.execute(_db.text("ALTER TABLE angebote ADD COLUMN is_kundenware BOOLEAN DEFAULT FALSE"))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Auftragstyp fuer Angebote (wird bei Umwandlung an Auftrag uebergeben)
+        try:
+            _db.session.execute(_db.text("ALTER TABLE angebote ADD COLUMN auftragstyp VARCHAR(20) DEFAULT 'embroidery'"))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Rechtliche Texte in Firmeneinstellungen
+        try:
+            _db.session.execute(_db.text("ALTER TABLE company_settings ADD COLUMN haftungsausschluss_kundenware TEXT DEFAULT ''"))
+            _db.session.execute(_db.text("ALTER TABLE company_settings ADD COLUMN agb_text TEXT DEFAULT ''"))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Textbausteine-Tabelle fuer Angebote (wiederverwendbare Textbloecke)
+        try:
+            _db.session.execute(_db.text("""
+                CREATE TABLE IF NOT EXISTS textbausteine (
+                    id SERIAL PRIMARY KEY,
+                    titel VARCHAR(200) NOT NULL,
+                    inhalt TEXT NOT NULL,
+                    kategorie VARCHAR(50) DEFAULT 'sonstiges',
+                    sort_order INTEGER DEFAULT 0,
+                    aktiv BOOLEAN DEFAULT TRUE,
+                    ist_standard BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_by VARCHAR(80),
+                    updated_at TIMESTAMP
+                )
+            """))
+            _db.session.commit()
+            print('[OK] Textbausteine-Tabelle erstellt')
+        except Exception:
+            _db.session.rollback()
+
+        # Textbausteine-Feld im Angebot (JSON mit ausgewaehlten IDs)
+        try:
+            _db.session.execute(_db.text("ALTER TABLE angebote ADD COLUMN textbausteine_ids TEXT DEFAULT ''"))
+            _db.session.execute(_db.text("ALTER TABLE angebote ADD COLUMN textbausteine_text TEXT DEFAULT ''"))
+            _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Standard-Textbausteine anlegen
+        try:
+            from src.models.textbaustein import Textbaustein
+            Textbaustein.ensure_defaults()
+        except Exception as e:
+            _db.session.rollback()
+            print(f'[WARN] Textbausteine defaults: {e}')
+
+        # Angebots-Freigabe Felder
+        for col in [
+            "approval_token VARCHAR(100) UNIQUE",
+            "approval_status VARCHAR(50)",
+            "approval_sent_at TIMESTAMP",
+            "approval_date TIMESTAMP",
+            "approval_signature TEXT",
+            "approval_ip VARCHAR(50)",
+            "approval_user_agent VARCHAR(500)",
+            "approval_notes TEXT",
+            "approved_by_name VARCHAR(200)"
+        ]:
+            try:
+                _db.session.execute(_db.text(f"ALTER TABLE angebote ADD COLUMN {col}"))
+                _db.session.commit()
+            except Exception:
+                _db.session.rollback()
+
+        # Standard E-Mail-Templates fuer Kunden-Benachrichtigungen
+        try:
+            from src.models.crm_contact import EmailTemplate, EmailTemplateCategory
+            from src.models.email_automation import EmailAutomationRule
+
+            if EmailTemplate.query.filter_by(category=EmailTemplateCategory.AUFTRAG_BESTAETIGUNG).count() == 0:
+                _templates = [
+                    (EmailTemplateCategory.AUFTRAG_BESTAETIGUNG, 'Auftragsbestaetigung',
+                     'Ihr Auftrag {auftragsnummer} wurde angenommen',
+                     'Guten Tag {anrede} {kunde_name},\n\nvielen Dank fuer Ihren Auftrag {auftragsnummer}.\nWir haben Ihren Auftrag erhalten und werden ihn schnellstmoeglich bearbeiten.\n\nMit freundlichen Gruessen\n{firmenname}',
+                     '<p>Guten Tag {anrede} {kunde_name},</p><p>vielen Dank fuer Ihren Auftrag <strong>{auftragsnummer}</strong>.</p><p>Wir haben Ihren Auftrag erhalten und werden ihn schnellstmoeglich bearbeiten.</p><p>Mit freundlichen Gruessen<br>{firmenname}</p>',
+                     'order_status', 'accepted'),
+
+                    (EmailTemplateCategory.PRODUKTION_GEPLANT, 'Ware im Zulauf',
+                     'Material fuer Ihren Auftrag {auftragsnummer} ist bestellt',
+                     'Guten Tag {anrede} {kunde_name},\n\ndie Materialien fuer Ihren Auftrag {auftragsnummer} sind bestellt.\nSobald alles eingetroffen ist, starten wir mit der Produktion.\n\nMit freundlichen Gruessen\n{firmenname}',
+                     '<p>Guten Tag {anrede} {kunde_name},</p><p>die Materialien fuer Ihren Auftrag <strong>{auftragsnummer}</strong> sind bestellt.</p><p>Sobald alles eingetroffen ist, starten wir mit der Produktion.</p><p>Mit freundlichen Gruessen<br>{firmenname}</p>',
+                     'workflow_status', 'confirmed'),
+
+                    (EmailTemplateCategory.PRODUKTION_GEPLANT, 'Produktion gestartet',
+                     'Ihr Auftrag {auftragsnummer} ist in Produktion',
+                     'Guten Tag {anrede} {kunde_name},\n\nIhr Auftrag {auftragsnummer} befindet sich jetzt in der Produktion.\nWir informieren Sie, sobald Ihr Auftrag fertiggestellt ist.\n\nMit freundlichen Gruessen\n{firmenname}',
+                     '<p>Guten Tag {anrede} {kunde_name},</p><p>Ihr Auftrag <strong>{auftragsnummer}</strong> befindet sich jetzt in der Produktion.</p><p>Wir informieren Sie, sobald Ihr Auftrag fertiggestellt ist.</p><p>Mit freundlichen Gruessen<br>{firmenname}</p>',
+                     'order_status', 'in_progress'),
+
+                    (EmailTemplateCategory.QM_ABNAHME, 'Auftrag fertig',
+                     'Ihr Auftrag {auftragsnummer} ist fertig!',
+                     'Guten Tag {anrede} {kunde_name},\n\nIhr Auftrag {auftragsnummer} ist fertiggestellt und bereit zur Abholung bzw. zum Versand.\n\nMit freundlichen Gruessen\n{firmenname}',
+                     '<p>Guten Tag {anrede} {kunde_name},</p><p>Ihr Auftrag <strong>{auftragsnummer}</strong> ist fertiggestellt und bereit zur Abholung bzw. zum Versand.</p><p>Mit freundlichen Gruessen<br>{firmenname}</p>',
+                     'order_status', 'ready'),
+
+                    (EmailTemplateCategory.VERSAND_INFO, 'Versendet mit Tracking',
+                     'Ihr Auftrag {auftragsnummer} wurde versendet',
+                     'Guten Tag {anrede} {kunde_name},\n\nIhr Auftrag {auftragsnummer} wurde versendet.\nVersanddienstleister: {versanddienstleister}\nSendungsnummer: {sendungsnummer}\n\nMit freundlichen Gruessen\n{firmenname}',
+                     '<p>Guten Tag {anrede} {kunde_name},</p><p>Ihr Auftrag <strong>{auftragsnummer}</strong> wurde versendet.</p><table style="background:#f8f9fa;padding:15px;border-radius:8px;margin:15px 0;width:100%"><tr><td><strong>Versand:</strong></td><td>{versanddienstleister}</td></tr><tr><td><strong>Sendungsnr.:</strong></td><td>{sendungsnummer}</td></tr></table><p>Mit freundlichen Gruessen<br>{firmenname}</p>',
+                     'workflow_status', 'shipped'),
+                ]
+
+                for cat, name, subj, text, html, trigger_evt, trigger_val in _templates:
+                    tpl = EmailTemplate(
+                        name=name, category=cat, subject=subj,
+                        body_text=text, body_html=html, is_active=True,
+                        created_by='System'
+                    )
+                    _db.session.add(tpl)
+                    _db.session.flush()
+
+                    rule = EmailAutomationRule(
+                        name=f'Auto: {name}',
+                        description=f'Sendet "{name}" bei {trigger_evt}={trigger_val}',
+                        trigger_event=trigger_evt,
+                        trigger_value=trigger_val,
+                        template_id=tpl.id,
+                        is_enabled=True,
+                        created_by='System'
+                    )
+                    _db.session.add(rule)
+
+                _db.session.commit()
+                print('[OK] Standard E-Mail-Templates und Automation-Regeln erstellt')
+        except Exception as e:
+            _db.session.rollback()
+            print(f'[WARN] E-Mail-Templates Migration: {e}')
 
         # Migriere Modul-Icons von Emojis/Text auf Bootstrap Icons
         try:
@@ -818,6 +1282,26 @@ def create_app():
                     requires_admin=False,
                     default_enabled=True,
                     sort_order=14,
+                ))
+                _db.session.commit()
+        except Exception:
+            _db.session.rollback()
+
+        # Aufgaben-Board Modul anlegen
+        try:
+            from src.models.user_permissions import Module
+            if not Module.query.filter_by(name='taskboard').first():
+                _db.session.add(Module(
+                    name='taskboard',
+                    display_name='Aufgaben-Board',
+                    description='Zentrale Aufgabenverwaltung mit Kanban-Board',
+                    icon='bi-kanban',
+                    color='info',
+                    route='taskboard.index',
+                    category='core',
+                    requires_admin=False,
+                    default_enabled=True,
+                    sort_order=2,
                 ))
                 _db.session.commit()
         except Exception:

@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}Kontakt erfassen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 750px;">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('crm.dashboard') }}" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+        <div>
+            <h4 class="mb-0"><i class="bi bi-chat-left-text me-2"></i>Kontakt erfassen</h4>
+            <small class="text-muted">Anruf, E-Mail, Notiz, Termin oder Besuch dokumentieren</small>
+        </div>
+    </div>
+
+    <!-- Stepper -->
+    <div class="d-flex justify-content-center mb-4">
+        <div class="d-flex align-items-center gap-0">
+            {% for i, label in [(1, 'Typ & Kontakt'), (2, 'Details'), (3, 'Wiedervorlage')] %}
+            <div class="text-center" id="si-{{ i }}">
+                <div class="rounded-circle {{ 'bg-primary text-white' if i == 1 else 'bg-light text-muted border' }} d-flex align-items-center justify-content-center mx-auto" style="width:36px;height:36px;font-weight:bold;">{{ i }}</div>
+                <small class="d-block mt-1 {{ 'fw-bold text-primary' if i == 1 else 'text-muted' }}">{{ label }}</small>
+            </div>
+            {% if i < 3 %}<div style="width:80px;height:2px;background:#dee2e6;" class="align-self-start mt-3"></div>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('crm.schnellkontakt', typ=typ) }}" id="contactForm">
+        <input type="hidden" name="contact_type" id="contact_type_field" value="{{ typ }}">
+        <input type="hidden" name="customer_id" id="customer_id" required>
+
+        <!-- STEP 1: Typ & Kontakt -->
+        <div id="step-1">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-tag me-1"></i> Kontaktart</h6></div>
+                <div class="card-body">
+                    <div class="row g-2">
+                        {% for key, icon, label, color in [
+                            ('anruf_aus', 'bi-telephone-outbound', 'Anruf (aus)', 'success'),
+                            ('anruf_ein', 'bi-telephone-inbound', 'Anruf (ein)', 'primary'),
+                            ('email', 'bi-envelope', 'E-Mail', 'info'),
+                            ('notiz', 'bi-sticky', 'Notiz', 'warning'),
+                            ('termin', 'bi-calendar-event', 'Termin', 'secondary'),
+                            ('besuch', 'bi-geo-alt', 'Besuch', 'danger')
+                        ] %}
+                        <div class="col-4 col-md-2">
+                            <input type="radio" class="btn-check" name="contact_type_select" id="ct_{{ key }}" value="{{ key }}" autocomplete="off"
+                                   {% if typ == key or (typ in ['anruf', 'anruf_aus'] and key == 'anruf_aus') or (typ in ['email', 'email_aus'] and key == 'email') %}checked{% endif %}
+                                   onchange="document.getElementById('contact_type_field').value=this.value">
+                            <label class="btn btn-outline-{{ color }} w-100 py-2 px-1" for="ct_{{ key }}">
+                                <i class="bi {{ icon }} d-block fs-5"></i>
+                                <small style="font-size:0.7rem;">{{ label }}</small>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-person-lines-fill me-1"></i> Kontakt ausw&auml;hlen</h6></div>
+                <div class="card-body">
+                    <div class="position-relative">
+                        <input type="text" class="form-control" id="kontakt-suche-input"
+                               placeholder="Kunde oder Lieferant suchen..." autocomplete="off">
+                        <div id="kontakt-ergebnisse" class="list-group position-absolute w-100 shadow-sm"
+                             style="display:none; z-index:100; max-height:250px; overflow-y:auto;"></div>
+                    </div>
+                    <div id="kontakt-gewaehlt" class="alert alert-success mt-2 mb-0" style="display:none;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-person-check me-1"></i>
+                                <strong id="kontakt-name"></strong>
+                                <span id="kontakt-details" class="text-muted ms-2"></span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearKontakt()"><i class="bi bi-x-lg"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-primary" onclick="goStep(2)" id="btn-step2" disabled>
+                    Weiter: Details <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP 2: Details -->
+        <div id="step-2" style="display:none;">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-pencil me-1"></i> Details</h6></div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Betreff *</label>
+                        <input type="text" class="form-control" name="subject" id="inp-subject" required
+                               placeholder="z.B. R&uuml;ckfrage zu Auftrag, Preisanfrage...">
+                    </div>
+
+                    <div class="row g-3" id="type-specific-fields">
+                        <!-- Telefon-Felder -->
+                        <div class="col-md-6 phone-field" style="display:none;">
+                            <label class="form-label">Telefonnummer</label>
+                            <input type="tel" class="form-control" name="phone_number" id="phone_number" placeholder="+49...">
+                        </div>
+                        <!-- E-Mail-Felder -->
+                        <div class="col-md-6 email-field" style="display:none;">
+                            <label class="form-label">E-Mail-Adresse</label>
+                            <input type="email" class="form-control" name="email_to" id="email_to" placeholder="kunde@beispiel.de">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Auftragsbezug</label>
+                            <input type="text" class="form-control" name="order_id" placeholder="Auftragsnr. (optional)">
+                        </div>
+                    </div>
+
+                    <div class="mb-3 mt-3">
+                        <label class="form-label">Notizen / Gespr&auml;chsinhalt</label>
+                        <textarea class="form-control" name="body_text" rows="4" placeholder="Was wurde besprochen?"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" name="status">
+                                <option value="erledigt" selected>Erledigt</option>
+                                <option value="offen">Offen</option>
+                                <option value="warte_antwort">Warte auf Antwort</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(1)"><i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck</button>
+                <button type="button" class="btn btn-primary" onclick="goStep(3)">Weiter: Wiedervorlage <i class="bi bi-arrow-right ms-1"></i></button>
+            </div>
+        </div>
+
+        <!-- STEP 3: Wiedervorlage & Absenden -->
+        <div id="step-3" style="display:none;">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-bell me-1"></i> R&uuml;ckruf / Wiedervorlage</h6></div>
+                <div class="card-body">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" name="callback_required" id="callback_required"
+                               onchange="document.getElementById('callback-fields').style.display = this.checked ? 'block' : 'none';">
+                        <label class="form-check-label fw-bold" for="callback_required">
+                            <i class="bi bi-telephone-forward me-1"></i> R&uuml;ckruf erforderlich
+                        </label>
+                    </div>
+                    <div id="callback-fields" style="display:none;" class="mb-3">
+                        <label class="form-label">R&uuml;ckruf am</label>
+                        <input type="datetime-local" class="form-control" name="callback_date">
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                        <label class="form-label"><i class="bi bi-clock-history me-1"></i> Wiedervorlage am (optional)</label>
+                        <input type="datetime-local" class="form-control" name="follow_up_date">
+                        <small class="form-text text-muted">Erinnerung im CRM-Dashboard wenn f&auml;llig</small>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label">Wiedervorlage-Notiz</label>
+                        <input type="text" class="form-control" name="follow_up_note" placeholder="z.B. Angebot nachfassen, Muster senden...">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zusammenfassung -->
+            <div class="card mb-3 bg-light border-0">
+                <div class="card-body py-2">
+                    <div class="row small">
+                        <div class="col-4"><span class="text-muted">Typ:</span> <strong id="sum-type"></strong></div>
+                        <div class="col-4"><span class="text-muted">Kontakt:</span> <strong id="sum-contact"></strong></div>
+                        <div class="col-4"><span class="text-muted">Betreff:</span> <strong id="sum-subject"></strong></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(2)"><i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck</button>
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="bi bi-check-lg me-1"></i> Kontakt speichern
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+var currentStep = 1;
+function goStep(n) {
+    if (n > 1 && !document.getElementById('customer_id').value) {
+        alert('Bitte zuerst einen Kontakt ausw\u00e4hlen.'); return;
+    }
+    if (n > 2 && !document.getElementById('inp-subject').value.trim()) {
+        alert('Bitte einen Betreff eingeben.'); return;
+    }
+    for (var i = 1; i <= 3; i++) document.getElementById('step-' + i).style.display = 'none';
+    document.getElementById('step-' + n).style.display = 'block';
+    // Stepper
+    for (var i = 1; i <= 3; i++) {
+        var si = document.getElementById('si-' + i), c = si.querySelector('div'), s = si.querySelector('small');
+        if (i < n) { c.className = 'rounded-circle bg-success text-white d-flex align-items-center justify-content-center mx-auto'; c.innerHTML = '<i class="bi bi-check-lg"></i>'; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-success'; }
+        else if (i === n) { c.className = 'rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 fw-bold text-primary'; }
+        else { c.className = 'rounded-circle bg-light text-muted d-flex align-items-center justify-content-center mx-auto border'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-muted'; }
+    }
+    // Typ-spezifische Felder in Step 2
+    if (n === 2) {
+        var ct = document.getElementById('contact_type_field').value;
+        var isPhone = ct.indexOf('anruf') >= 0;
+        var isEmail = ct.indexOf('email') >= 0;
+        document.querySelectorAll('.phone-field').forEach(function(el) { el.style.display = isPhone ? 'block' : 'none'; });
+        document.querySelectorAll('.email-field').forEach(function(el) { el.style.display = isEmail ? 'block' : 'none'; });
+    }
+    // Zusammenfassung in Step 3
+    if (n === 3) {
+        var typeLabels = {'anruf_aus':'Anruf (aus)','anruf_ein':'Anruf (ein)','email':'E-Mail','notiz':'Notiz','termin':'Termin','besuch':'Besuch'};
+        document.getElementById('sum-type').textContent = typeLabels[document.getElementById('contact_type_field').value] || '?';
+        document.getElementById('sum-contact').textContent = document.getElementById('kontakt-name').textContent;
+        document.getElementById('sum-subject').textContent = document.getElementById('inp-subject').value;
+    }
+    window.scrollTo(0, 0);
+}
+
+// === Kontakt-Suche (identisch wie vorher) ===
+var searchTimer, input = document.getElementById('kontakt-suche-input'), box = document.getElementById('kontakt-ergebnisse');
+input.addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    var q = this.value.trim();
+    if (q.length < 2) { box.style.display = 'none'; return; }
+    searchTimer = setTimeout(function() {
+        fetch('/customers/api/search?q=' + encodeURIComponent(q) + '&limit=15')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var items = data.customers || [];
+                var html = '';
+                if (items.length) {
+                    html = items.map(function(c) {
+                        var name = c.display_name || c.name || ((c.first_name||'')+' '+(c.last_name||'')).trim();
+                        var badge = c.type==='supplier'?'<span class="badge bg-info ms-1">Lieferant</span>':(c.id&&c.id.startsWith('TMP')?'<span class="badge bg-secondary ms-1">Temp</span>':'');
+                        return '<a href="#" class="list-group-item list-group-item-action py-2" data-id="'+c.id+'" data-name="'+name.replace(/"/g,'&quot;')+'" data-phone="'+(c.phone||c.mobile||'')+'" data-email="'+(c.email||'')+'">'+'<strong>'+name+'</strong>'+badge+(c.company_name?' <small class="text-muted">('+c.company_name+')</small>':'')+(c.phone?'<br><small class="text-muted"><i class="bi bi-telephone"></i> '+c.phone+'</small>':'')+(c.email?' <small class="text-muted"><i class="bi bi-envelope"></i> '+c.email+'</small>':'')+'</a>';
+                    }).join('');
+                } else {
+                    html = '<div class="list-group-item text-muted small py-2">Kein Ergebnis</div>';
+                }
+                html += '<a href="#" class="list-group-item list-group-item-action py-2 bg-light border-top" id="btn-neuer-kontakt" data-search="'+q.replace(/"/g,'&quot;')+'"><i class="bi bi-person-plus text-success me-1"></i><strong class="text-success">Neuen Kontakt anlegen</strong></a>';
+                box.innerHTML = html; box.style.display = 'block';
+                box.querySelectorAll('a:not(#btn-neuer-kontakt)').forEach(function(a) {
+                    a.addEventListener('click', function(e) { e.preventDefault(); if(this.dataset.id) selectKontakt(this.dataset.id,this.dataset.name,this.dataset.phone,this.dataset.email); });
+                });
+                var btnNeu = document.getElementById('btn-neuer-kontakt');
+                if(btnNeu) btnNeu.addEventListener('click', function(e) { e.preventDefault(); showNeuKontaktDialog(this.dataset.search); });
+            }).catch(function() { box.style.display='none'; });
+    }, 300);
+});
+
+function selectKontakt(id, name, phone, email) {
+    document.getElementById('customer_id').value = id;
+    document.getElementById('kontakt-name').textContent = name;
+    var d = []; if(phone)d.push(phone); if(email)d.push(email);
+    document.getElementById('kontakt-details').textContent = d.join(' \u00b7 ');
+    document.getElementById('kontakt-gewaehlt').style.display = 'block';
+    document.getElementById('kontakt-suche-input').style.display = 'none';
+    box.style.display = 'none';
+    document.getElementById('btn-step2').disabled = false;
+    var p = document.getElementById('phone_number'); if(p&&phone) p.value=phone;
+    var e = document.getElementById('email_to'); if(e&&email) e.value=email;
+}
+function clearKontakt() {
+    document.getElementById('customer_id').value = '';
+    document.getElementById('kontakt-gewaehlt').style.display = 'none';
+    document.getElementById('kontakt-suche-input').style.display = 'block';
+    document.getElementById('kontakt-suche-input').value = '';
+    document.getElementById('btn-step2').disabled = true;
+    document.getElementById('kontakt-suche-input').focus();
+}
+
+function showNeuKontaktDialog(prefillName) {
+    box.style.display = 'none';
+    var ov = document.createElement('div'); ov.id='neu-kontakt-overlay';
+    ov.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    ov.innerHTML='<div class="card shadow-lg" style="width:400px;max-width:90vw;"><div class="card-header d-flex justify-content-between"><h6 class="mb-0"><i class="bi bi-person-plus me-1"></i> Neuen Kontakt</h6><button type="button" class="btn-close" onclick="closeNeuKontakt()"></button></div><div class="card-body"><div class="mb-3"><label class="form-label">Name *</label><input type="text" class="form-control" id="nk-name" value="'+prefillName.replace(/"/g,'&quot;')+'"></div><div class="mb-3"><label class="form-label">Telefon</label><input type="tel" class="form-control" id="nk-phone"></div><div class="mb-3"><label class="form-label">E-Mail</label><input type="email" class="form-control" id="nk-email"></div><div class="d-flex gap-2 mb-3"><button type="button" class="btn btn-outline-secondary flex-fill nk-type-btn active" data-type="temporary" onclick="selectNkType(this)"><i class="bi bi-clock-history"></i> Temp</button><button type="button" class="btn btn-outline-primary flex-fill nk-type-btn" data-type="customer" onclick="selectNkType(this)"><i class="bi bi-person"></i> Kunde</button><button type="button" class="btn btn-outline-info flex-fill nk-type-btn" data-type="supplier" onclick="selectNkType(this)"><i class="bi bi-building"></i> Lieferant</button></div><div id="nk-error" class="alert alert-danger d-none mb-3"></div><button type="button" class="btn btn-success w-100" onclick="createNeuKontakt()"><i class="bi bi-check-lg me-1"></i> Anlegen</button></div></div>';
+    document.body.appendChild(ov); document.getElementById('nk-name').focus();
+}
+var selectedNkType='temporary';
+function selectNkType(b){document.querySelectorAll('.nk-type-btn').forEach(function(x){x.classList.remove('active')});b.classList.add('active');selectedNkType=b.dataset.type;}
+function closeNeuKontakt(){var o=document.getElementById('neu-kontakt-overlay');if(o)o.remove();}
+function createNeuKontakt(){
+    var name=document.getElementById('nk-name').value.trim(),phone=document.getElementById('nk-phone').value.trim(),email=document.getElementById('nk-email').value.trim(),err=document.getElementById('nk-error');
+    if(!name){err.textContent='Name erforderlich';err.classList.remove('d-none');return;}
+    fetch('/customers/api/quick-create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,phone:phone,email:email,contact_type:selectedNkType})})
+    .then(function(r){return r.json()}).then(function(d){if(d.success){closeNeuKontakt();selectKontakt(d.customer.id,d.customer.display_name,d.customer.phone,d.customer.email);}else{err.textContent=d.error||'Fehler';err.classList.remove('d-none');}})
+    .catch(function(e){err.textContent='Netzwerkfehler';err.classList.remove('d-none');});
+}
+document.addEventListener('click',function(e){if(!e.target.closest('#kontakt-suche-input')&&!e.target.closest('#kontakt-ergebnisse'))box.style.display='none';});
+</script>
+{% endblock %}

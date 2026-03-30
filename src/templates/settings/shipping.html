@@ -61,10 +61,23 @@
 
                         <hr>
 
-                        <h5>Versanddienstleister</h5>
+                        <h5>DPD Business</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="dpd_customer_number" class="form-label">DPD Kundennummer</label>
+                                    <input type="text" class="form-control" id="dpd_customer_number"
+                                           name="dpd_customer_number" value="{{ settings.dpd_customer_number or '' }}"
+                                           placeholder="z.B. 0123456">
+                                    <small class="form-text text-muted">7-stellige DPD Kundennummer für CSV-Export</small>
+                                </div>
+                            </div>
+                        </div>
                         <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i> 
-                            Die Integration von Versanddienstleistern wird in einem zukünftigen Update implementiert.
+                            <i class="bi bi-info-circle"></i>
+                            Der DPD-Export erzeugt CSV-Dateien im myDPD Business-Format.
+                            Exportiere unter <strong>Versand → DPD Export</strong> und lade die Datei im
+                            <a href="https://business.dpd.de" target="_blank">myDPD Business Portal</a> hoch.
                         </div>
 
                         <hr>

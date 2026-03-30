@@ -1,137 +1,1438 @@
 {% extends "base.html" %}
 
-{% block title %}Neues Angebot - StitchAdmin{% endblock %}
+{% block title %}{{ 'Angebot bearbeiten' if edit_mode else 'Neues Angebot' }} - StitchAdmin{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row">
     <div class="col-md-12">
-        <h1><i class="bi bi-plus-circle"></i> Neues Angebot</h1>
+        <h1><i class="bi bi-{{ 'pencil' if edit_mode else 'plus-circle' }}"></i> {{ 'Angebot ' ~ angebot.angebotsnummer ~ ' bearbeiten' if edit_mode else 'Neues Angebot' }}</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('angebote.index') }}">Angebote</a></li>
+                {% if edit_mode %}
+                <li class="breadcrumb-item"><a href="{{ url_for('angebote.show', angebot_id=angebot.id) }}">{{ angebot.angebotsnummer }}</a></li>
+                <li class="breadcrumb-item active">Bearbeiten</li>
+                {% else %}
+                <li class="breadcrumb-item active">Neues Angebot</li>
+                {% endif %}
+            </ol>
+        </nav>
     </div>
 </div>
 
 <div class="row">
-    <div class="col-md-8">
+    <div class="col-md-12">
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0">Angebots-Details</h5>
+                <h5><i class="bi bi-file-earmark-text"></i> {{ angebot.angebotsnummer if edit_mode else 'Neues Angebot' }}</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('angebote.neu') }}">
-                    {% if auftrag %}
-                    <!-- Aus Auftrag erstellen -->
+                <form method="POST" action="{{ url_for('angebote.bearbeiten', angebot_id=angebot.id) if edit_mode else url_for('angebote.neu') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                    {% if anfrage %}
+                    <input type="hidden" name="anfrage_id" value="{{ anfrage.id }}">
+                    <div class="alert alert-primary">
+                        <i class="bi bi-envelope-paper me-1"></i>
+                        Angebot wird aus <strong>Anfrage {{ anfrage.inquiry_number }}</strong> erstellt.
+                    </div>
+                    {% elif auftrag %}
                     <input type="hidden" name="auftrag_id" value="{{ auftrag.id }}">
-
                     <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i>
+                        <i class="bi bi-info-circle me-1"></i>
                         Angebot wird aus <strong>Auftrag {{ auftrag.id }}</strong> erstellt.
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Kunde</label>
-                            <input type="text" class="form-control" value="{{ auftrag.customer.display_name }}" readonly>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Gültig für (Tage)</label>
-                            <input type="number" name="gueltig_tage" class="form-control" value="30" min="1" required>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Beschreibung</label>
-                        <textarea class="form-control" rows="3" readonly>{{ auftrag.description }}</textarea>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Gesamtpreis (aus Auftrag)</label>
-                        <input type="text" class="form-control" value="{{ '{:,.2f}'.format(auftrag.total_price or 0) }} €" readonly>
-                    </div>
-
-                    {% else %}
-                    <!-- Neues Angebot ohne Auftrag -->
-                    <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <strong>Hinweis:</strong> Es wird empfohlen, Angebote aus Aufträgen zu erstellen, da dort die Kalkulation bereits erfolgt ist.
-                        <a href="{{ url_for('orders.create_order') }}" class="alert-link">Jetzt Auftrag erstellen →</a>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-12">
-                            <label class="form-label">Kunde *</label>
-                            <select name="kunde_id" class="form-select" required>
-                                <option value="">Bitte wählen...</option>
-                                {% for kunde in kunden %}
-                                <option value="{{ kunde.id }}">{{ kunde.display_name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Titel</label>
-                        <input type="text" name="titel" class="form-control" placeholder="z.B. 500 Poloshirts mit Logostickerei">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Beschreibung</label>
-                        <textarea name="beschreibung" class="form-control" rows="4" placeholder="Detaillierte Beschreibung des Angebots..."></textarea>
-                    </div>
-
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Gültig für (Tage)</label>
-                            <input type="number" name="gueltig_tage" class="form-control" value="30" min="1" required>
-                        </div>
-                    </div>
-
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i>
-                        <strong>Hinweis:</strong> Positionen können nach der Erstellung des Angebots hinzugefügt werden.
                     </div>
                     {% endif %}
 
-                    <div class="row mt-4">
-                        <div class="col-md-12">
-                            <a href="{{ url_for('angebote.index') }}" class="btn btn-secondary">
-                                <i class="bi bi-x-circle"></i> Abbrechen
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-check-circle"></i> Angebot erstellen
-                            </button>
+                    <!-- Kunde und Auftragstyp -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label" for="kunde_id">Kunde *</label>
+                                {% if anfrage %}
+                                    <input type="text" class="form-control" value="{{ anfrage.full_name }}{% if anfrage.company_name %} ({{ anfrage.company_name }}){% endif %}" readonly>
+                                {% elif auftrag %}
+                                    <input type="text" class="form-control" value="{{ auftrag.customer.display_name }}" readonly>
+                                {% else %}
+                                    <input type="text" class="form-control mb-1" id="kunde_search"
+                                           placeholder="Kunde suchen..." autocomplete="off"
+                                           oninput="filterKunden()">
+                                    <select name="kunde_id" id="kunde_id" class="form-select" required size="1">
+                                        <option value="">Kunde wählen...</option>
+                                        {% for kunde in kunden %}
+                                        <option value="{{ kunde.id }}" {{ 'selected' if vorselektierter_kunde == kunde.id }}
+                                                data-search="{% if kunde.company_name %}{{ kunde.company_name }} {% endif %}{{ kunde.first_name or '' }} {{ kunde.last_name or '' }} {{ kunde.email or '' }}">
+                                            {% if kunde.company_name %}
+                                                {{ kunde.company_name }}
+                                                {% if kunde.first_name %} ({{ kunde.first_name }} {{ kunde.last_name }}){% endif %}
+                                            {% else %}
+                                                {{ kunde.display_name }}
+                                            {% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                    <div class="form-text">
+                                        <i class="bi bi-info-circle"></i>
+                                        Kein Kunde in der Liste?
+                                        <a href="{{ url_for('customers.new') }}" target="_blank">Neuen Kunden anlegen</a>
+                                    </div>
+                                {% endif %}
+                            </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label" for="auftragstyp">Auftragstyp *</label>
+                                {% set at = anfrage.inquiry_type if anfrage else '' %}
+                                <select class="form-select" id="auftragstyp" name="auftragstyp" required onchange="toggleAngebotFields()">
+                                    <option value="embroidery" {{ 'selected' if at == 'embroidery' }}>Bestickung</option>
+                                    <option value="printing" {{ 'selected' if at == 'printing' }}>Textildruck</option>
+                                    <option value="dtf" {{ 'selected' if at == 'dtf' }}>DTF (Direct to Film)</option>
+                                    <option value="sublimation" {{ 'selected' if at == 'sublimation' }}>Sublimation</option>
+                                    <option value="combined" {{ 'selected' if at == 'combined' }}>Bestickung + Druck</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kundenware Toggle -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="is_kundenware" name="is_kundenware"
+                                   onchange="toggleKundenware()">
+                            <label class="form-check-label" for="is_kundenware">
+                                <i class="bi bi-box-seam me-1"></i><strong>Kundenware</strong> — Kunde stellt Textilien selbst bereit
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Artikel-Details (nur wenn KEINE Kundenware) -->
+                    <div class="card mb-4" id="textil-card">
+                        <div class="card-header">
+                            <h6><i class="bi bi-shirt"></i> Artikel-Details</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="textile-items">
+                                {% set pos = None %}
+                                <div class="textile-item border rounded p-3 mb-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="mb-0">Artikel #1</h6>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3 position-relative">
+                                                <label class="form-label">Artikel suchen</label>
+                                                <div class="input-group">
+                                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                                    <input type="text" class="form-control article-search-input"
+                                                           placeholder="Mind. 2 Zeichen tippen..." autocomplete="off"
+                                                           value="{{ pos.artikel_name if pos else '' }}">
+                                                </div>
+                                                <input type="hidden" class="article-id-input" name="article_id[]"
+                                                       value="{{ pos.artikel_id or '' if pos else '' }}">
+                                                <div class="article-search-results list-group shadow"
+                                                     style="display:none;position:absolute;top:100%;left:0;right:0;z-index:1050;max-height:250px;overflow-y:auto;"></div>
+                                                <div class="article-inline-filters mt-1" style="display:none;">
+                                                    <div class="row g-1">
+                                                        <div class="col-4">
+                                                            <select class="form-select form-select-sm article-filter" data-filter="brand">
+                                                                <option value="">Marke</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <select class="form-select form-select-sm article-filter" data-filter="category">
+                                                                <option value="">Kategorie</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-4">
+                                                            <select class="form-select form-select-sm article-filter" data-filter="supplier">
+                                                                <option value="">Lieferant</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <a href="#" class="small text-muted article-filter-toggle" onclick="toggleInlineFilters(this);return false;">
+                                                    <i class="bi bi-funnel"></i> Filter
+                                                </a>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                <label class="form-label">Menge *</label>
+                                                <input type="number" class="form-control quantity-input" name="quantity[]"
+                                                       min="1" value="{{ pos.menge|int if pos and pos.menge else (anfrage.quantity if anfrage else 1) }}" required onchange="calculateAngebotPrice()">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <div class="mb-3">
+                                                <label class="form-label">Einzelpreis</label>
+                                                <div class="input-group">
+                                                    <input type="number" class="form-control price-input" name="article_price[]"
+                                                           step="0.01" min="0" placeholder="0.00" onchange="calculateAngebotPrice()"
+                                                           value="{{ '%.2f'|format(pos.einzelpreis) if pos and pos.einzelpreis else '' }}">
+                                                    <span class="input-group-text">&euro;</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="mb-3">
+                                                <label class="form-label">Rabatt</label>
+                                                <div class="input-group">
+                                                    <input type="number" class="form-control rabatt-input" name="rabatt_wert[]"
+                                                           step="0.01" min="0" value="{{ pos.rabatt_prozent|default(0) if pos else 0 }}" onchange="calculateAngebotPrice()">
+                                                    <button class="btn btn-outline-secondary rabatt-toggle" type="button"
+                                                            onclick="toggleRabattTyp(this)" title="Zwischen % und &euro; umschalten">%</button>
+                                                    <input type="hidden" class="rabatt-typ" name="rabatt_typ[]" value="prozent">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">Artikelart</label>
+                                                <input type="text" class="form-control" name="textilart[]"
+                                                       placeholder="z.B. Poloshirt, T-Shirt..."
+                                                       value="{{ anfrage.textile_type if anfrage else '' }}">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">Größe</label>
+                                                <select class="form-select" name="size[]">
+                                                    <option value="">Wählen...</option>
+                                                    <option value="XS">XS</option>
+                                                    <option value="S">S</option>
+                                                    <option value="M">M</option>
+                                                    <option value="L">L</option>
+                                                    <option value="XL">XL</option>
+                                                    <option value="XXL">XXL</option>
+                                                    <option value="mixed">Gemischt</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">Farbe</label>
+                                                <input type="text" class="form-control" name="color[]"
+                                                       placeholder="z.B. Schwarz, Navy...">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-center d-flex justify-content-center gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="addTextileItem()">
+                                    <i class="bi bi-plus-lg"></i> Artikel hinzuf&uuml;gen
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="addFreetextItem()">
+                                    <i class="bi bi-fonts"></i> Freitext-Position
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kundenware-Info (nur wenn Kundenware) -->
+                    <div class="card mb-4" id="kundenware-card" style="display: none;">
+                        <div class="card-header bg-warning bg-opacity-25">
+                            <h6><i class="bi bi-box-seam"></i> Kundenware</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-warning mb-3">
+                                <i class="bi bi-exclamation-triangle me-1"></i>
+                                Kunde stellt Textilien selbst bereit. Haftungsausschluss wird dem Angebot beigefügt.
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Menge (Stück) *</label>
+                                        <input type="number" class="form-control" name="kundenware_menge"
+                                               min="1" placeholder="z.B. 100" value="{{ anfrage.quantity or '' }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Artikelart</label>
+                                        <input type="text" class="form-control" name="kundenware_textilart"
+                                               placeholder="z.B. Poloshirt, T-Shirt..."
+                                               value="{{ anfrage.textile_type if anfrage else '' }}">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Farbe/Details</label>
+                                        <input type="text" class="form-control" name="kundenware_farbe"
+                                               placeholder="z.B. Schwarz, Navy...">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Design-Details -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="bi bi-palette"></i> Design-Details</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label" for="titel">Projekt-Titel *</label>
+                                <input type="text" class="form-control" id="titel" name="titel" required
+                                       placeholder="z.B. 500 Poloshirts mit Logostickerei"
+                                       value="{{ anfrage.description[:100] if anfrage and anfrage.description else (auftrag.description[:100] if auftrag and auftrag.description else '') }}">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="beschreibung">Design-Beschreibung *</label>
+                                <textarea class="form-control" id="beschreibung" name="beschreibung" rows="3" required
+                                          placeholder="Beschreiben Sie das gewünschte Design (Logo, Text, Motiv)...">{% if anfrage %}{{ anfrage.description }}{% elif auftrag %}{{ auftrag.description }}{% endif %}</textarea>
+                            </div>
+
+                            <!-- Design-Workflow -->
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h6 class="mb-0"><i class="bi bi-palette"></i> Design-Status</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <select class="form-select" id="design_status" name="design_status" onchange="toggleDesignStatus()">
+                                            <option value="">Wählen Sie... (optional)</option>
+                                            <option value="logo_available">Logo/Design vorhanden</option>
+                                            <option value="logo_needs_creation">Design muss erstellt werden</option>
+                                            <option value="logo_needs_adaptation">Design muss angepasst werden</option>
+                                        </select>
+                                    </div>
+
+                                    <div id="design-available" style="display: none;">
+                                        <div class="alert alert-success">
+                                            <i class="bi bi-check-circle"></i> Logo/Design ist vorhanden und wird vom Kunden bereitgestellt.
+                                        </div>
+                                    </div>
+
+                                    <div id="design-creation" style="display: none;">
+                                        <div class="alert alert-warning">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                            Design muss erst erstellt werden. Kosten für Design-Erstellung im Angebot berücksichtigen!
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Design-Anforderungen</label>
+                                                    <textarea class="form-control" name="design_anforderungen" rows="2"
+                                                              placeholder="Farben, Stil, Größe, etc."></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Design-Kosten</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control design-kosten-input" name="design_kosten"
+                                                               step="0.01" min="0" placeholder="0.00" onchange="calculateAngebotPrice()">
+                                                        <span class="input-group-text">&euro;</span>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label small">Rabatt auf Design</label>
+                                                    <div class="input-group input-group-sm">
+                                                        <input type="number" class="form-control design-rabatt-input" name="design_rabatt_wert"
+                                                               step="0.01" min="0" value="0" onchange="calculateAngebotPrice()">
+                                                        <button class="btn btn-outline-secondary design-rabatt-toggle" type="button"
+                                                                onclick="toggleDesignRabattTyp(this)">%</button>
+                                                        <input type="hidden" class="design-rabatt-typ" name="design_rabatt_typ" value="prozent">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div id="design-adaptation" style="display: none;">
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i>
+                                            Bestehendes Design muss angepasst werden (Gr&ouml;&szlig;e, Format, Farben).
+                                        </div>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Anpassungsdetails</label>
+                                                    <textarea class="form-control" name="design_anpassung" rows="2"
+                                                              placeholder="Welche Anpassungen sind n&ouml;tig?"></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Anpassungskosten</label>
+                                                    <div class="input-group">
+                                                        <input type="number" class="form-control design-kosten-input" name="design_anpassung_kosten"
+                                                               step="0.01" min="0" placeholder="0.00" onchange="calculateAngebotPrice()">
+                                                        <span class="input-group-text">&euro;</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Veredelungs-Positionen (dynamisch) -->
+                            <div id="veredelung-section">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0 text-success"><i class="bi bi-brush"></i> Veredelungs-Positionen</h6>
+                                    <button type="button" class="btn btn-outline-success btn-sm" onclick="addVeredelungsPosition()">
+                                        <i class="bi bi-plus-lg"></i> Position hinzufuegen
+                                    </button>
+                                </div>
+                                <div id="veredelung-positionen">
+                                    <!-- Wird dynamisch befuellt -->
+                                </div>
+                                <div id="veredelung-empty" class="text-center text-muted py-3 border rounded bg-light">
+                                    <i class="bi bi-brush" style="font-size:1.5rem;"></i>
+                                    <p class="mb-1 small">Noch keine Veredelung hinzugefuegt.</p>
+                                    <button type="button" class="btn btn-success btn-sm" onclick="addVeredelungsPosition()">
+                                        <i class="bi bi-plus"></i> Erste Position hinzufuegen
+                                    </button>
+                                </div>
+                                <!-- Veredelungs-Gesamt -->
+                                <div id="veredelung-total" class="alert alert-success mt-2" style="display:none;">
+                                    <div class="d-flex justify-content-between">
+                                        <span><strong>Veredelung gesamt:</strong></span>
+                                        <span id="veredelung-total-betrag" class="fw-bold">0,00 EUR</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Textbausteine / Konditionen -->
+                    {% if textbausteine %}
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0"><i class="bi bi-card-text"></i> Textbausteine / Konditionen</h6>
+                            <a href="{{ url_for('settings.textbausteine') }}" class="btn btn-outline-secondary btn-sm" target="_blank" title="Textbausteine verwalten">
+                                <i class="bi bi-gear"></i>
+                            </a>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                Wählen Sie die Textbausteine, die dem Angebot beigefügt werden sollen.
+                            </p>
+                            {% set current_kat = namespace(val='') %}
+                            {% for tb in textbausteine %}
+                                {% if tb.kategorie != current_kat.val %}
+                                    {% if current_kat.val != '' %}</div>{% endif %}
+                                    {% set current_kat.val = tb.kategorie %}
+                                    <div class="mb-3">
+                                    <label class="form-label fw-bold text-muted small text-uppercase">
+                                        {{ textbaustein_kategorien.get(tb.kategorie, tb.kategorie) }}
+                                    </label>
+                                {% endif %}
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="textbausteine"
+                                           value="{{ tb.id }}" id="tb_{{ tb.id }}"
+                                           {{ 'checked' if tb.id|string in default_textbaustein_ids }}>
+                                    <label class="form-check-label" for="tb_{{ tb.id }}">
+                                        <strong>{{ tb.titel }}</strong>
+                                        <br><small class="text-muted">{{ tb.inhalt[:120] }}{% if tb.inhalt|length > 120 %}...{% endif %}</small>
+                                    </label>
+                                </div>
+                            {% endfor %}
+                            {% if current_kat.val != '' %}</div>{% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Kalkulation & Angebots-Details -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h6><i class="bi bi-calculator"></i> Kalkulation & Konditionen</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label class="form-label"><strong>Voraussichtlicher Gesamtpreis *</strong></label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="preis_schaetzung" name="preis_schaetzung"
+                                                   step="0.01" min="0" required placeholder="0.00"
+                                                   value="">
+                                            <span class="input-group-text">€</span>
+                                        </div>
+                                        <div id="price-breakdown" class="form-text mt-1"></div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label class="form-label">Gültig für (Tage)</label>
+                                        <input type="number" class="form-control" name="gueltig_tage"
+                                               value="30" min="1" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label class="form-label">Lieferzeit</label>
+                                        <input type="text" class="form-control" name="lieferzeit"
+                                               placeholder="z.B. 2-3 Wochen">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label class="form-label">Versandkosten (netto)</label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" name="versandkosten"
+                                                   step="0.01" min="0" value="0" placeholder="0,00">
+                                            <span class="input-group-text">€</span>
+                                        </div>
+                                        <small class="text-muted">0 = keine / wird separat berechnet</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label class="form-label">Wunschtermin</label>
+                                        <input type="date" class="form-control" name="wunschtermin"
+                                               value="{{ anfrage.desired_date.strftime('%Y-%m-%d') if anfrage and anfrage.desired_date else '' }}">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Besondere Anweisungen</label>
+                                <textarea class="form-control" name="besondere_anweisungen" rows="2"
+                                          placeholder="Spezielle Wünsche, Qualitätsanforderungen, Verpackung..."></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Interne Notizen</label>
+                                <textarea class="form-control" name="bemerkungen" rows="2"
+                                          placeholder="Interne Notizen (nicht für Kunden sichtbar)..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('angebote.index') }}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Zurück
+                        </a>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check-lg"></i> Angebot erstellen
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Workflow-Hinweis</h5>
-            </div>
-            <div class="card-body">
-                <h6>Empfohlener Ablauf:</h6>
-                <ol class="small">
-                    <li>Auftrag mit Kalkulation erstellen</li>
-                    <li>Aus Auftrag ein Angebot generieren</li>
-                    <li>Angebot versenden & Tracking aktivieren</li>
-                    <li>Follow-ups durchführen</li>
-                    <li>Bei Annahme: In Produktionsauftrag umwandeln</li>
-                </ol>
-
-                <hr>
-
-                <h6>Angebots-Status:</h6>
-                <ul class="small list-unstyled">
-                    <li><span class="badge bg-secondary">Entwurf</span> - In Bearbeitung</li>
-                    <li><span class="badge bg-info">Verschickt</span> - Beim Kunden</li>
-                    <li><span class="badge bg-success">Angenommen</span> - Auftrag folgt</li>
-                    <li><span class="badge bg-danger">Abgelehnt</span> - Verlustanalyse</li>
-                </ul>
-            </div>
-        </div>
-    </div>
 </div>
 
+<script>
+// Veredelungs-Daten (von API geladen)
+let _veredelungsVerfahren = [];
+let _vPosCounter = 0;
+
+function toggleAngebotFields() {
+    // Auftragstyp-Wechsel: Verfahren vorschlagen
+}
+
+// Veredelungsverfahren laden
+function loadVeredelungsVerfahren() {
+    fetch('/veredelung/api/alle', {credentials: 'same-origin'})
+        .then(r => r.json())
+        .then(data => { _veredelungsVerfahren = data; })
+        .catch(err => console.error('Veredelung laden fehlgeschlagen:', err));
+}
+loadVeredelungsVerfahren();
+
+function addVeredelungsPosition(initial) {
+    _vPosCounter++;
+    const idx = _vPosCounter;
+    const container = document.getElementById('veredelung-positionen');
+    document.getElementById('veredelung-empty').style.display = 'none';
+
+    const card = document.createElement('div');
+    card.className = 'card border-success mb-2 v-pos-card';
+    card.id = 'v-pos-' + idx;
+    card.innerHTML = `
+        <div class="card-header bg-success bg-opacity-10 py-2 d-flex justify-content-between align-items-center">
+            <span class="fw-semibold small"><i class="bi bi-brush me-1"></i>Veredelung #${idx}</span>
+            <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1" onclick="removeVeredelungsPosition(${idx})">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="card-body py-2">
+            <div class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label small">Verfahren</label>
+                    <select class="form-select form-select-sm v-verfahren" data-idx="${idx}" onchange="onVerfahrenChange(${idx})">
+                        <option value="">Waehlen...</option>
+                        ${_veredelungsVerfahren.map(v => '<option value="'+v.id+'" data-code="'+v.code+'">'+v.name+'</option>').join('')}
+                    </select>
+                    <input type="hidden" name="v_verfahren_id[]" class="v-verfahren-id" value="">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small">Position</label>
+                    <select class="form-select form-select-sm v-position" data-idx="${idx}" onchange="onPositionChange(${idx})">
+                        <option value="">Zuerst Verfahren waehlen</option>
+                    </select>
+                    <input type="hidden" name="v_design_position[]" class="v-design-pos" value="">
+                    <input type="hidden" name="v_design_label[]" class="v-design-label" value="">
+                </div>
+                <div class="col-md-2 v-stich-group">
+                    <label class="form-label small">Stichzahl</label>
+                    <input type="number" class="form-control form-control-sm v-stichzahl" data-idx="${idx}"
+                           min="0" step="100" placeholder="z.B. 8000" onchange="kalkulierePosition(${idx})">
+                    <input type="hidden" name="v_stichzahl[]" class="v-stichzahl-hidden" value="">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Breite (mm)</label>
+                    <input type="number" class="form-control form-control-sm v-breite" data-idx="${idx}"
+                           min="0" step="1" placeholder="100" onchange="kalkulierePosition(${idx})">
+                    <input type="hidden" name="v_breite_mm[]" class="v-breite-hidden" value="">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Hoehe (mm)</label>
+                    <input type="number" class="form-control form-control-sm v-hoehe" data-idx="${idx}"
+                           min="0" step="1" placeholder="80" onchange="kalkulierePosition(${idx})">
+                    <input type="hidden" name="v_hoehe_mm[]" class="v-hoehe-hidden" value="">
+                </div>
+            </div>
+            <div class="row g-2 mt-1">
+                <div class="col-md-4">
+                    <label class="form-label small">Design-Datei</label>
+                    <input type="file" class="form-control form-control-sm v-file" data-idx="${idx}"
+                           accept=".png,.jpg,.jpeg,.gif,.pdf,.ai,.eps,.svg,.dst,.emb" onchange="uploadDesignFile(${idx})">
+                    <input type="hidden" name="v_file_path[]" class="v-file-path" value="${initial && initial.file_path || ''}">
+                    <input type="hidden" name="v_thumb_path[]" class="v-thumb-path" value="${initial && initial.thumbnail_path || ''}">
+                    <div class="v-file-preview mt-1"></div>
+                </div>
+                <div class="col-md-8">
+                    <div class="row g-2">
+                        <div class="col-4">
+                            <label class="form-label small">Einrichtung</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" step="0.01" class="form-control v-einrichtung" data-idx="${idx}"
+                                       value="0" onchange="updateVeredelungTotal()">
+                                <span class="input-group-text">EUR</span>
+                            </div>
+                            <input type="hidden" name="v_einrichtung[]" class="v-einrichtung-hidden" value="0">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small">Stueckpreis</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" step="0.01" class="form-control v-stueckpreis" data-idx="${idx}"
+                                       value="0" onchange="updateVeredelungTotal()">
+                                <span class="input-group-text">EUR</span>
+                            </div>
+                            <input type="hidden" name="v_stueckpreis[]" class="v-stueckpreis-hidden" value="0">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label small">Gesamt</label>
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control fw-bold v-gesamt" readonly value="0,00">
+                                <span class="input-group-text">EUR</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <label class="form-label small">Rabatt auf Veredelung</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" step="0.01" min="0" class="form-control v-rabatt" value="0"
+                                       onchange="updateVeredelungTotal()">
+                                <button class="btn btn-outline-secondary v-rabatt-toggle" type="button"
+                                        onclick="toggleVRabattTyp(this)">%</button>
+                                <input type="hidden" class="v-rabatt-typ" name="v_rabatt_typ[]" value="prozent">
+                                <input type="hidden" name="v_rabatt_wert[]" class="v-rabatt-hidden" value="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="v-kalk-details small text-muted mt-1"></div>
+                </div>
+            </div>
+            <input type="hidden" name="v_fadenfarben[]" class="v-fadenfarben" value="[]">
+        </div>
+    `;
+    container.appendChild(card);
+
+    // Wenn initial data vorhanden (z.B. von Anfrage)
+    if (initial) {
+        if (initial.verfahren_id) {
+            card.querySelector('.v-verfahren').value = initial.verfahren_id;
+            onVerfahrenChange(idx);
+        }
+        if (initial.file_path) {
+            const preview = card.querySelector('.v-file-preview');
+            const ext = initial.file_path.split('.').pop().toLowerCase();
+            if (['png','jpg','jpeg','gif'].includes(ext)) {
+                preview.innerHTML = `<img src="/static/${initial.file_path}" style="max-height:60px;border-radius:4px;">`;
+            } else {
+                preview.innerHTML = `<span class="badge bg-secondary">${initial.filename || 'Datei vorhanden'}</span>`;
+            }
+        }
+    }
+}
+
+function removeVeredelungsPosition(idx) {
+    const card = document.getElementById('v-pos-' + idx);
+    if (card) card.remove();
+    if (!document.querySelectorAll('.v-pos-card').length) {
+        document.getElementById('veredelung-empty').style.display = '';
+        document.getElementById('veredelung-total').style.display = 'none';
+    }
+    updateVeredelungTotal();
+    calculateAngebotPrice();
+}
+
+function onVerfahrenChange(idx) {
+    const card = document.getElementById('v-pos-' + idx);
+    const verfahrenSelect = card.querySelector('.v-verfahren');
+    const vid = verfahrenSelect.value;
+    card.querySelector('.v-verfahren-id').value = vid;
+
+    const posSelect = card.querySelector('.v-position');
+    posSelect.innerHTML = '<option value="">Laden...</option>';
+
+    if (!vid) return;
+
+    const verfahren = _veredelungsVerfahren.find(v => v.id == vid);
+    if (!verfahren) return;
+
+    // Positionen laden
+    posSelect.innerHTML = '<option value="">Position waehlen...</option>';
+    verfahren.positionen.forEach(p => {
+        posSelect.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+    });
+
+    // Stichzahl-Feld nur bei Stickerei zeigen
+    const stichGroup = card.querySelector('.v-stich-group');
+    stichGroup.style.display = verfahren.code === 'embroidery' ? '' : 'none';
+
+    // Einrichtungspauschale vorausfuellen
+    if (verfahren.einrichtungspauschale) {
+        card.querySelector('.v-einrichtung').value = verfahren.einrichtungspauschale.toFixed(2);
+        card.querySelector('.v-einrichtung-hidden').value = verfahren.einrichtungspauschale;
+    }
+}
+
+function onPositionChange(idx) {
+    const card = document.getElementById('v-pos-' + idx);
+    const sel = card.querySelector('.v-position');
+    card.querySelector('.v-design-pos').value = sel.value;
+    card.querySelector('.v-design-label').value = sel.options[sel.selectedIndex]?.text || sel.value;
+}
+
+function kalkulierePosition(idx) {
+    const card = document.getElementById('v-pos-' + idx);
+    const vid = card.querySelector('.v-verfahren-id').value;
+    if (!vid) return;
+
+    const stich = card.querySelector('.v-stichzahl').value || 0;
+    const breite = card.querySelector('.v-breite').value || 0;
+    const hoehe = card.querySelector('.v-hoehe').value || 0;
+
+    // Hidden fields sync
+    card.querySelector('.v-stichzahl-hidden').value = stich;
+    card.querySelector('.v-breite-hidden').value = breite;
+    card.querySelector('.v-hoehe-hidden').value = hoehe;
+
+    // Gesamtmenge aus Artikel-Bereich
+    let menge = 0;
+    document.querySelectorAll('.quantity-input').forEach(q => { menge += parseInt(q.value) || 0; });
+    if (menge < 1) menge = 1;
+
+    const params = new URLSearchParams({
+        verfahren_id: vid, stichzahl: stich,
+        breite_mm: breite, hoehe_mm: hoehe, menge: menge
+    });
+
+    fetch('/angebote/api/kalkulation?' + params, {credentials: 'same-origin'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) return;
+            card.querySelector('.v-einrichtung').value = data.einrichtung.toFixed(2);
+            card.querySelector('.v-einrichtung-hidden').value = data.einrichtung;
+            card.querySelector('.v-stueckpreis').value = data.stueckpreis.toFixed(2);
+            card.querySelector('.v-stueckpreis-hidden').value = data.stueckpreis;
+            card.querySelector('.v-gesamt').value = data.gesamt.toFixed(2).replace('.', ',');
+            card.querySelector('.v-kalk-details').textContent = data.details || '';
+            updateVeredelungTotal();
+            calculateAngebotPrice();
+        });
+}
+
+function uploadDesignFile(idx) {
+    const card = document.getElementById('v-pos-' + idx);
+    const fileInput = card.querySelector('.v-file');
+    if (!fileInput.files.length) return;
+
+    const formData = new FormData();
+    formData.append('design_file', fileInput.files[0]);
+
+    fetch('/angebote/api/design-upload', {method: 'POST', credentials: 'same-origin', body: formData})
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) { alert(data.error || 'Upload fehlgeschlagen'); return; }
+            card.querySelector('.v-file-path').value = data.file_path;
+            card.querySelector('.v-thumb-path').value = data.thumbnail_path;
+            const preview = card.querySelector('.v-file-preview');
+            if (data.thumbnail_path) {
+                preview.innerHTML = `<img src="/static/${data.file_path}" style="max-height:60px;border-radius:4px;">`;
+            } else {
+                preview.innerHTML = `<span class="badge bg-success"><i class="bi bi-check"></i> ${data.filename}</span>`;
+            }
+        })
+        .catch(err => alert('Upload-Fehler: ' + err));
+}
+
+function toggleDesignRabattTyp(btn) {
+    var typField = btn.parentElement.querySelector('.design-rabatt-typ');
+    if (typField.value === 'prozent') {
+        typField.value = 'euro';
+        btn.textContent = '\u20ac';
+    } else {
+        typField.value = 'prozent';
+        btn.textContent = '%';
+    }
+    calculateAngebotPrice();
+}
+
+function toggleVRabattTyp(btn) {
+    var typField = btn.parentElement.querySelector('.v-rabatt-typ');
+    if (typField.value === 'prozent') {
+        typField.value = 'euro';
+        btn.textContent = '\u20ac';
+    } else {
+        typField.value = 'prozent';
+        btn.textContent = '%';
+    }
+    updateVeredelungTotal();
+}
+
+function updateVeredelungTotal() {
+    let total = 0;
+    document.querySelectorAll('.v-pos-card').forEach(card => {
+        const einrichtung = parseFloat(card.querySelector('.v-einrichtung').value) || 0;
+        const stueckpreis = parseFloat(card.querySelector('.v-stueckpreis').value) || 0;
+        let menge = 0;
+        document.querySelectorAll('.quantity-input').forEach(q => { menge += parseInt(q.value) || 0; });
+        if (menge < 1) menge = 1;
+        let gesamt = einrichtung + (stueckpreis * menge);
+        // Rabatt auf Veredelung
+        const rabattInput = card.querySelector('.v-rabatt');
+        const rabattTyp = card.querySelector('.v-rabatt-typ');
+        const rabattHidden = card.querySelector('.v-rabatt-hidden');
+        if (rabattInput) {
+            const rw = parseFloat(rabattInput.value) || 0;
+            const rt = rabattTyp ? rabattTyp.value : 'prozent';
+            if (rw > 0) {
+                const rb = rt === 'euro' ? Math.min(rw, gesamt) : gesamt * (rw / 100);
+                gesamt -= rb;
+            }
+            if (rabattHidden) rabattHidden.value = rw;
+        }
+        card.querySelector('.v-gesamt').value = gesamt.toFixed(2).replace('.', ',');
+        card.querySelector('.v-einrichtung-hidden').value = einrichtung;
+        card.querySelector('.v-stueckpreis-hidden').value = stueckpreis;
+        total += gesamt;
+    });
+    const totalDiv = document.getElementById('veredelung-total');
+    if (total > 0) {
+        totalDiv.style.display = '';
+        document.getElementById('veredelung-total-betrag').textContent = total.toFixed(2).replace('.', ',') + ' EUR';
+    } else {
+        totalDiv.style.display = 'none';
+    }
+}
+
+function toggleKundenware() {
+    const checked = document.getElementById('is_kundenware').checked;
+    // Artikel-Sektion IMMER sichtbar lassen, nur Header aendern
+    var headerEl = document.querySelector('#textil-card .card-header h6');
+    if (headerEl) {
+        headerEl.innerHTML = checked
+            ? '<i class="bi bi-box-seam"></i> Kundenartikel (vom Kunden bereitgestellt)'
+            : '<i class="bi bi-shirt"></i> Artikel-Details';
+    }
+    // Kundenware-Infobox ein/ausblenden
+    document.getElementById('kundenware-card').style.display = checked ? '' : 'none';
+
+    // Bei Kundenware: ersten Artikel automatisch auf "Kundenartikel" setzen (wenn leer)
+    if (checked) {
+        var firstSearch = document.querySelector('.textile-item .article-search-input');
+        if (firstSearch && !firstSearch.value.trim()) {
+            firstSearch.value = 'Kundenartikel';
+        }
+    }
+
+    // Required-Attribute bei Kundenware entfernen (damit Submit nicht blockiert)
+    document.querySelectorAll('.textile-item .article-search-input, .textile-item .quantity-input').forEach(function(el) {
+        if (checked) { el.removeAttribute('required'); } else { el.setAttribute('required', ''); }
+    });
+}
+
+function toggleDesignStatus() {
+    const status = document.getElementById('design_status').value;
+    document.getElementById('design-available').style.display = status === 'logo_available' ? '' : 'none';
+    document.getElementById('design-creation').style.display = status === 'logo_needs_creation' ? '' : 'none';
+    document.getElementById('design-adaptation').style.display = status === 'logo_needs_adaptation' ? '' : 'none';
+}
+
+// Kunden-Filter
+function filterKunden() {
+    const search = document.getElementById('kunde_search').value.toLowerCase();
+    const select = document.getElementById('kunde_id');
+    const options = select.querySelectorAll('option');
+    let firstMatch = null;
+
+    options.forEach(opt => {
+        if (!opt.value) { opt.style.display = ''; return; }
+        const text = (opt.dataset.search || opt.textContent).toLowerCase();
+        const match = !search || text.includes(search);
+        opt.style.display = match ? '' : 'none';
+        if (match && !firstMatch) firstMatch = opt;
+    });
+
+    // Select erweitern wenn gesucht wird
+    if (search.length > 0) {
+        select.size = 6;
+    } else {
+        select.size = 1;
+    }
+}
+
+// Artikel Live-Suche mit Smart-Filtern
+let _articleSearchTimer = null;
+let _articleFilterOptions = null;
+
+function loadArticleFilterOptions(callback) {
+    if (_articleFilterOptions) { if (callback) callback(_articleFilterOptions); return; }
+    fetch('/articles/api/filter-options', {credentials: 'same-origin'})
+        .then(r => r.json())
+        .then(data => { _articleFilterOptions = data; if (callback) callback(data); })
+        .catch(err => console.error('Filter laden fehlgeschlagen:', err));
+}
+
+function populateFilterDropdowns(container) {
+    loadArticleFilterOptions(function(data) {
+        container.querySelectorAll('.article-filter').forEach(sel => {
+            const filterType = sel.dataset.filter;
+            const firstOpt = sel.options[0];
+            sel.innerHTML = '';
+            sel.appendChild(firstOpt);
+
+            let items = [];
+            if (filterType === 'brand') items = data.brands || [];
+            else if (filterType === 'category') items = data.categories || [];
+            else if (filterType === 'supplier') items = data.suppliers || [];
+
+            items.forEach(item => {
+                const name = typeof item === 'string' ? item : item.name;
+                sel.appendChild(new Option(name, name));
+            });
+        });
+    });
+}
+
+function toggleInlineFilters(link) {
+    const container = link.closest('.position-relative');
+    const filtersDiv = container.querySelector('.article-inline-filters');
+    if (filtersDiv.style.display === 'none') {
+        filtersDiv.style.display = '';
+        populateFilterDropdowns(container);
+    } else {
+        filtersDiv.style.display = 'none';
+    }
+}
+
+function doArticleSearch(searchInput) {
+    const container = searchInput.closest('.position-relative');
+    const idInput = container.querySelector('.article-id-input');
+    const resultsBox = container.querySelector('.article-search-results');
+    const row = searchInput.closest('.textile-item');
+    const q = searchInput.value.trim();
+
+    idInput.value = '';
+    if (q.length < 2) { resultsBox.style.display = 'none'; return; }
+
+    // Filter-Werte sammeln
+    const params = new URLSearchParams({q: q, limit: 20});
+    container.querySelectorAll('.article-filter').forEach(sel => {
+        if (sel.value) params.append(sel.dataset.filter, sel.value);
+    });
+
+    fetch('/articles/api/search?' + params, {credentials: 'same-origin'})
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(data => {
+            const items = data.articles || [];
+            resultsBox.innerHTML = '';
+            if (!items.length) {
+                resultsBox.innerHTML = '<div class="list-group-item text-muted small py-1">Kein Ergebnis</div>';
+                resultsBox.style.display = 'block';
+                return;
+            }
+            items.forEach(function(a) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'list-group-item list-group-item-action py-1 small';
+                btn.innerHTML =
+                    '<strong>' + (a.article_number ? a.article_number + ' – ' : '') + a.name + '</strong>' +
+                    (a.brand ? ' <span class="text-info">| ' + a.brand + '</span>' : '') +
+                    (a.color ? ' <span class="text-muted">| ' + a.color + '</span>' : '') +
+                    (a.size ? ' <span class="text-muted">| ' + a.size + '</span>' : '') +
+                    ' <span class="badge bg-light text-dark ms-1">' + a.price.toFixed(2) + ' €</span>';
+
+                btn.addEventListener('click', function() {
+                    searchInput.value = (a.article_number ? a.article_number + ' – ' : '') + a.name;
+                    idInput.value = a.id;
+                    resultsBox.style.display = 'none';
+                    if (row) {
+                        const priceInput = row.querySelector('.price-input');
+                        if (priceInput) priceInput.value = a.price.toFixed(2);
+                        const textilartInput = row.querySelector('input[name="textilart[]"]');
+                        if (textilartInput && a.material) textilartInput.value = a.material;
+                        const colorInput = row.querySelector('input[name="color[]"]');
+                        if (colorInput && a.color) colorInput.value = a.color;
+                        calculateAngebotPrice();
+                    }
+                });
+                resultsBox.appendChild(btn);
+            });
+            resultsBox.style.display = 'block';
+        })
+        .catch(function() { resultsBox.style.display = 'none'; });
+}
+
+function initArticleSearch(searchInput) {
+    const container = searchInput.closest('.position-relative');
+    const resultsBox = container.querySelector('.article-search-results');
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(_articleSearchTimer);
+        _articleSearchTimer = setTimeout(() => doArticleSearch(searchInput), 300);
+    });
+
+    // Filter-Aenderungen loesen neue Suche aus
+    container.querySelectorAll('.article-filter').forEach(sel => {
+        sel.addEventListener('change', () => {
+            if (searchInput.value.trim().length >= 2) doArticleSearch(searchInput);
+        });
+    });
+
+    // Schliessen bei Klick ausserhalb
+    document.addEventListener('click', function(e) {
+        if (!container.contains(e.target)) {
+            resultsBox.style.display = 'none';
+        }
+    });
+}
+
+// Alle Artikel-Suchfelder initialisieren
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.article-search-input').forEach(initArticleSearch);
+});
+
+function toggleRabattTyp(btn) {
+    var typField = btn.parentElement.querySelector('.rabatt-typ');
+    if (typField.value === 'prozent') {
+        typField.value = 'euro';
+        btn.textContent = '\u20ac';
+        btn.title = 'Rabatt in Euro \u2013 klicken f\u00fcr %';
+    } else {
+        typField.value = 'prozent';
+        btn.textContent = '%';
+        btn.title = 'Rabatt in Prozent \u2013 klicken f\u00fcr \u20ac';
+    }
+    calculateAngebotPrice();
+}
+
+function calculateAngebotPrice() {
+    let total = 0;
+    let breakdown = [];
+
+    // Positionen inkl. Rabatte (% oder EUR)
+    const quantities = document.querySelectorAll('.quantity-input');
+    const prices = document.querySelectorAll('.price-input');
+    const rabatte = document.querySelectorAll('.rabatt-input');
+    const rabattTypen = document.querySelectorAll('.rabatt-typ');
+    let textilKosten = 0;
+    let rabattSumme = 0;
+    let gesamtMenge = 0;
+
+    quantities.forEach((q, i) => {
+        const qty = parseInt(q.value) || 0;
+        const price = parseFloat(prices[i] ? prices[i].value : 0) || 0;
+        const rabattWert = parseFloat(rabatte[i] ? rabatte[i].value : 0) || 0;
+        const typ = rabattTypen[i] ? rabattTypen[i].value : 'prozent';
+        let posNetto = qty * price;
+        if (rabattWert > 0) {
+            let rb = typ === 'euro' ? rabattWert : posNetto * (rabattWert / 100);
+            rb = Math.min(rb, posNetto);
+            rabattSumme += rb;
+            posNetto -= rb;
+        }
+        textilKosten += posNetto;
+        gesamtMenge += qty;
+    });
+
+    if (textilKosten > 0) {
+        let label = 'Positionen: ' + textilKosten.toFixed(2) + ' EUR';
+        if (rabattSumme > 0) label += ' (Rabatt: -' + rabattSumme.toFixed(2) + ')';
+        breakdown.push(label);
+        total += textilKosten;
+    }
+
+    // Veredelungskosten (neue Methode: aus v-pos-cards)
+    let veredlungTotal = 0;
+    document.querySelectorAll('.v-pos-card').forEach(card => {
+        const einrichtung = parseFloat(card.querySelector('.v-einrichtung').value) || 0;
+        const stueckpreis = parseFloat(card.querySelector('.v-stueckpreis').value) || 0;
+        const m = gesamtMenge > 0 ? gesamtMenge : 1;
+        veredlungTotal += einrichtung + (stueckpreis * m);
+    });
+    if (veredlungTotal > 0) {
+        breakdown.push('Veredelung: ' + veredlungTotal.toFixed(2) + ' EUR');
+        total += veredlungTotal;
+    }
+
+    // Design-Kosten (alle Felder summieren + Rabatt)
+    let designTotal = 0;
+    document.querySelectorAll('.design-kosten-input').forEach(function(inp) {
+        designTotal += parseFloat(inp.value) || 0;
+    });
+    if (designTotal > 0) {
+        const drInput = document.querySelector('.design-rabatt-input');
+        const drTyp = document.querySelector('.design-rabatt-typ');
+        if (drInput) {
+            const rw = parseFloat(drInput.value) || 0;
+            const rt = drTyp ? drTyp.value : 'prozent';
+            if (rw > 0) {
+                const rb = rt === 'euro' ? Math.min(rw, designTotal) : designTotal * (rw / 100);
+                breakdown.push('Design: ' + designTotal.toFixed(2) + ' - Rabatt ' + rb.toFixed(2) + ' = ' + (designTotal - rb).toFixed(2) + ' EUR');
+                designTotal -= rb;
+            } else {
+                breakdown.push('Design: ' + designTotal.toFixed(2) + ' EUR');
+            }
+        } else {
+            breakdown.push('Design: ' + designTotal.toFixed(2) + ' EUR');
+        }
+        total += designTotal;
+    }
+
+    // Anzeige aktualisieren
+    const priceField = document.getElementById('preis_schaetzung');
+    const breakdownDiv = document.getElementById('price-breakdown');
+    if (total > 0) {
+        priceField.value = total.toFixed(2);
+        breakdownDiv.innerHTML = breakdown.join(' + ');
+    }
+}
+
+function addTextileItem() {
+    const container = document.getElementById('textile-items');
+    const count = container.querySelectorAll('.textile-item').length + 1;
+    const first = container.querySelector('.textile-item');
+    const clone = first.cloneNode(true);
+
+    clone.querySelector('h6').textContent = 'Artikel #' + count;
+    clone.querySelectorAll('input, select').forEach(el => { if (el.type !== 'hidden') el.value = ''; });
+    clone.querySelectorAll('input[type="hidden"]').forEach(el => el.value = '');
+
+    // Alte Suchergebnisse entfernen
+    const oldResults = clone.querySelector('.article-search-results');
+    if (oldResults) { oldResults.innerHTML = ''; oldResults.style.display = 'none'; }
+
+    // Filter einklappen
+    const filtersDiv = clone.querySelector('.article-inline-filters');
+    if (filtersDiv) filtersDiv.style.display = 'none';
+    clone.querySelectorAll('.article-filter').forEach(sel => sel.selectedIndex = 0);
+
+    // Entfernen-Button hinzufuegen
+    const header = clone.querySelector('.d-flex');
+    if (!header.querySelector('.remove-textile')) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-outline-danger remove-textile';
+        btn.innerHTML = '<i class="bi bi-trash"></i>';
+        btn.onclick = function() { clone.remove(); };
+        header.appendChild(btn);
+    }
+
+    container.appendChild(clone);
+
+    // Artikel-Suche fuer neues Element initialisieren
+    const searchInput = clone.querySelector('.article-search-input');
+    if (searchInput) initArticleSearch(searchInput);
+}
+
+function addFreetextItem() {
+    const container = document.getElementById('textile-items');
+    const count = container.querySelectorAll('.textile-item').length + 1;
+    const div = document.createElement('div');
+    div.className = 'textile-item border rounded p-3 mb-3 bg-light';
+    div.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0"><i class="bi bi-fonts me-1"></i> Freitext #${count}</h6>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.textile-item').remove()"><i class="bi bi-trash"></i></button>
+        </div>
+        <input type="hidden" name="article_id[]" value="">
+        <div class="row">
+            <div class="col-md-5">
+                <div class="mb-2">
+                    <label class="form-label">Bezeichnung *</label>
+                    <input type="text" class="form-control article-search-input" name="article_name[]" placeholder="z.B. Sonderleistung, Anpassung..." required>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-2">
+                    <label class="form-label">Menge</label>
+                    <input type="number" class="form-control quantity-input" name="quantity[]" min="1" value="1" onchange="calculateAngebotPrice()">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-2">
+                    <label class="form-label">Einzelpreis</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control price-input" name="article_price[]" step="0.01" min="0" placeholder="0.00" onchange="calculateAngebotPrice()">
+                        <span class="input-group-text">&euro;</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="mb-2">
+                    <label class="form-label">Rabatt</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control rabatt-input" name="rabatt_wert[]" step="0.01" min="0" value="0" onchange="calculateAngebotPrice()">
+                        <button class="btn btn-outline-secondary rabatt-toggle" type="button" onclick="toggleRabattTyp(this)">%</button>
+                        <input type="hidden" class="rabatt-typ" name="rabatt_typ[]" value="prozent">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="mb-0">
+            <label class="form-label">Beschreibung</label>
+            <textarea class="form-control" name="beschreibung_freitext[]" rows="2" placeholder="Detailbeschreibung (erscheint im Angebot)..."></textarea>
+        </div>
+        <input type="hidden" name="textilart[]" value="">
+        <input type="hidden" name="size[]" value="">
+        <input type="hidden" name="color[]" value="">
+    `;
+    container.appendChild(div);
+}
+
+// Initial: Veredelungs-Verfahren laden
+{% if anfrage and anfrage.design_file_path %}
+// Anfrage hat Design-Datei: erste Position automatisch anlegen
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+        const typeMap = {'stickerei': 'embroidery', 'textildruck': 'printing', 'druck': 'printing',
+                         'dtf': 'dtf', 'sublimation': 'sublimation'};
+        const inquiryType = '{{ anfrage.inquiry_type or "" }}';
+        const verfahrenCode = typeMap[inquiryType] || 'embroidery';
+        const verfahren = _veredelungsVerfahren.find(v => v.code === verfahrenCode);
+        addVeredelungsPosition({
+            verfahren_id: verfahren ? verfahren.id : '',
+            file_path: '{{ anfrage.design_file_path|e }}',
+            thumbnail_path: '',
+            filename: '{{ anfrage.design_file_name|e }}'
+        });
+    }, 500);  // Warte auf API
+});
+{% endif %}
+
+{% if edit_mode and edit_data %}
+// ==========================================
+// EDIT MODE: Bestehende Daten laden
+// ==========================================
+document.addEventListener('DOMContentLoaded', function() {
+    var ed = {{ edit_data|tojson }};
+
+    // Kunde vorbelegen
+    var kundeSelect = document.getElementById('kunde_id');
+    if (kundeSelect) {
+        kundeSelect.value = ed.kunde_id;
+        kundeSelect.dispatchEvent(new Event('change'));
+    }
+
+    // Auftragstyp
+    var atSelect = document.getElementById('auftragstyp');
+    if (atSelect) { atSelect.value = ed.auftragstyp; atSelect.dispatchEvent(new Event('change')); }
+
+    // Kundenware
+    var kwCheck = document.getElementById('is_kundenware');
+    if (kwCheck && ed.is_kundenware) { kwCheck.checked = true; if (typeof toggleKundenware === 'function') toggleKundenware(); }
+
+    // Design-Status
+    if (ed.design_status) {
+        var dsEl = document.getElementById('design_status');
+        if (dsEl) { dsEl.value = ed.design_status; if (typeof toggleDesignStatus === 'function') toggleDesignStatus(); }
+        // Design-Kosten
+        setTimeout(function() {
+            var dkEl = document.querySelector('input[name="design_kosten"]');
+            if (dkEl && ed.design_kosten) dkEl.value = ed.design_kosten.toFixed(2);
+            var dakEl = document.querySelector('input[name="design_anpassung_kosten"]');
+            if (dakEl && ed.design_anpassung_kosten) dakEl.value = ed.design_anpassung_kosten.toFixed(2);
+            var daEl = document.querySelector('textarea[name="design_anforderungen"]');
+            if (daEl && ed.design_anforderungen) daEl.value = ed.design_anforderungen;
+            var dapEl = document.querySelector('textarea[name="design_anpassung"]');
+            if (dapEl && ed.design_anpassung_details) dapEl.value = ed.design_anpassung_details;
+        }, 100);
+    }
+
+    // Titel + Beschreibung
+    var titelEl = document.getElementById('titel');
+    if (titelEl) titelEl.value = ed.titel;
+    var beschrEl = document.getElementById('beschreibung');
+    if (beschrEl) beschrEl.value = ed.beschreibung;
+
+    // Kalkulation
+    var preisEl = document.getElementById('preis_schaetzung');
+    if (preisEl) preisEl.value = ed.netto_gesamt.toFixed(2);
+
+    // Gueltig-Tage
+    var gueltigEl = document.querySelector('input[name="gueltig_tage"]');
+    if (gueltigEl) gueltigEl.value = ed.gueltig_tage;
+
+    // Lieferzeit
+    var lieferzeitEl = document.querySelector('input[name="lieferzeit"]');
+    if (lieferzeitEl) lieferzeitEl.value = ed.lieferzeit;
+
+    // Versandkosten
+    var versandEl = document.querySelector('input[name="versandkosten"]');
+    if (versandEl) versandEl.value = ed.versandkosten.toFixed(2);
+
+    // Bemerkungen
+    var bemerkEl = document.querySelector('textarea[name="bemerkungen"]');
+    if (bemerkEl) bemerkEl.value = ed.bemerkungen;
+
+    // === Artikel-Positionen vorbelegen ===
+    if (ed.artikel_positionen.length > 0) {
+        // Erste Position: Felder direkt setzen
+        var firstItem = document.querySelector('.textile-item');
+        if (firstItem && ed.artikel_positionen[0]) {
+            var ap = ed.artikel_positionen[0];
+            var searchInput = firstItem.querySelector('.article-search-input');
+            if (searchInput) searchInput.value = ap.artikel_name;
+            var idInput = firstItem.querySelector('.article-id-input');
+            if (idInput) idInput.value = ap.artikel_id;
+            var qtyInput = firstItem.querySelector('.quantity-input');
+            if (qtyInput) qtyInput.value = ap.menge;
+            var priceInput = firstItem.querySelector('.price-input');
+            if (priceInput) priceInput.value = ap.einzelpreis.toFixed(2);
+            var rabattInput = firstItem.querySelector('.rabatt-input');
+            if (rabattInput) rabattInput.value = ap.rabatt_prozent;
+        }
+
+        // Weitere Positionen hinzufuegen
+        for (var i = 1; i < ed.artikel_positionen.length; i++) {
+            if (typeof addTextileItem === 'function') addTextileItem();
+            var items = document.querySelectorAll('.textile-item');
+            var item = items[items.length - 1];
+            if (item) {
+                var ap = ed.artikel_positionen[i];
+                var si = item.querySelector('.article-search-input');
+                if (si) si.value = ap.artikel_name;
+                var ii = item.querySelector('.article-id-input');
+                if (ii) ii.value = ap.artikel_id;
+                var qi = item.querySelector('.quantity-input');
+                if (qi) qi.value = ap.menge;
+                var pi = item.querySelector('.price-input');
+                if (pi) pi.value = ap.einzelpreis.toFixed(2);
+                var ri = item.querySelector('.rabatt-input');
+                if (ri) ri.value = ap.rabatt_prozent;
+            }
+        }
+    }
+
+    // === Veredelungs-Positionen vorbelegen ===
+    // Warten bis _veredelungsVerfahren per API geladen sind
+    function _waitForVerfahren(callback, tries) {
+        if (_veredelungsVerfahren && _veredelungsVerfahren.length > 0) { callback(); return; }
+        if (tries > 20) { console.warn('Veredelungsverfahren nicht geladen'); callback(); return; }
+        setTimeout(function() { _waitForVerfahren(callback, tries + 1); }, 200);
+    }
+
+    if (ed.veredelungs_positionen.length > 0) {
+        _waitForVerfahren(function() {
+        for (var j = 0; j < ed.veredelungs_positionen.length; j++) {
+            if (typeof addVeredelungsPosition === 'function') addVeredelungsPosition();
+
+            // Die zuletzt hinzugefuegte Karte finden (.v-pos-card)
+            var vCards = document.querySelectorAll('.v-pos-card');
+            var vCard = vCards[vCards.length - 1];
+            if (!vCard) continue;
+
+            var vp = ed.veredelungs_positionen[j];
+
+            // Verfahren (select mit Klasse .v-verfahren + hidden .v-verfahren-id)
+            var vSel = vCard.querySelector('.v-verfahren');
+            if (vSel && vp.verfahren_id) {
+                vSel.value = vp.verfahren_id;
+                vSel.dispatchEvent(new Event('change'));
+            }
+
+            // Nach Verfahren-Change warten, dann Position + Details setzen
+            (function(card, vp) {
+                setTimeout(function() {
+                    // Design-Position (select .v-position + hidden .v-design-pos/.v-design-label)
+                    var vPosSel = card.querySelector('.v-position');
+                    if (vPosSel && vp.design_position) {
+                        // Option mit passendem value suchen
+                        for (var k = 0; k < vPosSel.options.length; k++) {
+                            if (vPosSel.options[k].value === vp.design_position) {
+                                vPosSel.selectedIndex = k;
+                                vPosSel.dispatchEvent(new Event('change'));
+                                break;
+                            }
+                        }
+                    }
+                    var vDesLabel = card.querySelector('.v-design-label');
+                    if (vDesLabel && vp.design_label) vDesLabel.value = vp.design_label;
+
+                    // Stichzahl (input .v-stichzahl + hidden .v-stichzahl-hidden)
+                    var vStich = card.querySelector('.v-stichzahl');
+                    if (vStich && vp.stichzahl) { vStich.value = vp.stichzahl; }
+                    var vStichH = card.querySelector('.v-stichzahl-hidden');
+                    if (vStichH && vp.stichzahl) vStichH.value = vp.stichzahl;
+
+                    // Breite/Hoehe
+                    var vBr = card.querySelector('.v-breite');
+                    if (vBr && vp.breite_mm) vBr.value = vp.breite_mm;
+                    var vBrH = card.querySelector('.v-breite-hidden');
+                    if (vBrH && vp.breite_mm) vBrH.value = vp.breite_mm;
+                    var vHo = card.querySelector('.v-hoehe');
+                    if (vHo && vp.hoehe_mm) vHo.value = vp.hoehe_mm;
+                    var vHoH = card.querySelector('.v-hoehe-hidden');
+                    if (vHoH && vp.hoehe_mm) vHoH.value = vp.hoehe_mm;
+
+                    // Stueckpreis (input .v-stueckpreis + hidden .v-stueckpreis-hidden)
+                    var vSp = card.querySelector('.v-stueckpreis');
+                    if (vSp) vSp.value = vp.stueckpreis.toFixed(2);
+                    var vSpH = card.querySelector('.v-stueckpreis-hidden');
+                    if (vSpH) vSpH.value = vp.stueckpreis.toFixed(2);
+
+                    // Einrichtung (input .v-einrichtung + hidden .v-einrichtung-hidden)
+                    var vEi = card.querySelector('.v-einrichtung');
+                    if (vEi) vEi.value = vp.einrichtung.toFixed(2);
+                    var vEiH = card.querySelector('.v-einrichtung-hidden');
+                    if (vEiH) vEiH.value = vp.einrichtung.toFixed(2);
+
+                    // Veredelungs-Total aktualisieren
+                    if (typeof updateVeredelungTotal === 'function') updateVeredelungTotal();
+                }, 300 + j * 200);  // Gestaffelt warten fuer API-Calls
+            })(vCard, vp);
+        }
+        }, 0);  // Ende _waitForVerfahren callback
+    }
+
+    // Kundenware-Felder vorbelegen (Menge aus erster Artikelposition)
+    if (ed.is_kundenware && ed.artikel_positionen.length > 0) {
+        var kwMenge = document.querySelector('input[name="kundenware_menge"]');
+        if (kwMenge) kwMenge.value = ed.artikel_positionen[0].menge;
+        var kwTextilart = document.querySelector('input[name="kundenware_textilart"]');
+        if (kwTextilart && ed.artikel_positionen[0].artikel_name) kwTextilart.value = ed.artikel_positionen[0].artikel_name;
+    }
+
+    // Preis neu berechnen (mit Verzoegerung damit alle Felder geladen sind)
+    setTimeout(function() {
+        if (typeof calculateAngebotPrice === 'function') calculateAngebotPrice();
+    }, 800);
+});
+{% endif %}
+</script>
 {% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Dokument hochladen{% endblock %}
+{% block content %}
+<div class="container mt-4" style="max-width: 700px;">
+    <h4><i class="bi bi-cloud-upload me-2"></i>Dokument hochladen</h4>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() if csrf_token is defined else '' }}">
+
+                <div class="mb-3">
+                    <label class="form-label">Datei <span class="text-danger">*</span></label>
+                    <input type="file" name="file" class="form-control" required
+                           accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.tiff,.zip">
+                    <small class="text-muted">PDF, Word, Excel, Bilder, ZIP</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Titel</label>
+                    <input type="text" name="title" class="form-control"
+                           placeholder="Wird automatisch aus Dateiname generiert">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Kategorie</label>
+                    <select name="category" class="form-select">
+                        <option value="">Keine</option>
+                        <option value="rechnung">Rechnung</option>
+                        <option value="vertrag">Vertrag</option>
+                        <option value="angebot">Angebot</option>
+                        <option value="lieferschein">Lieferschein</option>
+                        <option value="email">E-Mail</option>
+                        <option value="sonstiges">Sonstiges</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Kunde (optional)</label>
+                    <select name="customer_id" class="form-select">
+                        <option value="">Kein Kunde zugeordnet</option>
+                        {% if customers is defined %}
+                        {% for c in customers %}
+                        <option value="{{ c.id }}">{{ c.company_name or (c.first_name + ' ' + c.last_name) }}</option>
+                        {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Notiz</label>
+                    <textarea name="description" class="form-control" rows="2"></textarea>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-cloud-upload"></i> Hochladen
+                    </button>
+                    <a href="{{ url_for('documents.list_documents') }}" class="btn btn-secondary">
+                        Abbrechen
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,91 +1,76 @@
 """
-Design File Browser - Datei-Browser für Design-Auswahl
+Design File Browser - Datei-Browser fuer Design-Auswahl
+Nutzt StorageSettings fuer konfigurierbare Speicherpfade.
+
+Erstellt von Hans Hahn - Alle Rechte vorbehalten
 """
 
 import os
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, send_file
 from flask_login import login_required
-from functools import wraps
-import mimetypes
 
-# Blueprint für Datei-Browser
 file_browser_bp = Blueprint('file_browser', __name__, url_prefix='/file_browser')
 
-def is_design_file(filename):
-    """Prüft ob die Datei ein Design-File ist"""
-    design_extensions = ['.dst', '.pes', '.jef', '.exp', '.svg', '.ai', '.pdf', '.png', '.jpg', '.jpeg', '.bmp', '.tiff']
-    return any(filename.lower().endswith(ext) for ext in design_extensions)
+# Design-Dateitypen
+DESIGN_EXTENSIONS = {'.dst', '.pes', '.jef', '.exp', '.svg', '.ai', '.pdf', '.png', '.jpg', '.jpeg', '.bmp', '.tiff'}
 
-def get_file_icon(filename):
-    """Gibt das entsprechende Icon für den Dateityp zurück"""
-    filename_lower = filename.lower()
-    
-    if filename_lower.endswith('.dst'):
-        return 'bi-file-earmark-binary'
-    elif filename_lower.endswith(('.pes', '.jef', '.exp')):
-        return 'bi-file-earmark-code'
-    elif filename_lower.endswith('.svg'):
-        return 'bi-file-earmark-image'
-    elif filename_lower.endswith('.ai'):
-        return 'bi-file-earmark-richtext'
-    elif filename_lower.endswith('.pdf'):
-        return 'bi-file-earmark-pdf'
-    elif filename_lower.endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
-        return 'bi-file-earmark-image'
-    elif os.path.isdir(filename):
-        return 'bi-folder'
-    else:
-        return 'bi-file-earmark'
+FILE_ICONS = {
+    '.dst': 'bi-file-earmark-binary',
+    '.pes': 'bi-file-earmark-code',
+    '.jef': 'bi-file-earmark-code',
+    '.exp': 'bi-file-earmark-code',
+    '.svg': 'bi-file-earmark-image',
+    '.ai': 'bi-file-earmark-richtext',
+    '.pdf': 'bi-file-earmark-pdf',
+    '.png': 'bi-file-earmark-image',
+    '.jpg': 'bi-file-earmark-image',
+    '.jpeg': 'bi-file-earmark-image',
+    '.bmp': 'bi-file-earmark-image',
+    '.tiff': 'bi-file-earmark-image',
+}
 
-def get_design_directories():
-    """Gibt Standard-Design-Verzeichnisse zurück"""
-    base_paths = [
-        "C:/Designs",
-        "C:/SoftwareEntwicklung/StitchAdmin/uploads/designs",
-        "C:/Users/Public/Documents/Designs",
-        "D:/Designs",
-        "E:/Designs"
-    ]
-    
-    existing_paths = []
-    for path in base_paths:
-        if os.path.exists(path):
-            existing_paths.append(path)
-    
-    # Erstelle Standard-Verzeichnis falls keines existiert
-    if not existing_paths:
-        default_path = "C:/Designs"
-        try:
-            os.makedirs(default_path, exist_ok=True)
-            existing_paths.append(default_path)
-        except:
-            pass
-    
-    return existing_paths
+
+def _get_storage_service():
+    """Lazy-Load des FileStorageService"""
+    from src.services.file_storage_service import FileStorageService
+    return FileStorageService()
+
 
 @file_browser_bp.route('/browse')
 @login_required
 def browse():
-    """Datei-Browser für Design-Auswahl"""
+    """Datei-Browser fuer Design-Auswahl"""
     current_path = request.args.get('path', '')
-    
-    # Sicherheitscheck: Nur erlaubte Pfade
+    filter_type = request.args.get('filter', 'design')  # design, all, images
+
+    storage = _get_storage_service()
+
+    # Kein Pfad angegeben -> zeige konfigurierte Speicherorte
     if not current_path:
-        design_dirs = get_design_directories()
-        current_path = design_dirs[0] if design_dirs else "C:/"
-    
-    # Normalisiere den Pfad
+        roots = storage.get_storage_roots()
+        # Erste verfuegbare Root als Default
+        for root in roots:
+            if root['available']:
+                current_path = root['path']
+                break
+        if not current_path:
+            return jsonify({'error': 'Kein Speicherpfad konfiguriert', 'roots': roots}), 404
+
     current_path = os.path.normpath(current_path)
-    
-    # Prüfe ob Pfad existiert
+
     if not os.path.exists(current_path):
-        return jsonify({'error': 'Pfad nicht gefunden'}), 404
-    
-    # Sammle Dateien und Ordner
+        return jsonify({'error': 'Pfad nicht gefunden', 'path': current_path}), 404
+
+    # Extensions-Filter
+    extensions = None
+    if filter_type == 'design':
+        extensions = DESIGN_EXTENSIONS
+    elif filter_type == 'images':
+        extensions = {'.png', '.jpg', '.jpeg', '.svg', '.bmp', '.tiff', '.gif', '.webp'}
+
     items = []
-    
     try:
-        # Parent-Verzeichnis hinzufügen (falls nicht Root)
+        # Parent-Verzeichnis
         parent_path = os.path.dirname(current_path)
         if parent_path != current_path and parent_path:
             items.append({
@@ -95,63 +80,69 @@ def browse():
                 'icon': 'bi-arrow-up-circle',
                 'is_parent': True
             })
-        
-        # Durchsuche aktuelles Verzeichnis
-        for item_name in sorted(os.listdir(current_path)):
-            item_path = os.path.join(current_path, item_name)
-            
-            # Versteckte Dateien überspringen
-            if item_name.startswith('.'):
+
+        for entry in sorted(os.listdir(current_path)):
+            if entry.startswith('.'):
                 continue
-            
-            if os.path.isdir(item_path):
+
+            full_path = os.path.join(current_path, entry)
+            is_dir = os.path.isdir(full_path)
+
+            if is_dir:
                 items.append({
-                    'name': item_name,
-                    'path': item_path,
+                    'name': entry,
+                    'path': full_path,
+                    'relative_path': storage.to_relative(full_path),
                     'type': 'directory',
                     'icon': 'bi-folder',
                     'is_parent': False
                 })
-            elif is_design_file(item_name):
-                # Datei-Informationen
-                stat = os.stat(item_path)
-                items.append({
-                    'name': item_name,
-                    'path': item_path,
-                    'type': 'file',
-                    'icon': get_file_icon(item_name),
-                    'size': stat.st_size,
-                    'size_mb': round(stat.st_size / 1024 / 1024, 2),
-                    'modified': stat.st_mtime,
-                    'is_parent': False
-                })
-    
+            else:
+                ext = os.path.splitext(entry)[1].lower()
+                if extensions and ext not in extensions:
+                    continue
+
+                try:
+                    stat = os.stat(full_path)
+                    items.append({
+                        'name': entry,
+                        'path': full_path,
+                        'relative_path': storage.to_relative(full_path),
+                        'type': 'file',
+                        'icon': FILE_ICONS.get(ext, 'bi-file-earmark'),
+                        'size': stat.st_size,
+                        'size_mb': round(stat.st_size / 1024 / 1024, 2),
+                        'modified': stat.st_mtime,
+                        'is_parent': False,
+                        'file_url': storage.get_file_url(storage.to_relative(full_path))
+                    })
+                except OSError:
+                    continue
+
     except PermissionError:
-        return jsonify({'error': 'Keine Berechtigung für diesen Pfad'}), 403
+        return jsonify({'error': 'Keine Berechtigung fuer diesen Pfad'}), 403
     except Exception as e:
-        return jsonify({'error': f'Fehler beim Lesen des Verzeichnisses: {str(e)}'}), 500
-    
+        return jsonify({'error': f'Fehler: {str(e)}'}), 500
+
+    # Speicherorte fuer Root-Navigation
+    roots = storage.get_storage_roots()
+
     return jsonify({
         'current_path': current_path,
+        'relative_path': storage.to_relative(current_path),
         'items': items,
-        'breadcrumbs': get_breadcrumbs(current_path)
+        'breadcrumbs': storage._breadcrumbs(current_path),
+        'roots': roots
     })
 
-def get_breadcrumbs(path):
-    """Erstellt Breadcrumb-Navigation für den Pfad"""
-    breadcrumbs = []
-    parts = path.split(os.sep)
-    
-    current = ""
-    for part in parts:
-        if part:  # Überspringe leere Teile
-            current = os.path.join(current, part) if current else part
-            breadcrumbs.append({
-                'name': part,
-                'path': current
-            })
-    
-    return breadcrumbs
+
+@file_browser_bp.route('/roots')
+@login_required
+def get_roots():
+    """Gibt alle konfigurierten Speicherorte zurueck"""
+    storage = _get_storage_service()
+    return jsonify({'roots': storage.get_storage_roots()})
+
 
 @file_browser_bp.route('/modal')
 @login_required
@@ -159,40 +150,83 @@ def modal():
     """Datei-Browser Modal"""
     return render_template('file_browser/modal.html')
 
+
 @file_browser_bp.route('/get_file_info')
 @login_required
 def get_file_info():
     """Detaillierte Datei-Informationen"""
     file_path = request.args.get('path')
-    
+
     if not file_path or not os.path.exists(file_path):
         return jsonify({'error': 'Datei nicht gefunden'}), 404
-    
+
     try:
         stat = os.stat(file_path)
-        
-        # Basis-Informationen
+        storage = _get_storage_service()
+        import mimetypes
+
         file_info = {
             'name': os.path.basename(file_path),
             'path': file_path,
+            'relative_path': storage.to_relative(file_path),
             'size': stat.st_size,
             'size_mb': round(stat.st_size / 1024 / 1024, 2),
             'modified': stat.st_mtime,
             'created': stat.st_ctime,
-            'mime_type': mimetypes.guess_type(file_path)[0] or 'unknown'
+            'mime_type': mimetypes.guess_type(file_path)[0] or 'unknown',
+            'file_url': storage.get_file_url(storage.to_relative(file_path))
         }
-        
-        # Versuche Design-Analyse
+
+        # Design-Analyse wenn moeglich
         try:
             from src.utils.file_analysis import analyze_design_file
-            analysis = analyze_design_file(file_path)
-            file_info['analysis'] = analysis
-        except:
-            file_info['analysis'] = {'success': False, 'error': 'Analyse nicht möglich'}
-        
+            file_info['analysis'] = analyze_design_file(file_path)
+        except Exception:
+            file_info['analysis'] = None
+
         return jsonify(file_info)
-        
+
     except Exception as e:
-        return jsonify({'error': f'Fehler beim Lesen der Datei-Informationen: {str(e)}'}), 500
+        return jsonify({'error': str(e)}), 500
+
+
+@file_browser_bp.route('/open')
+@login_required
+def open_file():
+    """
+    Oeffnet eine Datei zum Download/Anzeige.
+    Wird fuer Hyperlinks in der Anwendung genutzt.
+    """
+    relative_path = request.args.get('path', '')
+    if not relative_path:
+        return jsonify({'error': 'Kein Pfad angegeben'}), 400
+
+    storage = _get_storage_service()
+    result = storage.get_file(relative_path)
+
+    if not result['success']:
+        return jsonify({'error': result.get('error', 'Datei nicht gefunden')}), 404
+
+    abs_path = result['absolute_path']
+    return send_file(abs_path, as_attachment=False)
+
+
+@file_browser_bp.route('/download')
+@login_required
+def download_file():
+    """Datei herunterladen"""
+    relative_path = request.args.get('path', '')
+    if not relative_path:
+        return jsonify({'error': 'Kein Pfad angegeben'}), 400
+
+    storage = _get_storage_service()
+    result = storage.get_file(relative_path)
+
+    if not result['success']:
+        return jsonify({'error': result.get('error', 'Datei nicht gefunden')}), 404
+
+    abs_path = result['absolute_path']
+    return send_file(abs_path, as_attachment=True, download_name=result['filename'])
+
 
 # Erstellt von Hans Hahn - Alle Rechte vorbehalten

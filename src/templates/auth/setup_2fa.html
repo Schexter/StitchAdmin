@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}2FA einrichten{% endblock %}
+{% block content %}
+<div class="container" style="max-width: 600px;">
+    <div class="card mt-4">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Zwei-Faktor-Authentifizierung einrichten</h5>
+        </div>
+        <div class="card-body">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-1"></i>
+                Scannen Sie den QR-Code mit einer Authenticator-App (Google Authenticator, Authy, Microsoft Authenticator).
+            </div>
+
+            <!-- QR-Code -->
+            <div class="text-center my-4">
+                <img src="{{ qr_data_uri }}" alt="QR-Code" class="border rounded" style="image-rendering: pixelated;">
+            </div>
+
+            <!-- Manueller Code -->
+            <div class="text-center mb-4">
+                <small class="text-muted d-block mb-1">Oder manuell eingeben:</small>
+                <code class="fs-5 user-select-all" style="letter-spacing: 0.15em;">{{ secret }}</code>
+            </div>
+
+            <hr>
+
+            <!-- Verifizierung -->
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <p class="fw-bold">Geben Sie zur Bestaetigung den aktuellen 6-stelligen Code ein:</p>
+                <div class="input-group mb-3" style="max-width: 300px; margin: 0 auto;">
+                    <input type="text" class="form-control form-control-lg text-center" name="code"
+                           placeholder="000000" maxlength="6" required autofocus
+                           autocomplete="one-time-code" inputmode="numeric"
+                           style="font-size: 1.5rem; letter-spacing: 0.4rem; font-family: monospace; font-weight: 700;">
+                </div>
+                <div class="d-grid gap-2" style="max-width: 300px; margin: 0 auto;">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="bi bi-check-circle me-1"></i> 2FA aktivieren
+                    </button>
+                    <a href="{{ url_for('auth.profile') }}" class="btn btn-outline-secondary">Abbrechen</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

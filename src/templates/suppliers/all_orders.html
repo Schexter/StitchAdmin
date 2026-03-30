@@ -140,16 +140,15 @@
                         <td class="text-end">
                             <div class="btn-group" role="group">
                                 {% if order.supplier_id %}
-                                <a href="{{ url_for('suppliers.show_order', supplier_id=order.supplier_id, order_id=order.id) }}"
-                                   class="btn btn-sm btn-outline-primary" title="Details">
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}"
+                                   class="btn btn-sm btn-outline-primary" title="Details & Bearbeiten">
                                     <i class="bi bi-eye"></i>
                                 </a>
-                                {% if order.status == 'draft' %}
-                                <a href="{{ url_for('suppliers.new_order', supplier_id=order.supplier_id) }}"
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}"
                                    class="btn btn-sm btn-outline-secondary" title="Bearbeiten">
                                     <i class="bi bi-pencil"></i>
                                 </a>
-                                {% elif order.status in ['ordered', 'confirmed'] %}
+                                {% if order.status in ['ordered', 'confirmed'] %}
                                 <a href="{{ url_for('suppliers.receive_order', supplier_id=order.supplier_id, order_id=order.id) }}"
                                    class="btn btn-sm btn-outline-success" title="Wareneingang">
                                     <i class="bi bi-box-arrow-in-down"></i>

@@ -79,13 +79,27 @@
                     {% for order in current_productions[:10] %}
                     <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
                         <div>
-                            <strong>{{ order.order_number or order.id }}</strong><br>
+                            <strong>
+                                <a href="{{ url_for('orders.show', order_id=order.id) }}" class="text-decoration-none">
+                                    {{ order.order_number or order.id }}
+                                </a>
+                            </strong><br>
                             {% if order.customer %}
                                 <small>{{ order.customer.first_name }} {{ order.customer.last_name }}</small><br>
                             {% endif %}
                             <small class="text-muted">{{ order.description or 'Keine Beschreibung' }}</small>
                             {% if order.order_type %}
                                 <br><small class="text-info">{{ order.order_type|title }}</small>
+                            {% endif %}
+                            {% set progress = order.job_progress() %}
+                            {% if progress[1] > 0 %}
+                                <br>
+                                <div class="d-flex align-items-center gap-2 mt-1">
+                                    <div class="progress flex-grow-1" style="height: 6px; width: 80px;">
+                                        <div class="progress-bar bg-success" style="width: {{ (progress[0]/progress[1]*100)|int }}%"></div>
+                                    </div>
+                                    <small class="text-muted">{{ progress[0] }}/{{ progress[1] }} Jobs</small>
+                                </div>
                             {% endif %}
                         </div>
                         <div class="text-end">
@@ -103,7 +117,9 @@
                                 <i class="bi bi-pause-fill"></i>
                             </button>
                             <button type="button" class="btn btn-sm btn-success btn-stop-tracking"
-                                    data-order-id="{{ order.id }}" data-bs-toggle="modal"
+                                    data-order-id="{{ order.id }}"
+                                    data-order-type="{{ order.order_type or 'embroidery' }}"
+                                    data-bs-toggle="modal"
                                     data-bs-target="#stopTrackingModal">
                                 <i class="bi bi-check-lg"></i> Fertig
                             </button>
@@ -127,13 +143,21 @@
                     {% for order in waiting_orders[:10] %}
                     <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
                         <div>
-                            <strong>{{ order.order_number or order.id }}</strong><br>
+                            <strong>
+                                <a href="{{ url_for('orders.show', order_id=order.id) }}" class="text-decoration-none">
+                                    {{ order.order_number or order.id }}
+                                </a>
+                            </strong><br>
                             {% if order.customer %}
                                 <small>{{ order.customer.first_name }} {{ order.customer.last_name }}</small><br>
                             {% endif %}
                             <small class="text-muted">{{ order.description or 'Keine Beschreibung' }}</small>
                             {% if order.order_type %}
                                 <br><small class="text-info">{{ order.order_type|title }}</small>
+                            {% endif %}
+                            {% if order.has_production_jobs() %}
+                                {% set progress = order.job_progress() %}
+                                <br><small class="text-primary"><i class="bi bi-diagram-3"></i> {{ progress[1] }} Jobs angelegt</small>
                             {% endif %}
                         </div>
                         <div class="text-end">
@@ -234,11 +258,13 @@
             <form id="stopTrackingForm">
                 <div class="modal-body">
                     <input type="hidden" id="stop-order-id" name="order_id">
+                    <input type="hidden" id="stop-order-type" name="order_type">
 
                     <div class="alert alert-info">
                         <strong>Laufzeit:</strong> <span id="stop-elapsed-time">--:--</span>
                     </div>
 
+                    <!-- Gemeinsame Felder: Stückzahl -->
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Produzierte Stückzahl</label>
@@ -250,14 +276,44 @@
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Stichzahl</label>
-                            <input type="number" class="form-control" name="stitch_count" id="stop-stitch-count">
+                    <!-- Stickerei-spezifische Felder -->
+                    <div id="stop-fields-embroidery">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Stichzahl</label>
+                                <input type="number" class="form-control" name="stitch_count" id="stop-stitch-count">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Farbwechsel</label>
+                                <input type="number" class="form-control" name="color_changes" id="stop-color-changes" min="0">
+                            </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Farbwechsel</label>
-                            <input type="number" class="form-control" name="color_changes" id="stop-color-changes" min="0">
+                    </div>
+
+                    <!-- Druck/DTF/Sublimation-spezifische Felder -->
+                    <div id="stop-fields-print" style="display:none;">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Temperatur (°C)</label>
+                                <input type="number" class="form-control" name="print_temperature" id="stop-print-temperature" min="0" max="300" placeholder="z.B. 180">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Presszeit (Sekunden)</label>
+                                <input type="number" class="form-control" name="print_time_seconds" id="stop-print-time" min="0" placeholder="z.B. 15">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Druckbögen eingelagert?</label>
+                                <select class="form-select" name="excess_sheets_stored" id="stop-sheets-stored">
+                                    <option value="false">Nein</option>
+                                    <option value="true">Ja</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3" id="stop-storage-number-group" style="display:none;">
+                                <label class="form-label">Lagernummer</label>
+                                <input type="text" class="form-control" name="storage_number" id="stop-storage-number" placeholder="z.B. L-042">
+                            </div>
                         </div>
                     </div>
 
@@ -354,6 +410,9 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // CSRF Token
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
     // Timer-Objekte für laufende Aufträge
     const timers = {};
 
@@ -414,7 +473,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/production/time/start', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                 body: JSON.stringify(data)
             });
 
@@ -424,7 +483,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Auch den normalen Produktionsstart triggern
                 const startForm = document.createElement('form');
                 startForm.method = 'POST';
-                startForm.action = `/production/start/${data.order_id}`;
+                startForm.action = `/production/order/${data.order_id}/start`;
                 document.body.appendChild(startForm);
                 startForm.submit();
             } else {
@@ -442,7 +501,21 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.btn-stop-tracking').forEach(btn => {
         btn.addEventListener('click', function() {
             const orderId = this.dataset.orderId;
+            const orderType = this.dataset.orderType || 'embroidery';
             document.getElementById('stop-order-id').value = orderId;
+            document.getElementById('stop-order-type').value = orderType;
+
+            // Felder je nach Auftragstyp ein/ausblenden
+            const embFields = document.getElementById('stop-fields-embroidery');
+            const printFields = document.getElementById('stop-fields-print');
+            if (orderType === 'embroidery') {
+                embFields.style.display = '';
+                printFields.style.display = 'none';
+            } else {
+                // printing, dtf, sublimation, combined
+                embFields.style.display = 'none';
+                printFields.style.display = '';
+            }
 
             // Hole aktuelle Laufzeit
             const timerEl = document.getElementById(`timer-${orderId}`);
@@ -450,6 +523,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('stop-elapsed-time').textContent = timerEl.textContent;
             }
         });
+    });
+
+    // Lagernummer nur zeigen wenn Druckbögen eingelagert
+    document.getElementById('stop-sheets-stored').addEventListener('change', function() {
+        document.getElementById('stop-storage-number-group').style.display =
+            this.value === 'true' ? '' : 'none';
     });
 
     // Stop Tracking Form
@@ -461,7 +540,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/production/time/stop', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                 body: JSON.stringify(data)
             });
 
@@ -476,7 +555,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Auch die normale Produktion abschließen
                 const completeForm = document.createElement('form');
                 completeForm.method = 'POST';
-                completeForm.action = `/production/complete/${data.order_id}`;
+                completeForm.action = `/production/order/${data.order_id}/complete`;
                 document.body.appendChild(completeForm);
                 completeForm.submit();
             } else {
@@ -508,7 +587,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/production/time/pause', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                 body: JSON.stringify(data)
             });
 

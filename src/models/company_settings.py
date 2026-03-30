@@ -18,6 +18,8 @@ class CompanySettings(db.Model):
     company_name = db.Column(db.String(200), nullable=False, default='Ihre Firma')
     company_addition = db.Column(db.String(200))  # z.B. "GmbH", "e.K."
     owner_name = db.Column(db.String(200))  # Inhaber/Geschäftsführer
+    contact_first_name = db.Column(db.String(100))  # Ansprechpartner Vorname (Bearbeiter auf Rechnungen)
+    contact_last_name = db.Column(db.String(100))   # Ansprechpartner Nachname
 
     # Adresse
     street = db.Column(db.String(200))
@@ -56,6 +58,9 @@ class CompanySettings(db.Model):
     small_business = db.Column(db.Boolean, default=False)
     small_business_text = db.Column(db.Text, default='Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.')
 
+    # Besteuerungsart (für Buchhaltung)
+    steuerart = db.Column(db.String(10), default='soll')  # 'soll' = Soll-Versteuerung, 'ist' = Ist-Versteuerung
+
     # Logo
     logo_path = db.Column(db.String(500))  # Pfad zum Logo
 
@@ -92,6 +97,26 @@ class CompanySettings(db.Model):
     invoice_email_template = db.Column(db.Text)  # HTML-Template für Rechnungsmail
     email_signature = db.Column(db.Text)  # E-Mail Signatur
     outlook_account = db.Column(db.Text)  # Outlook Account Konfiguration
+
+    # DPD Versand-Integration
+    dpd_customer_number = db.Column(db.String(20))  # DPD Kundennummer fuer CSV-Export
+
+    # SumUp Payment Integration
+    sumup_api_key = db.Column(db.String(500))
+    sumup_merchant_code = db.Column(db.String(100))
+
+    # Google Custom Search (fuer Artikelbild-Suche)
+    google_api_key = db.Column(db.String(200))
+    google_search_cx = db.Column(db.String(100))
+
+    # Express-Aufpreis
+    express_surcharge_percent = db.Column(db.Float, default=0)  # Prozentualer Aufschlag
+    express_surcharge_fixed = db.Column(db.Float, default=0)  # Fester Aufschlag in EUR
+    express_delivery_days = db.Column(db.Integer, default=1)  # Express-Lieferzeit in Tagen
+
+    # Rechtliche Texte (AGB, Haftungsausschluss)
+    haftungsausschluss_kundenware = db.Column(db.Text, default='')
+    agb_text = db.Column(db.Text, default='')
 
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

@@ -1,4 +1,4 @@
-<!-- Artikel-Such-Modal für Aufträge -->
+<!-- Artikel-Such-Modal mit Smart-Filtern -->
 <div class="modal fade" id="articleSearchModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -21,28 +21,27 @@
                     <small class="text-muted">Mindestens 2 Zeichen eingeben</small>
                 </div>
 
-                <!-- Filter -->
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Kategorie</label>
-                        <select class="form-select form-select-sm" id="articleCategoryFilter">
-                            <option value="">Alle Kategorien</option>
-                            <option value="shirts">T-Shirts</option>
-                            <option value="polos">Polo-Shirts</option>
-                            <option value="hoodies">Hoodies & Sweatshirts</option>
-                            <option value="jackets">Jacken</option>
-                            <option value="caps">Caps & Mützen</option>
-                            <option value="bags">Taschen</option>
-                            <option value="other">Sonstiges</option>
+                <!-- Dynamische Filter -->
+                <div class="row mb-3 g-2" id="articleModalFilters">
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm" id="articleBrandFilter">
+                            <option value="">Marke</option>
                         </select>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Nur verfügbare</label>
-                        <div class="form-check form-switch">
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm" id="articleCategoryFilter">
+                            <option value="">Kategorie</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select form-select-sm" id="articleSupplierFilter">
+                            <option value="">Lieferant</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-check form-switch mt-1">
                             <input class="form-check-input" type="checkbox" id="onlyAvailableFilter" checked>
-                            <label class="form-check-label" for="onlyAvailableFilter">
-                                Nur lieferbare Artikel anzeigen
-                            </label>
+                            <label class="form-check-label small" for="onlyAvailableFilter">Nur vorrätig</label>
                         </div>
                     </div>
                 </div>
@@ -96,16 +95,61 @@
 <script>
 let articleSearchTimeout = null;
 let currentTargetSelect = null;
+let _modalFilterOptionsLoaded = false;
 
 function openArticleSearchModal(selectElement) {
     currentTargetSelect = selectElement;
     const modal = new bootstrap.Modal(document.getElementById('articleSearchModal'));
     modal.show();
 
-    // Fokus auf Suchfeld
+    // Filter-Optionen einmalig laden
+    if (!_modalFilterOptionsLoaded) {
+        loadModalFilterOptions();
+    }
+
     setTimeout(() => {
         document.getElementById('articleSearchInput').focus();
     }, 500);
+}
+
+function loadModalFilterOptions() {
+    fetch('/articles/api/filter-options', {credentials: 'same-origin'})
+        .then(r => r.json())
+        .then(data => {
+            _modalFilterOptionsLoaded = true;
+
+            // Marken befuellen
+            const brandSel = document.getElementById('articleBrandFilter');
+            if (data.brands && data.brands.length) {
+                data.brands.forEach(b => {
+                    const name = typeof b === 'string' ? b : b.name;
+                    const val = typeof b === 'string' ? b : (b.id || b.name);
+                    const opt = new Option(name, val);
+                    brandSel.appendChild(opt);
+                });
+            }
+
+            // Kategorien befuellen
+            const catSel = document.getElementById('articleCategoryFilter');
+            if (data.categories && data.categories.length) {
+                data.categories.forEach(c => {
+                    const name = typeof c === 'string' ? c : c.name;
+                    const val = typeof c === 'string' ? c : (c.id || c.name);
+                    const opt = new Option(name, val);
+                    catSel.appendChild(opt);
+                });
+            }
+
+            // Lieferanten befuellen
+            const supSel = document.getElementById('articleSupplierFilter');
+            if (data.suppliers && data.suppliers.length) {
+                data.suppliers.forEach(s => {
+                    const name = typeof s === 'string' ? s : s.name;
+                    supSel.appendChild(new Option(name, name));
+                });
+            }
+        })
+        .catch(err => console.error('Filter-Optionen laden fehlgeschlagen:', err));
 }
 
 function clearArticleSearch() {
@@ -120,7 +164,9 @@ function clearArticleSearch() {
 
 function searchArticles() {
     const searchTerm = document.getElementById('articleSearchInput').value;
+    const brand = document.getElementById('articleBrandFilter').value;
     const category = document.getElementById('articleCategoryFilter').value;
+    const supplier = document.getElementById('articleSupplierFilter').value;
     const onlyAvailable = document.getElementById('onlyAvailableFilter').checked;
 
     if (searchTerm.length < 2) {
@@ -133,28 +179,32 @@ function searchArticles() {
         return;
     }
 
-    // Zeige Ladeindikator
     document.getElementById('searchLoading').classList.remove('d-none');
     document.getElementById('searchResults').innerHTML = '';
 
-    // API-Aufruf
-    const params = new URLSearchParams({
-        q: searchTerm,
-        limit: 50
-    });
+    const params = new URLSearchParams({q: searchTerm, limit: 50});
+    if (brand) {
+        // Pruefen ob es eine ID (Zahl) oder ein String ist
+        if (!isNaN(brand)) params.append('brand_id', brand);
+        else params.append('brand', brand);
+    }
+    if (category) {
+        if (!isNaN(category)) params.append('category_id', category);
+        else params.append('category', category);
+    }
+    if (supplier) params.append('supplier', supplier);
+    if (onlyAvailable) params.append('stock', 'available');
 
-    if (category) params.append('category', category);
-    if (onlyAvailable) params.append('active', 'true');
-
-    fetch(`/api/articles/search?${params}`)
-        .then(response => response.json())
-        .then(articles => {
+    fetch('/articles/api/search?' + params, {credentials: 'same-origin'})
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(data => {
             document.getElementById('searchLoading').classList.add('d-none');
+            const articles = data.articles || data;
 
-            if (articles.length === 0) {
+            if (!articles.length) {
                 document.getElementById('searchResults').innerHTML = `
                     <div class="alert alert-info">
-                        <i class="bi bi-info-circle"></i> Keine Artikel gefunden für "${searchTerm}"
+                        <i class="bi bi-info-circle"></i> Keine Artikel gefunden für "${escapeHtml(searchTerm)}"
                     </div>
                 `;
                 return;
@@ -182,6 +232,7 @@ function searchArticles() {
                                 <h6 class="mb-1">${escapeHtml(article.name)}</h6>
                                 <p class="mb-1 text-muted small">
                                     <strong>Art-Nr:</strong> ${escapeHtml(article.article_number || 'N/A')}
+                                    ${article.brand ? ` | <strong>Marke:</strong> ${escapeHtml(article.brand)}` : ''}
                                     ${article.color ? ` | <strong>Farbe:</strong> ${escapeHtml(article.color)}` : ''}
                                     ${article.size ? ` | <strong>Größe:</strong> ${escapeHtml(article.size)}` : ''}
                                 </p>
@@ -196,23 +247,18 @@ function searchArticles() {
                 `;
             });
             html += '</div>';
-
-            html += `<div class="text-muted text-center mt-3 small">${articles.length} Artikel gefunden</div>`;
+            html += `<div class="text-muted text-center mt-3 small">${articles.length} von ${data.total || articles.length} Artikel(n)</div>`;
 
             document.getElementById('searchResults').innerHTML = html;
 
-            // Event-Listener für Artikel-Klicks hinzufügen
             document.querySelectorAll('.article-result-item').forEach(item => {
                 item.addEventListener('click', function() {
-                    const articleId = this.dataset.articleId;
-                    const articleName = this.dataset.articleName;
-                    const articlePrice = parseFloat(this.dataset.articlePrice);
-                    const articleColor = this.dataset.articleColor;
-                    const articleSize = this.dataset.articleSize;
-                    const articleMaterial = this.dataset.articleMaterial;
-                    const articleWeight = parseFloat(this.dataset.articleWeight);
-
-                    selectArticle(articleId, articleName, articlePrice, articleColor, articleSize, articleMaterial, articleWeight);
+                    selectArticle(
+                        this.dataset.articleId, this.dataset.articleName,
+                        parseFloat(this.dataset.articlePrice),
+                        this.dataset.articleColor, this.dataset.articleSize,
+                        this.dataset.articleMaterial, parseFloat(this.dataset.articleWeight)
+                    );
                 });
             });
         })
@@ -233,13 +279,11 @@ function selectArticle(articleId, articleName, articlePrice, articleColor, artic
         return;
     }
 
-    // Setze Defaults für optionale Parameter
     articleColor = articleColor || '';
     articleSize = articleSize || '';
     articleMaterial = articleMaterial || '';
     articleWeight = articleWeight || 0.5;
 
-    // Prüfe ob die Option bereits existiert
     let optionExists = false;
     for (let i = 0; i < currentTargetSelect.options.length; i++) {
         if (currentTargetSelect.options[i].value == articleId) {
@@ -248,16 +292,12 @@ function selectArticle(articleId, articleName, articlePrice, articleColor, artic
         }
     }
 
-    // Wenn die Option nicht existiert, füge sie hinzu
     if (!optionExists) {
         const newOption = document.createElement('option');
         newOption.value = articleId;
-
-        // Erstelle Display-Text mit verfügbaren Details
         let displayText = `${articleName} - ${formatPrice(articlePrice)}€`;
         if (articleColor) displayText += ` (${articleColor})`;
         if (articleSize) displayText += ` - ${articleSize}`;
-
         newOption.textContent = displayText;
         newOption.setAttribute('data-name', articleName);
         newOption.setAttribute('data-price', articlePrice);
@@ -265,23 +305,15 @@ function selectArticle(articleId, articleName, articlePrice, articleColor, artic
         newOption.setAttribute('data-color', articleColor);
         newOption.setAttribute('data-size', articleSize);
         newOption.setAttribute('data-material', articleMaterial);
-
-        // Füge die Option zum Select hinzu
         currentTargetSelect.appendChild(newOption);
     }
 
-    // Setze Wert im Select-Element
     currentTargetSelect.value = articleId;
-
-    // Trigger change event
     const event = new Event('change', { bubbles: true });
     currentTargetSelect.dispatchEvent(event);
 
-    // Schließe Modal
     const modal = bootstrap.Modal.getInstance(document.getElementById('articleSearchModal'));
     modal.hide();
-
-    // Zeige Bestätigung
     showToast('Artikel ausgewählt', `${articleName} wurde ausgewählt`);
 }
 
@@ -296,31 +328,22 @@ function formatPrice(price) {
 }
 
 function showToast(title, message) {
-    // Einfache Toast-Benachrichtigung
-    const toastHtml = `
+    const container = document.createElement('div');
+    container.innerHTML = `
         <div class="toast position-fixed bottom-0 end-0 m-3" role="alert" style="z-index: 9999;">
             <div class="toast-header">
                 <i class="bi bi-check-circle text-success me-2"></i>
                 <strong class="me-auto">${escapeHtml(title)}</strong>
                 <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
             </div>
-            <div class="toast-body">
-                ${escapeHtml(message)}
-            </div>
+            <div class="toast-body">${escapeHtml(message)}</div>
         </div>
     `;
-
-    const container = document.createElement('div');
-    container.innerHTML = toastHtml;
     document.body.appendChild(container);
-
     const toastEl = container.querySelector('.toast');
     const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
     toast.show();
-
-    toastEl.addEventListener('hidden.bs.toast', () => {
-        container.remove();
-    });
+    toastEl.addEventListener('hidden.bs.toast', () => container.remove());
 }
 
 // Event-Listener
@@ -329,9 +352,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (searchInput) {
         searchInput.addEventListener('input', function() {
             clearTimeout(articleSearchTimeout);
-            articleSearchTimeout = setTimeout(searchArticles, 500);
+            articleSearchTimeout = setTimeout(searchArticles, 400);
         });
-
         searchInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -341,14 +363,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    const categoryFilter = document.getElementById('articleCategoryFilter');
-    if (categoryFilter) {
-        categoryFilter.addEventListener('change', searchArticles);
-    }
-
-    const availableFilter = document.getElementById('onlyAvailableFilter');
-    if (availableFilter) {
-        availableFilter.addEventListener('change', searchArticles);
-    }
+    // Filter-Aenderungen loesen neue Suche aus
+    ['articleBrandFilter', 'articleCategoryFilter', 'articleSupplierFilter', 'onlyAvailableFilter'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', function() {
+            if (document.getElementById('articleSearchInput').value.length >= 2) searchArticles();
+        });
+    });
 });
 </script>

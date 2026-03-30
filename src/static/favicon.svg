@@ -1,6 +1,15 @@
-
-<!-- Dummy SVG-Favicon für StitchAdmin -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" fill="#007bff"/>
-  <text x="16" y="20" text-anchor="middle" fill="white" font-family="Arial" font-size="16" font-weight="bold">S</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Hintergrund -->
+  <rect width="32" height="32" rx="6" fill="#2563eb"/>
+  <!-- Sticknadel -->
+  <line x1="8" y1="6" x2="8" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/>
+  <path d="M8 22 L7 25 L9 25 Z" fill="white"/>
+  <path d="M9.5 7 C12 6 13 9 11 11" stroke="#93c5fd" stroke-width="1" fill="none"/>
+  <!-- Laserstrahl -->
+  <line x1="16" y1="8" x2="16" y2="23" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="2 1.5"/>
+  <circle cx="16" cy="23" r="1.5" fill="#ef4444" opacity="0.8"/>
+  <!-- Drucktropfen -->
+  <circle cx="23" cy="12" r="2" fill="#06b6d4"/>
+  <circle cx="23" cy="18" r="2" fill="#f59e0b"/>
+  <circle cx="23" cy="24" r="2" fill="#ec4899"/>
 </svg>

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Feedback & Bugs{% endblock %}
+{% block content %}
+<div class="container-fluid py-4">
+    <h2 class="mb-4"><i class="bi bi-bug me-2"></i>Feedback & Bug-Reports</h2>
+
+    <div class="row g-3 mb-4">
+        {% for key, label, color in [('neu','Neu','danger'),('in_arbeit','In Arbeit','warning'),('erledigt','Erledigt','success'),('gesamt','Gesamt','secondary')] %}
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm text-center py-2">
+                <h3 class="fw-bold text-{{ color }} mb-0">{{ stats[key] }}</h3>
+                <small class="text-muted">{{ label }}</small>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-sm table-hover mb-0">
+                <thead class="table-light">
+                    <tr><th>#</th><th>Typ</th><th>Titel</th><th>Von</th><th>Seite</th><th>Prio</th><th>Status</th><th>Datum</th><th></th></tr>
+                </thead>
+                <tbody>
+                    {% for r in reports %}
+                    <tr>
+                        <td>{{ r.id }}</td>
+                        <td>
+                            {% if r.typ == 'bug' %}<span class="badge bg-danger">Bug</span>
+                            {% elif r.typ == 'feature' %}<span class="badge bg-primary">Idee</span>
+                            {% else %}<span class="badge bg-info">{{ r.typ }}</span>{% endif %}
+                        </td>
+                        <td><strong>{{ r.titel }}</strong>
+                            {% if r.beschreibung %}<br><small class="text-muted">{{ r.beschreibung[:100] }}{% if r.beschreibung|length > 100 %}...{% endif %}</small>{% endif %}
+                        </td>
+                        <td>{{ r.erstellt_von }}</td>
+                        <td><small class="text-muted">{{ r.seite_url|replace('https://','') if r.seite_url else '-' }}</small></td>
+                        <td>
+                            {% if r.prioritaet == 'kritisch' %}<span class="badge bg-danger">Kritisch</span>
+                            {% elif r.prioritaet == 'hoch' %}<span class="badge bg-warning text-dark">Hoch</span>
+                            {% else %}<span class="badge bg-secondary">{{ r.prioritaet }}</span>{% endif %}
+                        </td>
+                        <td>
+                            <select class="form-select form-select-sm" style="width:120px;" onchange="updateFbStatus({{ r.id }}, this.value)">
+                                {% for val, label in [('neu','Neu'),('in_arbeit','In Arbeit'),('erledigt','Erledigt'),('abgelehnt','Abgelehnt')] %}
+                                <option value="{{ val }}" {{ 'selected' if r.status == val }}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td><small>{{ r.created_at.strftime('%d.%m.%Y %H:%M') if r.created_at else '' }}</small></td>
+                        <td>
+                            {% if r.antwort %}<i class="bi bi-chat-dots text-success" title="{{ r.antwort }}"></i>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script>
+function updateFbStatus(id, status) {
+    fetch('/feedback/' + id + '/status', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({status: status})})
+    .then(r => r.json()).then(d => { if(d.success) location.reload(); });
+}
+</script>
+{% endblock %}

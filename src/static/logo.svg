@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Sticknadel (links) -->
+  <g transform="translate(8, 8)">
+    <!-- Nadel -->
+    <line x1="6" y1="4" x2="6" y2="38" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Nadeloehr -->
+    <ellipse cx="6" cy="6" rx="2" ry="3.5" stroke="#2563eb" stroke-width="1.5" fill="none"/>
+    <!-- Nadelspitze -->
+    <path d="M6 38 L4.5 44 L7.5 44 Z" fill="#2563eb"/>
+    <!-- Faden -->
+    <path d="M8 6 C12 4 14 8 12 12 C10 16 14 18 12 22" stroke="#60a5fa" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+  </g>
+
+  <!-- Laserstrahl (mitte) -->
+  <g transform="translate(25, 6)">
+    <!-- Laser-Gehaeuse -->
+    <rect x="3" y="0" width="8" height="12" rx="2" fill="#2563eb"/>
+    <rect x="5" y="10" width="4" height="4" rx="1" fill="#1d4ed8"/>
+    <!-- Laserstrahl -->
+    <line x1="7" y1="14" x2="7" y2="42" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3 2"/>
+    <!-- Brennpunkt -->
+    <circle cx="7" cy="42" r="3" fill="none" stroke="#ef4444" stroke-width="1" opacity="0.7"/>
+    <circle cx="7" cy="42" r="1.2" fill="#ef4444" opacity="0.9"/>
+    <!-- Streulichtstrahlen -->
+    <line x1="7" y1="42" x2="3" y2="46" stroke="#ef4444" stroke-width="0.6" opacity="0.4"/>
+    <line x1="7" y1="42" x2="11" y2="46" stroke="#ef4444" stroke-width="0.6" opacity="0.4"/>
+  </g>
+
+  <!-- Druckkopf (rechts) -->
+  <g transform="translate(42, 6)">
+    <!-- Druckkopf-Gehaeuse -->
+    <rect x="0" y="0" width="14" height="10" rx="2" fill="#2563eb"/>
+    <!-- Duesen -->
+    <rect x="2" y="10" width="2" height="3" rx="0.5" fill="#1d4ed8"/>
+    <rect x="6" y="10" width="2" height="3" rx="0.5" fill="#1d4ed8"/>
+    <rect x="10" y="10" width="2" height="3" rx="0.5" fill="#1d4ed8"/>
+    <!-- Farbtropfen -->
+    <circle cx="3" cy="17" r="1.5" fill="#06b6d4"/>
+    <circle cx="7" cy="19" r="1.5" fill="#f59e0b"/>
+    <circle cx="11" cy="17" r="1.5" fill="#ec4899"/>
+    <!-- Schiene -->
+    <line x1="-2" y1="-2" x2="16" y2="-2" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+</svg>

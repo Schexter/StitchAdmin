@@ -284,6 +284,10 @@ def send_invoice_email(rechnung_id):
         betrag = float(getattr(rechnung, 'brutto_gesamt', None) or getattr(rechnung, 'summe_brutto', 0) or 0)
         kunde_name = rechnung.kunde.display_name if rechnung.kunde else (getattr(rechnung, 'kunde_name', None) or 'Kunde')
 
+        # Bearbeiter-Name ermitteln
+        from src.services.zugpferd_service import ZugpferdService as _ZS
+        bearbeiter_name = _ZS()._get_creator_name(getattr(rechnung, 'erstellt_von', None))
+
         # PDF generieren
         from src.services.zugpferd_service import ZugpferdService
         zugpferd_service = ZugpferdService()
@@ -340,7 +344,7 @@ def send_invoice_email(rechnung_id):
 
 <p>Bei Fragen stehen wir Ihnen gerne zur Verfuegung.</p>
 
-<p>Mit freundlichen Gruessen</p>
+<p>Mit freundlichen Gruessen<br><strong>{bearbeiter_name}</strong></p>
 </body>
 </html>'''
                 html_body = True
@@ -376,7 +380,7 @@ def send_invoice_email(rechnung_id):
                 customer_name=kunde_name,
                 amount=f'{betrag:,.2f}'
             )
-            body = f'Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unsere Rechnung {rechnung.rechnungsnummer}.\n\nMit freundlichen Gruessen'
+            body = f'Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unsere Rechnung {rechnung.rechnungsnummer}.\n\nMit freundlichen Grüßen\n{bearbeiter_name}'
 
             mailto_url = f"mailto:{to_email}?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
 
@@ -408,12 +412,12 @@ def send_invoice_email(rechnung_id):
                 )
                 html_body = None
             else:
-                body = f'Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unsere Rechnung {rechnung.rechnungsnummer} ueber {betrag:,.2f} EUR.\n\nBei Fragen stehen wir Ihnen gerne zur Verfuegung.\n\nMit freundlichen Gruessen'
+                body = f'Sehr geehrte Damen und Herren,\n\nanbei erhalten Sie unsere Rechnung {rechnung.rechnungsnummer} ueber {betrag:,.2f} EUR.\n\nBei Fragen stehen wir Ihnen gerne zur Verfuegung.\n\nMit freundlichen Grüßen\n{bearbeiter_name}'
                 html_body = f'''<html><body style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
 <p>Sehr geehrte Damen und Herren,</p>
 <p>anbei erhalten Sie unsere Rechnung <strong>{rechnung.rechnungsnummer}</strong> ueber <strong>{betrag:,.2f} EUR</strong>.</p>
 <p>Bei Fragen stehen wir Ihnen gerne zur Verfuegung.</p>
-<p>Mit freundlichen Gruessen</p>'''
+<p>Mit freundlichen Grüßen<br><strong>{bearbeiter_name}</strong></p>'''
 
                 # Signatur anhaengen
                 if settings.email_signature:

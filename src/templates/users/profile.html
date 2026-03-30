@@ -47,15 +47,47 @@
                 </div>
                 
                 <hr>
-                
+
                 <div class="d-flex gap-2">
-                    <a href="{{ url_for('users.edit_profile') }}" class="btn btn-primary">
+                    <a href="{{ url_for('users.edit', user_id=user.id) }}" class="btn btn-primary">
                         <i class="bi bi-pencil"></i> Profil bearbeiten
                     </a>
                     <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-                        <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
+                        <i class="bi bi-arrow-left"></i> Zurueck zum Dashboard
                     </a>
                 </div>
+            </div>
+        </div>
+
+        <!-- 2FA Bereich -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Zwei-Faktor-Authentifizierung (2FA)</h5>
+            </div>
+            <div class="card-body">
+                {% if user.totp_enabled %}
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i> Aktiviert</span>
+                    <span class="text-muted">Ihr Konto ist durch 2FA geschuetzt.</span>
+                </div>
+                <form method="POST" action="{{ url_for('auth.disable_2fa') }}" onsubmit="return confirm('2FA wirklich deaktivieren? Ihr Konto wird danach nur noch per Passwort geschuetzt.')">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="input-group" style="max-width: 400px;">
+                        <input type="password" class="form-control" name="password" placeholder="Passwort zur Bestaetigung" required>
+                        <button type="submit" class="btn btn-outline-danger">
+                            <i class="bi bi-shield-x me-1"></i> 2FA deaktivieren
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <span class="badge bg-secondary fs-6"><i class="bi bi-shield me-1"></i> Nicht aktiviert</span>
+                    <span class="text-muted">Schuetzen Sie Ihr Konto mit einer Authenticator-App.</span>
+                </div>
+                <a href="{{ url_for('auth.setup_2fa') }}" class="btn btn-success">
+                    <i class="bi bi-shield-lock me-1"></i> 2FA jetzt einrichten
+                </a>
+                {% endif %}
             </div>
         </div>
     </div>

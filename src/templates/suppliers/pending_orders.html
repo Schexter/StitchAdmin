@@ -110,7 +110,7 @@
                         <td class="text-end">
                             <div class="btn-group" role="group">
                                 {% if order.supplier_id %}
-                                <a href="{{ url_for('suppliers.show_order', supplier_id=order.supplier_id, order_id=order.id) }}"
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}"
                                    class="btn btn-sm btn-outline-primary" title="Details">
                                     <i class="bi bi-eye"></i>
                                 </a>
@@ -178,7 +178,7 @@
                         <td class="text-end">
                             <div class="btn-group" role="group">
                                 {% if order.supplier_id %}
-                                <a href="{{ url_for('suppliers.show_order', supplier_id=order.supplier_id, order_id=order.id) }}"
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}"
                                    class="btn btn-sm btn-outline-primary" title="Details">
                                     <i class="bi bi-eye"></i>
                                 </a>
@@ -246,7 +246,7 @@
                         <td class="text-end">
                             <div class="btn-group" role="group">
                                 {% if order.supplier_id %}
-                                <a href="{{ url_for('suppliers.show_order', supplier_id=order.supplier_id, order_id=order.id) }}"
+                                <a href="{{ url_for('purchasing.order_detail', order_id=order.id) }}"
                                    class="btn btn-sm btn-outline-primary" title="Details">
                                     <i class="bi bi-eye"></i>
                                 </a>

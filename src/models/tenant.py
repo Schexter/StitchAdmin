@@ -4,8 +4,62 @@ Multi-Tenant SaaS - Tenant & UserTenant Models
 Erstellt von: Hans Hahn - Alle Rechte vorbehalten
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from .models import db
+
+
+# Plan-Definitionen: Limits und Features pro Tier
+PLAN_CONFIG = {
+    'trial': {
+        'label': 'Testphase',
+        'price_monthly': 0,
+        'max_users': 3,
+        'max_customers': 50,
+        'max_orders': 100,
+        'storage_mb': 1024,
+        'modules': [
+            'customers', 'orders', 'articles', 'invoices',
+            'machines', 'production', 'settings', 'users',
+        ],
+    },
+    'starter': {
+        'label': 'Starter',
+        'price_monthly': 49,
+        'max_users': 5,
+        'max_customers': 500,
+        'max_orders': 2000,
+        'storage_mb': 5120,
+        'modules': [
+            'customers', 'orders', 'articles', 'invoices',
+            'machines', 'production', 'shipping', 'suppliers',
+            'settings', 'users', 'designs', 'file_browser',
+        ],
+    },
+    'professional': {
+        'label': 'Professional',
+        'price_monthly': 99,
+        'max_users': 15,
+        'max_customers': 5000,
+        'max_orders': 20000,
+        'storage_mb': 20480,
+        'modules': [
+            'customers', 'orders', 'articles', 'invoices',
+            'machines', 'production', 'shipping', 'suppliers',
+            'settings', 'users', 'designs', 'file_browser',
+            'crm', 'shop', 'email_integration', 'calendar',
+            'offers', 'buchhaltung', 'contracts', 'csv_import',
+        ],
+    },
+    'enterprise': {
+        'label': 'Enterprise',
+        'price_monthly': 199,
+        'max_users': 999,
+        'max_customers': 999999,
+        'max_orders': 999999,
+        'storage_mb': 102400,
+        'modules': '__all__',  # Alle Module freigeschaltet
+    },
+}
 
 
 class Tenant(db.Model):
@@ -29,6 +83,17 @@ class Tenant(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False, index=True)
     plan_tier = db.Column(db.String(50), default='starter')
     trial_ends_at = db.Column(db.DateTime, nullable=True)
+
+    # Billing
+    billing_status = db.Column(db.String(30), default='active')
+    # active, past_due, grace_period, suspended, cancelled
+    billing_cycle = db.Column(db.String(20), default='monthly')  # monthly, yearly
+    next_billing_date = db.Column(db.Date, nullable=True)
+    last_payment_date = db.Column(db.Date, nullable=True)
+    last_payment_amount = db.Column(db.Numeric(10, 2), nullable=True)
+    stripe_customer_id = db.Column(db.String(100), nullable=True)
+    stripe_subscription_id = db.Column(db.String(100), nullable=True)
+    tax_id = db.Column(db.String(50), nullable=True)  # USt-ID
 
     # Kontakt
     contact_email = db.Column(db.String(120), nullable=False)
@@ -63,14 +128,60 @@ class Tenant(db.Model):
     # Relationships
     user_memberships = db.relationship('UserTenant', back_populates='tenant',
                                        cascade='all, delete-orphan', lazy='dynamic')
+    payments = db.relationship('TenantPayment', backref='tenant',
+                               lazy='dynamic', order_by='TenantPayment.created_at.desc()')
 
     def __repr__(self):
         return f'<Tenant {self.subdomain}: {self.name}>'
+
+    @property
+    def plan_config(self):
+        return PLAN_CONFIG.get(self.plan_tier, PLAN_CONFIG['starter'])
+
+    @property
+    def plan_label(self):
+        return self.plan_config['label']
+
+    @property
+    def price_monthly(self):
+        return self.plan_config['price_monthly']
 
     def is_trial_expired(self):
         if self.plan_tier != 'trial' or not self.trial_ends_at:
             return False
         return datetime.utcnow() > self.trial_ends_at
+
+    @property
+    def trial_days_remaining(self):
+        if self.plan_tier != 'trial' or not self.trial_ends_at:
+            return None
+        delta = self.trial_ends_at - datetime.utcnow()
+        return max(0, delta.days)
+
+    @property
+    def is_plan_active(self):
+        """Pruefen ob der Plan aktiv und bezahlt ist"""
+        if self.plan_tier == 'trial':
+            return not self.is_trial_expired()
+        return self.billing_status in ('active', 'grace_period')
+
+    def has_module_access(self, module_name):
+        """Pruefen ob dieses Modul im aktuellen Plan enthalten ist"""
+        if not self.is_plan_active:
+            return False
+        modules = self.plan_config.get('modules', [])
+        if modules == '__all__':
+            return True
+        return module_name in modules
+
+    def get_limit(self, key):
+        """Limit-Wert aus Plan-Config holen (max_users, max_customers, etc.)"""
+        return self.plan_config.get(key, 0)
+
+    def check_limit(self, key, current_count):
+        """Pruefen ob ein Limit erreicht ist. True = noch Platz"""
+        limit = self.get_limit(key)
+        return current_count < limit
 
     @staticmethod
     def get_by_subdomain(subdomain):
@@ -79,6 +190,45 @@ class Tenant(db.Model):
     @staticmethod
     def get_by_slug(slug):
         return Tenant.query.filter_by(slug=slug, is_active=True).first()
+
+
+class TenantPayment(db.Model):
+    """
+    Zahlungshistorie pro Tenant - manuell oder via Stripe
+    """
+    __tablename__ = 'tenant_payments'
+
+    id = db.Column(db.Integer, primary_key=True)
+    tenant_id = db.Column(db.Integer, db.ForeignKey('tenants.id'), nullable=False, index=True)
+
+    # Zahlungs-Details
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    currency = db.Column(db.String(3), default='EUR')
+    payment_method = db.Column(db.String(50))  # bank_transfer, stripe, manual
+    reference = db.Column(db.String(200))  # Ueberweisungsreferenz / Stripe Payment ID
+    description = db.Column(db.String(300))  # z.B. "Professional Plan - Maerz 2026"
+
+    # Zeitraum
+    period_start = db.Column(db.Date, nullable=True)
+    period_end = db.Column(db.Date, nullable=True)
+
+    # Status
+    status = db.Column(db.String(30), default='completed')
+    # pending, completed, failed, refunded
+
+    # Rechnungsdaten
+    invoice_number = db.Column(db.String(50), nullable=True)
+    invoice_pdf_path = db.Column(db.String(500), nullable=True)
+
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_by = db.Column(db.String(100))
+
+    def __repr__(self):
+        return f'<TenantPayment {self.amount}€ for tenant={self.tenant_id}>'
+
+
+__all__ = ['Tenant', 'UserTenant', 'TenantPayment', 'PLAN_CONFIG']
 
 
 class UserTenant(db.Model):

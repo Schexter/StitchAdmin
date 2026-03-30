@@ -2,7 +2,7 @@
 """
 E-Mail Automation Service
 ==========================
-Prueft Trigger-Regeln und sendet automatische E-Mails bei Status-Aenderungen.
+Prüft Trigger-Regeln und sendet automatische E-Mails bei Status-Änderungen.
 
 Erstellt von Hans Hahn - Alle Rechte vorbehalten
 """
@@ -17,27 +17,27 @@ logger = logging.getLogger(__name__)
 
 
 class EmailAutomationService:
-    """Service fuer automatischen E-Mail-Versand"""
+    """Service für automatischen E-Mail-Versand"""
 
     def check_and_send(self, order, trigger_event, new_value, old_value=None):
         """
-        Prueft alle aktiven Regeln fuer ein Event und sendet passende E-Mails.
+        Prüft alle aktiven Regeln für ein Event und sendet passende E-Mails.
 
         Args:
             order: Order-Objekt
             trigger_event: z.B. 'order_status', 'workflow_status'
             new_value: Neuer Status-Wert
-            old_value: Alter Status-Wert (optional, fuer Logging)
+            old_value: Alter Status-Wert (optional, für Logging)
         """
         if not order or not order.customer:
             return
 
         customer = order.customer
         if not customer.email:
-            logger.info(f'Automation: Kein E-Mail fuer Kunde {customer.id} - uebersprungen')
+            logger.info(f'Automation: Kein E-Mail für Kunde {customer.id} - übersprungen')
             return
 
-        # Passende aktive Regeln finden
+        # Passende aktive Regeln für dieses Event finden
         rules = EmailAutomationRule.query.filter_by(
             trigger_event=trigger_event,
             trigger_value=new_value,
@@ -46,9 +46,9 @@ class EmailAutomationService:
 
         for rule in rules:
             try:
-                # Bedingungen pruefen
+                # Bedingungen prüfen
                 if not self._check_conditions(rule, order, customer):
-                    self._log(rule, order, customer, 'skipped', 'Bedingungen nicht erfuellt')
+                    self._log(rule, order, customer, 'skipped', 'Bedingungen nicht erfüllt')
                     continue
 
                 # Template laden
@@ -92,13 +92,13 @@ class EmailAutomationService:
                 self._log(rule, order, customer, 'failed', str(e))
 
     def _check_conditions(self, rule, order, customer):
-        """Prueft optionale Bedingungen einer Regel"""
+        """Prüft optionale Bedingungen einer Regel"""
         if not rule.conditions:
             return True
 
         conditions = rule.conditions
 
-        # Kundentyp pruefen
+        # Kundentyp prüfen
         if 'customer_type' in conditions:
             if customer.customer_type != conditions['customer_type']:
                 return False
@@ -110,8 +110,29 @@ class EmailAutomationService:
 
         return True
 
+    WORKFLOW_STATUS_LABELS = {
+        'offer': 'Angebot',
+        'confirmed': 'Bestätigt',
+        'design_pending': 'Design ausstehend',
+        'design_approved': 'Design freigegeben',
+        'in_production': 'In Produktion',
+        'packing': 'Wird verpackt',
+        'ready_to_ship': 'Versandbereit',
+        'shipped': 'Versendet',
+        'invoiced': 'Rechnung gestellt',
+        'completed': 'Abgeschlossen',
+    }
+
+    CARRIER_TRACKING_URLS = {
+        'DHL': 'https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode={}',
+        'DPD': 'https://tracking.dpd.de/status/de_DE/parcel/{}',
+        'UPS': 'https://www.ups.com/track?tracknum={}',
+        'GLS': 'https://gls-group.eu/DE/de/paketverfolgung?match={}',
+        'Hermes': 'https://www.myhermes.de/empfangen/sendungsverfolgung/sendungsinformation#{}',
+    }
+
     def _build_context(self, order, customer):
-        """Baut den Template-Kontext fuer eine Bestellung"""
+        """Baut den Template-Kontext für eine Bestellung"""
         context = {
             'anrede': self._get_anrede(customer),
             'kunde_name': customer.display_name or '',
@@ -121,6 +142,11 @@ class EmailAutomationService:
             'status': order.status or '',
         }
 
+        # Workflow-Status Label
+        if order.workflow_status:
+            context['workflow_status'] = self.WORKFLOW_STATUS_LABELS.get(
+                order.workflow_status, order.workflow_status)
+
         # Optionale Felder
         if order.total_price:
             context['gesamtbetrag'] = f'{order.total_price:.2f} EUR'
@@ -128,11 +154,43 @@ class EmailAutomationService:
         if order.description:
             context['beschreibung'] = order.description
 
-        if hasattr(order, 'tracking_number') and order.tracking_number:
-            context['sendungsnummer'] = order.tracking_number
+        # Lieferdatum
+        if order.due_date:
+            context['lieferdatum'] = order.due_date.strftime('%d.%m.%Y')
 
-        if hasattr(order, 'shipping_carrier') and order.shipping_carrier:
-            context['versanddienstleister'] = order.shipping_carrier
+        # Versand-Infos aus letzter Sendung
+        try:
+            from src.models.models import Shipment
+            shipment = Shipment.query.filter_by(order_id=order.id).order_by(
+                Shipment.created_at.desc()).first()
+            if shipment:
+                if shipment.tracking_number:
+                    context['sendungsnummer'] = shipment.tracking_number
+                if shipment.carrier:
+                    context['versanddienstleister'] = shipment.carrier
+                    # Tracking-URL generieren
+                    url_tpl = self.CARRIER_TRACKING_URLS.get(shipment.carrier)
+                    if url_tpl and shipment.tracking_number:
+                        context['tracking_url'] = url_tpl.format(shipment.tracking_number)
+        except Exception:
+            pass
+
+        # Status-Link für Kunden-Tracking
+        try:
+            if hasattr(order, 'tracking_token') and order.tracking_token:
+                from flask import url_for
+                context['status_link'] = url_for('shop.status', token=order.tracking_token, _external=True)
+        except Exception:
+            pass
+
+        # Firmenname für Signatur
+        try:
+            from src.models.company_settings import CompanySettings
+            company = CompanySettings.get_settings()
+            if company and company.company_name:
+                context['firmenname'] = company.company_name
+        except Exception:
+            pass
 
         return context
 
@@ -146,7 +204,7 @@ class EmailAutomationService:
         return ''
 
     def _send_email(self, to_email, subject, body_html, body_text=None, cc=None):
-        """Sendet E-Mail ueber SMTP"""
+        """Sendet E-Mail über SMTP"""
         try:
             from src.services.email_service_new import EmailService
             service = EmailService()
@@ -154,8 +212,8 @@ class EmailAutomationService:
             result = service.send_email(
                 to=to_email,
                 subject=subject,
-                body_html=body_html,
-                body_text=body_text or '',
+                body=body_text or '',
+                html_body=body_html,
                 cc=cc,
             )
             return result.get('success', False)
@@ -180,6 +238,7 @@ class EmailAutomationService:
             db.session.add(contact)
             db.session.commit()
         except Exception as e:
+            db.session.rollback()
             logger.warning(f'Kontakthistorie konnte nicht gespeichert werden: {e}')
 
     def _log(self, rule, order, customer, status, error_message=None, subject=None):
@@ -200,4 +259,5 @@ class EmailAutomationService:
             db.session.add(log)
             db.session.commit()
         except Exception as e:
+            db.session.rollback()
             logger.error(f'Automation-Log Fehler: {e}')

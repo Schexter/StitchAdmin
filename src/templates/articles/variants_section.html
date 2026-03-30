@@ -4,7 +4,7 @@
 <div class="card mt-4">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0">
-            <i class="fas fa-tags"></i> Artikel-Varianten
+            <i class="bi bi-tags"></i> Artikel-Varianten
             {% if article.has_variants %}
                 <span class="badge bg-info">{{ article.variants.count() }} Varianten</span>
             {% else %}
@@ -13,73 +13,57 @@
         </h5>
         <div>
             {% if article.has_variants %}
-            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addVariantModal">
-                <i class="fas fa-plus"></i> Variante hinzufügen
+            <button type="button" class="btn btn-sm btn-success" onclick="showAddVariant()">
+                <i class="bi bi-plus-lg"></i> Variante
             </button>
             {% endif %}
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="refreshVariants()">
-                <i class="fas fa-sync"></i> Aktualisieren
-            </button>
         </div>
     </div>
     <div class="card-body">
         {% if article.has_variants %}
             <div class="row mb-3">
                 <div class="col-md-8">
-                    <div class="alert alert-info mb-0">
-                        <i class="fas fa-info-circle"></i>
-                        <strong>StitchAdmin Artikelnummer:</strong> {{ article.article_number }}<br>
-                        <strong>L-Shop Artikelnummer:</strong> {{ article.supplier_article_number or 'Nicht verfügbar' }}
+                    <div class="alert alert-info mb-0 py-2">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Artikelnummer:</strong> {{ article.article_number }}
+                        {% if article.supplier_article_number %}
+                        | <strong>Lieferant:</strong> {{ article.supplier_article_number }}
+                        {% endif %}
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="text-end">
-                        <h6 class="text-muted mb-1">Preisspanne</h6>
+                        <small class="text-muted">Preisspanne (EK)</small>
                         {% set price_range = article.calculate_price_range() %}
                         {% if price_range.min == price_range.max %}
-                            <h5 class="text-success mb-0">{{ "%.2f"|format(price_range.min) }} €</h5>
+                            <h5 class="text-success mb-0">{{ "%.2f"|format(price_range.min) }} &euro;</h5>
                         {% else %}
-                            <h5 class="text-success mb-0">{{ "%.2f"|format(price_range.min) }} - {{ "%.2f"|format(price_range.max) }} €</h5>
+                            <h5 class="text-success mb-0">{{ "%.2f"|format(price_range.min) }} - {{ "%.2f"|format(price_range.max) }} &euro;</h5>
                         {% endif %}
-                        <small class="text-muted">Ø {{ "%.2f"|format(price_range.avg) }} €</small>
+                        <small class="text-muted">&Oslash; {{ "%.2f"|format(price_range.avg) }} &euro;</small>
                     </div>
                 </div>
             </div>
 
             <!-- Varianten-Tabelle -->
             <div class="table-responsive">
-                <table class="table table-hover" id="variantsTable">
+                <table class="table table-hover table-sm" id="variantsTable">
                     <thead class="table-light">
                         <tr>
-                            <th style="width: 40px;"></th>
-                            <th>Varianten-Nr.</th>
                             <th>Farbe</th>
-                            <th>Größe</th>
-                            <th>EK Einzel</th>
-                            <th>EK Karton</th>
-                            <th>VK aktuell</th>
-                            <th>Bestand</th>
-                            <th>Status</th>
-                            <th style="width: 100px;">Aktionen</th>
+                            <th>Gr&ouml;&szlig;e</th>
+                            <th>EAN</th>
+                            <th class="text-end">EK Einzel</th>
+                            <th class="text-end">EK Karton</th>
+                            <th class="text-end">VK</th>
+                            <th class="text-center">Bestand</th>
+                            <th class="text-center">Status</th>
+                            <th style="width: 90px;">Aktionen</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for variant in article.get_all_variants() %}
-                        <tr data-variant-id="{{ variant.id }}" 
-                            {% if variant.is_main_variant %}class="table-warning"{% endif %}>
-                            <td>
-                                {% if variant.is_main_variant %}
-                                    <i class="fas fa-star text-warning" title="Haupt-Variante"></i>
-                                {% else %}
-                                    <span class="badge bg-light text-dark">{{ loop.index }}</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <code class="text-primary">{{ variant.variant_number }}</code>
-                                {% if variant.manufacturer_number %}
-                                    <br><small class="text-muted">Herst.: {{ variant.manufacturer_number }}</small>
-                                {% endif %}
-                            </td>
+                        <tr data-variant-id="{{ variant.id }}">
                             <td>
                                 {% if variant.color %}
                                     <span class="badge bg-secondary">{{ variant.color }}</span>
@@ -94,44 +78,41 @@
                                     <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>
-                                {% if variant.purchase_price_single > 0 %}
-                                    <span class="text-success">{{ "%.2f"|format(variant.purchase_price_single) }} €</span>
+                            <td><small class="text-muted">{{ variant.ean or '-' }}</small></td>
+                            <td class="text-end">
+                                {% if variant.single_price %}
+                                    {{ "%.2f"|format(variant.single_price) }} &euro;
                                 {% else %}
                                     <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>
-                                {% if variant.purchase_price_carton > 0 %}
-                                    <span class="text-info">{{ "%.2f"|format(variant.purchase_price_carton) }} €</span>
+                            <td class="text-end">
+                                {% if variant.carton_price %}
+                                    {{ "%.2f"|format(variant.carton_price) }} &euro;
                                     {% if variant.units_per_carton %}
-                                        <br><small class="text-muted">{{ variant.units_per_carton }} Stk/Krt</small>
+                                    <br><small class="text-muted">{{ variant.units_per_carton }} Stk</small>
                                     {% endif %}
                                 {% else %}
                                     <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="text-end">
                                 {% if variant.price > 0 %}
-                                    <strong class="text-success">{{ "%.2f"|format(variant.price) }} €</strong>
-                                    <br><small class="text-muted">Brutto: {{ "%.2f"|format(variant.price * 1.19) }} €</small>
+                                    <strong>{{ "%.2f"|format(variant.price) }} &euro;</strong>
                                 {% else %}
-                                    <span class="text-warning">Nicht gesetzt</span>
+                                    <span class="text-warning">-</span>
                                 {% endif %}
                             </td>
-                            <td>
+                            <td class="text-center">
                                 {% if variant.stock > 0 %}
                                     <span class="badge bg-success">{{ variant.stock }}</span>
                                 {% elif variant.stock == 0 %}
-                                    <span class="badge bg-warning">0</span>
+                                    <span class="badge bg-warning text-dark">0</span>
                                 {% else %}
                                     <span class="badge bg-danger">{{ variant.stock }}</span>
                                 {% endif %}
-                                {% if variant.min_stock > 0 %}
-                                    <br><small class="text-muted">Min: {{ variant.min_stock }}</small>
-                                {% endif %}
                             </td>
-                            <td>
+                            <td class="text-center">
                                 {% if variant.active %}
                                     <span class="badge bg-success">Aktiv</span>
                                 {% else %}
@@ -139,21 +120,15 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <button type="button" class="btn btn-outline-primary" 
-                                            onclick="editVariant('{{ variant.id }}')" title="Bearbeiten">
-                                        <i class="fas fa-edit"></i>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary py-0 px-1"
+                                            onclick="editVariant({{ variant.id }})" title="Bearbeiten">
+                                        <i class="bi bi-pencil"></i>
                                     </button>
-                                    <button type="button" class="btn btn-outline-secondary" 
-                                            onclick="copyVariant('{{ variant.id }}')" title="Kopieren">
-                                        <i class="fas fa-copy"></i>
+                                    <button class="btn btn-outline-danger py-0 px-1"
+                                            onclick="deleteVariant({{ variant.id }})" title="L&ouml;schen">
+                                        <i class="bi bi-trash"></i>
                                     </button>
-                                    {% if not variant.is_main_variant %}
-                                    <button type="button" class="btn btn-outline-danger" 
-                                            onclick="deleteVariant('{{ variant.id }}')" title="Löschen">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                    {% endif %}
                                 </div>
                             </td>
                         </tr>
@@ -163,17 +138,203 @@
             </div>
 
         {% else %}
-            <!-- Keine Varianten vorhanden -->
-            <div class="text-center py-5">
-                <i class="fas fa-tags fa-3x text-muted mb-3"></i>
-                <h5 class="text-muted">Dieser Artikel hat keine Varianten</h5>
-                <p class="text-muted mb-4">
-                    Varianten ermöglichen es, Artikel in verschiedenen Farben, Größen oder anderen Eigenschaften zu verwalten.
-                </p>
-                <button type="button" class="btn btn-primary" onclick="convertToVariantGroup()">
-                    <i class="fas fa-magic"></i> Zu Varianten-Artikel umwandeln
+            <div class="text-center py-4">
+                <i class="bi bi-tags" style="font-size: 2rem; color: #adb5bd;"></i>
+                <p class="text-muted mt-2 mb-3">Dieser Artikel hat keine Varianten.</p>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="convertToVariantGroup()">
+                    <i class="bi bi-arrow-repeat"></i> Zu Varianten-Artikel umwandeln
                 </button>
             </div>
         {% endif %}
     </div>
 </div>
+
+<!-- Variante bearbeiten/erstellen Modal -->
+<div class="modal fade" id="variantModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="variantModalTitle">Variante</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="variantId">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Farbe</label>
+                        <input type="text" id="variantColor" class="form-control" placeholder="z.B. Schwarz">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Gr&ouml;&szlig;e</label>
+                        <input type="text" id="variantSize" class="form-control" placeholder="z.B. M">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">EAN / Barcode</label>
+                    <input type="text" id="variantEan" class="form-control">
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">EK Einzel (&euro;)</label>
+                        <input type="number" step="0.01" id="variantSinglePrice" class="form-control">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">EK Karton (&euro;)</label>
+                        <input type="number" step="0.01" id="variantCartonPrice" class="form-control">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">EK 10-Karton (&euro;)</label>
+                        <input type="number" step="0.01" id="variantTenCartonPrice" class="form-control">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">VE/Karton</label>
+                        <input type="number" id="variantUnitsPerCarton" class="form-control">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Bestand</label>
+                        <input type="number" id="variantStock" class="form-control" value="0">
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Min. Bestand</label>
+                        <input type="number" id="variantMinStock" class="form-control" value="0">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="saveVariant()">Speichern</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const ARTICLE_ID = '{{ article.id }}';
+const VARIANTS_API = '/articles/api/' + ARTICLE_ID + '/variants';
+let variantModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    variantModal = new bootstrap.Modal(document.getElementById('variantModal'));
+});
+
+function showAddVariant() {
+    document.getElementById('variantModalTitle').textContent = 'Neue Variante';
+    document.getElementById('variantId').value = '';
+    document.getElementById('variantColor').value = '';
+    document.getElementById('variantSize').value = '';
+    document.getElementById('variantEan').value = '';
+    document.getElementById('variantSinglePrice').value = '';
+    document.getElementById('variantCartonPrice').value = '';
+    document.getElementById('variantTenCartonPrice').value = '';
+    document.getElementById('variantUnitsPerCarton').value = '';
+    document.getElementById('variantStock').value = '0';
+    document.getElementById('variantMinStock').value = '0';
+    variantModal.show();
+}
+
+function editVariant(variantId) {
+    fetch('/articles/api/variants/' + variantId, {method: 'GET'})
+        .then(r => {
+            // Variante laden aus der Tabelle via GET auf die Liste
+            return fetch(VARIANTS_API);
+        })
+        .then(r => r.json())
+        .then(variants => {
+            const v = variants.find(x => x.id === variantId);
+            if (!v) { alert('Variante nicht gefunden'); return; }
+
+            document.getElementById('variantModalTitle').textContent = 'Variante bearbeiten';
+            document.getElementById('variantId').value = v.id;
+            document.getElementById('variantColor').value = v.color || '';
+            document.getElementById('variantSize').value = v.size || '';
+            document.getElementById('variantEan').value = v.ean || '';
+            document.getElementById('variantSinglePrice').value = v.single_price || '';
+            document.getElementById('variantCartonPrice').value = v.carton_price || '';
+            document.getElementById('variantTenCartonPrice').value = v.ten_carton_price || '';
+            document.getElementById('variantUnitsPerCarton').value = v.units_per_carton || '';
+            document.getElementById('variantStock').value = v.stock || 0;
+            document.getElementById('variantMinStock').value = v.min_stock || 0;
+            variantModal.show();
+        })
+        .catch(err => alert('Fehler: ' + err.message));
+}
+
+function saveVariant() {
+    const id = document.getElementById('variantId').value;
+    const data = {
+        color: document.getElementById('variantColor').value.trim(),
+        size: document.getElementById('variantSize').value.trim(),
+        ean: document.getElementById('variantEan').value.trim(),
+        single_price: document.getElementById('variantSinglePrice').value || null,
+        carton_price: document.getElementById('variantCartonPrice').value || null,
+        ten_carton_price: document.getElementById('variantTenCartonPrice').value || null,
+        units_per_carton: document.getElementById('variantUnitsPerCarton').value || null,
+        stock: document.getElementById('variantStock').value || 0,
+        min_stock: document.getElementById('variantMinStock').value || 0,
+    };
+
+    if (!data.color && !data.size) {
+        alert('Bitte Farbe oder Groesse angeben');
+        return;
+    }
+
+    let url, method;
+    if (id) {
+        url = '/articles/api/variants/' + id;
+        method = 'PUT';
+    } else {
+        url = VARIANTS_API;
+        method = 'POST';
+    }
+
+    fetch(url, {
+        method: method,
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) {
+            variantModal.hide();
+            location.reload();
+        } else {
+            alert(result.error || 'Fehler beim Speichern');
+        }
+    })
+    .catch(err => alert('Netzwerkfehler: ' + err.message));
+}
+
+function deleteVariant(variantId) {
+    if (!confirm('Variante wirklich loeschen?')) return;
+
+    fetch('/articles/api/variants/' + variantId, {
+        method: 'DELETE',
+        credentials: 'same-origin'
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) location.reload();
+        else alert(result.error || 'Fehler');
+    })
+    .catch(err => alert('Netzwerkfehler: ' + err.message));
+}
+
+function convertToVariantGroup() {
+    if (!confirm('Diesen Artikel zu einem Varianten-Artikel umwandeln?')) return;
+
+    fetch('/articles/api/' + ARTICLE_ID + '/convert-to-variants', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.success) location.reload();
+        else alert(result.error || 'Fehler');
+    })
+    .catch(err => alert('Netzwerkfehler: ' + err.message));
+}
+</script>

@@ -109,7 +109,7 @@ class EmailAutomationLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     rule_id = db.Column(db.Integer, db.ForeignKey('email_automation_rules.id', ondelete='SET NULL'), nullable=True)
-    order_id = db.Column(db.Integer, nullable=True)
+    order_id = db.Column(db.String(50), nullable=True)
     customer_id = db.Column(db.String(50), nullable=True)
 
     # E-Mail Details

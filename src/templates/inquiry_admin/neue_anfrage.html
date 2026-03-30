@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Neue Anfrage - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-envelope-paper"></i> Neue Anfrage anlegen</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item"><a href="{{ url_for('inquiry_admin.list') }}">Anfragen</a></li>
+                <li class="breadcrumb-item active">Neue Anfrage</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <form method="POST" action="{{ url_for('inquiry_admin.neue_anfrage') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+            <!-- Kontaktdaten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6><i class="bi bi-person"></i> Kontaktdaten</h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Bestehenden Kunden verknüpfen</label>
+                        <select name="kunde_id" id="kunde_id" class="form-select" onchange="fillFromCustomer(this)">
+                            <option value="">-- Kein Kunde / Neuer Kontakt --</option>
+                            {% for kunde in kunden %}
+                            <option value="{{ kunde.id }}"
+                                    data-first="{{ kunde.first_name or '' }}"
+                                    data-last="{{ kunde.last_name or '' }}"
+                                    data-email="{{ kunde.email or '' }}"
+                                    data-phone="{{ kunde.phone or '' }}"
+                                    data-company="{{ kunde.company_name or '' }}"
+                                    {{ 'selected' if vorselektierter_kunde and vorselektierter_kunde.id == kunde.id }}>
+                                {{ kunde.display_name }}
+                                {% if kunde.company_name %} ({{ kunde.company_name }}){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text"><i class="bi bi-info-circle"></i> Optional: Verknüpft die Anfrage mit einem bestehenden Kunden</div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Vorname *</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" required
+                                       value="{{ vorselektierter_kunde.first_name if vorselektierter_kunde else '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Nachname *</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" required
+                                       value="{{ vorselektierter_kunde.last_name if vorselektierter_kunde else '' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">E-Mail</label>
+                                <input type="email" class="form-control" id="email" name="email"
+                                       value="{{ vorselektierter_kunde.email if vorselektierter_kunde else '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Telefon</label>
+                                <input type="text" class="form-control" id="phone" name="phone"
+                                       value="{{ vorselektierter_kunde.phone if vorselektierter_kunde else '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Firma</label>
+                                <input type="text" class="form-control" id="company_name" name="company_name"
+                                       value="{{ vorselektierter_kunde.company_name if vorselektierter_kunde else '' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Anfrage-Details -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6><i class="bi bi-chat-left-text"></i> Anfrage-Details</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Anfrageart *</label>
+                                <select name="inquiry_type" class="form-select" required>
+                                    {% for key, label in inquiry_types.items() %}
+                                    <option value="{{ key }}">{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Menge</label>
+                                <input type="number" class="form-control" name="quantity" min="1" placeholder="z.B. 100">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Wunschtermin</label>
+                                <input type="date" class="form-control" name="desired_date">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label class="form-label">Textilart</label>
+                                <input type="text" class="form-control" name="textile_type"
+                                       placeholder="z.B. Poloshirt, T-Shirt, Cap...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung *</label>
+                        <textarea class="form-control" name="description" rows="4" required
+                                  placeholder="Was möchte der Kunde? (Design, Farben, Platzierung, besondere Wünsche...)"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Interne Notizen</label>
+                        <textarea class="form-control" name="internal_notes" rows="2"
+                                  placeholder="Interne Notizen (nicht für Kunden sichtbar)..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="{{ url_for('inquiry_admin.list') }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Zurück
+                </a>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check-lg"></i> Anfrage anlegen
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Hinweis</h6>
+            </div>
+            <div class="card-body">
+                <p class="small">Nutzen Sie dieses Formular für Anfragen, die per <strong>Telefon</strong>, <strong>E-Mail</strong> oder <strong>persönlich</strong> eingegangen sind.</p>
+                <hr>
+                <h6>Nächste Schritte:</h6>
+                <ol class="small">
+                    <li>Anfrage anlegen</li>
+                    <li>Kalkulation durchführen</li>
+                    <li>Angebot erstellen</li>
+                    <li>Angebot versenden</li>
+                </ol>
+                <hr>
+                <p class="small text-muted">
+                    <i class="bi bi-globe"></i> Online-Anfragen über die Website werden automatisch angelegt.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function fillFromCustomer(select) {
+    const option = select.options[select.selectedIndex];
+    if (option.value) {
+        document.getElementById('first_name').value = option.dataset.first || '';
+        document.getElementById('last_name').value = option.dataset.last || '';
+        document.getElementById('email').value = option.dataset.email || '';
+        document.getElementById('phone').value = option.dataset.phone || '';
+        document.getElementById('company_name').value = option.dataset.company || '';
+    }
+}
+</script>
+{% endblock %}

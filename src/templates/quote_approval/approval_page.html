@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Angebots-Freigabe - {{ angebot.angebotsnummer }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+    <style>
+        body { background: #f0f2f5; }
+        .approval-header {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            color: white; padding: 30px 0; text-align: center;
+        }
+        .approval-card { background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); padding: 30px; margin-bottom: 20px; }
+        .signature-canvas { border: 2px dashed #dee2e6; border-radius: 8px; cursor: crosshair; width: 100%; height: 200px; }
+        .signature-canvas.has-signature { border-color: #198754; }
+        .detail-label { font-weight: 600; color: #6c757d; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .detail-value { font-size: 1.1rem; margin-bottom: 0.5rem; }
+        .price-highlight { font-size: 1.5rem; font-weight: 700; color: #2563eb; }
+        @media print { .no-print { display: none !important; } }
+    </style>
+</head>
+<body>
+    <div class="approval-header">
+        <div class="container">
+            {% if company and company.company_name %}
+            <p class="mb-1" style="opacity: 0.8;">{{ company.company_name }}</p>
+            {% endif %}
+            <h1 class="mb-0"><i class="bi bi-file-earmark-check"></i> Angebots-Freigabe</h1>
+            <p class="mt-2 mb-0" style="opacity: 0.9;">Angebot {{ angebot.angebotsnummer }}</p>
+        </div>
+    </div>
+
+    <div class="container" style="max-width: 800px; margin-top: -20px;">
+        <!-- Angebots-Details -->
+        <div class="approval-card">
+            <h4 class="mb-4"><i class="bi bi-file-text text-primary"></i> Angebotsdetails</h4>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="detail-label">Angebotsnummer</div>
+                    <div class="detail-value">{{ angebot.angebotsnummer }}</div>
+                </div>
+                <div class="col-md-6">
+                    <div class="detail-label">Datum</div>
+                    <div class="detail-value">{{ angebot.angebotsdatum.strftime('%d.%m.%Y') if angebot.angebotsdatum else '-' }}</div>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="detail-label">Gueltig bis</div>
+                    <div class="detail-value">
+                        {{ angebot.gueltig_bis.strftime('%d.%m.%Y') if angebot.gueltig_bis else '-' }}
+                        {% if angebot.ist_abgelaufen %}
+                        <span class="badge bg-danger ms-1">Abgelaufen</span>
+                        {% else %}
+                        <span class="badge bg-success ms-1">Gueltig</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="detail-label">Kunde</div>
+                    <div class="detail-value">{{ angebot.kunde_name }}</div>
+                </div>
+            </div>
+
+            {% if angebot.titel %}
+            <div class="mb-3">
+                <div class="detail-label">Titel</div>
+                <div class="detail-value">{{ angebot.titel }}</div>
+            </div>
+            {% endif %}
+
+            {% if angebot.beschreibung %}
+            <div class="mb-3">
+                <div class="detail-label">Beschreibung</div>
+                <div class="detail-value">{{ angebot.beschreibung }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Positionen -->
+        {% if angebot.positionen %}
+        <div class="approval-card">
+            <h4 class="mb-4"><i class="bi bi-list-check text-primary"></i> Positionen</h4>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Pos.</th>
+                            <th>Beschreibung</th>
+                            <th class="text-center">Menge</th>
+                            <th class="text-end">Einzelpreis</th>
+                            <th class="text-end">Gesamt</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pos in angebot.positionen %}
+                        {% if pos.is_veredelung %}
+                        {# Veredelungs-Position mit Design-Vorschau #}
+                        <tr>
+                            <td>{{ pos.position }}</td>
+                            <td colspan="4">
+                                <div class="d-flex gap-3 align-items-start">
+                                    {% if pos.design_thumbnail_path or pos.design_file_path %}
+                                    <div class="flex-shrink-0" style="width: 80px; height: 80px; border: 1px solid #dee2e6; border-radius: 6px; overflow: hidden; background: #f8f9fa;">
+                                        <img src="{{ url_for('static', filename=pos.design_thumbnail_path or pos.design_file_path) }}"
+                                             alt="Design-Vorschau" style="width: 100%; height: 100%; object-fit: contain;">
+                                    </div>
+                                    {% endif %}
+                                    <div class="flex-grow-1">
+                                        <strong>{{ pos.artikel_name }}</strong>
+                                        {% if pos.design_position_label %}
+                                        <span class="badge bg-info ms-1">{{ pos.design_position_label }}</span>
+                                        {% endif %}
+                                        <div class="mt-1">
+                                            {% if pos.stichzahl %}
+                                            <small class="text-muted me-3"><i class="bi bi-hash"></i> {{ "{:,}".format(pos.stichzahl).replace(",", ".") }} Stiche</small>
+                                            {% endif %}
+                                            {% if pos.design_breite_mm and pos.design_hoehe_mm %}
+                                            <small class="text-muted me-3"><i class="bi bi-aspect-ratio"></i> {{ "%.0f"|format(pos.design_breite_mm) }} x {{ "%.0f"|format(pos.design_hoehe_mm) }} mm</small>
+                                            {% endif %}
+                                        </div>
+                                        {% if pos.beschreibung %}
+                                        <small class="text-muted">{{ pos.beschreibung }}</small>
+                                        {% endif %}
+                                        <div class="mt-1">
+                                            {% if pos.einrichtungskosten %}
+                                            <small class="text-muted">Einrichtung: {{ "%.2f"|format(pos.einrichtungskosten) }} EUR</small>
+                                            <span class="mx-1">|</span>
+                                            {% endif %}
+                                            <small>{{ pos.menge|int }} Stk x {{ "%.2f"|format(pos.einzelpreis or 0) }} EUR = <strong>{{ "%.2f"|format(pos.brutto_betrag or 0) }} EUR</strong></small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        {# Normale Position #}
+                        <tr>
+                            <td>{{ pos.position }}</td>
+                            <td>
+                                <strong>{{ pos.artikel_name }}</strong>
+                                {% if pos.beschreibung %}
+                                <br><small class="text-muted">{{ pos.beschreibung }}</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ pos.menge|int }} {{ pos.einheit }}</td>
+                            <td class="text-end">{{ "%.2f"|format(pos.einzelpreis or 0) }} EUR</td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(pos.brutto_betrag or 0) }} EUR</strong></td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-light">
+                        {% if angebot.rabatt_prozent %}
+                        <tr>
+                            <td colspan="4" class="text-end">Rabatt ({{ angebot.rabatt_prozent }}%)</td>
+                            <td class="text-end text-danger">-{{ "%.2f"|format(angebot.rabatt_betrag or 0) }} EUR</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td colspan="4" class="text-end"><strong>Netto</strong></td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(angebot.netto_gesamt or 0) }} EUR</strong></td>
+                        </tr>
+                        <tr>
+                            <td colspan="4" class="text-end">MwSt.</td>
+                            <td class="text-end">{{ "%.2f"|format(angebot.mwst_gesamt or 0) }} EUR</td>
+                        </tr>
+                        <tr>
+                            <td colspan="4" class="text-end"><strong class="price-highlight">Gesamt (brutto)</strong></td>
+                            <td class="text-end"><strong class="price-highlight">{{ "%.2f"|format(angebot.brutto_gesamt or 0) }} EUR</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Textbausteine / Konditionen -->
+        {% if angebot.textbausteine_text %}
+        <div class="approval-card">
+            <h4 class="mb-3"><i class="bi bi-card-text text-primary"></i> Konditionen</h4>
+            <div class="bg-light rounded p-3">
+                {{ angebot.textbausteine_text|replace('\n', '<br>')|safe }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- PDF-Download -->
+        <div class="approval-card">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <i class="bi bi-file-earmark-pdf text-danger" style="font-size: 2rem;"></i>
+                <div>
+                    <strong>Angebot als PDF herunterladen</strong><br>
+                    <small class="text-muted">Drucken, per Hand unterschreiben und per Post oder E-Mail zuruecksenden.</small>
+                </div>
+                <a href="{{ url_for('quote_approval.download_pdf', token=token) }}" class="btn btn-outline-danger ms-auto" target="_blank">
+                    <i class="bi bi-download me-1"></i> PDF herunterladen
+                </a>
+            </div>
+        </div>
+
+        <!-- Freigabe-Bereich -->
+        <div class="approval-card no-print" id="approval-section">
+            <h4 class="mb-4"><i class="bi bi-pen text-success"></i> Freigabe</h4>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Ihr Name *</label>
+                <input type="text" class="form-control" id="customerName" placeholder="Vor- und Nachname" required>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Unterschrift</label>
+                <canvas id="signatureCanvas" class="signature-canvas"></canvas>
+                <div class="d-flex justify-content-between mt-1">
+                    <small class="text-muted">Mit der Maus oder dem Finger unterschreiben</small>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSignature()">
+                        <i class="bi bi-eraser"></i> Loeschen
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold">Anmerkungen (optional)</label>
+                <textarea class="form-control" id="approvalNotes" rows="2" placeholder="Optionale Anmerkungen..."></textarea>
+            </div>
+
+            <div class="form-check mb-4">
+                <input class="form-check-input" type="checkbox" id="confirmCheck">
+                <label class="form-check-label" for="confirmCheck">
+                    Ich habe das Angebot {% if angebot.positionen|selectattr('is_veredelung')|list %}und die Design-Vorlagen {% endif %}gelesen und moechte es <strong>verbindlich annehmen</strong>.
+                </label>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-success btn-lg flex-grow-1" onclick="submitApproval()" id="approveBtn">
+                    <i class="bi bi-check-circle"></i> Angebot annehmen
+                </button>
+                <button class="btn btn-outline-warning btn-lg" onclick="showRejectForm()" id="rejectBtn">
+                    <i class="bi bi-pencil-square"></i> Aenderung wuenschen
+                </button>
+            </div>
+
+            <!-- Ablehnung / Aenderungswunsch (versteckt) -->
+            <div id="rejectForm" class="mt-4" style="display: none;">
+                <hr>
+                <h5 class="text-warning"><i class="bi bi-pencil-square"></i> Aenderungswunsch</h5>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Was moechten Sie aendern? *</label>
+                    <textarea class="form-control" id="rejectReason" rows="3" placeholder="Beschreiben Sie Ihre Aenderungswuensche..."></textarea>
+                </div>
+                <button class="btn btn-warning" onclick="submitRejection()">
+                    <i class="bi bi-send"></i> Aenderungswunsch absenden
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="text-center py-4 text-muted small">
+        {% if company and company.company_name %}
+        <p>{{ company.company_name }}{% if company.phone %} | {{ company.phone }}{% endif %}{% if company.email %} | {{ company.email }}{% endif %}</p>
+        {% endif %}
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    // Signature Pad initialisieren
+    const canvas = document.getElementById('signatureCanvas');
+    const signaturePad = new SignaturePad(canvas, {
+        backgroundColor: 'rgb(255, 255, 255)',
+        penColor: 'rgb(0, 0, 0)'
+    });
+
+    function resizeCanvas() {
+        const ratio = Math.max(window.devicePixelRatio || 1, 1);
+        canvas.width = canvas.offsetWidth * ratio;
+        canvas.height = canvas.offsetHeight * ratio;
+        canvas.getContext('2d').scale(ratio, ratio);
+        signaturePad.clear();
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function clearSignature() {
+        signaturePad.clear();
+        canvas.classList.remove('has-signature');
+    }
+
+    signaturePad.addEventListener('endStroke', function() {
+        canvas.classList.add('has-signature');
+    });
+
+    function submitApproval() {
+        const name = document.getElementById('customerName').value.trim();
+        const confirmed = document.getElementById('confirmCheck').checked;
+        const notes = document.getElementById('approvalNotes').value.trim();
+
+        if (!name) { alert('Bitte geben Sie Ihren Namen ein.'); return; }
+        if (!confirmed) { alert('Bitte bestaetigen Sie die Annahme des Angebots.'); return; }
+
+        const data = {
+            customer_name: name,
+            notes: notes,
+            signature: signaturePad.isEmpty() ? null : signaturePad.toDataURL('image/png')
+        };
+
+        document.getElementById('approveBtn').disabled = true;
+        document.getElementById('approveBtn').innerHTML = '<span class="spinner-border spinner-border-sm"></span> Wird verarbeitet...';
+
+        fetch('{{ url_for("quote_approval.approve", token=token) }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                window.location.href = result.redirect;
+            } else {
+                alert(result.error || 'Fehler bei der Freigabe');
+                document.getElementById('approveBtn').disabled = false;
+                document.getElementById('approveBtn').innerHTML = '<i class="bi bi-check-circle"></i> Angebot annehmen';
+            }
+        })
+        .catch(() => {
+            alert('Verbindungsfehler. Bitte versuchen Sie es erneut.');
+            document.getElementById('approveBtn').disabled = false;
+            document.getElementById('approveBtn').innerHTML = '<i class="bi bi-check-circle"></i> Angebot annehmen';
+        });
+    }
+
+    function showRejectForm() {
+        document.getElementById('rejectForm').style.display = '';
+        document.getElementById('rejectForm').scrollIntoView({behavior: 'smooth'});
+    }
+
+    function submitRejection() {
+        const name = document.getElementById('customerName').value.trim();
+        const reason = document.getElementById('rejectReason').value.trim();
+
+        if (!name) { alert('Bitte geben Sie Ihren Namen ein.'); return; }
+        if (!reason) { alert('Bitte beschreiben Sie Ihre Aenderungswuensche.'); return; }
+
+        fetch('{{ url_for("quote_approval.reject", token=token) }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({customer_name: name, reason: reason})
+        })
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) {
+                window.location.href = result.redirect;
+            } else {
+                alert(result.error || 'Fehler');
+            }
+        })
+        .catch(() => alert('Verbindungsfehler'));
+    }
+    </script>
+</body>
+</html>

@@ -308,6 +308,59 @@
     </div>
     
     <div class="col-md-4">
+        <!-- Artikelbild -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-image me-1"></i>Artikelbild</h5>
+                {% if article.image_path %}
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteArticleImage()" title="Bild entfernen">
+                    <i class="bi bi-trash"></i>
+                </button>
+                {% endif %}
+            </div>
+            <div class="card-body text-center" id="article-image-container">
+                {% if article.image_path %}
+                <img src="/uploads/{{ article.image_path }}" class="img-fluid rounded mb-2" style="max-height: 250px;" alt="{{ article.name }}">
+                {% else %}
+                <div class="text-muted py-4">
+                    <i class="bi bi-image" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <p class="mt-2 mb-0">Kein Bild vorhanden</p>
+                </div>
+                {% endif %}
+                <div class="d-grid gap-1 mt-2">
+                    <button class="btn btn-outline-primary btn-sm" onclick="searchArticleImage()" id="search-image-btn">
+                        <i class="bi bi-search me-1"></i>Automatisch suchen
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" type="button"
+                            data-bs-toggle="collapse" data-bs-target="#manualUrlInput">
+                        <i class="bi bi-link-45deg me-1"></i>URL direkt eingeben
+                    </button>
+                </div>
+                <div class="collapse mt-2" id="manualUrlInput">
+                    <div class="input-group input-group-sm">
+                        <input type="url" class="form-control" id="manual-image-url"
+                               placeholder="https://...bild.jpg">
+                        <button class="btn btn-success" type="button" onclick="saveFromUrl()">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted">Bild-URL von Lieferant/L-Shop einfügen</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bildsuch-Ergebnisse (hidden) -->
+        <div class="card mb-4 d-none" id="image-search-results">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Gefundene Bilder</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeImageSearch()">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="card-body" id="image-results-body">
+            </div>
+        </div>
+
         <!-- Lagerbestand -->
         <div class="card mb-4">
             <div class="card-header">
@@ -347,6 +400,30 @@
             </div>
         </div>
         
+        <!-- Veredelungsinfos -->
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-sliders"></i> Veredelungsinfos</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="toggleVeredelungEdit()">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </div>
+            <div class="card-body" id="veredelungDisplay">
+                <div class="text-center text-muted py-2" id="veredelungLoading">
+                    <i class="bi bi-hourglass-split"></i> Laden...
+                </div>
+            </div>
+            <div class="card-body d-none" id="veredelungEdit">
+                <div id="veredelungForms"></div>
+                <div class="text-end mt-2">
+                    <button class="btn btn-sm btn-secondary" onclick="toggleVeredelungEdit()">Abbrechen</button>
+                    <button class="btn btn-sm btn-primary" onclick="saveVeredelung()">
+                        <i class="bi bi-check"></i> Speichern
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Schnellaktionen -->
         <div class="card">
             <div class="card-header">
@@ -578,8 +655,259 @@ function duplicateArticle() {
     alert('Duplizieren-Funktion wird in der nächsten Version implementiert');
 }
 
-function printLabel() {
-    alert('Etikettendruck wird in der nächsten Version implementiert');
+// ==================== Artikelbild-Suche ====================
+
+function searchArticleImage() {
+    const btn = document.getElementById('search-image-btn');
+    const resultsCard = document.getElementById('image-search-results');
+    const resultsBody = document.getElementById('image-results-body');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Suche...';
+    resultsCard.classList.remove('d-none');
+    resultsBody.innerHTML = '<div class="text-center py-3"><div class="spinner-border text-primary"></div><p class="mt-2 text-muted">Bilder werden gesucht...</p></div>';
+
+    fetch("{{ url_for('articles.image_search', article_id=article.id) }}")
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            resultsBody.innerHTML = `<div class="alert alert-danger mb-0">${data.error}</div>`;
+            return;
+        }
+        const images = data.images || [];
+        if (images.length === 0) {
+            resultsBody.innerHTML = '<div class="alert alert-secondary mb-0"><i class="bi bi-info-circle me-1"></i>Keine Bilder gefunden. Versuche es mit einem anderen Suchbegriff.</div>';
+            return;
+        }
+        let html = '<div class="row g-2">';
+        images.forEach((img, idx) => {
+            const sourceBadge = img.source === 'L-Shop'
+                ? '<span class="badge bg-primary">L-Shop</span>'
+                : '<span class="badge bg-warning text-dark">Google</span>';
+            html += `
+            <div class="col-6">
+                <div class="card h-100 image-result-card" style="cursor:pointer;" onclick="selectImage('${img.url.replace(/'/g, "\\'")}', this)">
+                    <img src="${img.thumbnail_url || img.url}" class="card-img-top" style="height: 120px; object-fit: contain; background: #f8f9fa; padding: 4px;"
+                         onerror="this.parentElement.style.display='none'" loading="lazy">
+                    <div class="card-body p-1 text-center">
+                        ${sourceBadge}
+                    </div>
+                </div>
+            </div>`;
+        });
+        html += '</div>';
+        resultsBody.innerHTML = html;
+    })
+    .catch(err => {
+        resultsBody.innerHTML = `<div class="alert alert-danger mb-0">Fehler: ${err.message}</div>`;
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-search me-1"></i>Bild suchen';
+    });
 }
+
+function selectImage(url, card) {
+    // Vorherige Auswahl entfernen
+    document.querySelectorAll('.image-result-card').forEach(c => c.classList.remove('border-primary', 'border-2'));
+    card.classList.add('border-primary', 'border-2');
+
+    // Bestaetigungs-Button anzeigen
+    let confirmDiv = document.getElementById('image-confirm-div');
+    if (!confirmDiv) {
+        confirmDiv = document.createElement('div');
+        confirmDiv.id = 'image-confirm-div';
+        confirmDiv.className = 'mt-3 text-center';
+        document.getElementById('image-results-body').appendChild(confirmDiv);
+    }
+    confirmDiv.innerHTML = `
+        <button class="btn btn-success w-100" onclick="saveArticleImage('${url.replace(/'/g, "\\'")}')">
+            <i class="bi bi-check-lg me-1"></i>Dieses Bild uebernehmen
+        </button>`;
+}
+
+function saveArticleImage(url) {
+    const confirmDiv = document.getElementById('image-confirm-div');
+    if (confirmDiv) {
+        confirmDiv.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm me-1"></span>Wird gespeichert...</div>';
+    }
+
+    fetch("{{ url_for('articles.image_save', article_id=article.id) }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({image_url: url})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            // Bild-Container aktualisieren
+            const container = document.getElementById('article-image-container');
+            container.innerHTML = `
+                <img src="${data.image_path}" class="img-fluid rounded mb-2" style="max-height: 250px;" alt="Artikelbild">
+                <button class="btn btn-outline-primary btn-sm w-100 mt-2" onclick="searchArticleImage()" id="search-image-btn">
+                    <i class="bi bi-search me-1"></i>Bild suchen
+                </button>`;
+            // Loeschen-Button im Header anzeigen
+            const header = container.closest('.card').querySelector('.card-header');
+            if (!header.querySelector('.btn-outline-danger')) {
+                header.innerHTML += ' <button class="btn btn-sm btn-outline-danger" onclick="deleteArticleImage()" title="Bild entfernen"><i class="bi bi-trash"></i></button>';
+            }
+            closeImageSearch();
+        } else {
+            if (confirmDiv) confirmDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+        }
+    })
+    .catch(err => {
+        if (confirmDiv) confirmDiv.innerHTML = `<div class="alert alert-danger">Fehler: ${err.message}</div>`;
+    });
+}
+
+function saveFromUrl() {
+    const url = document.getElementById('manual-image-url').value.trim();
+    if (!url) {
+        alert('Bitte eine Bild-URL eingeben.');
+        return;
+    }
+    saveArticleImage(url);
+}
+
+function deleteArticleImage() {
+    if (!confirm('Artikelbild wirklich entfernen?')) return;
+
+    fetch("{{ url_for('articles.image_delete', article_id=article.id) }}", {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+
+function closeImageSearch() {
+    document.getElementById('image-search-results').classList.add('d-none');
+}
+
+// === VEREDELUNGSINFOS ===
+let veredelungData = null;
+let artikelWerte = {};
+
+function loadVeredelung() {
+    Promise.all([
+        fetch('/veredelung/api/alle', {credentials: 'same-origin'}).then(r => r.json()),
+        fetch('/veredelung/api/artikel/{{ article.id }}', {credentials: 'same-origin'}).then(r => r.json())
+    ]).then(([verfahren, werte]) => {
+        veredelungData = verfahren;
+        artikelWerte = werte;
+        renderVeredelungDisplay();
+        renderVeredelungForms();
+    }).catch(() => {
+        document.getElementById('veredelungLoading').innerHTML = '<small class="text-muted">Keine Veredelungsverfahren konfiguriert</small>';
+    });
+}
+
+function renderVeredelungDisplay() {
+    const container = document.getElementById('veredelungDisplay');
+    if (!veredelungData || veredelungData.length === 0) {
+        container.innerHTML = '<small class="text-muted">Keine Veredelungsverfahren konfiguriert. <a href="/veredelung/einstellungen">Einrichten</a></small>';
+        return;
+    }
+    let html = '';
+    let hasValues = false;
+    veredelungData.forEach(v => {
+        let params = [];
+        v.parameter.forEach(p => {
+            const key = v.id + '_' + p.id;
+            if (artikelWerte[key]) {
+                params.push(`<strong>${p.name}:</strong> ${artikelWerte[key].wert}${p.einheit ? ' ' + p.einheit : ''}`);
+                hasValues = true;
+            }
+        });
+        if (params.length > 0) {
+            html += `<div class="mb-2"><small><i class="${v.icon} me-1"></i><strong>${v.name}</strong></small><br>`;
+            html += `<small class="text-muted">${params.join(' | ')}</small></div>`;
+        }
+    });
+    if (!hasValues) {
+        html = '<small class="text-muted">Keine Veredelungsinfos hinterlegt. Klicke <i class="bi bi-pencil"></i> zum Bearbeiten.</small>';
+    }
+    container.innerHTML = html;
+}
+
+function renderVeredelungForms() {
+    const container = document.getElementById('veredelungForms');
+    if (!veredelungData || veredelungData.length === 0) {
+        container.innerHTML = '<small class="text-muted">Keine Veredelungsverfahren konfiguriert.</small>';
+        return;
+    }
+    let html = '';
+    veredelungData.forEach(v => {
+        html += `<div class="mb-3"><h6><i class="${v.icon} me-1"></i>${v.name}</h6>`;
+        v.parameter.forEach(p => {
+            const key = v.id + '_' + p.id;
+            const val = artikelWerte[key] ? artikelWerte[key].wert : (p.default_value || '');
+            const label = p.name + (p.einheit ? ` (${p.einheit})` : '');
+
+            if (p.param_type === 'select' && p.optionen.length > 0) {
+                html += `<div class="mb-2"><label class="form-label small mb-0">${label}</label>`;
+                html += `<select class="form-select form-select-sm vered-input" data-v="${v.id}" data-p="${p.id}">`;
+                html += `<option value="">-</option>`;
+                p.optionen.forEach(o => {
+                    html += `<option value="${o}" ${o === val ? 'selected' : ''}>${o}</option>`;
+                });
+                html += `</select></div>`;
+            } else {
+                const inputType = p.param_type === 'number' ? 'number' : 'text';
+                html += `<div class="mb-2"><label class="form-label small mb-0">${label}</label>`;
+                html += `<input type="${inputType}" class="form-control form-control-sm vered-input" data-v="${v.id}" data-p="${p.id}" value="${val}"></div>`;
+            }
+        });
+        html += '</div>';
+    });
+    container.innerHTML = html;
+}
+
+function toggleVeredelungEdit() {
+    document.getElementById('veredelungDisplay').classList.toggle('d-none');
+    document.getElementById('veredelungEdit').classList.toggle('d-none');
+}
+
+function saveVeredelung() {
+    const inputs = document.querySelectorAll('.vered-input');
+    const werte = [];
+    inputs.forEach(el => {
+        werte.push({
+            verfahren_id: parseInt(el.dataset.v),
+            parameter_id: parseInt(el.dataset.p),
+            wert: el.value
+        });
+    });
+
+    fetch('/veredelung/api/artikel/{{ article.id }}/save', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify({werte})
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            // Reload values
+            fetch('/veredelung/api/artikel/{{ article.id }}', {credentials: 'same-origin'})
+                .then(r => r.json()).then(w => {
+                    artikelWerte = w;
+                    renderVeredelungDisplay();
+                    toggleVeredelungEdit();
+                });
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+        }
+    });
+}
+
+// Load on page ready
+document.addEventListener('DOMContentLoaded', loadVeredelung);
 </script>
 {% endblock %}

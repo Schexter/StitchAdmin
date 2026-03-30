@@ -30,92 +30,91 @@
 <form method="POST">
     <div class="row">
         <div class="col-md-8">
-            <!-- Kundentyp-Info (nur Anzeige) -->
-            <div class="alert alert-info mb-4">
-                <i class="bi bi-info-circle"></i> 
-                <strong>Kundentyp:</strong> 
-                {% if customer.customer_type == 'business' %}
-                    Firmenkunde
-                {% else %}
-                    Privatperson
-                {% endif %}
-                <small class="text-muted">(kann nicht geändert werden)</small>
+            <!-- Kundentyp umschalten -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Kundentyp</h5>
+                </div>
+                <div class="card-body">
+                    <div class="btn-group w-100" role="group">
+                        <input type="radio" class="btn-check" name="customer_type" id="type_private" value="private"
+                               {{ 'checked' if customer.customer_type != 'business' }} onchange="toggleCustomerType()">
+                        <label class="btn btn-outline-primary" for="type_private">
+                            <i class="bi bi-person me-1"></i>Privatperson
+                        </label>
+                        <input type="radio" class="btn-check" name="customer_type" id="type_business" value="business"
+                               {{ 'checked' if customer.customer_type == 'business' }} onchange="toggleCustomerType()">
+                        <label class="btn btn-outline-primary" for="type_business">
+                            <i class="bi bi-building me-1"></i>Firmenkunde
+                        </label>
+                    </div>
+                </div>
             </div>
-            
-            {% if customer.customer_type == 'business' %}
-                <!-- Firmendaten -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Firmendaten</h5>
+
+            <!-- Firmendaten -->
+            <div class="card mb-4" id="businessFields" style="{{ 'display:none' if customer.customer_type != 'business' }}">
+                <div class="card-header">
+                    <h5 class="mb-0">Firmendaten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="company_name" class="form-label">Firmenname *</label>
+                            <input type="text" class="form-control" id="company_name" name="company_name" value="{{ customer.company_name or '' }}">
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-12 mb-3">
-                                <label for="company_name" class="form-label">Firmenname *</label>
-                                <input type="text" class="form-control" id="company_name" name="company_name" value="{{ customer.company_name }}" required>
-                            </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="tax_id" class="form-label">Steuernummer</label>
+                            <input type="text" class="form-control" id="tax_id" name="tax_id" value="{{ customer.tax_id or '' }}">
                         </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="tax_id" class="form-label">Steuernummer</label>
-                                <input type="text" class="form-control" id="tax_id" name="tax_id" value="{{ customer.tax_id or '' }}">
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="vat_id" class="form-label">USt-ID</label>
-                                <input type="text" class="form-control" id="vat_id" name="vat_id" value="{{ customer.vat_id or '' }}" 
-                                       placeholder="DE123456789" pattern="^(DE[0-9]{9})?$" title="Format: DE + 9 Ziffern (z.B. DE123456789)">
-                                <div class="form-text">Format: DE + 9 Ziffern</div>
-                            </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="vat_id" class="form-label">USt-ID</label>
+                            <input type="text" class="form-control" id="vat_id" name="vat_id" value="{{ customer.vat_id or '' }}"
+                                   placeholder="DE123456789">
                         </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="contact_person" class="form-label">Ansprechpartner</label>
-                                <input type="text" class="form-control" id="contact_person" name="contact_person" value="{{ customer.contact_person or '' }}">
-                            </div>
-                            
-                            <div class="col-md-3 mb-3">
-                                <label for="department" class="form-label">Abteilung</label>
-                                <input type="text" class="form-control" id="department" name="department" value="{{ customer.department or '' }}">
-                            </div>
-                            
-                            <div class="col-md-3 mb-3">
-                                <label for="position" class="form-label">Position</label>
-                                <input type="text" class="form-control" id="position" name="position" value="{{ customer.position or '' }}">
-                            </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="contact_person" class="form-label">Ansprechpartner</label>
+                            <input type="text" class="form-control" id="contact_person" name="contact_person" value="{{ customer.contact_person or '' }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="department" class="form-label">Abteilung</label>
+                            <input type="text" class="form-control" id="department" name="department" value="{{ customer.department or '' }}">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="position" class="form-label">Position</label>
+                            <input type="text" class="form-control" id="position" name="position" value="{{ customer.position or '' }}">
                         </div>
                     </div>
                 </div>
-            {% else %}
-                <!-- Persönliche Daten -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Persönliche Daten</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="first_name" class="form-label">Vorname *</label>
-                                <input type="text" class="form-control" id="first_name" name="first_name" value="{{ customer.first_name }}" required>
-                            </div>
-                            
-                            <div class="col-md-6 mb-3">
-                                <label for="last_name" class="form-label">Nachname *</label>
-                                <input type="text" class="form-control" id="last_name" name="last_name" value="{{ customer.last_name }}" required>
-                            </div>
+            </div>
+
+            <!-- Persönliche Daten -->
+            <div class="card mb-4" id="privateFields" style="{{ 'display:none' if customer.customer_type == 'business' }}">
+                <div class="card-header">
+                    <h5 class="mb-0">Persönliche Daten</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="first_name" class="form-label">Vorname *</label>
+                            <input type="text" class="form-control" id="first_name" name="first_name" value="{{ customer.first_name or '' }}">
                         </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="birth_date" class="form-label">Geburtsdatum</label>
-                                <input type="date" class="form-control" id="birth_date" name="birth_date" value="{{ customer.birth_date or '' }}">
-                            </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="last_name" class="form-label">Nachname *</label>
+                            <input type="text" class="form-control" id="last_name" name="last_name" value="{{ customer.last_name or '' }}">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="birth_date" class="form-label">Geburtsdatum</label>
+                            <input type="date" class="form-control" id="birth_date" name="birth_date" value="{{ customer.birth_date or '' }}">
                         </div>
                     </div>
                 </div>
-            {% endif %}
+            </div>
             
             <!-- Kontaktdaten -->
             <div class="card mb-4">
@@ -161,7 +160,14 @@
                             <input type="text" class="form-control" id="house_number" name="house_number" value="{{ customer.house_number or '' }}">
                         </div>
                     </div>
-                    
+
+                    <div class="mb-3">
+                        <label for="address_supplement" class="form-label">Adresszusatz <small class="text-muted">(c/o, Abteilung, Gebäude...)</small></label>
+                        <input type="text" class="form-control" id="address_supplement" name="address_supplement"
+                               value="{{ customer.address_supplement or '' }}"
+                               placeholder="z.B. c/o Müller, Halle B, 2. OG">
+                    </div>
+
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="postal_code" class="form-label">PLZ</label>
@@ -239,4 +245,14 @@
         </div>
     </div>
 </form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleCustomerType() {
+    const isBusiness = document.getElementById('type_business').checked;
+    document.getElementById('businessFields').style.display = isBusiness ? '' : 'none';
+    document.getElementById('privateFields').style.display = isBusiness ? 'none' : '';
+}
+</script>
 {% endblock %}

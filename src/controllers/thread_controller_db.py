@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from datetime import datetime
 from src.models import db, Thread, ThreadStock, ThreadUsage, ActivityLog
+from src.utils.activity_logger import log_activity
 import csv
 import io
 import os
@@ -17,17 +18,6 @@ import glob
 
 # Blueprint erstellen
 thread_bp = Blueprint('thread', __name__, url_prefix='/thread')
-
-def log_activity(action, details):
-    """Aktivität in Datenbank protokollieren"""
-    activity = ActivityLog(
-        username=current_user.username,
-        action=action,
-        details=details,
-        ip_address=request.remote_addr
-    )
-    db.session.add(activity)
-    db.session.commit()
 
 @thread_bp.route('/dashboard')
 @login_required
@@ -208,9 +198,9 @@ def new():
                 thread.rgb_r = int(hex_color[0:2], 16)
                 thread.rgb_g = int(hex_color[2:4], 16)
                 thread.rgb_b = int(hex_color[4:6], 16)
-            except:
+            except (ValueError, TypeError):
                 pass
-        
+
         # ID generieren: Hersteller_Nummer
         thread.id = f"{thread.manufacturer}_{thread.color_number}".replace(' ', '_')
         
@@ -301,9 +291,9 @@ def edit(thread_id):
                 thread.rgb_r = int(hex_color[0:2], 16)
                 thread.rgb_g = int(hex_color[2:4], 16)
                 thread.rgb_b = int(hex_color[4:6], 16)
-            except:
+            except (ValueError, TypeError):
                 pass
-        
+
         # Lagerbestand aktualisieren
         if thread.stock:
             thread.stock.min_stock = int(request.form.get('min_stock', 5) or 5)
@@ -424,13 +414,13 @@ def import_threads():
                             thread.rgb_r = int(hex_color[0:2], 16)
                             thread.rgb_g = int(hex_color[2:4], 16)
                             thread.rgb_b = int(hex_color[4:6], 16)
-                        except:
+                        except (ValueError, TypeError):
                             pass
-                    
+
                     if row.get('price'):
                         try:
                             thread.price = float(row['price'])
-                        except:
+                        except (ValueError, TypeError):
                             pass
                     
                     thread.updated_by = current_user.username
@@ -516,7 +506,7 @@ def import_threads():
                                     thread.rgb_r = int(hex_color[0:2], 16)
                                     thread.rgb_g = int(hex_color[2:4], 16)
                                     thread.rgb_b = int(hex_color[4:6], 16)
-                                except:
+                                except (ValueError, TypeError):
                                     pass
 
                             thread.category = color_data.get('category', 'Standard')

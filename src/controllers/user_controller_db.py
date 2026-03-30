@@ -6,20 +6,10 @@ Benutzer-Verwaltung mit Datenbank
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required, current_user
 from src.models import db, User, ActivityLog
+from src.utils.activity_logger import log_activity
 
 # Blueprint erstellen
 user_bp = Blueprint('users', __name__, url_prefix='/users')
-
-def log_activity(action, details):
-    """Aktivität in Datenbank protokollieren"""
-    activity = ActivityLog(
-        username=current_user.username,  # Geändert von 'user' zu 'username'
-        action=action,
-        details=details,
-        ip_address=request.remote_addr
-    )
-    db.session.add(activity)
-    db.session.commit()
 
 @user_bp.route('/')
 @login_required
@@ -118,6 +108,8 @@ def edit(user_id):
                 flash('E-Mail-Adresse wird bereits verwendet!', 'danger')
                 return render_template('users/edit.html', user=user)
         user.email = new_email
+        user.first_name = request.form.get('first_name', '').strip() or None
+        user.last_name = request.form.get('last_name', '').strip() or None
 
         # Passwort nur ändern wenn ausgefüllt
         new_password = request.form.get('new_password')
@@ -195,11 +187,18 @@ def delete(user_id):
             return redirect(url_for('users.index'))
     
     username = user.username
-    
+
     # Aktivität protokollieren bevor gelöscht wird
-    log_activity('user_deleted', 
+    log_activity('user_deleted',
                 f'Benutzer gelöscht: {username}')
-    
+
+    # Verknüpfte UserTenant-Einträge zuerst löschen
+    try:
+        from src.models.tenant import UserTenant
+        UserTenant.query.filter_by(user_id=user.id).delete()
+    except (ImportError, Exception):
+        pass
+
     # Benutzer löschen
     db.session.delete(user)
     db.session.commit()

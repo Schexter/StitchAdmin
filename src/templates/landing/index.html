@@ -32,7 +32,7 @@
             font-weight: 800; font-size: 1.4rem; color: var(--sa-primary);
             text-decoration: none; display: flex; align-items: center; gap: 0.5rem;
         }
-        .landing-nav .nav-brand i { font-size: 1.6rem; }
+        .landing-nav .nav-brand img { vertical-align: middle; }
 
         /* ========== HERO ========== */
         .hero-section {
@@ -263,11 +263,14 @@
 <nav class="landing-nav">
     <div class="container d-flex justify-content-between align-items-center">
         <a href="/" class="nav-brand">
-            <i class="bi bi-tsunami"></i> StitchAdmin
+            <img src="{{ url_for('static', filename='logo.svg') }}" alt="" style="height: 28px; width: 28px;"> StitchAdmin
         </a>
         <div class="d-flex align-items-center gap-3">
             <a href="#features" class="text-decoration-none text-muted d-none d-md-inline fw-500">Features</a>
             <a href="#preise" class="text-decoration-none text-muted d-none d-md-inline fw-500">Preise</a>
+            <a href="{{ url_for('landing.demo_login') }}" class="text-decoration-none d-none d-md-inline fw-500" style="color: var(--sa-primary);">
+                <i class="bi bi-eye me-1"></i>Demo
+            </a>
             <a href="{{ url_for('auth.login') }}" class="btn btn-outline-secondary btn-sm px-3">
                 <i class="bi bi-box-arrow-in-right me-1"></i>Login
             </a>
@@ -299,8 +302,8 @@
                     <a href="#registrierung" class="btn-hero-primary">
                         <i class="bi bi-rocket-takeoff"></i> 14 Tage kostenlos testen
                     </a>
-                    <a href="#features" class="btn-hero-secondary">
-                        <i class="bi bi-play-circle"></i> Features ansehen
+                    <a href="{{ url_for('landing.demo_login') }}" class="btn-hero-secondary">
+                        <i class="bi bi-eye"></i> Live-Demo ansehen
                     </a>
                 </div>
             </div>
@@ -728,8 +731,8 @@
                                         <div class="form-check" style="color: rgba(255,255,255,0.8);">
                                             <input class="form-check-input" type="checkbox" id="agbCheck" required>
                                             <label class="form-check-label small" for="agbCheck">
-                                                Ich akzeptiere die <a href="#" style="color: var(--sa-accent);">AGB</a>
-                                                und <a href="#" style="color: var(--sa-accent);">Datenschutzerklaerung</a>
+                                                Ich akzeptiere die <a href="{{ url_for('landing.agb') }}" target="_blank" style="color: var(--sa-accent);">AGB</a>
+                                                und <a href="{{ url_for('landing.datenschutz') }}" target="_blank" style="color: var(--sa-accent);">Datenschutzerklaerung</a>
                                             </label>
                                         </div>
                                     </div>
@@ -748,13 +751,25 @@
     </div>
 </section>
 
+<!-- ========== BETA-HINWEIS ========== -->
+<div style="background: #fef3c7; border-top: 3px solid #f59e0b; padding: 1rem 0;">
+    <div class="container text-center">
+        <p class="mb-0" style="color: #92400e;">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Beta-Version:</strong> StitchAdmin befindet sich in aktiver Entwicklung. Funktionen koennen sich aendern.
+            Es wird keine Haftung fuer Datenverlust oder Fehlfunktionen uebernommen. Nutzung auf eigene Verantwortung.
+        </p>
+    </div>
+</div>
+
 <!-- ========== FOOTER ========== -->
 <footer class="landing-footer">
     <div class="container">
         <div class="row g-4">
             <div class="col-md-4">
-                <h6 class="text-white mb-3"><i class="bi bi-tsunami me-2"></i>StitchAdmin</h6>
-                <p class="small">Die All-in-One ERP-Loesung fuer Stickerei-Betriebe. Entwickelt in Deutschland, gehostet in Deutschland.</p>
+                <h6 class="text-white mb-3"><img src="{{ url_for('static', filename='favicon.svg') }}" alt="" style="height: 20px; width: 20px; margin-right: 0.5rem;">StitchAdmin</h6>
+                <p class="small">Die All-in-One ERP-Loesung fuer Stickerei- und Veredelungsbetriebe. Entwickelt und gehostet in Deutschland.</p>
+                <p class="small" style="opacity: 0.6;"><i class="bi bi-info-circle me-1"></i>Beta-Software — keine Gewaehrleistung</p>
             </div>
             <div class="col-md-2">
                 <h6 class="text-white mb-3">Produkt</h6>
@@ -767,15 +782,15 @@
             <div class="col-md-3">
                 <h6 class="text-white mb-3">Rechtliches</h6>
                 <ul class="list-unstyled small">
-                    <li class="mb-1"><a href="#">Impressum</a></li>
-                    <li class="mb-1"><a href="#">Datenschutz</a></li>
-                    <li class="mb-1"><a href="#">AGB</a></li>
+                    <li class="mb-1"><a href="{{ url_for('landing.impressum') }}">Impressum</a></li>
+                    <li class="mb-1"><a href="{{ url_for('landing.datenschutz') }}">Datenschutz</a></li>
+                    <li class="mb-1"><a href="{{ url_for('landing.agb') }}">AGB</a></li>
                 </ul>
             </div>
             <div class="col-md-3">
                 <h6 class="text-white mb-3">Kontakt</h6>
                 <ul class="list-unstyled small">
-                    <li class="mb-1"><i class="bi bi-envelope me-2"></i>info@hahn-it-wuppertal.de</li>
+                    <li class="mb-1"><i class="bi bi-envelope me-2"></i><a href="mailto:kontakt@hahn-it-wuppertal.de" style="color: rgba(255,255,255,0.7);">kontakt@hahn-it-wuppertal.de</a></li>
                     <li class="mb-1"><i class="bi bi-geo-alt me-2"></i>Wuppertal, Deutschland</li>
                 </ul>
             </div>

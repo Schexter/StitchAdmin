@@ -51,25 +51,60 @@
                     </div>
                 </div>
                 
-                {% if shipment.tracking_number %}
                 <div class="row mb-3">
                     <div class="col-md-3"><strong>Sendungsnummer:</strong></div>
                     <div class="col-md-9">
-                        <code>{{ shipment.tracking_number }}</code>
-                        {% if shipment.carrier == 'DHL' %}
-                            <a href="https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode={{ shipment.tracking_number }}" 
-                               target="_blank" class="btn btn-sm btn-info ms-2">
-                                <i class="bi bi-search"></i> Verfolgen
-                            </a>
-                        {% elif shipment.carrier == 'DPD' %}
-                            <a href="https://tracking.dpd.de/parcelstatus?query={{ shipment.tracking_number }}" 
-                               target="_blank" class="btn btn-sm btn-info ms-2">
-                                <i class="bi bi-search"></i> Verfolgen
-                            </a>
+                        {% if shipment.tracking_number %}
+                            <span id="tracking-display">
+                                <code class="fs-6">{{ shipment.tracking_number }}</code>
+                                {% if shipment.carrier == 'DHL' %}
+                                    <a href="https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode={{ shipment.tracking_number }}"
+                                       target="_blank" class="btn btn-sm btn-outline-info ms-2">
+                                        <i class="bi bi-search"></i> Verfolgen
+                                    </a>
+                                {% elif shipment.carrier == 'DPD' %}
+                                    <a href="https://tracking.dpd.de/parcelstatus?query={{ shipment.tracking_number }}"
+                                       target="_blank" class="btn btn-sm btn-outline-info ms-2">
+                                        <i class="bi bi-search"></i> Verfolgen
+                                    </a>
+                                {% elif shipment.carrier == 'UPS' %}
+                                    <a href="https://www.ups.com/track?tracknum={{ shipment.tracking_number }}"
+                                       target="_blank" class="btn btn-sm btn-outline-info ms-2">
+                                        <i class="bi bi-search"></i> Verfolgen
+                                    </a>
+                                {% elif shipment.carrier == 'GLS' %}
+                                    <a href="https://gls-group.eu/DE/de/paketverfolgung?match={{ shipment.tracking_number }}"
+                                       target="_blank" class="btn btn-sm btn-outline-info ms-2">
+                                        <i class="bi bi-search"></i> Verfolgen
+                                    </a>
+                                {% endif %}
+                                {% if shipment.status != 'delivered' %}
+                                <button class="btn btn-sm btn-outline-secondary ms-1" onclick="document.getElementById('tracking-edit').style.display='block'; document.getElementById('tracking-display').style.display='none';">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            <span class="text-muted" id="tracking-display">
+                                Noch nicht eingetragen
+                                <button class="btn btn-sm btn-outline-primary ms-2" onclick="document.getElementById('tracking-edit').style.display='block'; document.getElementById('tracking-display').style.display='none';">
+                                    <i class="bi bi-plus-lg"></i> Eintragen
+                                </button>
+                            </span>
                         {% endif %}
+                        <form method="POST" action="{{ url_for('shipping.update_tracking', shipment_id=shipment.id) }}"
+                              id="tracking-edit" style="display:none;" class="mt-2">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="tracking_number"
+                                       value="{{ shipment.tracking_number or '' }}" placeholder="Sendungsnummer eingeben...">
+                                <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i></button>
+                                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('tracking-edit').style.display='none'; document.getElementById('tracking-display').style.display='';">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
-                {% endif %}
                 
                 <div class="row mb-3">
                     <div class="col-md-3"><strong>Versanddienstleister:</strong></div>
@@ -102,6 +137,34 @@
             </div>
         </div>
         
+        <!-- Probebox-Info -->
+        {% if shipment.shipment_type == 'probebox' %}
+        <div class="card mb-4 border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-box-seam me-2"></i>Probebox</h5>
+            </div>
+            <div class="card-body">
+                {% if shipment.description %}
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Beschreibung:</strong></div>
+                    <div class="col-md-9">{{ shipment.description }}</div>
+                </div>
+                {% endif %}
+                {% if shipment.inquiry %}
+                <div class="row mb-2">
+                    <div class="col-md-3"><strong>Anfrage:</strong></div>
+                    <div class="col-md-9">
+                        <a href="{{ url_for('inquiry_admin.detail', id=shipment.inquiry.id) }}">
+                            {{ shipment.inquiry.inquiry_number }}
+                        </a>
+                        ({{ shipment.inquiry.type_label }}, {{ shipment.inquiry.full_name }})
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Auftragsdetails -->
         {% if shipment.order %}
         <div class="card mb-4">
@@ -117,7 +180,7 @@
                         </a>
                     </div>
                 </div>
-                
+
                 <div class="row mb-2">
                     <div class="col-md-3"><strong>Kunde:</strong></div>
                     <div class="col-md-9">
@@ -130,7 +193,7 @@
                         {% endif %}
                     </div>
                 </div>
-                
+
                 <div class="row mb-2">
                     <div class="col-md-3"><strong>Beschreibung:</strong></div>
                     <div class="col-md-9">{{ shipment.order.description or '-' }}</div>
@@ -232,8 +295,16 @@
                     </form>
                     {% endif %}
                     
-                    <a href="{{ url_for('shipping.label', shipment_id=shipment.id) }}" 
-                       class="btn btn-info" target="_blank">
+                    {% if shipment.tracking_number and shipment.order and shipment.order.customer and shipment.order.customer.email %}
+                    <form method="POST" action="{{ url_for('shipping.send_tracking_email', shipment_id=shipment.id) }}">
+                        <button type="submit" class="btn btn-info w-100">
+                            <i class="bi bi-envelope-arrow-up"></i> Tracking per E-Mail senden
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    <a href="{{ url_for('shipping.label', shipment_id=shipment.id) }}"
+                       class="btn btn-outline-info" target="_blank">
                         <i class="bi bi-printer"></i> Versandlabel drucken
                     </a>
                     

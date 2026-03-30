@@ -154,67 +154,121 @@ class PDFService:
             return self._create_fallback_pdf()
             
     def _create_header(self, invoice_data: Dict) -> List:
-        """Erstelle Kopfbereich"""
+        """Erstelle Kopfbereich - DIN 5008: Logo links, Firmendaten rechts (wie Angebot)"""
         elements = []
-        
-        # Logo (falls vorhanden)
-        logo_path = invoice_data.get('logo_path')
-        if logo_path and os.path.exists(logo_path):
-            try:
-                logo = Image(logo_path, width=6*cm, height=2*cm)
-                logo.hAlign = 'LEFT'
-                elements.append(logo)
-                elements.append(Spacer(1, 0.5*cm))
-            except:
-                pass
-                
-        # Überschrift
-        elements.append(Paragraph("RECHNUNG", self.styles['InvoiceHeader']))
-        elements.append(Spacer(1, 1*cm))
-        
+
+        sender = invoice_data.get('sender', {})
+
+        # Logo laden: prüfe mehrere mögliche Pfade
+        logo_img = None
+        try:
+            from flask import current_app
+            from src.models.company_settings import CompanySettings
+            settings = CompanySettings.get_settings()
+            if settings and settings.logo_path:
+                candidates = [
+                    # 1. UPLOAD_FOLDER (data/uploads) - wo Dateien tatsächlich gespeichert sind
+                    os.path.join(current_app.config.get('UPLOAD_FOLDER', ''), settings.logo_path),
+                    # 2. UPLOAD_FOLDER ohne Prefix "uploads/"
+                    os.path.join(current_app.config.get('UPLOAD_FOLDER', ''),
+                                 settings.logo_path.replace('uploads/', '', 1)),
+                    # 3. static_folder (alter Pfad)
+                    os.path.join(current_app.static_folder, settings.logo_path),
+                    # 4. Absoluter Pfad aus invoice_data
+                    str(invoice_data.get('logo_path', '') or ''),
+                ]
+                for candidate in candidates:
+                    if candidate and os.path.exists(candidate):
+                        # Proportional skalieren (max 55mm breit, max 25mm hoch)
+                        from reportlab.lib.utils import ImageReader
+                        ir = ImageReader(candidate)
+                        img_w, img_h = ir.getSize()
+                        max_w, max_h = 55*mm, 25*mm
+                        scale = min(max_w / img_w, max_h / img_h)
+                        logo_img = Image(candidate, width=img_w * scale, height=img_h * scale)
+                        break
+        except Exception as e:
+            logger.debug(f"Logo-Laden fehlgeschlagen: {e}")
+
+        # Logo-Zelle (links): Logo oder Firmenname als Text-Fallback
+        if logo_img:
+            logo_cell = logo_img
+        else:
+            logo_cell = Paragraph(
+                f"<b>{sender.get('name', '')}</b>",
+                ParagraphStyle('LogoFallback', parent=self.styles['Normal'], fontSize=14, leading=18)
+            )
+
+        # Firmendaten-Zelle (rechts): immer mit Firmenname
+        vat_id = sender.get('vat_id', '') or sender.get('tax_number', '')
+        owner_name = sender.get('owner_name', '')
+        company_info_text = (
+            f"<b>{sender.get('name', '')}</b><br/>"
+        )
+        if owner_name:
+            company_info_text += f"Inh. {owner_name}<br/>"
+        company_info_text += (
+            f"{sender.get('street', '')}<br/>"
+            f"{sender.get('postcode', '')} {sender.get('city', '')}<br/>"
+            f"Tel: {sender.get('phone', '')}<br/>"
+            f"{sender.get('email', '')}"
+        )
+        if vat_id:
+            company_info_text += f"<br/>USt-IdNr: {vat_id}"
+
+        small_style = ParagraphStyle(
+            'SmallRight', parent=self.styles['Normal'],
+            fontSize=8, leading=11, alignment=4  # TA_RIGHT
+        )
+        company_info = Paragraph(company_info_text, small_style)
+
+        header_table = Table([[logo_cell, company_info]], colWidths=[90*mm, 80*mm])
+        header_table.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ]))
+        elements.append(header_table)
+        elements.append(Spacer(1, 10*mm))
+
         return elements
-        
+
     def _create_address_section(self, invoice_data: Dict) -> List:
-        """Erstelle Adressbereich"""
+        """Erstelle Adressbereich - DIN 5008: Empfänger links im Adressfenster"""
         elements = []
-        
-        # Absender und Empfänger nebeneinander
+
         sender = invoice_data.get('sender', {})
         recipient = invoice_data.get('recipient', {})
-        
-        # Tabelle für Adressen
-        address_data = [[
-            # Absender
-            Paragraph(f"<b>{sender.get('name', '')}</b><br/>" +
-                     f"{sender.get('street', '')}<br/>" +
-                     f"{sender.get('postcode', '')} {sender.get('city', '')}<br/>" +
-                     f"Tel: {sender.get('phone', '')}<br/>" +
-                     f"E-Mail: {sender.get('email', '')}<br/>" +
-                     f"USt-IdNr: {sender.get('tax_id', '')}",
-                     self.styles['AddressBlock']),
-            # Leerzeile
-            "",
-            # Empfänger
-            Paragraph(f"<b>{recipient.get('name', '')}</b><br/>" +
-                     f"{recipient.get('street', '')}<br/>" +
-                     f"{recipient.get('postcode', '')} {recipient.get('city', '')}",
-                     self.styles['AddressBlock'])
-        ]]
-        
-        address_table = Table(address_data, colWidths=[7*cm, 2*cm, 7*cm])
-        address_table.setStyle(TableStyle([
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-        ]))
-        
-        elements.append(address_table)
+
+        # Absenderzeile (Rücksendeangabe, 1 Zeile, klein)
+        sender_line = f"{sender.get('name', '')} · {sender.get('street', '')} · {sender.get('postcode', '')} {sender.get('city', '')}".strip(' ·')
+
+        # Empfänger-Adressblock
+        addr_lines = [f'<font size="7">{sender_line}</font>']
+        if recipient.get('name'):
+            addr_lines.append(f"<b>{recipient['name']}</b>")
+        if recipient.get('street'):
+            addr_lines.append(recipient['street'])
+        plz_ort = f"{recipient.get('postcode', '')} {recipient.get('city', '')}".strip()
+        if plz_ort:
+            addr_lines.append(plz_ort)
+        country = recipient.get('country', '')
+        if country and country not in ('DE', 'Deutschland', 'Germany'):
+            addr_lines.append(country)
+
+        addr_para = Paragraph('<br/>'.join(addr_lines), self.styles['AddressBlock'])
+        elements.append(addr_para)
         elements.append(Spacer(1, 1*cm))
-        
+
         return elements
         
     def _create_invoice_info(self, invoice_data: Dict) -> List:
         """Erstelle Rechnungsinformationen"""
         elements = []
-        
+
+        # Dokumenttitel (wie Angebot: nach Empfängeradresse)
+        elements.append(Paragraph("RECHNUNG", self.styles['InvoiceHeader']))
+        elements.append(Spacer(1, 5*mm))
+
         # Rechnungsdaten
         info_data = [
             ["Rechnungsnummer:", invoice_data.get('invoice_number', '')],
@@ -222,6 +276,8 @@ class PDFService:
             ["Leistungsdatum:", self._format_date(invoice_data.get('delivery_date'))],
             ["Kundennummer:", invoice_data.get('customer_number', '')],
         ]
+        if invoice_data.get('created_by'):
+            info_data.append(["Bearbeiter:", invoice_data['created_by']])
         
         info_table = Table(info_data, colWidths=[4*cm, 12*cm])
         info_table.setStyle(TableStyle([
@@ -253,9 +309,15 @@ class PDFService:
         
         items = invoice_data.get('items', [])
         for idx, item in enumerate(items, 1):
+            rabatt_pct = item.get('rabatt_prozent', 0)
+            rabatt_betrag = item.get('rabatt_betrag', 0)
+            # Beschreibung mit Rabatt-Hinweis
+            desc = item.get('description', '')
+            if rabatt_pct and rabatt_pct > 0:
+                desc = f"{desc}\n  ↓ Rabatt {rabatt_pct:.1f}%: -{self._format_currency(rabatt_betrag)}"
             data.append([
                 str(idx),
-                item.get('description', ''),
+                desc,
                 str(item.get('quantity', 1)),
                 item.get('unit', 'Stk.'),
                 self._format_currency(item.get('unit_price', 0)),
@@ -306,10 +368,15 @@ class PDFService:
         if invoice_data.get('subtotal'):
             totals_data.append(['Zwischensumme:', self._format_currency(invoice_data['subtotal'])])
             
-        # Rabatt
-        if invoice_data.get('discount_amount'):
-            totals_data.append([f"Rabatt ({invoice_data.get('discount_percent', 0)}%):", 
-                              f"- {self._format_currency(invoice_data['discount_amount'])}"])
+        # Rabatt: global oder Summe der Positions-Rabatte
+        discount_amount = invoice_data.get('discount_amount', 0) or 0
+        discount_percent = invoice_data.get('discount_percent', 0) or 0
+        if not discount_amount:
+            # Positions-Rabatte summieren
+            discount_amount = sum(item.get('rabatt_betrag', 0) for item in invoice_data.get('items', []))
+        if discount_amount and discount_amount > 0:
+            label = f"Rabatt ({discount_percent:.1f}%):" if discount_percent else "Rabatte (Positionen):"
+            totals_data.append([label, f"- {self._format_currency(discount_amount)}"])
             
         # Netto
         totals_data.append(['Nettobetrag:', self._format_currency(invoice_data.get('total_net', 0))])
@@ -346,46 +413,133 @@ class PDFService:
         return elements
         
     def _create_payment_terms(self, invoice_data: Dict) -> List:
-        """Erstelle Zahlungsbedingungen"""
+        """Erstelle Zahlungsbedingungen mit GiroCode QR"""
         elements = []
-        
+
         # Zahlungsbedingungen
         payment_terms = invoice_data.get('payment_terms', 'Zahlbar innerhalb 14 Tagen ohne Abzug')
-        elements.append(Paragraph(f"<b>Zahlungsbedingungen:</b> {payment_terms}", 
-                                self.styles['Normal']))
-        
-        # Bankverbindung
+        elements.append(Paragraph(f"<b>Zahlungsbedingungen:</b> {payment_terms}",
+                                  self.styles['Normal']))
+
+        # Bankverbindung + GiroCode QR nebeneinander
         bank_details = invoice_data.get('bank_details', {})
         if bank_details:
             elements.append(Spacer(1, 0.5*cm))
-            elements.append(Paragraph("<b>Bankverbindung:</b>", self.styles['Normal']))
-            
-            bank_text = f"""
-            {bank_details.get('bank_name', '')}<br/>
-            IBAN: {bank_details.get('iban', '')}<br/>
-            BIC: {bank_details.get('bic', '')}
-            """
-            elements.append(Paragraph(bank_text, self.styles['Normal']))
-            
-        # Verwendungszweck
-        if invoice_data.get('payment_reference'):
+
+            iban = (bank_details.get('iban', '') or '').replace(' ', '')
+            bic = bank_details.get('bic', '') or ''
+            bank_name = bank_details.get('bank_name', '') or ''
+            sender_name = invoice_data.get('sender', {}).get('name', '')
+            amount = invoice_data.get('total_gross', 0) or 0
+            reference = invoice_data.get('payment_reference', '') or invoice_data.get('invoice_number', '')
+
+            bank_text = (
+                f"<b>Bankverbindung:</b><br/>"
+                f"{bank_name}<br/>"
+                f"IBAN: {bank_details.get('iban', '')}<br/>"
+                f"BIC: {bic}"
+            )
+            if reference:
+                bank_text += f"<br/><b>Verwendungszweck:</b> {reference}"
+
+            bank_para = Paragraph(bank_text, self.styles['Normal'])
+
+            # GiroCode QR (EPC-Standard) erstellen
+            qr_cell = self._create_girocode_qr(
+                iban=iban, bic=bic,
+                name=sender_name,
+                amount=float(amount),
+                reference=str(reference)
+            )
+
+            if qr_cell is not None:
+                pay_table = Table(
+                    [[bank_para, qr_cell]],
+                    colWidths=[120*mm, 45*mm]
+                )
+                pay_table.setStyle(TableStyle([
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ]))
+                elements.append(pay_table)
+            else:
+                elements.append(bank_para)
+
+        elif invoice_data.get('payment_reference'):
             elements.append(Spacer(1, 0.3*cm))
-            elements.append(Paragraph(f"<b>Verwendungszweck:</b> {invoice_data['payment_reference']}", 
-                                    self.styles['Normal']))
-            
+            elements.append(Paragraph(
+                f"<b>Verwendungszweck:</b> {invoice_data['payment_reference']}",
+                self.styles['Normal']
+            ))
+
         return elements
+
+    def _create_girocode_qr(self, iban: str, bic: str, name: str,
+                             amount: float, reference: str):
+        """Erstelle GiroCode (EPC) QR für SEPA-Überweisung"""
+        if not iban:
+            return None
+        try:
+            from reportlab.graphics.barcode import qr as rl_qr
+            from reportlab.graphics.shapes import Drawing
+
+            # EPC QR Code Format (GiroCode)
+            # Zeile 1: BCD (Service Tag)
+            # Zeile 2: 002 (Version)
+            # Zeile 3: 1 (UTF-8 Encoding)
+            # Zeile 4: SCT (SEPA Credit Transfer)
+            # Zeile 5: BIC
+            # Zeile 6: Empfängername (max 70 Zeichen)
+            # Zeile 7: IBAN
+            # Zeile 8: EUR + Betrag (z.B. EUR12.50)
+            # Zeile 9: Purpose code (leer)
+            # Zeile 10: Remittance reference (leer)
+            # Zeile 11: Verwendungszweck (max 140 Zeichen)
+            amount_str = f"EUR{amount:.2f}" if amount > 0 else "EUR"
+            girocode = (
+                f"BCD\n002\n1\nSCT\n{bic}\n{name[:70]}\n{iban}\n"
+                f"{amount_str}\n\n\n{reference[:140]}"
+            )
+
+            qr_widget = rl_qr.QrCodeWidget(girocode, barLevel='M')
+            bounds = qr_widget.getBounds()
+            w = bounds[2] - bounds[0]
+            h = bounds[3] - bounds[1]
+            size = 38*mm
+            d = Drawing(size, size, transform=[size/w, 0, 0, size/h, 0, 0])
+            d.add(qr_widget)
+            return d
+        except Exception as e:
+            logger.debug(f"GiroCode QR konnte nicht erstellt werden: {e}")
+            return None
         
     def _create_footer(self, invoice_data: Dict) -> List:
         """Erstelle Fußbereich"""
         elements = []
-        
+
         # Abschlusstext
-        footer_text = invoice_data.get('footer_text', 
+        footer_text = invoice_data.get('footer_text',
                                       'Vielen Dank für Ihren Auftrag! Bei Fragen stehen wir Ihnen gerne zur Verfügung.')
-        
+
         elements.append(Spacer(1, 2*cm))
         elements.append(Paragraph(footer_text, self.styles['Normal']))
-        
+
+        # Design-Urheberrechtshinweis (Kleindruck)
+        small_style = ParagraphStyle(
+            'DesignHinweis', parent=self.styles['Normal'],
+            fontSize=7, leading=9, textColor=colors.HexColor('#888888'),
+            spaceBefore=8
+        )
+        design_note = (
+            "<b>Hinweis zu Digitalisierungen &amp; Design-Leistungen:</b> "
+            "Erstellte Stickprogramme und Digitalisierungen sind geistiges Eigentum unseres Unternehmens "
+            "und wurden ausschließlich für den Eigengebrauch im Produktionsprozess angefertigt. "
+            "Der in Rechnung gestellte Betrag entspricht dem Kundenanteil an den Erstellungskosten (i.d.R. 50 %). "
+            "Es besteht kein Anspruch auf Herausgabe bestimmter Dateiformate oder Rohdaten, "
+            "da wir kein Grafikbüro sind. Eine vollständige Rechteübertragung ist gegen gesonderte Vereinbarung und "
+            "Zahlung des vollen Erstellungspreises möglich."
+        )
+        elements.append(Paragraph(design_note, small_style))
+
         return elements
         
     def _add_page_number(self, canvas_obj, doc):

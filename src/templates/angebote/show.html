@@ -15,6 +15,9 @@
         <a href="{{ url_for('angebote.pdf_generieren', angebot_id=angebot.id) }}" class="btn btn-outline-primary">
             <i class="bi bi-file-pdf"></i> PDF
         </a>
+        <a href="{{ url_for('rechnung.proforma_aus_angebot', angebot_id=angebot.id) }}" class="btn btn-outline-warning">
+            <i class="bi bi-receipt-cutoff"></i> Proforma
+        </a>
     </div>
 </div>
 
@@ -47,9 +50,28 @@
                             <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#versendenModal">
                                 <i class="bi bi-send"></i> Versenden
                             </button>
+                            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#direktAuftragModal">
+                                <i class="bi bi-telephone-forward"></i> Direkt als Auftrag
+                            </button>
+                            {% if angebot.kunde_email %}
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="sendApprovalLink({{ angebot.id }})">
+                                <i class="bi bi-pen"></i> Freigabe-Link senden
+                            </button>
+                            {% endif %}
                         {% elif angebot.status == 'verschickt' %}
+                            {% if angebot.kunde_email %}
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="sendApprovalLink({{ angebot.id }})">
+                                <i class="bi bi-pen"></i> Freigabe-Link senden
+                            </button>
+                            {% endif %}
                             <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#annehmenModal">
                                 <i class="bi bi-check-circle"></i> Annehmen
+                            </button>
+                            <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#direktAuftragModal">
+                                <i class="bi bi-telephone-forward"></i> Direkt als Auftrag
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#manuellFreigebenModal">
+                                <i class="bi bi-clipboard-check"></i> Manuell freigeben
                             </button>
                             <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#ablehnenModal">
                                 <i class="bi bi-x-circle"></i> Ablehnen
@@ -71,6 +93,49 @@
     </div>
 </div>
 
+<!-- Freigabe-Status -->
+{% if angebot.approval_status %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card {% if angebot.approval_status == 'approved' %}border-success{% elif angebot.approval_status == 'sent' %}border-info{% elif angebot.approval_status == 'revision_requested' %}border-warning{% endif %}">
+            <div class="card-body py-2">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <i class="bi {% if angebot.approval_status == 'approved' %}bi-check-circle-fill text-success{% elif angebot.approval_status == 'sent' %}bi-hourglass-split text-info{% elif angebot.approval_status == 'revision_requested' %}bi-pencil-square text-warning{% else %}bi-clock text-muted{% endif %}" style="font-size: 1.3rem;"></i>
+                        <strong class="ms-2">Freigabe:</strong>
+                        {% if angebot.approval_status == 'approved' %}
+                            <span class="badge bg-success">Freigegeben</span>
+                            {% if angebot.approved_by_name %}<span class="text-muted ms-2">von {{ angebot.approved_by_name }}</span>{% endif %}
+                            {% if angebot.approval_date %}<span class="text-muted ms-1">am {{ angebot.approval_date.strftime('%d.%m.%Y %H:%M') }}</span>{% endif %}
+                        {% elif angebot.approval_status == 'sent' %}
+                            <span class="badge bg-info">Gesendet</span>
+                            {% if angebot.approval_sent_at %}<span class="text-muted ms-2">am {{ angebot.approval_sent_at.strftime('%d.%m.%Y %H:%M') }}</span>{% endif %}
+                        {% elif angebot.approval_status == 'revision_requested' %}
+                            <span class="badge bg-warning text-dark">Änderung gewünscht</span>
+                            {% if angebot.approved_by_name %}<span class="text-muted ms-2">von {{ angebot.approved_by_name }}</span>{% endif %}
+                        {% else %}
+                            <span class="badge bg-secondary">{{ angebot.approval_status }}</span>
+                        {% endif %}
+                    </div>
+                    {% if angebot.approval_signature %}
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#signaturModal">
+                            <i class="bi bi-vector-pen"></i> Unterschrift anzeigen
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if angebot.approval_notes and angebot.approval_status == 'revision_requested' %}
+                <div class="mt-2 text-muted small">
+                    <strong>Kundenwunsch:</strong> {{ angebot.approval_notes }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Angebots-Details -->
 <div class="row mb-4">
     <div class="col-md-8">
@@ -90,7 +155,7 @@
                     <dd class="col-sm-9">
                         {% if angebot.gueltig_bis %}
                             {{ angebot.gueltig_bis.strftime('%d.%m.%Y') }}
-                            {% set today = now().date() %}
+                            {# today kommt aus context_processor #}
                             {% if angebot.gueltig_bis < today %}
                                 <span class="badge bg-danger">Abgelaufen</span>
                             {% endif %}
@@ -108,6 +173,14 @@
                     <dt class="col-sm-3">Bemerkungen:</dt>
                     <dd class="col-sm-9">{{ angebot.bemerkungen or '-' }}</dd>
                 </dl>
+
+                {% if angebot.textbausteine_text %}
+                <hr>
+                <h6><i class="bi bi-card-text"></i> Konditionen / Textbausteine</h6>
+                <div class="bg-light rounded p-3">
+                    {{ angebot.textbausteine_text|replace('\n', '<br>')|safe }}
+                </div>
+                {% endif %}
 
                 <hr>
 
@@ -130,7 +203,7 @@
                             <td>{{ pos.artikel_name }}</td>
                             <td class="text-end">{{ pos.menge }} {{ pos.einheit }}</td>
                             <td class="text-end">{{ "{:,.2f}".format(pos.einzelpreis or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
-                            <td class="text-end">{{ "{:,.2f}".format(pos.brutto_betrag or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                            <td class="text-end">{{ "{:,.2f}".format(pos.netto_betrag or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -147,6 +220,12 @@
                             <td colspan="4" class="text-end"><strong>Brutto:</strong></td>
                             <td class="text-end"><strong>{{ "{:,.2f}".format(angebot.brutto_gesamt or 0).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</strong></td>
                         </tr>
+                        {% if angebot.versandkosten and angebot.versandkosten > 0 %}
+                        <tr>
+                            <td colspan="4" class="text-end">zzgl. Versand:</td>
+                            <td class="text-end">{{ "{:,.2f}".format(angebot.versandkosten).replace(',', 'X').replace('.', ',').replace('X', '.') }} €</td>
+                        </tr>
+                        {% endif %}
                     </tfoot>
                 </table>
                 {% else %}
@@ -195,7 +274,7 @@
                     <dd class="col-sm-6">
                         {% if tracking.naechster_kontakt_geplant %}
                             {{ tracking.naechster_kontakt_geplant.strftime('%d.%m.%Y') }}
-                            {% set today = now().date() %}
+                            {# today kommt aus context_processor #}
                             {% if tracking.naechster_kontakt_geplant <= today %}
                                 <span class="badge bg-warning">Fällig!</span>
                             {% endif %}
@@ -274,6 +353,56 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Direkt als Auftrag Modal (telefonische Zusage etc.) -->
+<div class="modal fade" id="direktAuftragModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('angebote.direkt_als_auftrag', angebot_id=angebot.id) }}">
+                <div class="modal-header bg-success bg-opacity-10">
+                    <h5 class="modal-title"><i class="bi bi-telephone-forward me-2"></i>Direkt als Auftrag</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info py-2">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Angebot wird als <strong>angenommen</strong> markiert und direkt in einen Auftrag umgewandelt.
+                        <br><small>F&uuml;r telefonische Zusagen, E-Mail-Best&auml;tigungen oder pers&ouml;nliche Absprachen.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Grund / Notiz</label>
+                        <select class="form-select mb-2" name="zusage_grund">
+                            <option value="telefon">Telefonische Zusage</option>
+                            <option value="email">E-Mail Best&auml;tigung</option>
+                            <option value="persoenlich">Pers&ouml;nliche Absprache</option>
+                            <option value="stammkunde">Stammkunde (Standardkonditionen)</option>
+                            <option value="sonstiges">Sonstiges</option>
+                        </select>
+                        <input type="text" class="form-control" name="zusage_notiz" placeholder="Optionale Notiz...">
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="split_auftraege" id="splitCheck"
+                               onchange="document.getElementById('split-options').style.display=this.checked?'block':'none'">
+                        <label class="form-check-label" for="splitCheck">
+                            In mehrere Auftr&auml;ge aufteilen (Design, Produktion, Versand)
+                        </label>
+                    </div>
+                    <div id="split-options" style="display:none;" class="mt-2 ps-4">
+                        <div class="form-check"><input class="form-check-input" type="checkbox" name="split_typ" value="design" id="sp_design" checked><label class="form-check-label" for="sp_design">Grafik / Design</label></div>
+                        <div class="form-check"><input class="form-check-input" type="checkbox" name="split_typ" value="{{ angebot.auftragstyp or 'embroidery' }}" id="sp_prod" checked><label class="form-check-label" for="sp_prod">Produktion ({{ angebot.auftragstyp or 'Bestickung' }})</label></div>
+                        <div class="form-check"><input class="form-check-input" type="checkbox" name="split_typ" value="shipping" id="sp_ship"><label class="form-check-label" for="sp_ship">Versand</label></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-lg me-1"></i>Auftrag erstellen
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <!-- Versenden Modal -->
 <div class="modal fade" id="versendenModal" tabindex="-1">
@@ -379,5 +508,108 @@
         </div>
     </div>
 </div>
+
+<!-- Manuell Freigeben Modal -->
+<div class="modal fade" id="manuellFreigebenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-clipboard-check"></i> Manuell als freigegeben markieren</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Markieren Sie das Angebot als vom Kunden freigegeben (z.B. nach Telefonat, E-Mail oder unterschriebener PDF).</p>
+                <div class="mb-3">
+                    <label class="form-label">Methode</label>
+                    <select id="manualApprovalMethod" class="form-select">
+                        <option value="phone">Telefonisch bestätigt</option>
+                        <option value="email">Per E-Mail bestätigt</option>
+                        <option value="pdf">Unterschriebene PDF erhalten</option>
+                        <option value="in_person">Persönlich bestätigt</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Name des Bestätigenden</label>
+                    <input type="text" id="manualApprovalName" class="form-control" value="{{ angebot.kunde_name }}" placeholder="Name">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-success" onclick="markManualApproval({{ angebot.id }})">
+                    <i class="bi bi-check-circle"></i> Als freigegeben markieren
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Signatur Modal -->
+{% if angebot.approval_signature %}
+<div class="modal fade" id="signaturModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-vector-pen"></i> Kundenunterschrift</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img src="{{ angebot.approval_signature }}" alt="Unterschrift" class="img-fluid border rounded p-2" style="max-width: 400px;">
+                <div class="mt-3 text-muted small">
+                    {% if angebot.approved_by_name %}{{ angebot.approved_by_name }} - {% endif %}
+                    {% if angebot.approval_date %}{{ angebot.approval_date.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+                    {% if angebot.approval_ip %}<br>IP: {{ angebot.approval_ip }}{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function sendApprovalLink(angebotId) {
+    if (!confirm('Freigabe-Link an den Kunden senden?')) return;
+
+    fetch(`/angebot-freigabe/api/send/${angebotId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Freigabe-Link wurde versendet!\n\nLink: ' + data.approval_link);
+            location.reload();
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+        }
+    })
+    .catch(err => {
+        alert('Fehler beim Senden: ' + err.message);
+    });
+}
+
+function markManualApproval(angebotId) {
+    const method = document.getElementById('manualApprovalMethod').value;
+    const name = document.getElementById('manualApprovalName').value;
+
+    fetch(`/angebot-freigabe/api/mark-approved/${angebotId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        credentials: 'same-origin',
+        body: JSON.stringify({method: method, name: name})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+        }
+    })
+    .catch(err => {
+        alert('Fehler: ' + err.message);
+    });
+}
+</script>
 
 {% endblock %}

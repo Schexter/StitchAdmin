@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2FA-Verifizierung - StitchAdmin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        :root {
+            --sa-primary: #1a6b5a;
+            --sa-primary-dark: #145346;
+            --sa-primary-light: #e8f5f1;
+            --sa-primary-hover: #15594a;
+        }
+        .login-page {
+            background: linear-gradient(135deg, #0f3d32 0%, #1a6b5a 50%, #228a73 100%);
+        }
+        .code-input {
+            font-size: 2rem;
+            text-align: center;
+            letter-spacing: 0.5rem;
+            font-family: monospace;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="login-page">
+    <div class="login-card">
+        <div class="card">
+            <div class="card-body">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show mb-3" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="login-brand">
+                    <div style="width: 64px; height: 64px; background: var(--sa-primary); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+                        <i class="bi bi-shield-lock" style="font-size: 2rem; color: white;"></i>
+                    </div>
+                    <h2>Zwei-Faktor-Authentifizierung</h2>
+                    <p>Geben Sie den Code aus Ihrer Authenticator-App ein</p>
+                </div>
+
+                <form method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-4">
+                        <input type="text" class="form-control form-control-lg code-input" id="code"
+                               name="code" placeholder="000000" maxlength="8" required autofocus
+                               autocomplete="one-time-code" inputmode="numeric">
+                    </div>
+
+                    <button type="submit" class="btn btn-success btn-lg w-100 mb-3">
+                        <i class="bi bi-check-circle me-1"></i> Verifizieren
+                    </button>
+
+                    <div class="text-center">
+                        <small class="text-muted">
+                            Keinen Zugriff auf die App?
+                            Geben Sie einen <strong>Backup-Code</strong> ein.
+                        </small>
+                    </div>
+
+                    <div class="text-center mt-3">
+                        <a href="{{ url_for('auth.login') }}" class="text-muted small">
+                            <i class="bi bi-arrow-left"></i> Zurueck zum Login
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

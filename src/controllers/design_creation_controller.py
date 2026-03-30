@@ -113,9 +113,9 @@ def create_external_order(order_id):
         if thread_colors_json:
             try:
                 specs['thread_colors'] = json.loads(thread_colors_json)
-            except:
+            except (json.JSONDecodeError, TypeError, ValueError):
                 pass
-        
+
         # Service aufrufen
         service = get_design_creation_service()
         send_email = request.form.get('send_email') == 'on'
@@ -183,9 +183,9 @@ def create_internal_task(order_id):
         if thread_colors_json:
             try:
                 specs['thread_colors'] = json.loads(thread_colors_json)
-            except:
+            except (json.JSONDecodeError, TypeError, ValueError):
                 pass
-        
+
         # Service aufrufen
         service = get_design_creation_service()
         generate_pdf = request.form.get('generate_pdf') != 'off'
@@ -198,12 +198,23 @@ def create_internal_task(order_id):
         )
         
         if result.get('success'):
-            flash(f"✅ {result['message']}", 'success')
+            flash(result['message'], 'success')
             if result.get('pdf_generated'):
-                flash('📄 Auftragszettel wurde erstellt', 'info')
+                flash('Auftragszettel wurde erstellt', 'info')
+
+            # Design-Freigabe-Token automatisch setzen, falls noch nicht vorhanden
+            if not order.design_approval_token:
+                try:
+                    order.generate_approval_token()
+                    order.design_approval_status = 'pending'
+                    db.session.commit()
+                    logger.info(f"Design approval token generated for order {order.id}")
+                except Exception as token_err:
+                    logger.warning(f"Token-Generierung fehlgeschlagen: {token_err}")
+
             return redirect(url_for('design_creation.internal_tasks'))
         else:
-            flash(f"❌ Fehler: {result.get('error')}", 'danger')
+            flash(f"Fehler: {result.get('error')}", 'danger')
             return redirect(url_for('design_creation.new_design_request', order_id=order_id))
             
     except Exception as e:
@@ -629,7 +640,7 @@ def _parse_float(value):
     if value:
         try:
             return float(value.replace(',', '.'))
-        except:
+        except (ValueError, TypeError):
             pass
     return None
 
@@ -638,7 +649,7 @@ def _parse_int(value):
     if value:
         try:
             return int(value)
-        except:
+        except (ValueError, TypeError):
             pass
     return None
 
@@ -647,6 +658,6 @@ def _parse_date(value):
     if value:
         try:
             return datetime.strptime(value, '%Y-%m-%d').date()
-        except:
+        except (ValueError, TypeError):
             pass
     return None

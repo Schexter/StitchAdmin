@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Impressum - StitchAdmin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}">
+    <style>
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #f8f9fa; }
+        .legal-nav { background: white; border-bottom: 1px solid #e9ecef; padding: 1rem 0; }
+        .legal-nav a { color: #1a6b5a; text-decoration: none; font-weight: 700; font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem; }
+        .legal-content { max-width: 800px; margin: 2rem auto; background: white; border-radius: 12px; padding: 3rem; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .legal-content h1 { font-size: 2rem; font-weight: 800; margin-bottom: 2rem; color: #1a6b5a; }
+        .legal-content h2 { font-size: 1.3rem; font-weight: 700; margin-top: 2rem; color: #333; }
+    </style>
+</head>
+<body>
+    <div class="legal-nav">
+        <div class="container">
+            <a href="{{ url_for('landing.index') }}">
+                <img src="{{ url_for('static', filename='favicon.svg') }}" alt="" style="height: 24px;">
+                StitchAdmin
+            </a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="legal-content">
+            <h1>Impressum</h1>
+
+            <h2>Angaben gemaess &sect; 5 TMG</h2>
+            <p>
+                Hans Hahn<br>
+                Hahn IT<br>
+                Wuppertal, Deutschland
+            </p>
+
+            <h2>Kontakt</h2>
+            <p>
+                E-Mail: <a href="mailto:kontakt@hahn-it-wuppertal.de">kontakt@hahn-it-wuppertal.de</a>
+            </p>
+
+            <h2>Verantwortlich fuer den Inhalt nach &sect; 55 Abs. 2 RStV</h2>
+            <p>
+                Hans Hahn<br>
+                Wuppertal, Deutschland
+            </p>
+
+            <h2>Haftungsausschluss</h2>
+
+            <h3 style="font-size: 1.1rem; margin-top: 1.5rem;">Beta-Software</h3>
+            <p>
+                StitchAdmin befindet sich in der <strong>Beta-Phase</strong>. Die Software wird ohne
+                Gewaehrleistung fuer Verfuegbarkeit, Vollstaendigkeit oder Fehlerfreiheit bereitgestellt.
+                Fuer Datenverlust, Betriebsunterbrechungen oder Schaeden jeglicher Art wird
+                <strong>keine Haftung uebernommen</strong>. Die Nutzung erfolgt auf eigene Verantwortung.
+            </p>
+
+            <h3 style="font-size: 1.1rem;">Haftung fuer Inhalte</h3>
+            <p>
+                Die Inhalte dieser Seiten wurden mit groesster Sorgfalt erstellt. Fuer die Richtigkeit,
+                Vollstaendigkeit und Aktualitaet der Inhalte koennen wir jedoch keine Gewaehr uebernehmen.
+            </p>
+
+            <h3 style="font-size: 1.1rem;">Haftung fuer Links</h3>
+            <p>
+                Unser Angebot enthaelt Links zu externen Webseiten Dritter, auf deren Inhalte wir keinen
+                Einfluss haben. Fuer die Inhalte der verlinkten Seiten ist stets der jeweilige Anbieter
+                verantwortlich.
+            </p>
+
+            <h2>Urheberrecht</h2>
+            <p>
+                Die durch den Seitenbetreiber erstellten Inhalte und Werke auf diesen Seiten unterliegen
+                dem deutschen Urheberrecht. &copy; {{ today.year if today is defined else '2026' }} Hans Hahn / Hahn IT.
+                Alle Rechte vorbehalten.
+            </p>
+
+            <hr class="my-4">
+            <p class="text-center">
+                <a href="{{ url_for('landing.index') }}" class="text-decoration-none">
+                    <i class="bi bi-arrow-left me-1"></i> Zurueck zur Startseite
+                </a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

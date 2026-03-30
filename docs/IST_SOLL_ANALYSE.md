@@ -58,6 +58,7 @@
 - ⚠️ `ProductionSchedule` - Existiert im Model, aber nicht voll genutzt
 - ⚠️ `ThreadUsage` - Garnverbrauch-Tracking fehlt teilweise
 
+
 ---
 
 #### 2. Kundenverwaltung (85% fertig)

@@ -4,634 +4,563 @@
 
 {% block extra_css %}
 <style>
-    /* Grid Container */
-    .row.g-4 {
-        align-items: stretch !important;
+    /* Quick-Stats Bar */
+    .quick-stat {
+        text-align: center;
+        padding: 12px 8px;
+        border-radius: 8px;
+        background: #fff;
+        border: 1px solid #e9ecef;
+        transition: box-shadow 0.2s;
     }
-    
-    /* Kachel-Wrapper - muss volle Höhe haben */
-    .module-card-wrapper {
-        display: flex;
-        height: 100%;
+    .quick-stat:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .quick-stat .stat-num {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1.1;
     }
-    
-    .module-card-wrapper > a {
+    .quick-stat .stat-lbl {
+        font-size: 0.72rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        margin-top: 2px;
+    }
+
+    /* Ereignisse & Todos */
+    .event-item {
         display: flex;
-        width: 100%;
+        align-items: center;
+        padding: 8px 12px;
+        border-bottom: 1px solid #f0f0f0;
         text-decoration: none;
+        color: inherit;
+        transition: background 0.15s;
     }
-    
-    /* Kachel-Design - alle exakt gleich groß */
-    .module-card {
-        transition: all 0.3s ease;
-        border: none;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-    }
-    
-    .module-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 8px 15px rgba(0,0,0,0.2);
-    }
-    
-    .module-card .card-body {
-        padding: 2rem;
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-    }
-    
-    .module-icon {
-        width: 56px;
-        height: 56px;
-        border-radius: 12px;
+    .event-item:last-child { border-bottom: none; }
+    .event-item:hover { background: #f8f9fa; }
+    .event-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 1rem;
+        flex-shrink: 0;
+        font-size: 0.85rem;
     }
-
-    .module-icon i {
-        font-size: 1.6rem;
-        color: #fff;
-    }
-
-    /* Icon-Hintergründe pro Modul-Farbe */
-    .module-card.border-primary .module-icon { background: linear-gradient(135deg, #0d6efd, #0a58ca); }
-    .module-card.border-success .module-icon { background: linear-gradient(135deg, #198754, #146c43); }
-    .module-card.border-warning .module-icon { background: linear-gradient(135deg, #fd7e14, #e06b0a); }
-    .module-card.border-info .module-icon { background: linear-gradient(135deg, #0dcaf0, #0aa2c0); }
-    .module-card.border-danger .module-icon { background: linear-gradient(135deg, #dc3545, #b02a37); }
-    .module-card.border-secondary .module-icon { background: linear-gradient(135deg, #6c757d, #565e64); }
-    .module-card.border-dark .module-icon { background: linear-gradient(135deg, #343a40, #212529); }
-
-    .module-card h3 {
-        font-size: 1.25rem;
+    .event-body { flex: 1; min-width: 0; margin-left: 10px; }
+    .event-title {
+        font-size: 0.85rem;
         font-weight: 600;
-        margin-bottom: 0.4rem;
-        color: #212529;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
-
-    .module-card p {
+    .event-sub {
+        font-size: 0.75rem;
         color: #6c757d;
-        margin-bottom: 1rem;
-        font-size: 0.875rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
+    .event-badge { flex-shrink: 0; margin-left: 8px; }
 
-    .module-stats {
-        border-top: 1px solid #e9ecef;
-        padding-top: 1rem;
-        margin-top: auto;
-        min-height: 80px;
-    }
-
-    .stat-item {
+    .todo-item {
         display: flex;
-        justify-content: space-between;
-        margin-bottom: 0.4rem;
+        align-items: center;
+        padding: 7px 12px;
+        border-bottom: 1px solid #f0f0f0;
+        font-size: 0.85rem;
+    }
+    .todo-item:last-child { border-bottom: none; }
+    .todo-prio {
+        width: 4px;
+        height: 28px;
+        border-radius: 2px;
+        flex-shrink: 0;
+        margin-right: 10px;
+    }
+    .todo-prio.urgent { background: #dc3545; }
+    .todo-prio.high { background: #fd7e14; }
+    .todo-prio.normal { background: #0d6efd; }
+    .todo-prio.low { background: #6c757d; }
+    .todo-body { flex: 1; min-width: 0; }
+    .todo-title {
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .todo-due {
+        font-size: 0.72rem;
+        color: #6c757d;
+    }
+    .todo-due.overdue { color: #dc3545; font-weight: 600; }
+
+    /* Kompakte Modul-Kacheln */
+    .module-tile {
+        display: flex;
+        align-items: center;
+        padding: 14px 16px;
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-left: 3px solid #dee2e6;
+        border-radius: 8px;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s;
+        height: 100%;
+    }
+    .module-tile:hover {
+        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+        text-decoration: none;
+        color: inherit;
+    }
+    .module-tile .tile-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        color: #fff;
+        font-size: 1.1rem;
+    }
+    .module-tile .tile-body { margin-left: 12px; flex: 1; min-width: 0; }
+    .module-tile .tile-name {
+        font-weight: 600;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .module-tile .tile-stat {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+    .module-tile .tile-stat .text-danger { font-weight: 600; }
+
+    /* Farben */
+    .module-tile.c-primary { border-left-color: #0d6efd; }
+    .module-tile.c-primary .tile-icon { background: linear-gradient(135deg, #0d6efd, #0a58ca); }
+    .module-tile.c-success { border-left-color: #198754; }
+    .module-tile.c-success .tile-icon { background: linear-gradient(135deg, #198754, #146c43); }
+    .module-tile.c-warning { border-left-color: #fd7e14; }
+    .module-tile.c-warning .tile-icon { background: linear-gradient(135deg, #fd7e14, #e06b0a); }
+    .module-tile.c-info { border-left-color: #0dcaf0; }
+    .module-tile.c-info .tile-icon { background: linear-gradient(135deg, #0dcaf0, #0aa2c0); }
+    .module-tile.c-danger { border-left-color: #dc3545; }
+    .module-tile.c-danger .tile-icon { background: linear-gradient(135deg, #dc3545, #b02a37); }
+    .module-tile.c-secondary { border-left-color: #6c757d; }
+    .module-tile.c-secondary .tile-icon { background: linear-gradient(135deg, #6c757d, #565e64); }
+    .module-tile.c-dark { border-left-color: #343a40; }
+    .module-tile.c-dark .tile-icon { background: linear-gradient(135deg, #343a40, #212529); }
+
+    .section-title {
+        font-size: 0.8rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #6c757d;
+        margin-bottom: 10px;
+    }
+    .card-compact {
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .card-compact .card-header {
+        background: #fff;
+        border-bottom: 1px solid #f0f0f0;
+        padding: 10px 14px;
+        font-weight: 600;
         font-size: 0.85rem;
     }
 
-    .stat-item .label {
-        color: #6c757d;
+    /* Drag & Drop */
+    .module-tile.sortable-ghost {
+        opacity: 0.4;
+        background: #e9ecef;
     }
-
-    .stat-item .value {
-        font-weight: 700;
-        font-size: 1.1rem;
-        color: #212529;
+    .module-tile.sortable-drag {
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        transform: rotate(1deg);
     }
-
-    /* Farbige Left-Borders pro Modul */
-    .module-card {
-        border-left: 4px solid transparent !important;
-        border-top: none !important;
+    .module-col.sortable-chosen .module-tile {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 2px rgba(13,110,253,0.25);
     }
-    .module-card.border-primary { border-left-color: #0d6efd !important; }
-    .module-card.border-success { border-left-color: #198754 !important; }
-    .module-card.border-warning { border-left-color: #fd7e14 !important; }
-    .module-card.border-info { border-left-color: #0dcaf0 !important; }
-    .module-card.border-danger { border-left-color: #dc3545 !important; }
-    .module-card.border-secondary { border-left-color: #6c757d !important; }
-    .module-card.border-dark { border-left-color: #343a40 !important; }
-    
-    /* Edit-Mode Styles */
-    body.dashboard-edit-mode .module-card-wrapper {
-        cursor: move;
+    .edit-mode .module-tile {
+        cursor: grab;
+        position: relative;
     }
-    
-    body.dashboard-edit-mode .module-card::after {
-        content: '⋮⋮';
+    .edit-mode .module-tile:active { cursor: grabbing; }
+    .edit-mode .module-tile::after {
+        content: '\F3FE';
+        font-family: 'bootstrap-icons';
         position: absolute;
-        top: 15px;
-        right: 15px;
-        font-size: 24px;
-        color: #ccc;
-        font-weight: bold;
-    }
-    
-    .module-card-wrapper.dragging {
-        opacity: 0.5;
-    }
-    
-    /* Module die ausgeblendet sind */
-    .module-card-wrapper.hidden-module {
-        display: none !important;
-    }
-    
-    /* Sichtbarkeits-Toggle Position */
-    .module-visibility-toggle {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        z-index: 10;
-        display: none;
-    }
-    
-    body.dashboard-edit-mode .module-visibility-toggle {
-        display: block;
-    }
-    
-    /* Sichtbarkeits-Toggle Buttons - nutzt Branding-Farbe */
-    .module-visibility-toggle .btn {
-        {% if branding and branding.primary_color %}
-        --bs-btn-bg: {{ branding.primary_color }};
-        --bs-btn-border-color: {{ branding.primary_color }};
-        --bs-btn-hover-bg: {{ branding.primary_color }}dd;
-        --bs-btn-hover-border-color: {{ branding.primary_color }}dd;
-        {% else %}
-        --bs-btn-bg: #198754;
-        --bs-btn-border-color: #198754;
-        --bs-btn-hover-bg: #157347;
-        --bs-btn-hover-border-color: #157347;
-        {% endif %}
-    }
-    
-    .module-visibility-toggle .btn.btn-success {
-        background-color: var(--bs-btn-bg) !important;
-        border-color: var(--bs-btn-border-color) !important;
-    }
-    
-    .module-visibility-toggle .btn.btn-success:hover {
-        background-color: var(--bs-btn-hover-bg) !important;
-        border-color: var(--bs-btn-hover-border-color) !important;
-    }
-    
-    /* Responsive Grid - Tablet */
-    @media (max-width: 991px) {
-        .module-card-wrapper {
-            min-height: auto;
-        }
-        .module-card .card-body {
-            padding: 1.25rem;
-        }
-        .module-icon {
-            width: 44px;
-            height: 44px;
-            border-radius: 10px;
-            margin-bottom: 0.75rem;
-        }
-        .module-icon i {
-            font-size: 1.3rem;
-        }
-        .module-card h3 {
-            font-size: 1.1rem;
-        }
-        .module-card p {
-            font-size: 0.8rem;
-            margin-bottom: 0.75rem;
-        }
-        .module-stats {
-            min-height: auto;
-            padding-top: 0.75rem;
-        }
-        .stat-item .value {
-            font-size: 1rem;
-        }
-        .module-card:hover {
-            transform: translateY(-3px);
-        }
+        top: 4px;
+        right: 6px;
+        font-size: 0.7rem;
+        color: #adb5bd;
     }
 
-    /* Responsive Grid - Mobile */
     @media (max-width: 767px) {
-        .module-card-wrapper {
-            min-height: auto;
-        }
-        .module-card .card-body {
-            padding: 1rem;
-        }
-        .module-icon {
-            width: 40px;
-            height: 40px;
-            margin-bottom: 0.5rem;
-        }
-        .module-icon i {
-            font-size: 1.2rem;
-        }
-        .module-card h3 {
-            font-size: 1rem;
-        }
-        .module-card:hover {
-            transform: none;
-        }
-    }
-    
-    /* Dashboard-Anpassen Button - nutzt Branding-Farbe */
-    #btn-edit-dashboard {
-        {% if branding and branding.primary_color %}
-        background-color: {{ branding.primary_color }} !important;
-        border-color: {{ branding.primary_color }} !important;
-        {% endif %}
-    }
-    
-    #btn-edit-dashboard:hover {
-        {% if branding and branding.primary_color %}
-        background-color: {{ branding.primary_color }}dd !important;
-        border-color: {{ branding.primary_color }}dd !important;
-        {% endif %}
-    }
-    
-    #btn-edit-dashboard.btn-success {
-        {% if branding and branding.primary_color %}
-        background-color: {{ branding.primary_color }} !important;
-        border-color: {{ branding.primary_color }} !important;
-        {% endif %}
-    }
-    
-    /* Notification Toast */
-    .toast-notification {
-        position: fixed;
-        top: 80px;
-        right: 20px;
-        z-index: 9999;
-        min-width: 300px;
+        .quick-stat .stat-num { font-size: 1.2rem; }
+        .module-tile { padding: 10px 12px; }
+        .module-tile .tile-icon { width: 34px; height: 34px; font-size: 0.95rem; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-start mb-4 gap-2">
-    <div>
-        <h1 class="mb-1">
-            {% if branding and branding.company_name %}
-                {{ branding.company_name }}'s Dashboard
-            {% else %}
-                Dashboard
-            {% endif %}
-        </h1>
-        <p class="text-muted mb-0">Willkommen {{ current_user.username }}</p>
-    </div>
-    <div class="d-flex gap-2">
-        <button id="btn-edit-dashboard" class="btn btn-primary btn-sm">
-            <i class="bi bi-gear"></i> Dashboard anpassen
-        </button>
-        <button id="btn-reset-dashboard" class="btn btn-outline-secondary btn-sm" style="display:none;">
-            <i class="bi bi-arrow-clockwise"></i> Zurücksetzen
-        </button>
-    </div>
-</div>
+<div class="container-fluid py-3">
 
-<!-- Module Grid -->
-<div class="row g-4" id="module-grid">
-    
-    {% if user_modules %}
-        {% for module, visible, order in user_modules %}
-        <div class="col-md-6 col-lg-4 module-card-wrapper {% if not visible %}hidden-module{% endif %}" 
-             data-module-id="{{ module.id }}" 
-             data-order="{{ order }}">
-            
-            <!-- Sichtbarkeits-Toggle (nur im Edit-Mode) -->
-            <div class="module-visibility-toggle">
-                <button class="btn btn-sm {% if visible %}btn-success{% else %}btn-secondary{% endif %} toggle-visibility" 
-                        data-module-id="{{ module.id }}"
-                        title="{% if visible %}Ausblenden{% else %}Einblenden{% endif %}">
-                    <i class="bi {% if visible %}bi-eye{% else %}bi-eye-slash{% endif %}"></i>
-                </button>
-            </div>
-            
-            <a href="{{ url_for(module.route) }}" class="text-decoration-none">
-                <div class="card module-card border-{{ module.color }}">
-                    <div class="card-body">
-                        <div class="module-icon">
-                            {% if module.icon and module.icon.startswith('bi-') %}
-                                <i class="bi {{ module.icon }}"></i>
-                            {% else %}
-                                <i class="bi bi-grid-fill"></i>
-                            {% endif %}
-                        </div>
-                        <h3>{{ module.display_name }}</h3>
-                        <p>{{ module.description }}</p>
-                        
-                        <div class="module-stats">
-                            {% if module.name == 'crm' %}
-                                <div class="stat-item">
-                                    <span class="label">Kunden gesamt</span>
-                                    <span class="value">{{ stats.get('total_customers', 0) }}</span>
-                                </div>
-                            {% elif module.name == 'production' %}
-                                <div class="stat-item">
-                                    <span class="label">Offene Aufträge</span>
-                                    <span class="value">{{ stats.get('open_orders', 0) }}</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="label">In Produktion</span>
-                                    <span class="value">{{ stats.get('in_production', 0) }}</span>
-                                </div>
-                            {% elif module.name == 'pos' %}
-                                <div class="stat-item">
-                                    <span class="label">Umsatz heute</span>
-                                    <span class="value">{{ "%.2f"|format(stats.get('today_revenue', 0)) }} €</span>
-                                </div>
-                            {% elif module.name == 'accounting' %}
-                                <div class="stat-item">
-                                    <span class="label">Offene Rechnungen</span>
-                                    <span class="value">{{ stats.get('open_invoices', 0) }}</span>
-                                </div>
-                            {% elif module.name == 'documents' %}
-                                <div class="stat-item">
-                                    <span class="label">Dokumente</span>
-                                    <span class="value">{{ stats.get('document_count', 0) }}</span>
-                                </div>
-                            {% elif module.name == 'warehouse' %}
-                                <div class="stat-item">
-                                    <span class="label">Artikel</span>
-                                    <span class="value">{{ stats.get('article_count', 0) }}</span>
-                                </div>
-                            {% elif module.name == 'purchasing' %}
-                                <div class="stat-item">
-                                    <span class="label">Offene Bestellungen</span>
-                                    <span class="value">{{ stats.get('pending_supplier_orders', 0) }}</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="label">Zu bestellen</span>
-                                    <span class="value">{{ stats.get('items_to_order', 0) }}</span>
-                                </div>
-                            {% elif module.name == 'website_cms' %}
-                                <div class="stat-item">
-                                    <span class="label">CMS-Inhalte</span>
-                                    <span class="value">{{ stats.get('website_content_count', 0) }}</span>
-                                </div>
-                            {% elif module.name == 'shop_admin' %}
-                                <div class="stat-item">
-                                    <span class="label">Shop-Bestellungen</span>
-                                    <span class="value">{{ stats.get('shop_orders', 0) }}</span>
-                                </div>
-                            {% elif module.name == 'inquiry_admin' %}
-                                <div class="stat-item">
-                                    <span class="label">Neue Anfragen</span>
-                                    <span class="value">{{ stats.get('new_inquiries', 0) }}</span>
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h4 class="mb-0">
+                {% if branding and branding.company_name %}
+                    {{ branding.company_name }}
+                {% else %}
+                    Dashboard
+                {% endif %}
+            </h4>
+            <small class="text-muted">Willkommen {{ current_user.username }}</small>
+        </div>
+        <a href="{{ url_for('taskboard.index') }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-kanban me-1"></i>Aufgaben-Board
+        </a>
+    </div>
+
+    <!-- Workflow-Kacheln -->
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-4 col-lg-2">
+            <a href="{{ url_for('inquiry_admin.list') }}" class="quick-stat d-block text-decoration-none" style="border-left: 3px solid #fd7e14;">
+                <div class="d-flex align-items-center justify-content-center mb-1">
+                    <i class="bi bi-envelope-paper text-warning" style="font-size: 1.3rem;"></i>
                 </div>
+                <div class="stat-num text-warning">{{ stats.get('total_inquiries_open', stats.get('new_inquiries', 0)) }}</div>
+                <div class="stat-lbl">Anfragen</div>
+                {% if stats.get('new_inquiries', 0) > 0 %}
+                <span class="badge bg-danger mt-1" style="font-size: 0.65rem;">{{ stats.get('new_inquiries', 0) }} neu</span>
+                {% endif %}
             </a>
         </div>
-        {% endfor %}
-    {% else %}
-        <div class="col-12">
-            <div class="alert alert-info">
-                <i class="bi bi-info-circle"></i> Keine Module verfügbar. 
-                {% if current_user.is_admin %}
-                <a href="{{ url_for('permissions.index') }}">Berechtigungen konfigurieren</a>
-                {% else %}
-                Bitte kontaktieren Sie Ihren Administrator.
+        <div class="col-6 col-md-4 col-lg-2">
+            <a href="{{ url_for('angebote.index') }}" class="quick-stat d-block text-decoration-none" style="border-left: 3px solid #6610f2;">
+                <div class="d-flex align-items-center justify-content-center mb-1">
+                    <i class="bi bi-file-earmark-text" style="font-size: 1.3rem; color: #6610f2;"></i>
+                </div>
+                <div class="stat-num" style="color: #6610f2;">{{ stats.get('open_angebote', 0) }}</div>
+                <div class="stat-lbl">Angebote</div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <a href="{{ url_for('orders.index') }}" class="quick-stat d-block text-decoration-none" style="border-left: 3px solid #0d6efd;">
+                <div class="d-flex align-items-center justify-content-center mb-1">
+                    <i class="bi bi-clipboard-check text-primary" style="font-size: 1.3rem;"></i>
+                </div>
+                <div class="stat-num text-primary">{{ stats.get('open_orders', 0) }}</div>
+                <div class="stat-lbl">Aufträge</div>
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <a href="{{ url_for('purchasing.orders') }}" class="quick-stat d-block text-decoration-none" style="border-left: 3px solid #0dcaf0;">
+                <div class="d-flex align-items-center justify-content-center mb-1">
+                    <i class="bi bi-cart3 text-info" style="font-size: 1.3rem;"></i>
+                </div>
+                <div class="stat-num text-info">{{ stats.get('pending_supplier_orders', 0) }}</div>
+                <div class="stat-lbl">Einkauf</div>
+                {% if stats.get('items_to_order', 0) > 0 %}
+                <span class="badge bg-warning text-dark mt-1" style="font-size: 0.65rem;">{{ stats.get('items_to_order', 0) }} zu bestellen</span>
                 {% endif %}
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <a href="{{ url_for('production.index') }}" class="quick-stat d-block text-decoration-none" style="border-left: 3px solid #198754;">
+                <div class="d-flex align-items-center justify-content-center mb-1">
+                    <i class="bi bi-gear text-success" style="font-size: 1.3rem;"></i>
+                </div>
+                <div class="stat-num text-success">{{ stats.get('in_production', 0) }}</div>
+                <div class="stat-lbl">Produktion</div>
+                {% if stats.get('ready_pickup', 0) > 0 %}
+                <span class="badge bg-success mt-1" style="font-size: 0.65rem;">{{ stats.get('ready_pickup', 0) }} fertig</span>
+                {% endif %}
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <a href="{{ url_for('rechnung.rechnungs_index') }}" class="quick-stat d-block text-decoration-none" style="border-left: 3px solid #dc3545;">
+                <div class="d-flex align-items-center justify-content-center mb-1">
+                    <i class="bi bi-receipt text-danger" style="font-size: 1.3rem;"></i>
+                </div>
+                <div class="stat-num text-danger">{{ stats.get('open_invoices', 0) }}</div>
+                <div class="stat-lbl">Rechnungen</div>
+                {% if stats.get('today_revenue', 0) > 0 %}
+                <span class="badge bg-dark mt-1" style="font-size: 0.65rem;">{{ "%.0f"|format(stats.get('today_revenue', 0)) }}&euro; heute</span>
+                {% endif %}
+            </a>
+        </div>
+        <div class="col-6 col-md-4 col-lg-2">
+            <a href="{{ url_for('shipping.index') }}" class="quick-stat d-block text-decoration-none" style="border-left: 3px solid #6c757d;">
+                <div class="d-flex align-items-center justify-content-center mb-1">
+                    <i class="bi bi-truck text-secondary" style="font-size: 1.3rem;"></i>
+                </div>
+                <div class="stat-num text-secondary">{{ stats.get('ready_to_ship', 0) }}</div>
+                <div class="stat-lbl">Versand</div>
+                {% if stats.get('shipped_today', 0) > 0 %}
+                <span class="badge bg-secondary mt-1" style="font-size: 0.65rem;">{{ stats.get('shipped_today', 0) }} heute</span>
+                {% endif %}
+            </a>
+        </div>
+    </div>
+
+    <!-- Ereignisse + Todos -->
+    <div class="row g-3 mb-3">
+        <!-- Aktuelle Ereignisse -->
+        <div class="col-lg-7">
+            <div class="card-compact">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-lightning me-1"></i>Aktuelle Ereignisse</span>
+                    <a href="{{ url_for('taskboard.index') }}" class="text-decoration-none" style="font-size: 0.75rem;">Alle anzeigen</a>
+                </div>
+                <div>
+                    {% if recent_events %}
+                        {% for ev in recent_events %}
+                        <a href="{{ ev.url }}" class="event-item">
+                            <div class="event-icon bg-{{ ev.color }} bg-opacity-10 text-{{ ev.color }}">
+                                <i class="bi {{ ev.icon }}"></i>
+                            </div>
+                            <div class="event-body">
+                                <div class="event-title">{{ ev.title }}</div>
+                                <div class="event-sub">{{ ev.subtitle }}</div>
+                            </div>
+                            <div class="event-badge">
+                                <span class="badge bg-{{ ev.color }} bg-opacity-10 text-{{ ev.color }}" style="font-size:0.7rem;">{{ ev.status }}</span>
+                            </div>
+                        </a>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-4" style="font-size:0.85rem;">
+                            <i class="bi bi-check-circle me-1"></i>Keine aktuellen Ereignisse
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
-    {% endif %}
 
-</div>
-
-<!-- Toast Container -->
-<div class="toast-container position-fixed top-0 end-0 p-3">
-    <div id="toast-notification" class="toast" role="alert">
-        <div class="toast-header">
-            <i class="bi bi-check-circle me-2 text-success"></i>
-            <strong class="me-auto">Dashboard</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        <!-- Meine Aufgaben -->
+        <div class="col-lg-5">
+            <div class="card-compact">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-check2-square me-1"></i>Meine Aufgaben</span>
+                    <a href="{{ url_for('taskboard.index') }}" class="text-decoration-none" style="font-size: 0.75rem;">Board öffnen</a>
+                </div>
+                <div>
+                    {% if my_todos %}
+                        {% for t in my_todos %}
+                        <div class="todo-item">
+                            <div class="todo-prio {{ t.priority or 'normal' }}"></div>
+                            <div class="todo-body">
+                                <div class="todo-title">{{ t.title }}</div>
+                                {% if t.due_date %}
+                                <div class="todo-due {% if t.is_overdue %}overdue{% endif %}">
+                                    <i class="bi bi-calendar3 me-1"></i>{{ t.due_date.strftime('%d.%m.%Y') }}
+                                    {% if t.is_overdue %} - überfällig{% endif %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted py-4" style="font-size:0.85rem;">
+                            <i class="bi bi-emoji-smile me-1"></i>Keine offenen Aufgaben
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
-        <div class="toast-body"></div>
     </div>
+
+    <!-- Module Grid (kompakt) -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="section-title mb-0">Module</div>
+        <div class="d-flex gap-1" id="grid-controls">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btn-edit-grid" onclick="toggleEditMode()" title="Reihenfolge anpassen">
+                <i class="bi bi-arrows-move me-1"></i><span class="d-none d-md-inline">Anpassen</span>
+            </button>
+            <button type="button" class="btn btn-sm btn-success d-none" id="btn-save-grid" onclick="saveGridOrder()">
+                <i class="bi bi-check-lg me-1"></i>Speichern
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger d-none" id="btn-cancel-grid" onclick="cancelEditMode()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+    </div>
+    <div class="row g-2" id="module-grid">
+        {% if user_modules %}
+            {% for module, visible, order in user_modules %}
+                {% if visible %}
+                <div class="col-6 col-md-4 col-lg-3 module-col" data-module-id="{{ module.id }}">
+                    <a href="{{ url_for(module.route) }}" class="module-tile c-{{ module.color }}">
+                        <div class="tile-icon">
+                            <i class="bi {{ module.icon or 'bi-grid-fill' }}"></i>
+                        </div>
+                        <div class="tile-body">
+                            <div class="tile-name">{{ module.display_name }}</div>
+                            <div class="tile-stat">
+                                {% if module.name == 'crm' %}
+                                    {{ stats.get('total_customers', 0) }} Kunden
+                                {% elif module.name == 'production' %}
+                                    {{ stats.get('in_production', 0) }} in Produktion
+                                {% elif module.name == 'pos' %}
+                                    {{ "%.2f"|format(stats.get('today_revenue', 0)) }} EUR heute
+                                {% elif module.name == 'accounting' %}
+                                    {{ stats.get('open_invoices', 0) }} offen
+                                {% elif module.name == 'warehouse' %}
+                                    {{ stats.get('article_count', 0) }} Artikel
+                                {% elif module.name == 'purchasing' %}
+                                    {{ stats.get('pending_supplier_orders', 0) }} Bestellungen
+                                {% elif module.name == 'inquiry_admin' %}
+                                    <span class="{% if stats.get('new_inquiries', 0) > 0 %}text-danger{% endif %}">{{ stats.get('new_inquiries', 0) }} neu</span>
+                                {% elif module.name == 'taskboard' %}
+                                    {{ stats.get('open_tasks', 0) }} offen
+                                    {% if stats.get('overdue_tasks', 0) > 0 %}
+                                    <span class="text-danger">/ {{ stats.get('overdue_tasks', 0) }} überfällig</span>
+                                    {% endif %}
+                                {% elif module.name == 'shop_admin' %}
+                                    {{ stats.get('shop_orders', 0) }} Bestellungen
+                                {% elif module.name == 'shipping' %}
+                                    {{ stats.get('ready_to_ship', 0) }} versandbereit
+                                {% elif module.name == 'documents' %}
+                                    {{ stats.get('document_count', 0) }} Dokumente
+                                {% else %}
+                                    {{ module.description[:30] }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                {% endif %}
+            {% endfor %}
+        {% else %}
+
+            <div class="col-12">
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle me-1"></i>Keine Module verfügbar.
+                    {% if current_user.is_admin %}
+                    <a href="{{ url_for('permissions.index') }}">Berechtigungen konfigurieren</a>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
 </div>
-{% endblock %}
 
-{% block scripts %}
-<!-- SortableJS für Drag & Drop mit lokalem Fallback -->
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"
-        onerror="this.onerror=null; var s=document.createElement('script'); s.src='{{ url_for('static', filename='vendor/sortablejs/Sortable.min.js') }}'; document.head.appendChild(s);"></script>
-
+<!-- SortableJS CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
 <script>
-// WICHTIG: Kacheln gleich groß machen - pro visuelle Zeile
-function equalizeCardHeights() {
+let sortableInstance = null;
+let editMode = false;
+
+function toggleEditMode() {
+    editMode = true;
     const grid = document.getElementById('module-grid');
-    if (!grid) return;
+    grid.classList.add('edit-mode');
+    document.getElementById('btn-edit-grid').classList.add('d-none');
+    document.getElementById('btn-save-grid').classList.remove('d-none');
+    document.getElementById('btn-cancel-grid').classList.remove('d-none');
 
-    const wrappers = Array.from(grid.querySelectorAll('.module-card-wrapper:not(.hidden-module)'));
-
-    // Erst alle Höhen zurücksetzen
-    wrappers.forEach(w => {
-        const card = w.querySelector('.module-card');
-        if (card) card.style.minHeight = '';
+    // Links deaktivieren im Edit-Modus
+    grid.querySelectorAll('.module-tile').forEach(tile => {
+        tile.addEventListener('click', preventClick, true);
     });
 
-    // Kacheln nach visueller Zeile gruppieren (gleiche offsetTop)
-    const rowGroups = {};
-    wrappers.forEach(w => {
-        const top = w.offsetTop;
-        if (!rowGroups[top]) rowGroups[top] = [];
-        rowGroups[top].push(w);
-    });
-
-    // Pro Zeile gleiche Höhe setzen
-    Object.values(rowGroups).forEach(group => {
-        let maxHeight = 0;
-        group.forEach(w => {
-            const card = w.querySelector('.module-card');
-            if (card && card.offsetHeight > maxHeight) {
-                maxHeight = card.offsetHeight;
-            }
+    // SortableJS initialisieren
+    if (!sortableInstance) {
+        sortableInstance = Sortable.create(grid, {
+            animation: 200,
+            ghostClass: 'sortable-ghost',
+            dragClass: 'sortable-drag',
+            chosenClass: 'sortable-chosen',
+            draggable: '.module-col',
+            handle: '.module-tile',
+            delay: 100,
+            delayOnTouchOnly: true,
+            touchStartThreshold: 5
         });
-        group.forEach(w => {
-            const card = w.querySelector('.module-card');
-            if (card) card.style.minHeight = maxHeight + 'px';
-        });
-    });
+    }
+    sortableInstance.option('disabled', false);
 }
 
-// Beim Laden und bei Resize
-window.addEventListener('load', equalizeCardHeights);
-window.addEventListener('resize', equalizeCardHeights);
+function preventClick(e) {
+    if (editMode) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+}
 
-document.addEventListener('DOMContentLoaded', function() {
-    let isEditMode = false;
-    const moduleGrid = document.getElementById('module-grid');
-    const btnEdit = document.getElementById('btn-edit-dashboard');
-    const btnReset = document.getElementById('btn-reset-dashboard');
-    let sortable = null;
-    
-    // Edit-Modus Toggle
-    btnEdit.addEventListener('click', function() {
-        isEditMode = !isEditMode;
-        document.body.classList.toggle('dashboard-edit-mode', isEditMode);
-        
-        if (isEditMode) {
-            enableDragDrop();
-            btnEdit.innerHTML = '<i class="bi bi-check-lg"></i> Fertig';
-            btnEdit.classList.remove('btn-primary');
-            btnEdit.classList.add('btn-success');
-            btnReset.style.display = 'inline-block';
-            
-            // Deaktiviere Links im Edit-Mode
-            document.querySelectorAll('.module-card-wrapper a').forEach(link => {
-                link.style.pointerEvents = 'none';
+function cancelEditMode() {
+    editMode = false;
+    const grid = document.getElementById('module-grid');
+    grid.classList.remove('edit-mode');
+    document.getElementById('btn-edit-grid').classList.remove('d-none');
+    document.getElementById('btn-save-grid').classList.add('d-none');
+    document.getElementById('btn-cancel-grid').classList.add('d-none');
+
+    grid.querySelectorAll('.module-tile').forEach(tile => {
+        tile.removeEventListener('click', preventClick, true);
+    });
+
+    if (sortableInstance) sortableInstance.option('disabled', true);
+
+    // Seite neu laden um Original-Reihenfolge wiederherzustellen
+    location.reload();
+}
+
+function saveGridOrder() {
+    const grid = document.getElementById('module-grid');
+    const cols = grid.querySelectorAll('.module-col');
+    const modules = [];
+
+    cols.forEach((col, idx) => {
+        modules.push({
+            module_id: parseInt(col.dataset.moduleId),
+            order: idx + 1,
+            visible: true,
+            size: 'normal'
+        });
+    });
+
+    fetch('/api/dashboard/layout', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({modules: modules})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            editMode = false;
+            const grid = document.getElementById('module-grid');
+            grid.classList.remove('edit-mode');
+            document.getElementById('btn-edit-grid').classList.remove('d-none');
+            document.getElementById('btn-save-grid').classList.add('d-none');
+            document.getElementById('btn-cancel-grid').classList.add('d-none');
+
+            grid.querySelectorAll('.module-tile').forEach(tile => {
+                tile.removeEventListener('click', preventClick, true);
             });
+
+            if (sortableInstance) sortableInstance.option('disabled', true);
         } else {
-            disableDragDrop();
-            btnEdit.innerHTML = '<i class="bi bi-gear"></i> Dashboard anpassen';
-            btnEdit.classList.remove('btn-success');
-            btnEdit.classList.add('btn-primary');
-            btnReset.style.display = 'none';
-            
-            // Aktiviere Links wieder
-            document.querySelectorAll('.module-card-wrapper a').forEach(link => {
-                link.style.pointerEvents = '';
-            });
-            
-            saveDashboardLayout();
-            
-            // Kacheln neu angleichen nach Edit
-            setTimeout(equalizeCardHeights, 100);
+            alert('Fehler beim Speichern: ' + (data.error || 'Unbekannt'));
         }
-    });
-    
-    // Reset Dashboard
-    btnReset.addEventListener('click', function() {
-        if (!confirm('Dashboard wirklich auf Standard zurücksetzen?')) {
-            return;
-        }
-        
-        fetch('/api/dashboard/reset', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification('Dashboard zurückgesetzt!', 'success');
-                setTimeout(() => location.reload(), 1000);
-            } else {
-                showNotification('Fehler beim Zurücksetzen', 'danger');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification('Fehler beim Zurücksetzen', 'danger');
-        });
-    });
-    
-    // Sichtbarkeits-Toggle
-    document.querySelectorAll('.toggle-visibility').forEach(btn => {
-        btn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            const moduleId = this.dataset.moduleId;
-            const wrapper = this.closest('.module-card-wrapper');
-            
-            // Toggle visuell
-            wrapper.classList.toggle('hidden-module');
-            
-            // Update Button
-            const isVisible = !wrapper.classList.contains('hidden-module');
-            this.classList.toggle('btn-success', isVisible);
-            this.classList.toggle('btn-secondary', !isVisible);
-            this.querySelector('i').classList.toggle('bi-eye', isVisible);
-            this.querySelector('i').classList.toggle('bi-eye-slash', !isVisible);
-            
-            // Kacheln neu angleichen
-            setTimeout(equalizeCardHeights, 50);
-        });
-    });
-    
-    function enableDragDrop() {
-        sortable = new Sortable(moduleGrid, {
-            animation: 150,
-            ghostClass: 'dragging',
-            handle: '.module-card',
-            draggable: '.module-card-wrapper',
-            onEnd: function(evt) {
-                console.log('Moved from', evt.oldIndex, 'to', evt.newIndex);
-            }
-        });
-    }
-    
-    function disableDragDrop() {
-        if (sortable) {
-            sortable.destroy();
-            sortable = null;
-        }
-    }
-    
-    function saveDashboardLayout() {
-        const modules = [];
-        const cards = moduleGrid.querySelectorAll('.module-card-wrapper');
-        
-        cards.forEach((card, index) => {
-            modules.push({
-                module_id: parseInt(card.dataset.moduleId),
-                order: index + 1,
-                visible: !card.classList.contains('hidden-module'),
-                size: 'normal'
-            });
-        });
-        
-        fetch('/api/dashboard/layout', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ modules: modules })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                console.log('Layout gespeichert:', data);
-                showNotification('Dashboard-Layout gespeichert!', 'success');
-            } else {
-                showNotification('Fehler beim Speichern', 'danger');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showNotification('Fehler beim Speichern', 'danger');
-        });
-    }
-    
-    function showNotification(message, type = 'success') {
-        const toast = document.getElementById('toast-notification');
-        const toastBody = toast.querySelector('.toast-body');
-        const toastIcon = toast.querySelector('.toast-header i');
-        
-        toastBody.textContent = message;
-        
-        // Update Icon
-        toastIcon.className = 'bi me-2';
-        if (type === 'success') {
-            toastIcon.classList.add('bi-check-circle', 'text-success');
-        } else {
-            toastIcon.classList.add('bi-exclamation-circle', 'text-danger');
-        }
-        
-        const bsToast = new bootstrap.Toast(toast);
-        bsToast.show();
-    }
-});
+    })
+    .catch(err => alert('Fehler: ' + err));
+}
 </script>
 {% endblock %}

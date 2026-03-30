@@ -5,35 +5,51 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-6">
-        <h1>Neuer Benutzer</h1>
-        
+        <h1><i class="bi bi-person-plus me-2"></i>Neuer Benutzer</h1>
+
         <div class="card">
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" id="newUserForm">
                     <div class="mb-3">
                         <label for="username" class="form-label">Benutzername</label>
-                        <input type="text" class="form-control" id="username" name="username" required>
+                        <input type="text" class="form-control" id="username" name="username" required autofocus>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="email" class="form-label">E-Mail</label>
                         <input type="email" class="form-control" id="email" name="email" required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="password" class="form-label">Passwort</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="password" name="password" required minlength="6">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePw('password')" title="Passwort anzeigen">
+                                <i class="bi bi-eye" id="icon_password"></i>
+                            </button>
+                        </div>
                     </div>
-                    
+
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Passwort bestätigen</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="confirm_password" required minlength="6">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePw('confirm_password')" title="Passwort anzeigen">
+                                <i class="bi bi-eye" id="icon_confirm_password"></i>
+                            </button>
+                        </div>
+                        <div class="invalid-feedback" id="pw-mismatch">Passwörter stimmen nicht überein!</div>
+                    </div>
+
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="is_admin" name="is_admin">
                         <label class="form-check-label" for="is_admin">
-                            Administrator-Rechte
+                            <i class="bi bi-shield-check me-1"></i>Administrator-Rechte
                         </label>
                     </div>
-                    
+
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-success">Benutzer erstellen</button>
+                        <button type="submit" class="btn btn-success"><i class="bi bi-person-plus me-1"></i>Benutzer erstellen</button>
                         <a href="{{ url_for('users.index') }}" class="btn btn-secondary">Abbrechen</a>
                     </div>
                 </form>
@@ -41,4 +57,31 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePw(fieldId) {
+    var f = document.getElementById(fieldId);
+    var icon = document.getElementById('icon_' + fieldId);
+    if (f.type === 'password') {
+        f.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        f.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+}
+
+document.getElementById('newUserForm').addEventListener('submit', function(e) {
+    var pw = document.getElementById('password').value;
+    var confirm = document.getElementById('confirm_password').value;
+    if (pw !== confirm) {
+        e.preventDefault();
+        document.getElementById('confirm_password').classList.add('is-invalid');
+        document.getElementById('pw-mismatch').style.display = 'block';
+        return false;
+    }
+});
+</script>
 {% endblock %}

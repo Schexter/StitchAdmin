@@ -38,10 +38,10 @@
             <p class="text-muted mb-0">Sektionen per Drag & Drop verwalten. Klicken zum Bearbeiten.</p>
         </div>
         <div class="d-flex gap-2">
-            <a href="{{ url_for('website.home') }}" target="_blank" class="btn btn-outline-primary">
+            <a href="{{ url_for('website.home', preview=1) }}" target="_blank" class="btn btn-outline-primary">
                 <i class="bi bi-eye me-1"></i>Website Vorschau
             </a>
-            <a href="{{ url_for('shop.index') }}" target="_blank" class="btn btn-outline-success">
+            <a href="{{ url_for('shop.index', preview=1) }}" target="_blank" class="btn btn-outline-success">
                 <i class="bi bi-shop me-1"></i>Shop Vorschau
             </a>
         </div>

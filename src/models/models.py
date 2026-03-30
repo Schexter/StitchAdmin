@@ -23,18 +23,72 @@ class User(UserMixin, db.Model):
     is_system_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
-    
-    # Relationships
-    # activities = db.relationship('ActivityLog', backref='user_obj', lazy='dynamic')  # Temporär deaktiviert
-    
+    first_name = db.Column(db.String(100))  # Vorname (für Rechnungen als Bearbeiter)
+    last_name = db.Column(db.String(100))   # Nachname
+
+    # 2FA / TOTP
+    totp_secret = db.Column(db.String(32))       # Base32-kodiertes TOTP-Secret
+    totp_enabled = db.Column(db.Boolean, default=False)
+    backup_codes = db.Column(db.Text)            # JSON-Liste mit einmaligen Backup-Codes
+
+    # Demo-Modus
+    is_demo = db.Column(db.Boolean, default=False)  # Readonly Demo-User
+
+    @property
+    def full_name(self):
+        """Vollständiger Name, Fallback auf Benutzername"""
+        name = f"{self.first_name or ''} {self.last_name or ''}".strip()
+        return name or self.username
+
     def set_password(self, password):
         """Passwort hashen und speichern"""
         self.password_hash = generate_password_hash(password)
-    
+
     def check_password(self, password):
         """Passwort überprüfen"""
         return check_password_hash(self.password_hash, password)
-    
+
+    def generate_totp_secret(self):
+        """Neues TOTP-Secret generieren (noch nicht aktiviert)"""
+        import pyotp
+        self.totp_secret = pyotp.random_base32()
+        return self.totp_secret
+
+    def get_totp_uri(self):
+        """TOTP-URI fuer QR-Code (otpauth://...)"""
+        import pyotp
+        if not self.totp_secret:
+            return None
+        totp = pyotp.TOTP(self.totp_secret)
+        return totp.provisioning_uri(name=self.email or self.username, issuer_name='StitchAdmin')
+
+    def verify_totp(self, code):
+        """TOTP-Code pruefen (aktuell + 1 Zeitfenster Toleranz)"""
+        import pyotp
+        if not self.totp_secret:
+            return False
+        totp = pyotp.TOTP(self.totp_secret)
+        return totp.verify(code, valid_window=1)
+
+    def verify_backup_code(self, code):
+        """Backup-Code pruefen und verbrauchen"""
+        if not self.backup_codes:
+            return False
+        codes = json.loads(self.backup_codes)
+        code = code.strip().upper()
+        if code in codes:
+            codes.remove(code)
+            self.backup_codes = json.dumps(codes)
+            return True
+        return False
+
+    def generate_backup_codes(self, count=8):
+        """Einmalige Backup-Codes generieren"""
+        import secrets
+        codes = [secrets.token_hex(4).upper() for _ in range(count)]
+        self.backup_codes = json.dumps(codes)
+        return codes
+
     def __repr__(self):
         return f'<User {self.username}>'
 
@@ -67,6 +121,7 @@ class Customer(db.Model):
     # Adresse
     street = db.Column(db.String(200))
     house_number = db.Column(db.String(20))
+    address_supplement = db.Column(db.String(200))  # Adresszusatz (c/o, Abteilung, Gebäude)
     postal_code = db.Column(db.String(20))
     city = db.Column(db.String(100))
     country = db.Column(db.String(100), default='Deutschland')
@@ -85,9 +140,11 @@ class Customer(db.Model):
     created_by = db.Column(db.String(80))
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
     updated_by = db.Column(db.String(80))
-    
+    # DSGVO
+    anonymized_at = db.Column(db.DateTime)  # gesetzt wenn Kundendaten anonymisiert wurden
+
     # Relationships
-    orders = db.relationship('Order', backref='customer', lazy='dynamic')
+    orders = db.relationship('Order', backref='customer', lazy='dynamic', foreign_keys='Order.customer_id')
     
     @property
     def display_name(self):
@@ -148,6 +205,11 @@ class Article(db.Model):
 
     # Status
     active = db.Column(db.Boolean, default=True, index=True)
+
+    # Artikelbild
+    image_url = db.Column(db.String(500))  # Externe Quell-URL
+    image_path = db.Column(db.String(255))  # Lokaler Pfad (uploads/articles/...)
+    image_thumbnail_path = db.Column(db.String(255))  # Thumbnail-Pfad
 
     # Shop-Felder (öffentlicher Webshop)
     show_in_shop = db.Column(db.Boolean, default=False, index=True)
@@ -235,6 +297,28 @@ class Article(db.Model):
         for suffix in [' gmbh', ' ag', ' kg', ' ohg', ' e.k.', ' gbr', ' ug', ' ltd', ' inc']:
             normalized = normalized.replace(suffix, '')
         return normalized.strip()
+
+    def get_all_variants(self):
+        """Alle Varianten sortiert nach Farbe, Groesse"""
+        from src.models.article_variant import ArticleVariant
+        return self.variants.order_by(
+            ArticleVariant.color, ArticleVariant.size
+        ).all()
+
+    def calculate_price_range(self):
+        """Preisspanne aller Varianten"""
+        variants = self.variants.all()
+        if not variants:
+            p = self.price or 0
+            return {'min': p, 'max': p, 'avg': p}
+        prices = [v.single_price for v in variants if v.single_price]
+        if not prices:
+            return {'min': 0, 'max': 0, 'avg': 0}
+        return {
+            'min': min(prices),
+            'max': max(prices),
+            'avg': round(sum(prices) / len(prices), 2)
+        }
 
     def calculate_prices(self, use_new_system=True):
         """Berechne VK-Preise basierend auf EK und erweiterten Einstellungen"""
@@ -344,9 +428,18 @@ class Article(db.Model):
 class Order(db.Model):
     """Aufträge Model"""
     __tablename__ = 'orders'
-    
+    __table_args__ = (
+        db.Index('idx_order_workflow_status', 'workflow_status'),
+        db.Index('idx_order_design_approval_status', 'design_approval_status'),
+        db.Index('idx_order_payment_status', 'payment_status'),
+        db.Index('idx_order_archived_at', 'archived_at'),
+        db.Index('idx_order_active', 'archived_at', 'workflow_status'),
+        db.Index('idx_order_customer_created', 'customer_id', 'created_at'),
+    )
+
     id = db.Column(db.String(50), primary_key=True)
     customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'), index=True)
+    billing_customer_id = db.Column(db.String(50), db.ForeignKey('customers.id'), nullable=True)
     order_number = db.Column(db.String(50), unique=True)
     order_type = db.Column(db.String(20))
     status = db.Column(db.String(50), default='new', index=True)
@@ -373,12 +466,23 @@ class Order(db.Model):
     print_colors = db.Column(db.Text)  # JSON
     
     # Design-Workflow (Erweiterte Felder)
-    design_status = db.Column(db.String(50), default='none')  # none, customer_provided, needs_order, ordered, received, ready
+    design_status = db.Column(db.String(50), default='none')  # none, customer_provided, logo_needs_creation, logo_needs_adaptation, needs_order, ordered, received, ready
     design_supplier_id = db.Column(db.String(50), db.ForeignKey('suppliers.id'))
     design_order_date = db.Column(db.Date)
     design_expected_date = db.Column(db.Date)
     design_received_date = db.Column(db.Date)
     design_order_notes = db.Column(db.Text)
+
+    # Design-Kosten und Erstellung
+    design_cost = db.Column(db.Float, default=0)  # Kosten fuer Logo-Erstellung
+    design_requirements = db.Column(db.Text)  # Design-Anforderungen Beschreibung
+    design_priority = db.Column(db.String(20), default='normal')  # normal, high, urgent
+    designer_id = db.Column(db.String(50))  # internal, external
+    adaptation_cost = db.Column(db.Float, default=0)  # Kosten fuer Logo-Anpassung
+    adaptation_details = db.Column(db.Text)  # Anpassungsdetails
+    adaptation_days = db.Column(db.Integer)  # Geschaetzte Bearbeitungszeit
+    target_format = db.Column(db.String(20))  # dst, svg, png, pdf, ai
+    original_logo_path = db.Column(db.String(255))  # Pfad zum Original-Logo
     
     # Dateien
     design_file = db.Column(db.String(255))
@@ -398,6 +502,9 @@ class Order(db.Model):
     # Termine
     due_date = db.Column(db.DateTime)
     rush_order = db.Column(db.Boolean, default=False)
+
+    # Kundenware (Kunde bringt eigene Textilien mit)
+    is_kundenware = db.Column(db.Boolean, default=False)
     
     # Produktion
     assigned_machine_id = db.Column(db.String(50), db.ForeignKey('machines.id'))
@@ -418,6 +525,10 @@ class Order(db.Model):
     packing_list_id = db.Column(db.Integer, db.ForeignKey('packing_lists.id'))
     delivery_note_id = db.Column(db.Integer, db.ForeignKey('delivery_notes.id'))
     auto_create_packing_list = db.Column(db.Boolean, default=True)
+
+    # Angebot-Verknuepfung (1 Angebot -> n Auftraege)
+    angebot_id = db.Column(db.Integer, db.ForeignKey('angebote.id'), nullable=True, index=True)
+    auftrag_typ = db.Column(db.String(30))  # design, embroidery, printing, dtf, shipping, combined
 
     # Angebots-Felder
     is_offer = db.Column(db.Boolean, default=False)  # True wenn es ein Angebot ist
@@ -453,6 +564,7 @@ class Order(db.Model):
     pickup_confirmed_at = db.Column(db.DateTime)  # Wann wurde Abholung bestätigt
     pickup_signature = db.Column(db.Text)  # Base64 Signatur bei Abholung
     pickup_signature_name = db.Column(db.String(100))  # Name des Abholers
+    pickup_token = db.Column(db.String(64))  # Token für externe Unterschrift per Mail
 
     # Shop-Integration
     source = db.Column(db.String(20), default='admin')  # admin, shop, phone
@@ -469,7 +581,36 @@ class Order(db.Model):
     status_history = db.relationship('OrderStatusHistory', backref='order', lazy='dynamic', cascade='all, delete-orphan')
     shipments = db.relationship('Shipment', backref='order', lazy='dynamic')
     design_supplier = db.relationship('Supplier', backref='design_orders', foreign_keys=[design_supplier_id])
-    
+    billing_customer = db.relationship('Customer', foreign_keys=[billing_customer_id], backref='billing_orders')
+
+    def get_billing_customer(self):
+        """Returns billing customer if set, otherwise falls back to order customer"""
+        return self.billing_customer if self.billing_customer_id else self.customer
+
+    def all_jobs_completed(self):
+        """Prueft ob alle Produktionsjobs abgeschlossen sind"""
+        from src.models.production_job import ProductionJob
+        jobs = ProductionJob.query.filter_by(order_id=self.id).all()
+        if not jobs:
+            return True  # Keine Jobs = alter Workflow
+        return all(j.status == 'completed' for j in jobs)
+
+    def has_production_jobs(self):
+        """Hat dieser Auftrag Produktionsjobs?"""
+        from src.models.production_job import ProductionJob
+        return ProductionJob.query.filter_by(order_id=self.id).count() > 0
+
+    def job_progress(self):
+        """Gibt Fortschritt als (completed, total) zurueck"""
+        from src.models.production_job import ProductionJob
+        jobs = ProductionJob.query.filter_by(order_id=self.id).filter(
+            ProductionJob.status != 'cancelled'
+        ).all()
+        if not jobs:
+            return (0, 0)
+        completed = sum(1 for j in jobs if j.status == 'completed')
+        return (completed, len(jobs))
+
     def get_selected_threads(self):
         """Gibt die ausgewählten Garne als Liste zurück"""
         if self.selected_threads:
@@ -700,6 +841,113 @@ class Order(db.Model):
                 self.workflow_status in allowed_statuses)
 
     # ==========================================
+    # Workflow-Timeline
+    # ==========================================
+    def get_workflow_timeline(self):
+        """Sammelt alle verknüpften Workflow-Schritte für die Timeline-Ansicht."""
+        from src.models.inquiry import Inquiry
+
+        timeline = []
+
+        # 1. Anfrage (Reverse-Lookup: Inquiry.order_id -> this Order)
+        try:
+            inquiry = Inquiry.query.filter_by(order_id=self.id).first()
+            if inquiry:
+                timeline.append({
+                    'step': 'anfrage',
+                    'label': f'Anfrage {inquiry.inquiry_number}',
+                    'icon': 'bi-envelope-open',
+                    'color': 'primary',
+                    'date': inquiry.created_at,
+                    'url': f'/admin/anfragen/{inquiry.id}',
+                })
+        except Exception:
+            pass
+
+        # 2. Angebot (Angebot.auftrag_id -> this Order)
+        try:
+            from src.models.angebot import Angebot
+            angebote = Angebot.query.filter(
+                db.or_(Angebot.auftrag_id == self.id, Angebot.erstellt_aus_auftrag_id == self.id)
+            ).all()
+            for ang in angebote:
+                timeline.append({
+                    'step': 'angebot',
+                    'label': f'Angebot {ang.angebotsnummer}',
+                    'icon': 'bi-file-earmark-text',
+                    'color': 'info',
+                    'date': ang.created_at,
+                    'url': f'/angebote/{ang.id}',
+                })
+        except Exception:
+            pass
+
+        # 3. Auftrag erstellt
+        timeline.append({
+            'step': 'auftrag',
+            'label': f'Auftrag {self.order_number or self.id}',
+            'icon': 'bi-clipboard-check',
+            'color': 'success',
+            'date': self.created_at,
+            'url': None,
+        })
+
+        # 4. Design-Freigabe
+        if self.design_approval_status and self.design_approval_status != 'none':
+            approved = self.design_approval_status == 'approved'
+            timeline.append({
+                'step': 'freigabe',
+                'label': 'Design-Freigabe' + (' (genehmigt)' if approved else ''),
+                'icon': 'bi-palette',
+                'color': 'success' if approved else 'warning',
+                'date': self.design_approval_date or self.design_approval_sent_at,
+                'url': None,
+            })
+
+        # 5. Produktion
+        if self.production_start:
+            timeline.append({
+                'step': 'produktion',
+                'label': 'Produktion gestartet',
+                'icon': 'bi-gear-wide-connected',
+                'color': 'warning',
+                'date': self.production_start,
+                'url': None,
+            })
+
+        # 6. Versand
+        try:
+            shipment = self.shipments.order_by(Shipment.created_at.desc()).first()
+            if shipment:
+                delivered = shipment.status == 'delivered'
+                timeline.append({
+                    'step': 'versand',
+                    'label': f'Versand {shipment.carrier or ""}'.strip() + (' (zugestellt)' if delivered else ''),
+                    'icon': 'bi-truck',
+                    'color': 'success' if delivered else 'primary',
+                    'date': shipment.shipped_date or shipment.created_at,
+                    'url': f'/shipping/{shipment.id}',
+                })
+        except Exception:
+            pass
+
+        # 7. Rechnung
+        if self.invoice_id:
+            timeline.append({
+                'step': 'rechnung',
+                'label': 'Rechnung erstellt',
+                'icon': 'bi-receipt',
+                'color': 'dark',
+                'date': None,
+                'url': f'/rechnung/{self.invoice_id}',
+            })
+
+        # Nach Datum sortieren (None-Daten ans Ende)
+        from datetime import datetime as dt
+        timeline.sort(key=lambda x: x['date'] or dt(2099, 1, 1))
+        return timeline
+
+    # ==========================================
     # Zahlungs-Methoden
     # ==========================================
     def get_payment_status_display(self):
@@ -870,6 +1118,11 @@ class OrderItem(db.Model):
     textile_color = db.Column(db.String(50))
     position_details = db.Column(db.Text)
     
+    # Sublimation-Felder
+    sublimation_position = db.Column(db.String(50))  # vorne, hinten, seite, allover
+    is_non_textile = db.Column(db.Boolean, default=False)  # Tassen, Mousepads etc.
+    non_textile_type = db.Column(db.String(100))  # tasse, mousepad, kissen, etc.
+
     # Lieferanten-Bestellstatus
     supplier_order_status = db.Column(db.String(50), default='none')  # none, to_order, ordered, delivered
     supplier_order_id = db.Column(db.String(50), db.ForeignKey('supplier_orders.id', ondelete='SET NULL'))
@@ -1280,49 +1533,64 @@ class ThreadUsage(db.Model):
 class Shipment(db.Model):
     """Versand Model"""
     __tablename__ = 'shipments'
-    
+
     id = db.Column(db.String(50), primary_key=True)
     order_id = db.Column(db.String(50), db.ForeignKey('orders.id'))
-    
+    inquiry_id = db.Column(db.Integer, db.ForeignKey('inquiries.id'))
+
+    # Typ: order (Standard), probebox (Muster/Probe ohne Auftrag)
+    shipment_type = db.Column(db.String(30), default='order')
+    description = db.Column(db.String(500))  # Beschreibung bei Probebox
+
     # Versanddetails
     tracking_number = db.Column(db.String(100))
     carrier = db.Column(db.String(50))  # DHL, DPD, etc.
     service = db.Column(db.String(50))  # Express, Standard, etc.
-    
+
     # Paketdetails
     weight = db.Column(db.Float)  # kg
     length = db.Column(db.Float)  # cm
     width = db.Column(db.Float)   # cm
     height = db.Column(db.Float)  # cm
-    
+
     # Status
     status = db.Column(db.String(50), default='created')
     shipped_date = db.Column(db.DateTime)
     delivered_date = db.Column(db.DateTime)
-    
+
     # Kosten
     shipping_cost = db.Column(db.Float, default=0)
     insurance_value = db.Column(db.Float)
-    
-    # Empfänger
+
+    # Empfaenger
     recipient_name = db.Column(db.String(200))
     recipient_street = db.Column(db.String(200))
     recipient_postal_code = db.Column(db.String(20))
     recipient_city = db.Column(db.String(100))
     recipient_country = db.Column(db.String(100), default='Deutschland')
-    
+
     # Metadaten
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by = db.Column(db.String(80))
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
-    
+
     # Relationships
     items = db.relationship('ShipmentItem', backref='shipment', lazy='dynamic', cascade='all, delete-orphan')
-    
+    inquiry = db.relationship('Inquiry', backref='shipments')
+
+    @property
+    def is_probebox(self):
+        return self.shipment_type == 'probebox'
+
+    @property
+    def type_display(self):
+        types = {'order': 'Auftrag', 'probebox': 'Probebox'}
+        return types.get(self.shipment_type, self.shipment_type)
+
     def get(self, key, default=None):
-        """Kompatibilität mit Dictionary-Zugriff"""
+        """Kompatibilitaet mit Dictionary-Zugriff"""
         return getattr(self, key, default)
-    
+
     def __repr__(self):
         return f'<Shipment {self.tracking_number or self.id}>'
 
@@ -1529,6 +1797,11 @@ class SupplierOrder(db.Model):
     delivery_city = db.Column(db.String(100))
     delivery_country = db.Column(db.String(100))
     
+    # Wareneingang / Lieferschein
+    delivery_note_photo = db.Column(db.String(500))  # Pfad zum Lieferschein-Foto
+    actual_delivery_date = db.Column(db.Date)  # Tatsaechliches Lieferdatum
+    receiving_notes = db.Column(db.Text)  # Anmerkungen zum Wareneingang
+
     # Druck-Tracking
     print_count = db.Column(db.Integer, default=0)
     last_printed_at = db.Column(db.DateTime)

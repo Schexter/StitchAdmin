@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Anfrage in Auftrag - {{ inquiry.inquiry_number }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px;">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('inquiry_admin.detail', id=inquiry.id) }}" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+        <div>
+            <h4 class="mb-0"><i class="bi bi-arrow-right-circle me-2"></i>Anfrage in Auftrag umwandeln</h4>
+            <small class="text-muted">{{ inquiry.inquiry_number }} &ndash; {{ inquiry.full_name }}</small>
+        </div>
+    </div>
+
+    <!-- Anfrage-Zusammenfassung -->
+    <div class="card mb-4">
+        <div class="card-header"><h6 class="mb-0"><i class="bi bi-envelope-paper me-1"></i> Anfrage</h6></div>
+        <div class="card-body py-2">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <small class="text-muted">Kunde</small><br>
+                    <strong>{{ kunde.display_name if kunde else inquiry.full_name }}</strong>
+                    {% if inquiry.company_name %}<br><small class="text-muted">{{ inquiry.company_name }}</small>{% endif %}
+                </div>
+                <div class="col-md-2">
+                    <small class="text-muted">Typ</small><br>
+                    <strong>{{ inquiry.type_label }}</strong>
+                </div>
+                <div class="col-md-2">
+                    <small class="text-muted">Menge</small><br>
+                    <strong>{{ inquiry.quantity or '?' }} Stk.</strong>
+                </div>
+                <div class="col-md-2">
+                    <small class="text-muted">Textil</small><br>
+                    <strong>{{ inquiry.textile_type or '-' }}</strong>
+                </div>
+                <div class="col-md-3">
+                    <small class="text-muted">Wunschtermin</small><br>
+                    <strong>{{ inquiry.desired_date.strftime('%d.%m.%Y') if inquiry.desired_date else '&ndash;' }}</strong>
+                </div>
+            </div>
+            {% if inquiry.description %}
+            <div class="mt-2 small border-top pt-2">
+                <strong>Beschreibung:</strong> {{ inquiry.description[:200] }}{% if inquiry.description|length > 200 %}...{% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="POST">
+        <!-- Split-Auswahl -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-diagram-3 me-1"></i> Auftr&auml;ge erstellen</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    W&auml;hle welche Auftr&auml;ge aus dieser Anfrage erstellt werden sollen.
+                    Jeder Haken = ein separater Auftrag mit eigener Nummer.
+                </p>
+
+                <div class="row g-2">
+                    {% for opt in typ_options %}
+                    <div class="col-md-6">
+                        <div class="form-check card p-3 h-100 {{ 'border-primary bg-primary bg-opacity-10' if opt.checked }}">
+                            <input class="form-check-input" type="checkbox" name="auftrag_typ"
+                                   value="{{ opt.key }}" id="typ_{{ opt.key }}"
+                                   {{ 'checked' if opt.checked }} onchange="updatePreview()">
+                            <label class="form-check-label w-100" for="typ_{{ opt.key }}">
+                                <i class="bi {{ opt.icon }} me-2 fs-5"></i>
+                                <strong>{{ opt.label }}</strong>
+                                {% if opt.key == 'design' %}
+                                <br><small class="text-muted">Grafik inhouse oder extern beauftragen</small>
+                                {% elif opt.key == 'shipping' %}
+                                <br><small class="text-muted">Versand separat verwalten</small>
+                                {% endif %}
+                            </label>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Vorschau -->
+        <div class="card mb-4 border-success" id="preview-card">
+            <div class="card-header bg-success bg-opacity-10">
+                <h6 class="mb-0"><i class="bi bi-eye me-1"></i> Vorschau: <span id="preview-count">0</span> Auftrag/Auftr&auml;ge</h6>
+            </div>
+            <div class="card-body" id="preview-body">
+                <!-- Wird per JS befuellt -->
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{{ url_for('inquiry_admin.detail', id=inquiry.id) }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Abbrechen
+            </a>
+            <div>
+                <a href="{{ url_for('angebote.neu', anfrage_id=inquiry.id) }}" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-file-earmark-text me-1"></i> Stattdessen Angebot
+                </a>
+                <button type="submit" class="btn btn-success btn-lg" id="btn-submit">
+                    <i class="bi bi-check-lg me-1"></i> <span id="btn-text">Auftrag erstellen</span>
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+var typLabels = {
+    'design': 'Grafik / Design', 'embroidery': 'Bestickung', 'printing': 'Textildruck',
+    'dtf': 'DTF-Druck', 'sublimation': 'Sublimation', 'shipping': 'Versand'
+};
+var typIcons = {
+    'design': 'bi-palette', 'embroidery': 'bi-brush', 'printing': 'bi-printer',
+    'dtf': 'bi-layers', 'sublimation': 'bi-droplet', 'shipping': 'bi-truck'
+};
+
+function updatePreview() {
+    var checked = document.querySelectorAll('input[name="auftrag_typ"]:checked');
+    var count = checked.length;
+    document.getElementById('preview-count').textContent = count;
+    document.getElementById('btn-text').textContent = count > 1
+        ? count + ' Auftr\u00e4ge erstellen'
+        : (count === 1 ? 'Auftrag erstellen' : 'Bitte ausw\u00e4hlen');
+    document.getElementById('btn-submit').disabled = count === 0;
+
+    var html = '';
+    checked.forEach(function(cb, i) {
+        var key = cb.value;
+        html += '<div class="d-flex align-items-center py-2' + (i > 0 ? ' border-top' : '') + '">' +
+            '<i class="bi ' + (typIcons[key] || 'bi-gear') + ' fs-4 me-3 text-primary"></i>' +
+            '<div><strong>' + (typLabels[key] || key) + '</strong>' +
+            '<br><small class="text-muted">Neue Auftragsnummer wird vergeben</small></div></div>';
+    });
+    if (!html) html = '<div class="text-muted text-center py-2">Bitte mindestens einen Auftragstyp w&auml;hlen</div>';
+    document.getElementById('preview-body').innerHTML = html;
+}
+updatePreview();
+</script>
+{% endblock %}

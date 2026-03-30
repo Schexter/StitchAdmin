@@ -266,19 +266,12 @@ Mit freundlichen Grüßen
             from src.services.email_service_new import EmailService
             email_service = EmailService()
             
-            # Anhang vorbereiten
-            attachments = [{
-                'path': pdf_path,
-                'filename': f'Design-Freigabe_{order.order_number}.pdf',
-                'content_type': 'application/pdf'
-            }]
-            
             result = email_service.send_email(
                 to=customer.email,
                 subject=subject,
                 body=text_body,
                 html_body=html_body,
-                attachments=attachments
+                attachments=[pdf_path]
             )
             
             if result.get('success'):
@@ -582,12 +575,10 @@ Bitte das Design anpassen und erneut zur Freigabe senden.
             bbox = draw.textbbox((0, 0), text, font=font)
             tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
 
-            # Mehrfach diagonal
-            import math
-            angle = -30
-            for y_offset in range(-img.height, img.height * 2, int(th * 2.5)):
-                for x_offset in range(-img.width, img.width * 2, int(tw * 1.5)):
-                    draw.text((x_offset, y_offset), text, font=font, fill=(255, 0, 0, 60))
+            # Einmal zentral – sehr blass grau
+            x = (img.width - tw) // 2
+            y = (img.height - th) // 2
+            draw.text((x, y), text, font=font, fill=(160, 160, 160, 35))
 
             # Overlay zusammenfuegen
             watermarked = Image.alpha_composite(img, overlay)

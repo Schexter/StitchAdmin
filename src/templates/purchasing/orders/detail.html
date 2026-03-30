@@ -19,7 +19,7 @@
                     {% elif order.status == 'ordered' %}
                         <span class="badge bg-primary">Bestellt</span>
                     {% elif order.status == 'confirmed' %}
-                        <span class="badge bg-info">Bestätigt</span>
+                        <span class="badge bg-info">Bestaetigt</span>
                     {% elif order.status == 'shipped' %}
                         <span class="badge bg-warning text-dark">Unterwegs</span>
                     {% elif order.status == 'partial' %}
@@ -48,7 +48,7 @@
                     <i class="bi bi-printer"></i> Drucken
                 </a>
                 <a href="{{ url_for('purchasing.orders') }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-arrow-left"></i> Zurück
+                    <i class="bi bi-arrow-left"></i> Zurueck
                 </a>
             </div>
         </div>
@@ -56,55 +56,165 @@
 </div>
 
 <div class="row">
-    <!-- Bestellinfos -->
+    <!-- Linke Spalte: Infos + Bearbeiten -->
     <div class="col-md-4">
+        <!-- Bestelldetails -->
         <div class="card mb-3">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0"><i class="bi bi-info-circle"></i> Bestelldetails</h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="toggleEditForm()">
+                    <i class="bi bi-pencil"></i> Bearbeiten
+                </button>
             </div>
             <div class="card-body">
-                <table class="table table-sm">
-                    <tr>
-                        <td class="text-muted">Bestellnummer:</td>
-                        <td><strong>{{ order.purchase_order_number or order.order_number or order.id }}</strong></td>
-                    </tr>
-                    {% if order.supplier_order_number %}
-                    <tr>
-                        <td class="text-muted">Lieferanten-Nr.:</td>
-                        <td>{{ order.supplier_order_number }}</td>
-                    </tr>
-                    {% endif %}
-                    <tr>
-                        <td class="text-muted">Bestelldatum:</td>
-                        <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted">Lieferung erwartet:</td>
-                        <td>
-                            {% if order.delivery_date %}
-                            <span class="{% if order.delivery_date < today and order.status not in ['delivered', 'cancelled'] %}text-danger fw-bold{% endif %}">
-                                {{ order.delivery_date.strftime('%d.%m.%Y') }}
-                            </span>
-                            {% else %}-{% endif %}
-                        </td>
-                    </tr>
-                    {% if order.actual_delivery_date %}
-                    <tr>
-                        <td class="text-muted">Geliefert am:</td>
-                        <td class="text-success">{{ order.actual_delivery_date.strftime('%d.%m.%Y') }}</td>
-                    </tr>
-                    {% endif %}
-                    <tr>
-                        <td class="text-muted">Erstellt:</td>
-                        <td>{{ order.created_at.strftime('%d.%m.%Y %H:%M') if order.created_at else '-' }}</td>
-                    </tr>
-                    {% if order.created_by %}
-                    <tr>
-                        <td class="text-muted">Erstellt von:</td>
-                        <td>{{ order.created_by }}</td>
-                    </tr>
-                    {% endif %}
-                </table>
+                <!-- Anzeige-Modus -->
+                <div id="detailView">
+                    <table class="table table-sm mb-0">
+                        <tr>
+                            <td class="text-muted">Bestellnummer:</td>
+                            <td><strong>{{ order.purchase_order_number or order.order_number or order.id }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Lieferanten-Nr.:</td>
+                            <td>{{ order.supplier_order_number or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Bestelldatum:</td>
+                            <td>{{ order.order_date.strftime('%d.%m.%Y') if order.order_date else '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Lieferung erwartet:</td>
+                            <td>
+                                {% if order.delivery_date %}
+                                <span class="{% if order.delivery_date < today and order.status not in ['delivered', 'cancelled'] %}text-danger fw-bold{% endif %}">
+                                    {{ order.delivery_date.strftime('%d.%m.%Y') }}
+                                </span>
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        {% if order.tracking_number %}
+                        <tr>
+                            <td class="text-muted">Tracking:</td>
+                            <td><code>{{ order.tracking_number }}</code></td>
+                        </tr>
+                        {% endif %}
+                        {% if order.shipping_method %}
+                        <tr>
+                            <td class="text-muted">Versandart:</td>
+                            <td>{{ order.shipping_method }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if order.actual_delivery_date %}
+                        <tr>
+                            <td class="text-muted">Geliefert am:</td>
+                            <td class="text-success fw-bold">{{ order.actual_delivery_date.strftime('%d.%m.%Y') }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if order.subtotal %}
+                        <tr>
+                            <td class="text-muted">Netto:</td>
+                            <td>{{ "%.2f"|format(order.subtotal) }} &euro;</td>
+                        </tr>
+                        {% endif %}
+                        {% if order.shipping_cost %}
+                        <tr>
+                            <td class="text-muted">Versand:</td>
+                            <td>{{ "%.2f"|format(order.shipping_cost) }} &euro;</td>
+                        </tr>
+                        {% endif %}
+                        {% if order.tax_amount %}
+                        <tr>
+                            <td class="text-muted">MwSt.:</td>
+                            <td>{{ "%.2f"|format(order.tax_amount) }} &euro;</td>
+                        </tr>
+                        {% endif %}
+                        {% if order.total_amount %}
+                        <tr>
+                            <td class="text-muted"><strong>Gesamt:</strong></td>
+                            <td><strong>{{ "%.2f"|format(order.total_amount) }} &euro;</strong></td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">Erstellt:</td>
+                            <td>{{ order.created_at.strftime('%d.%m.%Y %H:%M') if order.created_at else '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Bearbeiten-Modus -->
+                <div id="editForm" class="d-none">
+                    <form method="POST" action="{{ url_for('purchasing.edit_order', order_id=order.id) }}">
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Lieferanten-Bestellnr.</label>
+                            <input type="text" class="form-control form-control-sm" name="supplier_order_number"
+                                   value="{{ order.supplier_order_number or '' }}" placeholder="z.B. AB-12345">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Erwartetes Lieferdatum</label>
+                            <input type="date" class="form-control form-control-sm" name="delivery_date"
+                                   value="{{ order.delivery_date.strftime('%Y-%m-%d') if order.delivery_date else '' }}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Tracking-Nummer</label>
+                            <input type="text" class="form-control form-control-sm" name="tracking_number"
+                                   value="{{ order.tracking_number or '' }}" placeholder="Sendungsverfolgung">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Versandart</label>
+                            <input type="text" class="form-control form-control-sm" name="shipping_method"
+                                   value="{{ order.shipping_method or '' }}" placeholder="z.B. DHL, UPS, Spedition">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Netto-Betrag</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" class="form-control" name="subtotal" id="edit_subtotal" step="0.01" min="0"
+                                       value="{{ '%.2f'|format(order.subtotal or 0) }}" onchange="calcFromNetto()">
+                                <span class="input-group-text">&euro;</span>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">MwSt.-Satz</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" class="form-control" id="edit_tax_rate" value="19" min="0" max="100" onchange="calcFromNetto()">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">MwSt.</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" class="form-control" name="tax_amount" id="edit_tax" step="0.01" min="0"
+                                       value="{{ '%.2f'|format(order.tax_amount or 0) }}">
+                                <span class="input-group-text">&euro;</span>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted"><strong>Gesamt (brutto)</strong></label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" class="form-control fw-bold" name="total_amount" id="edit_total" step="0.01" min="0"
+                                       value="{{ '%.2f'|format(order.total_amount or 0) }}" onchange="calcFromBrutto()">
+                                <span class="input-group-text">&euro;</span>
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small text-muted">Status</label>
+                            <select class="form-select form-select-sm" name="status">
+                                {% for val, label in [('draft','Entwurf'),('ordered','Bestellt'),('confirmed','Best&auml;tigt'),('shipped','Unterwegs'),('partial','Teillieferung'),('delivered','Geliefert'),('cancelled','Storniert')] %}
+                                <option value="{{ val }}" {{ 'selected' if order.status == val }}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Interne Notizen</label>
+                            <textarea class="form-control form-control-sm" name="internal_notes" rows="2">{{ order.internal_notes or '' }}</textarea>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-sm">
+                                <i class="bi bi-check-lg"></i> Speichern
+                            </button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleEditForm()">Abbrechen</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -121,7 +231,7 @@
                 {% if supplier.country and supplier.country != 'Deutschland' %}{{ supplier.country }}<br>{% endif %}
                 <hr>
                 {% if supplier.phone %}
-                <i class="bi bi-telephone"></i> {{ supplier.phone }}<br>
+                <i class="bi bi-telephone"></i> <a href="tel:{{ supplier.phone }}">{{ supplier.phone }}</a><br>
                 {% endif %}
                 {% if supplier.email %}
                 <i class="bi bi-envelope"></i> <a href="mailto:{{ supplier.email }}">{{ supplier.email }}</a><br>
@@ -133,11 +243,48 @@
         </div>
         {% endif %}
 
-        <!-- Verknüpfte Aufträge -->
+        <!-- Lieferschein-Foto -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-camera"></i> Lieferschein</h5>
+            </div>
+            <div class="card-body">
+                <div id="deliveryNoteArea">
+                    {% if order.delivery_note_photo %}
+                    <div class="text-center mb-2">
+                        <a href="/uploads/{{ order.delivery_note_photo }}" target="_blank">
+                            {% if order.delivery_note_photo.endswith('.pdf') %}
+                            <i class="bi bi-file-earmark-pdf text-danger" style="font-size: 3rem;"></i>
+                            <br><small>PDF anzeigen</small>
+                            {% else %}
+                            <img src="/uploads/{{ order.delivery_note_photo }}" class="img-fluid rounded" style="max-height: 200px;">
+                            {% endif %}
+                        </a>
+                    </div>
+                    <button class="btn btn-outline-danger btn-sm w-100" onclick="deleteDeliveryNote()">
+                        <i class="bi bi-trash"></i> Foto loeschen
+                    </button>
+                    {% else %}
+                    <div class="text-center text-muted mb-2">
+                        <i class="bi bi-image" style="font-size: 2rem; opacity: 0.3;"></i>
+                        <br><small>Noch kein Lieferschein hinterlegt</small>
+                    </div>
+                    <div class="input-group input-group-sm">
+                        <input type="file" class="form-control" id="deliveryNoteFile" accept="image/*,.pdf">
+                        <button class="btn btn-primary" onclick="uploadDeliveryNote()">
+                            <i class="bi bi-upload"></i>
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Verknuepfte Auftraege -->
         {% if linked_orders %}
         <div class="card">
             <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-link"></i> Verknüpfte Kundenaufträge</h5>
+                <h5 class="mb-0"><i class="bi bi-link"></i> Verknuepfte Kundenauftraege</h5>
             </div>
             <ul class="list-group list-group-flush">
                 {% for linked in linked_orders %}
@@ -179,7 +326,7 @@
                                 <small class="text-muted">{{ item.article_number or '-' }}</small>
                                 {% if item.size or item.color %}
                                 <br><small class="text-info">
-                                    {% if item.size %}Größe: {{ item.size }}{% endif %}
+                                    {% if item.size %}Groesse: {{ item.size }}{% endif %}
                                     {% if item.color %} Farbe: {{ item.color }}{% endif %}
                                 </small>
                                 {% endif %}
@@ -190,8 +337,8 @@
                                 <br><small class="text-success">{{ item.received_quantity }} erhalten</small>
                                 {% endif %}
                             </td>
-                            <td class="text-end">{{ "%.2f"|format(item.unit_price or 0) }}€</td>
-                            <td class="text-end"><strong>{{ "%.2f"|format(item.total or 0) }}€</strong></td>
+                            <td class="text-end">{{ "%.2f"|format(item.unit_price or 0) }} EUR</td>
+                            <td class="text-end"><strong>{{ "%.2f"|format(item.total or 0) }} EUR</strong></td>
                         </tr>
                         {% else %}
                         <tr>
@@ -205,23 +352,23 @@
                     <tfoot class="table-light">
                         <tr>
                             <td colspan="4" class="text-end"><strong>Zwischensumme:</strong></td>
-                            <td class="text-end">{{ "%.2f"|format(order.subtotal or 0) }}€</td>
+                            <td class="text-end">{{ "%.2f"|format(order.subtotal or 0) }} EUR</td>
                         </tr>
                         {% if order.shipping_cost %}
                         <tr>
                             <td colspan="4" class="text-end">Versandkosten:</td>
-                            <td class="text-end">{{ "%.2f"|format(order.shipping_cost) }}€</td>
+                            <td class="text-end">{{ "%.2f"|format(order.shipping_cost) }} EUR</td>
                         </tr>
                         {% endif %}
                         {% if order.tax_amount %}
                         <tr>
                             <td colspan="4" class="text-end">MwSt.:</td>
-                            <td class="text-end">{{ "%.2f"|format(order.tax_amount) }}€</td>
+                            <td class="text-end">{{ "%.2f"|format(order.tax_amount) }} EUR</td>
                         </tr>
                         {% endif %}
                         <tr class="fw-bold fs-5">
                             <td colspan="4" class="text-end">Gesamtbetrag:</td>
-                            <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }}€</td>
+                            <td class="text-end">{{ "%.2f"|format(order.total_amount or 0) }} EUR</td>
                         </tr>
                     </tfoot>
                 </table>
@@ -236,6 +383,28 @@
             </div>
             <div class="card-body">
                 <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ order.notes }}</pre>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if order.internal_notes %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lock"></i> Interne Notizen</h5>
+            </div>
+            <div class="card-body">
+                <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ order.internal_notes }}</pre>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if order.receiving_notes %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-box-arrow-in-down"></i> Wareneingang-Notizen</h5>
+            </div>
+            <div class="card-body">
+                <pre class="mb-0" style="white-space: pre-wrap; font-family: inherit;">{{ order.receiving_notes }}</pre>
             </div>
         </div>
         {% endif %}
@@ -257,7 +426,7 @@
                         <form method="POST" action="{{ url_for('purchasing.update_status', order_id=order.id) }}" style="display: inline;">
                             <input type="hidden" name="status" value="confirmed">
                             <button type="submit" class="btn btn-info">
-                                <i class="bi bi-check-circle"></i> Als bestätigt markieren
+                                <i class="bi bi-check-circle"></i> Als bestaetigt markieren
                             </button>
                         </form>
                         <form method="POST" action="{{ url_for('purchasing.update_status', order_id=order.id) }}" style="display: inline;" class="ms-2">
@@ -266,14 +435,26 @@
                                 <i class="bi bi-truck"></i> Als versendet markieren
                             </button>
                         </form>
+                        <form method="POST" action="{{ url_for('purchasing.update_status', order_id=order.id) }}" style="display:inline;" class="ms-2" onsubmit="return confirm('Bestellung als komplett geliefert markieren?');">
+                            <input type="hidden" name="status" value="delivered">
+                            <button type="submit" class="btn btn-outline-success">
+                                <i class="bi bi-check2-all"></i> Komplett geliefert
+                            </button>
+                        </form>
                         {% elif order.status in ['confirmed', 'shipped', 'partial'] %}
-                        <a href="{{ url_for('purchasing.receiving_checklist', order_id=order.id) }}" class="btn btn-success">
+                        <a href="{{ url_for('purchasing.receiving_checklist', order_id=order.id) }}" class="btn btn-success me-2">
                             <i class="bi bi-clipboard-check"></i> Wareneingang erfassen
                         </a>
+                        <form method="POST" action="{{ url_for('purchasing.update_status', order_id=order.id) }}" style="display:inline;" onsubmit="return confirm('Bestellung als komplett geliefert markieren?');">
+                            <input type="hidden" name="status" value="delivered">
+                            <button type="submit" class="btn btn-outline-success">
+                                <i class="bi bi-check2-all"></i> Komplett geliefert
+                            </button>
+                        </form>
                         {% endif %}
                     </div>
                     <div>
-                        {% if order.status == 'draft' %}
+                        {% if order.status in ['draft', 'ordered'] %}
                         <form method="POST" action="{{ url_for('purchasing.cancel_order', order_id=order.id) }}" style="display: inline;" onsubmit="return confirm('Bestellung wirklich stornieren?');">
                             <button type="submit" class="btn btn-outline-danger">
                                 <i class="bi bi-x-circle"></i> Stornieren
@@ -286,4 +467,74 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+function toggleEditForm() {
+    document.getElementById('detailView').classList.toggle('d-none');
+    document.getElementById('editForm').classList.toggle('d-none');
+}
+
+function calcFromNetto() {
+    var netto = parseFloat(document.getElementById('edit_subtotal').value) || 0;
+    var rate = parseFloat(document.getElementById('edit_tax_rate').value) || 0;
+    var tax = Math.round(netto * rate / 100 * 100) / 100;
+    document.getElementById('edit_tax').value = tax.toFixed(2);
+    document.getElementById('edit_total').value = (netto + tax).toFixed(2);
+}
+function calcFromBrutto() {
+    var brutto = parseFloat(document.getElementById('edit_total').value) || 0;
+    var rate = parseFloat(document.getElementById('edit_tax_rate').value) || 0;
+    var netto = Math.round(brutto / (1 + rate / 100) * 100) / 100;
+    var tax = Math.round((brutto - netto) * 100) / 100;
+    document.getElementById('edit_subtotal').value = netto.toFixed(2);
+    document.getElementById('edit_tax').value = tax.toFixed(2);
+}
+
+function uploadDeliveryNote() {
+    const fileInput = document.getElementById('deliveryNoteFile');
+    if (!fileInput.files.length) {
+        alert('Bitte Datei auswaehlen');
+        return;
+    }
+    const formData = new FormData();
+    formData.append('delivery_note_photo', fileInput.files[0]);
+
+    fetch('{{ url_for("purchasing.upload_delivery_note", order_id=order.id) }}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF_TOKEN },
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+        }
+    })
+    .catch(err => alert('Upload fehlgeschlagen: ' + err));
+}
+
+function deleteDeliveryNote() {
+    if (!confirm('Lieferschein-Foto wirklich loeschen?')) return;
+
+    fetch('{{ url_for("purchasing.delete_delivery_note", order_id=order.id) }}', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': CSRF_TOKEN }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Fehler: ' + (data.error || 'Unbekannt'));
+        }
+    })
+    .catch(err => alert('Loeschen fehlgeschlagen: ' + err));
+}
+</script>
 {% endblock %}

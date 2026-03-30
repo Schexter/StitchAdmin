@@ -8,6 +8,7 @@ Erstellt von Hans Hahn - Alle Rechte vorbehalten
 from datetime import datetime, date
 from src.models.models import db
 import hashlib
+import json
 import os
 
 

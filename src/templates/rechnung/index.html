@@ -69,19 +69,24 @@
 
     <!-- Aktionsbuttons -->
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <a href="{{ url_for('rechnung.neue_rechnung') }}" class="btn btn-success btn-lg w-100">
-                <i class="bi bi-plus-circle"></i> Neue Rechnung erstellen
+                <i class="bi bi-plus-circle"></i> Neue Rechnung
             </a>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <a href="{{ url_for('rechnung.neue_rechnung_aus_auftrag') }}" class="btn btn-primary btn-lg w-100">
-                <i class="bi bi-cart-check"></i> Aus Auftrag erstellen
+                <i class="bi bi-cart-check"></i> Aus Auftrag
             </a>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
+            <a href="{{ url_for('rechnung.neue_sammelrechnung') }}" class="btn btn-info btn-lg w-100 text-white">
+                <i class="bi bi-collection"></i> Sammelrechnung
+            </a>
+        </div>
+        <div class="col-md-1">
             <button class="btn btn-outline-secondary btn-lg w-100" data-bs-toggle="modal" data-bs-target="#exportModal">
-                <i class="bi bi-download"></i> Export
+                <i class="bi bi-download"></i>
             </button>
         </div>
         <div class="col-md-2">
@@ -91,10 +96,30 @@
         </div>
     </div>
 
+    <!-- Filter Ausgang -->
+    <div class="mb-3 d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('rechnung.rechnungs_index', tab='ausgang') }}"
+           class="btn btn-sm {% if not request.args.get('status') %}btn-primary{% else %}btn-outline-primary{% endif %}">
+            <i class="bi bi-clock"></i> Nur Offene
+        </a>
+        <a href="{{ url_for('rechnung.rechnungs_index', tab='ausgang', status='ENTWURF') }}"
+           class="btn btn-sm {% if request.args.get('status') == 'ENTWURF' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+            <i class="bi bi-pencil"></i> Entwürfe
+        </a>
+        <a href="{{ url_for('rechnung.rechnungs_index', tab='ausgang', status='BEZAHLT') }}"
+           class="btn btn-sm {% if request.args.get('status') == 'BEZAHLT' %}btn-success{% else %}btn-outline-success{% endif %}">
+            <i class="bi bi-check-circle"></i> Bezahlt
+        </a>
+        <a href="{{ url_for('rechnung.rechnungs_index', tab='ausgang', status='STORNIERT') }}"
+           class="btn btn-sm {% if request.args.get('status') == 'STORNIERT' %}btn-dark{% else %}btn-outline-dark{% endif %}">
+            <i class="bi bi-x-circle"></i> Storniert
+        </a>
+    </div>
+
     <!-- Rechnungsliste Ausgang -->
     <div class="card">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Ausgangsrechnungen (an Kunden)</h5>
+            <h5 class="mb-0" style="color:#fff;"><i class="bi bi-list-ul"></i> Ausgangsrechnungen (an Kunden)</h5>
         </div>
         <div class="card-body">
             {% if ausgangsrechnungen %}
@@ -162,10 +187,16 @@
                                        class="btn btn-outline-secondary" title="PDF" target="_blank">
                                         <i class="bi bi-file-pdf"></i>
                                     </a>
-                                    {% if rechnung.status.value in ['ENTWURF', 'OFFEN'] %}
-                                    <button class="btn btn-outline-success" title="Als bezahlt markieren"
-                                            onclick="markAsPaid({{ rechnung.id }})">
+                                    {% if rechnung.status.value in ['ENTWURF', 'OFFEN', 'TEILBEZAHLT'] %}
+                                    <button class="btn btn-outline-success" title="Zahlung erfassen"
+                                            onclick="markAsPaid({{ rechnung.id }}, {{ rechnung.brutto_gesamt|float }})">
                                         <i class="bi bi-check-circle"></i>
+                                    </button>
+                                    {% endif %}
+                                    {% if rechnung.status.value not in ['STORNIERT'] %}
+                                    <button class="btn btn-outline-danger" title="Stornieren"
+                                            onclick="stornoRechnung({{ rechnung.id }}, '{{ rechnung.rechnungsnummer }}')">
+                                        <i class="bi bi-x-circle"></i>
                                     </button>
                                     {% endif %}
                                 </div>
@@ -211,9 +242,14 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-2">
             <a href="{{ url_for('rechnung.neue_eingangsrechnung') }}" class="btn btn-success btn-lg w-100 h-100 d-flex align-items-center justify-content-center">
-                <i class="bi bi-plus-circle me-2"></i> Eingangsrechnung erfassen
+                <i class="bi bi-plus-circle me-2"></i> Erfassen
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="{{ url_for('rechnung.scan_rechnung') }}" class="btn btn-primary btn-lg w-100 h-100 d-flex align-items-center justify-content-center">
+                <i class="bi bi-camera me-2"></i> Scannen
             </a>
         </div>
     </div>
@@ -221,7 +257,7 @@
     <!-- Rechnungsliste Eingang -->
     <div class="card">
         <div class="card-header bg-secondary text-white">
-            <h5 class="mb-0"><i class="bi bi-list-ul"></i> Eingangsrechnungen (von Lieferanten)</h5>
+            <h5 class="mb-0" style="color:#fff;"><i class="bi bi-list-ul"></i> Eingangsrechnungen (von Lieferanten)</h5>
         </div>
         <div class="card-body">
             {% if eingangsrechnungen %}
@@ -301,22 +337,85 @@
     {% endif %}
 </div>
 
+<!-- Zahlungs-Modal -->
+<div class="modal fade" id="zahlungModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-cash-coin me-2"></i>Zahlung erfassen</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Zahlungsart</label>
+          <div class="d-grid gap-2">
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="zahlungsart" id="z_bar" value="bar" checked>
+              <label class="form-check-label" for="z_bar"><i class="bi bi-cash me-1"></i>Bar</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="zahlungsart" id="z_ub" value="ueberweisung">
+              <label class="form-check-label" for="z_ub"><i class="bi bi-bank me-1"></i>Überweisung</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="zahlungsart" id="z_ec" value="ec_karte">
+              <label class="form-check-label" for="z_ec"><i class="bi bi-credit-card me-1"></i>EC-Karte</label>
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label for="zahlBetrag" class="form-label fw-semibold">Betrag (€)</label>
+          <input type="number" class="form-control" id="zahlBetrag" step="0.01" min="0.01">
+          <div class="form-text">Weniger als Rechnungsbetrag = Teilzahlung</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+        <button type="button" class="btn btn-success" onclick="submitZahlung()">
+          <i class="bi bi-check2-circle me-1"></i>Zahlung buchen
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-function markAsPaid(rechnungId) {
-    if (confirm('Rechnung als bezahlt markieren?')) {
-        fetch(`/rechnung/api/${rechnungId}/bezahlt`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Fehler: ' + data.error);
-            }
-        });
-    }
+let _zahlungRechnungId = null;
+function markAsPaid(rechnungId, brutto) {
+    _zahlungRechnungId = rechnungId;
+    document.getElementById('zahlBetrag').value = brutto ? parseFloat(brutto).toFixed(2) : '';
+    document.getElementById('z_bar').checked = true;
+    new bootstrap.Modal(document.getElementById('zahlungModal')).show();
+}
+function submitZahlung() {
+    const art = document.querySelector('input[name="zahlungsart"]:checked').value;
+    const betrag = parseFloat(document.getElementById('zahlBetrag').value);
+    if (!betrag || betrag <= 0) { alert('Bitte gültigen Betrag eingeben.'); return; }
+    fetch(`/rechnung/api/${_zahlungRechnungId}/bezahlt`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({zahlungsart: art, betrag: betrag})
+    })
+    .then(res => res.json())
+    .then(data => {
+        bootstrap.Modal.getInstance(document.getElementById('zahlungModal')).hide();
+        if (data.success) { location.reload(); }
+        else { alert('Fehler: ' + data.message); }
+    });
+}
+function stornoRechnung(rechnungId, rechnungsnummer) {
+    const grund = prompt(`Rechnung ${rechnungsnummer} stornieren?\n\nBitte Storno-Grund eingeben:`);
+    if (!grund) return;
+    fetch(`/rechnung/api/${rechnungId}/stornieren`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({grund: grund})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) { alert(data.message); location.reload(); }
+        else { alert('Fehler: ' + data.message); }
+    });
 }
 </script>
 {% endblock %}

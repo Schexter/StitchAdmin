@@ -85,6 +85,9 @@ class Inquiry(db.Model):
     # Auftrags-Verknüpfung (bei Konvertierung)
     order_id = db.Column(db.String(50), db.ForeignKey('orders.id'))
 
+    # Angebots-Verknüpfung
+    angebot_id = db.Column(db.Integer, db.ForeignKey('angebote.id'))
+
     # Metadaten
     source = db.Column(db.String(20), default='website')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -94,6 +97,7 @@ class Inquiry(db.Model):
     # Relationships
     customer = db.relationship('Customer', backref=db.backref('inquiries', lazy='dynamic'))
     order = db.relationship('Order', backref='inquiry')
+    angebot = db.relationship('Angebot', backref='anfrage')
 
     @property
     def full_name(self):

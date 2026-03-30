@@ -53,6 +53,12 @@ class ProductionTimeLog(db.Model):
     embroidery_position = db.Column(db.String(100))  # Brust, Rücken, Ärmel, etc.
     embroidery_size_mm2 = db.Column(db.Float)  # Fläche in mm²
 
+    # Druck / DTF / Sublimation
+    print_temperature = db.Column(db.Integer)  # Temperatur in °C
+    print_time_seconds = db.Column(db.Integer)  # Presszeit in Sekunden
+    excess_sheets_stored = db.Column(db.Boolean, default=False)  # Überschüssige Druckbögen eingelagert?
+    storage_number = db.Column(db.String(50))  # Lagernummer für eingelagerte Bögen
+
     # Mengen
     quantity_planned = db.Column(db.Integer)  # Geplante Stückzahl
     quantity_produced = db.Column(db.Integer)  # Tatsächlich produziert

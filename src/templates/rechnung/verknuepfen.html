@@ -59,7 +59,7 @@
                                         <small class="text-muted">
                                             {{ auftrag.created_at.strftime('%d.%m.%Y') if auftrag.created_at else '-' }}
                                             {% if auftrag.items %}
-                                             | {{ auftrag.items|length }} Position(en)
+                                             | {{ auftrag.items.count() }} Position(en)
                                             {% endif %}
                                         </small>
                                     </div>

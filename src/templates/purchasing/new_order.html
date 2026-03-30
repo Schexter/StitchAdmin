@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}Neue Bestellung - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('purchasing.orders') }}" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+        <div>
+            <h4 class="mb-0"><i class="bi bi-cart-plus me-2"></i>Neue Bestellung</h4>
+            <small class="text-muted">Manuelle Lieferantenbestellung mit Auftragsverkn&uuml;pfung</small>
+            {% if linked_order %}
+            <div class="badge bg-info ms-2">Aus Auftrag {{ linked_order.id }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <form method="POST">
+        <!-- Lieferant + Auftrag -->
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-building me-1"></i> Lieferant &amp; Auftrag</h6></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Lieferant *</label>
+                        <select class="form-select" name="supplier_id" id="supplier_select" required>
+                            <option value="">Lieferant w&auml;hlen...</option>
+                            {% for s in suppliers %}
+                            <option value="{{ s.id }}" data-email="{{ s.email or '' }}" data-phone="{{ s.phone or '' }}">
+                                {{ s.name }}{% if s.city %} ({{ s.city }}){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Verkn&uuml;pfte Kundenauftr&auml;ge</label>
+                        <select class="form-select" name="linked_customer_orders" id="linked_orders" multiple style="height:auto;">
+                            {% for o in open_orders %}
+                            <option value="{{ o.id }}" {{ 'selected' if linked_order and o.id == linked_order.id }}>
+                                {{ o.id }} - {{ o.customer.display_name if o.customer else '?' }}
+                                {% if o.total_price %} ({{ "%.2f"|format(o.total_price) }}&euro;){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="form-text text-muted">Mehrere mit Strg+Klick ausw&auml;hlen</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bestelldetails -->
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-calendar me-1"></i> Details</h6></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Bestelldatum</label>
+                        <input type="date" class="form-control" name="order_date" value="{{ today.isoformat() }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Gew&uuml;nschtes Lieferdatum</label>
+                        <input type="date" class="form-control" name="delivery_date">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Lieferanten-Bestellnr.</label>
+                        <input type="text" class="form-control" name="supplier_order_number" placeholder="Optional">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Versandart</label>
+                        <select class="form-select" name="shipping_method">
+                            <option value="">Standard</option>
+                            <option value="DHL">DHL</option>
+                            <option value="DPD">DPD</option>
+                            <option value="UPS">UPS</option>
+                            <option value="Spedition">Spedition</option>
+                            <option value="Abholung">Selbstabholung</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Positionen -->
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-list-check me-1"></i> Positionen</h6>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addItem()">
+                    <i class="bi bi-plus-lg"></i> Position
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width:35px;">#</th>
+                            <th>Bezeichnung</th>
+                            <th style="width:120px;">Art.-Nr. (Lief.)</th>
+                            <th style="width:80px;" class="text-center">Menge</th>
+                            <th style="width:110px;" class="text-end">EK-Preis</th>
+                            <th style="width:100px;" class="text-end">Gesamt</th>
+                            <th style="width:35px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="items-body">
+                        <tr class="item-row">
+                            <td class="align-middle text-center item-nr">1</td>
+                            <td><input type="text" class="form-control form-control-sm" name="item_name[]" placeholder="z.B. Poloshirt Fruit of the Loom" required></td>
+                            <td><input type="text" class="form-control form-control-sm" name="item_article_nr[]" placeholder="63-218-0"></td>
+                            <td><input type="number" class="form-control form-control-sm text-center item-qty" name="item_qty[]" min="1" value="1" onchange="calcItemRow(this)"></td>
+                            <td><div class="input-group input-group-sm"><input type="number" class="form-control text-end item-price" name="item_price[]" step="0.01" min="0" value="0.00" onchange="calcItemRow(this)"><span class="input-group-text">&euro;</span></div></td>
+                            <td class="align-middle text-end fw-bold item-total">0.00 &euro;</td>
+                            <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeItemRow(this)"><i class="bi bi-x"></i></button></td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr><td colspan="5" class="text-end">Netto:</td><td class="text-end fw-bold" id="sum-netto">0.00 &euro;</td><td></td></tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <!-- Kosten + Notizen -->
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-calculator me-1"></i> Kosten &amp; Notizen</h6></div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Versandkosten</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" class="form-control" name="shipping_cost" step="0.01" min="0" value="0.00">
+                            <span class="input-group-text">&euro;</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">MwSt.-Satz</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" class="form-control" name="tax_rate" value="19" min="0" max="100">
+                            <span class="input-group-text">%</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Zahlungsart</label>
+                        <select class="form-select form-select-sm" name="payment_method">
+                            <option value="rechnung">Rechnung</option>
+                            <option value="vorkasse">Vorkasse</option>
+                            <option value="paypal">PayPal</option>
+                            <option value="kreditkarte">Kreditkarte</option>
+                            <option value="nachnahme">Nachnahme</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-3 mt-1">
+                    <div class="col-md-6">
+                        <label class="form-label">Bemerkungen (an Lieferant)</label>
+                        <textarea class="form-control form-control-sm" name="notes" rows="2" placeholder="Wird auf Bestellung gedruckt"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Interne Notizen</label>
+                        <textarea class="form-control form-control-sm" name="internal_notes" rows="2" placeholder="Nur intern sichtbar"></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between mb-4">
+            <a href="{{ url_for('purchasing.orders') }}" class="btn btn-outline-secondary">Abbrechen</a>
+            <button type="submit" class="btn btn-success btn-lg">
+                <i class="bi bi-check-lg me-1"></i> Bestellung anlegen
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+function addItem() {
+    var tbody = document.getElementById('items-body');
+    var nr = tbody.querySelectorAll('.item-row').length + 1;
+    var tr = document.createElement('tr'); tr.className = 'item-row';
+    tr.innerHTML = '<td class="align-middle text-center item-nr">'+nr+'</td>' +
+        '<td><input type="text" class="form-control form-control-sm" name="item_name[]" placeholder="Bezeichnung" required></td>' +
+        '<td><input type="text" class="form-control form-control-sm" name="item_article_nr[]" placeholder="Art.-Nr."></td>' +
+        '<td><input type="number" class="form-control form-control-sm text-center item-qty" name="item_qty[]" min="1" value="1" onchange="calcItemRow(this)"></td>' +
+        '<td><div class="input-group input-group-sm"><input type="number" class="form-control text-end item-price" name="item_price[]" step="0.01" value="0.00" onchange="calcItemRow(this)"><span class="input-group-text">\u20ac</span></div></td>' +
+        '<td class="align-middle text-end fw-bold item-total">0.00 \u20ac</td>' +
+        '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeItemRow(this)"><i class="bi bi-x"></i></button></td>';
+    tbody.appendChild(tr);
+}
+function removeItemRow(btn) { btn.closest('.item-row').remove(); renumberItems(); calcTotal(); }
+function renumberItems() { document.querySelectorAll('.item-nr').forEach(function(td,i){td.textContent=i+1;}); }
+function calcItemRow(el) {
+    var row = el.closest('.item-row');
+    var q = parseFloat(row.querySelector('.item-qty').value)||0;
+    var p = parseFloat(row.querySelector('.item-price').value)||0;
+    row.querySelector('.item-total').textContent = (q*p).toFixed(2)+' \u20ac';
+    calcTotal();
+}
+function calcTotal() {
+    var t = 0;
+    document.querySelectorAll('.item-total').forEach(function(td){t += parseFloat(td.textContent)||0;});
+    document.getElementById('sum-netto').textContent = t.toFixed(2)+' \u20ac';
+}
+</script>
+{% endblock %}

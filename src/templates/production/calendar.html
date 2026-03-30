@@ -4,822 +4,426 @@
 
 {% block content %}
 <div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h3 mb-0"><i class="bi bi-calendar3"></i> Produktionskalender</h1>
+        <div>
+            <button type="button" class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#scheduleModal">
+                <i class="bi bi-plus-lg"></i> Einplanen
+            </button>
+            <a href="{{ url_for('production.planning') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-list-ul"></i> Listenansicht
+            </a>
+        </div>
+    </div>
+
     <div class="row">
-        <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3 mb-0">📅 Produktionskalender</h1>
-                <div>
-                    <button type="button" class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#scheduleModal">
-                        <i class="fas fa-plus"></i> Manuell planen
-                    </button>
-                    <div class="btn-group me-2">
-                        <a href="{{ url_for('production.calendar', week=week_offset-1) }}" class="btn btn-outline-primary">
-                            <i class="fas fa-chevron-left"></i> Vorherige Woche
-                        </a>
-                        <a href="{{ url_for('production.calendar', week=0) }}" class="btn btn-outline-primary">
-                            Heute
-                        </a>
-                        <a href="{{ url_for('production.calendar', week=week_offset+1) }}" class="btn btn-outline-primary">
-                            Nächste Woche <i class="fas fa-chevron-right"></i>
-                        </a>
-                    </div>
-                    <a href="{{ url_for('production.planning') }}" class="btn btn-outline-secondary">
-                        <i class="fas fa-list"></i> Listenansicht
-                    </a>
+        <!-- Wartende Auftraege -->
+        <div class="col-lg-2 mb-3">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark py-2">
+                    <h6 class="mb-0"><i class="bi bi-hourglass-split"></i> Wartend ({{ waiting_orders|length }})</h6>
                 </div>
-            </div>
-
-            <!-- Wochen-Info -->
-            <div class="alert alert-info mb-3">
-                <i class="fas fa-info-circle"></i>
-                Woche vom <strong>{{ week_start.strftime('%d.%m.%Y') }}</strong>
-                bis <strong>{{ week_end.strftime('%d.%m.%Y') }}</strong>
-                <span class="float-end">
-                    Ablenkungsfaktor: {{ (settings.distraction_factor * 100)|int }}%
-                    <small class="text-muted">({{ (100 - settings.distraction_factor * 100)|int }}% Puffer)</small>
-                </span>
-            </div>
-
-            <!-- Bedienungshinweise -->
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <strong>💡 Produktionsplanung:</strong>
-                <div class="small mt-1">
-                    <span class="badge bg-primary me-1">Drag & Drop</span> Aufträge in Kalender ziehen
-                    <span class="ms-2">|</span>
-                    <span class="badge bg-info ms-1 me-1">Klick</span> Eingeplante Aufträge für Details/Aktionen
-                    <span class="ms-2">|</span>
-                    <span class="badge bg-success ms-1 me-1">Manuell</span> Button für präzise Planung mit Auto-Berechnung
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-
-            <div class="row">
-                <!-- Wartende Aufträge (Drag Source) -->
-                <div class="col-lg-3 mb-4">
-                    <div class="card h-100">
-                        <div class="card-header bg-warning text-dark">
-                            <h5 class="card-title mb-0">⏳ Wartende Aufträge</h5>
-                        </div>
-                        <div class="card-body" style="max-height: 800px; overflow-y: auto;">
-                            <div id="waiting-orders">
-                                {% for order in waiting_orders %}
-                                <div class="draggable-order card mb-2 border-{{ 'danger' if order.rush_order else 'primary' }}" 
-                                     data-order-id="{{ order.id }}"
-                                     data-duration="{{ 2 if not order.stitch_count else (order.stitch_count / 10000)|round(1) }}"
-                                     data-type="{{ order.order_type }}">
-                                    <div class="card-body p-2">
-                                        <h6 class="card-title mb-1">
-                                            {{ order.id }}
-                                            {% if order.rush_order %}
-                                            <span class="badge bg-danger float-end">Eilig</span>
-                                            {% endif %}
-                                        </h6>
-                                        <small class="text-muted d-block">
-                                            {{ order.customer.display_name if order.customer else 'Unbekannt' }}
-                                        </small>
-                                        <small class="text-muted">
-                                            <i class="fas fa-clock"></i> ~{{ 2 if not order.stitch_count else (order.stitch_count / 10000)|round(1) }}h
-                                        </small>
-                                        {% if order.order_type == 'embroidery' %}
-                                        <span class="badge bg-primary">Stickerei</span>
-                                        {% elif order.order_type == 'dtf' %}
-                                        <span class="badge bg-success">DTF</span>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                                {% endfor %}
+                <div class="card-body p-2" id="waiting-orders" style="max-height: calc(100vh - 220px); overflow-y: auto;">
+                    {% for order in waiting_orders %}
+                    <div class="fc-event draggable-order card mb-2 border-{{ 'danger' if order.rush_order else 'secondary' }}"
+                         data-order-id="{{ order.id }}"
+                         data-duration="{{ 2 if not order.stitch_count else (order.stitch_count / 10000)|round(1) }}"
+                         data-type="{{ order.order_type }}"
+                         data-customer="{{ order.customer.display_name if order.customer else 'Unbekannt' }}"
+                         style="cursor: grab;">
+                        <div class="card-body p-2">
+                            <div class="fw-bold small">
+                                {{ order.id }}
+                                {% if order.rush_order %}
+                                <span class="badge bg-danger float-end">Eil</span>
+                                {% endif %}
+                            </div>
+                            <div class="text-muted small text-truncate">{{ order.customer.display_name if order.customer else 'Unbekannt' }}</div>
+                            <div class="mt-1">
+                                <span class="badge bg-{{ 'primary' if order.order_type == 'embroidery' else 'success' if order.order_type == 'dtf' else 'secondary' }} small">
+                                    {{ 'Stick' if order.order_type == 'embroidery' else 'DTF' if order.order_type == 'dtf' else order.order_type or 'Std' }}
+                                </span>
+                                <span class="text-muted small"><i class="bi bi-clock"></i> ~{{ 2 if not order.stitch_count else (order.stitch_count / 10000)|round(1) }}h</span>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Kalender -->
-                <div class="col-lg-9">
-                    <div class="calendar-container">
-                        <table class="table table-bordered calendar-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 120px;">Maschine</th>
-                                    {% for day_offset in range(7) %}
-                                    {% set current_date = week_start + timedelta(days=day_offset) %}
-                                    <th class="text-center {% if current_date == today %}bg-light{% endif %}">
-                                        {{ ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'][current_date.weekday()] }}<br>
-                                        <small>{{ current_date.strftime('%d.%m') }}</small>
-                                    </th>
-                                    {% endfor %}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for machine in machines %}
-                                <tr>
-                                    <td class="machine-label">
-                                        <strong>{{ machine.name }}</strong><br>
-                                        <small class="text-muted">
-                                            {% if machine.type == 'embroidery' %}🧵 Stickerei
-                                            {% elif machine.type == 'dtf' %}🖨️ DTF
-                                            {% else %}⚙️ {{ machine.type|title }}
-                                            {% endif %}
-                                        </small>
-                                    </td>
-                                    {% for day_offset in range(7) %}
-                                    {% set current_date = week_start + timedelta(days=day_offset) %}
-                                    {% set is_weekend = current_date.weekday() >= 5 %}
-                                    <td class="calendar-day {% if is_weekend %}weekend{% endif %}" 
-                                        data-date="{{ current_date }}"
-                                        data-machine-id="{{ machine.id }}">
-                                        <div class="day-container">
-                                            <!-- Zeitraster -->
-                                            <div class="time-grid">
-                                                {% for hour in range(settings.work_start, settings.work_end + 1) %}
-                                                <div class="hour-slot" data-hour="{{ hour }}">
-                                                    {% if hour == settings.lunch_start %}
-                                                    <div class="lunch-break"></div>
-                                                    {% endif %}
-                                                </div>
-                                                {% endfor %}
-                                            </div>
-                                            
-                                            <!-- Geplante Produktionen -->
-                                            <div class="schedules-container">
-                                                {% for schedule in calendar_data[current_date][machine.id] %}
-                                                {% set start_hour = schedule.scheduled_start.hour %}
-                                                {% set start_minute = schedule.scheduled_start.minute %}
-                                                {% set duration_hours = ((schedule.scheduled_end - schedule.scheduled_start).total_seconds() / 3600) %}
-                                                {% set top_position = ((start_hour - settings.work_start) * 60 + start_minute) %}
-                                                {% set height = duration_hours * 60 %}
-                                                
-                                                                <div class="scheduled-item draggable-schedule"
-                                                     data-schedule-id="{{ schedule.id }}"
-                                                     data-order-id="{{ schedule.order.id }}"
-                                                     data-order-type="{{ schedule.order.order_type }}"
-                                                     data-customer="{{ schedule.order.customer.display_name if schedule.order.customer else 'Unbekannt' }}"
-                                                     style="top: {{ top_position }}px; height: {{ height }}px; cursor: pointer;"
-                                                     onclick="showScheduleDetails({{ schedule.id }})">
-                                                    <div class="schedule-content">
-                                                        <strong>{{ schedule.order.id }}</strong><br>
-                                                        <small>{{ schedule.scheduled_start.strftime('%H:%M') }} - {{ schedule.scheduled_end.strftime('%H:%M') }}</small>
-                                                        {% if schedule.order.rush_order %}
-                                                        <span class="badge bg-danger">!</span>
-                                                        {% endif %}
-                                                    </div>
-                                                </div>
-                                                {% endfor %}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    {% endfor %}
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    {% else %}
+                    <div class="text-center text-muted py-4 small">
+                        <i class="bi bi-check-circle"></i><br>Keine wartenden Auftraege
                     </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Kalender -->
+        <div class="col-lg-10">
+            <div class="card">
+                <div class="card-body p-2">
+                    <div id="production-calendar"></div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal für Auftrags-Details -->
-<div class="modal fade" id="scheduleDetailModal" tabindex="-1" aria-labelledby="scheduleDetailModalLabel" aria-hidden="true">
+<!-- Modal: Manuell einplanen -->
+<div class="modal fade" id="scheduleModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="scheduleDetailModalLabel">
-                    <i class="fas fa-info-circle"></i> Auftrags-Details
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <h5 class="modal-title"><i class="bi bi-calendar-plus"></i> Produktion einplanen</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body" id="scheduleDetailContent">
-                <!-- Wird dynamisch gefüllt -->
-                <div class="text-center">
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Laden...</span>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer" id="scheduleDetailActions">
-                <!-- Aktionen werden dynamisch hinzugefügt -->
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Modal für manuelle Planung -->
-<div class="modal fade" id="scheduleModal" tabindex="-1" aria-labelledby="scheduleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="scheduleModalLabel">
-                    <i class="fas fa-calendar-plus"></i> Produktion manuell planen
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="scheduleForm" method="POST" action="{{ url_for('production.schedule_production') }}">
+            <form method="POST" action="{{ url_for('production.schedule_production') }}">
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="order_id" class="form-label">Offener Auftrag *</label>
-                                <select class="form-select" id="order_id" name="order_id" required onchange="loadOrderDetails()">
-                                    <option value="">-- Auftrag wählen --</option>
-                                    {% for order in waiting_orders %}
-                                    <option value="{{ order.id }}"
-                                            data-stitch-count="{{ order.stitch_count or 0 }}"
-                                            data-quantity="{{ order.quantity or 1 }}"
-                                            data-type="{{ order.order_type }}"
-                                            data-customer="{{ order.customer.display_name if order.customer else 'Unbekannt' }}">
-                                        {{ order.id }} - {{ order.customer.display_name if order.customer else 'Unbekannt' }}
-                                        {% if order.rush_order %} [EILIG]{% endif %}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                                <small class="text-muted">Auftrag aus der Warteschlange auswählen</small>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="machine_id" class="form-label">Maschine *</label>
-                                <select class="form-select" id="machine_id" name="machine_id" required onchange="updateMachineDetails()">
-                                    <option value="">-- Maschine wählen --</option>
-                                    {% for machine in machines %}
-                                    <option value="{{ machine.id }}"
-                                            data-speed="{{ machine.max_speed or 1000 }}"
-                                            data-setup-time="{{ machine.setup_time_minutes or 15 }}"
-                                            data-thread-change-time="{{ machine.thread_change_time_minutes or 5 }}"
-                                            data-type="{{ machine.type }}">
-                                        {{ machine.name }}
-                                        ({% if machine.type == 'embroidery' %}🧵 Stickerei{% elif machine.type == 'dtf' %}🖨️ DTF{% else %}{{ machine.type|title }}{% endif %})
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                                <small class="text-muted">Verfügbare Maschine wählen</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="scheduled_date" class="form-label">Datum *</label>
-                                <input type="date" class="form-control" id="scheduled_date" name="scheduled_date" required>
-                            </div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="scheduled_time" class="form-label">Startzeit *</label>
-                                <input type="time" class="form-control" id="scheduled_time" name="scheduled_time" value="08:00" required>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Automatische Zeitberechnung Anzeige -->
-                    <div class="card bg-light mb-3">
-                        <div class="card-body">
-                            <h6 class="card-title">📊 Produktionszeit-Kalkulation</h6>
-                            <div id="timeCalculation">
-                                <p class="text-muted mb-1">Bitte wählen Sie einen Auftrag und eine Maschine aus.</p>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="mb-3">
-                        <label for="duration_minutes" class="form-label">Geschätzte Dauer (Minuten) *</label>
-                        <input type="number" class="form-control" id="duration_minutes" name="duration_minutes" value="60" min="1" required>
-                        <small class="text-muted">Wird automatisch berechnet, kann manuell angepasst werden</small>
+                        <label class="form-label">Auftrag *</label>
+                        <select class="form-select" name="order_id" id="modal-order" required>
+                            <option value="">-- Auftrag waehlen --</option>
+                            {% for order in waiting_orders %}
+                            <option value="{{ order.id }}"
+                                    data-stitch-count="{{ order.stitch_count or 0 }}"
+                                    data-quantity="{{ order.quantity or 1 }}">
+                                {{ order.id }} — {{ order.customer.display_name if order.customer else 'Unbekannt' }}
+                                {% if order.rush_order %} [EILIG]{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
                     </div>
-
                     <div class="mb-3">
-                        <label for="notes" class="form-label">Notizen</label>
-                        <textarea class="form-control" id="notes" name="notes" rows="2" placeholder="Optionale Notizen zur Planung..."></textarea>
+                        <label class="form-label">Maschine *</label>
+                        <select class="form-select" name="machine_id" id="modal-machine" required>
+                            <option value="">-- Maschine waehlen --</option>
+                            {% for machine in machines %}
+                            <option value="{{ machine.id }}">
+                                {{ machine.name }}
+                                ({{ 'Stickerei' if machine.type == 'embroidery' else 'DTF' if machine.type == 'dtf' else machine.type|title }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="mb-3">
+                                <label class="form-label">Datum *</label>
+                                <input type="date" class="form-control" name="scheduled_date" id="modal-date" required>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="mb-3">
+                                <label class="form-label">Startzeit *</label>
+                                <input type="time" class="form-control" name="scheduled_time" id="modal-time" value="08:00" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Dauer (Minuten) *</label>
+                        <input type="number" class="form-control" name="duration_minutes" id="modal-duration" value="120" min="15" step="15" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Notizen</label>
+                        <textarea class="form-control" name="notes" rows="2"></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> Einplanen
-                    </button>
+                    <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> Einplanen</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+<!-- Modal: Event-Details -->
+<div class="modal fade" id="eventDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="eventDetailTitle">Auftrags-Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="eventDetailBody"></div>
+            <div class="modal-footer" id="eventDetailFooter"></div>
+        </div>
+    </div>
+</div>
+
+<!-- FullCalendar 6 (Scheduler Bundle: includes resource views) -->
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@6.1.11/index.global.min.js"></script>
+
 <style>
-.calendar-table {
-    table-layout: fixed;
+#production-calendar {
+    min-height: calc(100vh - 220px);
 }
-
-.calendar-day {
-    position: relative;
-    height: 600px;
-    padding: 0;
-    vertical-align: top;
-    background: #fff;
+.fc .fc-toolbar-title {
+    font-size: 1.1rem;
 }
-
-.calendar-day.weekend {
-    background: #f8f9fa;
-}
-
-.day-container {
-    position: relative;
-    height: 100%;
-    width: 100%;
-}
-
-.time-grid {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-}
-
-.hour-slot {
-    height: 60px;
-    border-bottom: 1px dotted #dee2e6;
-    position: relative;
-}
-
-.lunch-break {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 60px;
-    background: repeating-linear-gradient(
-        45deg,
-        #f8f9fa,
-        #f8f9fa 10px,
-        #e9ecef 10px,
-        #e9ecef 20px
-    );
-    opacity: 0.5;
-}
-
-.schedules-container {
-    position: absolute;
-    top: 0;
-    left: 2px;
-    right: 2px;
-    bottom: 0;
-    pointer-events: none;
-}
-
-.scheduled-item {
-    position: absolute;
-    left: 0;
-    right: 0;
-    background: #007bff;
-    color: white;
-    border-radius: 4px;
-    padding: 4px;
-    margin: 1px;
+.fc .fc-event {
     cursor: pointer;
-    pointer-events: all;
-    overflow: hidden;
-    font-size: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    transition: all 0.2s ease;
+    border: none;
+    font-size: 0.8rem;
 }
-
-.scheduled-item:hover {
-    z-index: 10;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    transform: scale(1.02);
-    background: #0056b3;
+.fc .fc-timegrid-slot {
+    height: 2em;
 }
-
-.schedule-content {
-    overflow: hidden;
-    text-overflow: ellipsis;
+.fc .fc-resource-label {
+    font-weight: 600;
 }
-
-.draggable-order {
-    cursor: move;
+.draggable-order.dragging {
+    opacity: 0.4;
 }
-
-.draggable-order:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+.fc-event.fc-event-dragging {
+    opacity: 0.7;
 }
-
-.machine-label {
-    background: #f8f9fa;
-    font-weight: 500;
-}
-
-/* Drag & Drop Styles */
-.drag-over {
-    background: #e3f2fd !important;
-}
-
-.dragging {
-    opacity: 0.5;
-}
-
-.drop-preview {
-    position: absolute;
-    background: rgba(0, 123, 255, 0.3);
-    border: 2px dashed #007bff;
-    border-radius: 4px;
-    pointer-events: none;
+/* Lunch break styling */
+.fc .fc-non-business {
+    background: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.03) 5px, rgba(0,0,0,0.03) 10px);
 }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const workStart = {{ settings.work_start }};
-    const workEnd = {{ settings.work_end }};
-    const distractionFactor = {{ settings.distraction_factor }};
-    
-    // Drag & Drop für wartende Aufträge
-    const orders = document.querySelectorAll('.draggable-order');
-    orders.forEach(order => {
-        order.draggable = true;
-        
-        order.addEventListener('dragstart', function(e) {
-            e.dataTransfer.effectAllowed = 'copy';
-            e.dataTransfer.setData('order-id', this.dataset.orderId);
-            e.dataTransfer.setData('duration', this.dataset.duration);
-            e.dataTransfer.setData('type', this.dataset.type);
-            this.classList.add('dragging');
-        });
-        
-        order.addEventListener('dragend', function(e) {
-            this.classList.remove('dragging');
-        });
-    });
-    
-    // Drag & Drop für geplante Items
-    const schedules = document.querySelectorAll('.draggable-schedule');
-    let isDragging = false;
-    let dragStartPos = {x: 0, y: 0};
+    const calendarEl = document.getElementById('production-calendar');
+    const workStart = '{{ settings.work_start|default(8) }}:00:00';
+    const workEnd = '{{ settings.work_end|default(17) }}:00:00';
 
-    schedules.forEach(schedule => {
-        schedule.draggable = true;
+    // Ressourcen (Maschinen)
+    const resources = [
+        {% for machine in machines %}
+        {
+            id: '{{ machine.id }}',
+            title: '{{ machine.name }}',
+            type: '{{ machine.type }}',
+            extendedProps: {type: '{{ machine.type }}'}
+        }{{ ',' if not loop.last }}
+        {% endfor %}
+    ];
 
-        // Verhindere Drag bei Click
-        schedule.addEventListener('mousedown', function(e) {
-            dragStartPos = {x: e.clientX, y: e.clientY};
-            isDragging = false;
-        });
-
-        schedule.addEventListener('mousemove', function(e) {
-            const distance = Math.sqrt(
-                Math.pow(e.clientX - dragStartPos.x, 2) +
-                Math.pow(e.clientY - dragStartPos.y, 2)
-            );
-            if (distance > 5) {
-                isDragging = true;
-            }
-        });
-
-        schedule.addEventListener('dragstart', function(e) {
-            if (!isDragging) {
-                e.preventDefault();
-                return;
-            }
-            e.dataTransfer.effectAllowed = 'move';
-            e.dataTransfer.setData('schedule-id', this.dataset.scheduleId);
-            e.dataTransfer.setData('is-schedule', 'true');
-            this.classList.add('dragging');
-        });
-
-        schedule.addEventListener('dragend', function(e) {
-            this.classList.remove('dragging');
-            isDragging = false;
-        });
-
-        schedule.addEventListener('click', function(e) {
-            if (!isDragging) {
-                e.stopPropagation();
-            }
-        });
-    });
-    
-    // Drop-Zonen (Kalendertage)
-    const calendarDays = document.querySelectorAll('.calendar-day');
-    calendarDays.forEach(day => {
-        day.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-            this.classList.add('drag-over');
-            
-            // Zeige Drop-Preview
-            showDropPreview(e, this);
-        });
-        
-        day.addEventListener('dragleave', function(e) {
-            if (e.target === this) {
-                this.classList.remove('drag-over');
-                removeDropPreview();
-            }
-        });
-        
-        day.addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.classList.remove('drag-over');
-            removeDropPreview();
-            
-            const isSchedule = e.dataTransfer.getData('is-schedule') === 'true';
-            const machineId = this.dataset.machineId;
-            const date = this.dataset.date;
-            
-            // Berechne Zeit basierend auf Mausposition
-            const rect = this.getBoundingClientRect();
-            const y = e.clientY - rect.top;
-            const hourOffset = Math.floor(y / 60);
-            const minuteOffset = Math.floor((y % 60) / 60 * 60);
-            const hour = workStart + hourOffset;
-            const minute = minuteOffset;
-            
-            const startTime = `${date} ${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-            
-            if (isSchedule) {
-                // Verschiebe existierende Planung
-                const scheduleId = e.dataTransfer.getData('schedule-id');
-                moveSchedule(scheduleId, machineId, startTime);
-            } else {
-                // Plane neuen Auftrag
-                const orderId = e.dataTransfer.getData('order-id');
-                const duration = parseFloat(e.dataTransfer.getData('duration'));
-                scheduleOrder(orderId, machineId, startTime, duration);
-            }
-        });
-    });
-    
-    function showDropPreview(e, dayElement) {
-        removeDropPreview();
-        
-        const rect = dayElement.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-        const duration = parseFloat(e.dataTransfer.getData('duration') || 2);
-        
-        const preview = document.createElement('div');
-        preview.className = 'drop-preview';
-        preview.style.top = y + 'px';
-        preview.style.height = (duration * 60) + 'px';
-        preview.id = 'drop-preview';
-        
-        dayElement.querySelector('.schedules-container').appendChild(preview);
-    }
-    
-    function removeDropPreview() {
-        const preview = document.getElementById('drop-preview');
-        if (preview) {
-            preview.remove();
-        }
-    }
-    
-    function moveSchedule(scheduleId, machineId, startTime) {
-        fetch('/production/api/schedule/move', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        schedulerLicenseKey: 'CC-Attribution-NonCommercial-NoDerivatives',
+        locale: 'de',
+        timeZone: 'local',
+        initialView: 'resourceTimeGridWeek',
+        headerToolbar: {
+            left: 'prev,today,next',
+            center: 'title',
+            right: 'resourceTimeGridDay,resourceTimeGridWeek,dayGridMonth'
+        },
+        buttonText: {
+            today: 'Heute',
+            day: 'Tag',
+            week: 'Woche',
+            month: 'Monat'
+        },
+        views: {
+            resourceTimeGridDay: {
+                titleFormat: {year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'}
             },
-            body: JSON.stringify({
-                schedule_id: scheduleId,
-                machine_id: machineId,
-                new_start: startTime
-            })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+            resourceTimeGridWeek: {
+                titleFormat: {year: 'numeric', month: 'long', day: 'numeric'}
             }
-        });
-    }
-    
-    function scheduleOrder(orderId, machineId, startTime, duration) {
-        fetch('/production/api/order/schedule', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                order_id: orderId,
-                machine_id: machineId,
-                start_time: startTime,
-                duration_hours: duration
+        },
+        resources: resources,
+        resourceLabelContent: function(arg) {
+            const type = arg.resource.extendedProps.type;
+            const icon = type === 'embroidery' ? 'bi-scissors' : type === 'dtf' ? 'bi-printer' : 'bi-gear';
+            return {
+                html: `<i class="bi ${icon} me-1"></i>${arg.resource.title}`
+            };
+        },
+        events: {
+            url: '{{ url_for("production.api_events") }}',
+            failure: function() {
+                console.error('Fehler beim Laden der Events');
+            }
+        },
+        editable: true,
+        droppable: true,
+        eventDurationEditable: true,
+        eventResourceEditable: true,
+        slotMinTime: workStart,
+        slotMaxTime: workEnd,
+        slotDuration: '00:30:00',
+        allDaySlot: false,
+        weekends: false,
+        nowIndicator: true,
+        height: 'auto',
+        expandRows: true,
+        stickyHeaderDates: true,
+        firstDay: 1,
+
+        // External drag (wartende Auftraege)
+        drop: function(info) {
+            // Wird gefeuert wenn ein externes Element gedroppt wird
+        },
+
+        eventReceive: function(info) {
+            // Externes Element wurde auf den Kalender gezogen
+            const el = info.draggedEl;
+            const orderId = el.dataset.orderId;
+            const machineId = info.event.getResources()[0]?.id;
+            const startTime = formatDateTime(info.event.start);
+            const durationHours = parseFloat(el.dataset.duration) || 2;
+
+            fetch('{{ url_for("production.api_schedule_order") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    order_id: orderId,
+                    machine_id: machineId,
+                    start_time: startTime,
+                    duration_hours: durationHours
+                })
             })
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Entferne Auftrag aus Warteschlange
-                const orderCard = document.querySelector(`.draggable-order[data-order-id="${orderId}"]`);
-                if (orderCard) {
-                    orderCard.style.transition = 'opacity 0.3s, transform 0.3s';
-                    orderCard.style.opacity = '0';
-                    orderCard.style.transform = 'translateX(-20px)';
-                    setTimeout(() => {
-                        orderCard.remove();
-                        // Reload nur wenn keine Aufträge mehr da sind oder nach 1 Sekunde
-                        setTimeout(() => location.reload(), 500);
-                    }, 300);
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    // Event-ID setzen damit es bearbeitbar wird
+                    info.event.setProp('id', String(data.schedule_id));
+                    info.event.setProp('title', `${orderId} — ${data.order.customer_name}`);
+                    // Auftrag aus Sidebar entfernen
+                    el.style.display = 'none';
                 } else {
-                    location.reload();
+                    alert('Fehler: ' + (data.error || 'Unbekannt'));
+                    info.event.remove();
                 }
-            } else {
-                alert('Fehler: ' + (data.error || 'Unbekannter Fehler'));
+            })
+            .catch(() => {
+                alert('Netzwerkfehler');
+                info.event.remove();
+            });
+        },
+
+        // Drag & Drop bestehender Events
+        eventDrop: function(info) {
+            const machineId = info.event.getResources()[0]?.id || info.oldResource?.id;
+            const newStart = formatDateTime(info.event.start);
+
+            fetch('{{ url_for("production.api_move_schedule") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    schedule_id: parseInt(info.event.id),
+                    machine_id: machineId,
+                    new_start: newStart
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    alert('Fehler: ' + (data.error || 'Slot belegt'));
+                    info.revert();
+                }
+            })
+            .catch(() => { info.revert(); });
+        },
+
+        // Resize
+        eventResize: function(info) {
+            const machineId = info.event.getResources()[0]?.id;
+            const newStart = formatDateTime(info.event.start);
+            const newEnd = formatDateTime(info.event.end);
+
+            fetch('{{ url_for("production.api_move_schedule") }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    schedule_id: parseInt(info.event.id),
+                    machine_id: machineId,
+                    new_start: newStart,
+                    new_end: newEnd
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    info.revert();
+                }
+            })
+            .catch(() => { info.revert(); });
+        },
+
+        // Click => Details
+        eventClick: function(info) {
+            info.jsEvent.preventDefault();
+            const props = info.event.extendedProps;
+            const orderId = props.orderId;
+            const scheduleId = info.event.id;
+            const startStr = info.event.start ? info.event.start.toLocaleString('de-DE') : '';
+            const endStr = info.event.end ? info.event.end.toLocaleString('de-DE') : '';
+
+            const statusLabels = {
+                'scheduled': '<span class="badge bg-primary">Geplant</span>',
+                'in_progress': '<span class="badge bg-warning text-dark">In Produktion</span>',
+                'completed': '<span class="badge bg-success">Fertig</span>'
+            };
+
+            document.getElementById('eventDetailTitle').textContent = 'Auftrag ' + orderId;
+            document.getElementById('eventDetailBody').innerHTML = `
+                <table class="table table-sm mb-0">
+                    <tr><th style="width:120px">Kunde</th><td>${props.customer}</td></tr>
+                    <tr><th>Typ</th><td>${props.orderType === 'embroidery' ? 'Stickerei' : props.orderType === 'dtf' ? 'DTF/Druck' : (props.orderType || 'Standard')}</td></tr>
+                    <tr><th>Status</th><td>${statusLabels[props.status] || props.status}</td></tr>
+                    <tr><th>Von</th><td>${startStr}</td></tr>
+                    <tr><th>Bis</th><td>${endStr}</td></tr>
+                    ${props.rush ? '<tr><th></th><td><span class="badge bg-danger">Eilauftrag</span></td></tr>' : ''}
+                    ${props.description ? `<tr><th>Beschreibung</th><td>${props.description}</td></tr>` : ''}
+                </table>
+            `;
+            document.getElementById('eventDetailFooter').innerHTML = `
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schliessen</button>
+                <a href="/orders/${orderId}" class="btn btn-info"><i class="bi bi-eye"></i> Auftrag oeffnen</a>
+                <form method="POST" action="/production/schedule/${scheduleId}/cancel" class="d-inline"
+                      onsubmit="return confirm('Planung wirklich stornieren?')">
+                    <button type="submit" class="btn btn-outline-danger"><i class="bi bi-x-lg"></i> Stornieren</button>
+                </form>
+            `;
+            new bootstrap.Modal(document.getElementById('eventDetailModal')).show();
+        },
+
+        // Leeren Slot klicken => Modal vorausfuellen
+        dateClick: function(info) {
+            if (info.resource) {
+                document.getElementById('modal-machine').value = info.resource.id;
+            }
+            document.getElementById('modal-date').value = info.dateStr.substring(0, 10);
+            const timeStr = info.date.toTimeString().substring(0, 5);
+            document.getElementById('modal-time').value = timeStr;
+            new bootstrap.Modal(document.getElementById('scheduleModal')).show();
+        }
+    });
+
+    calendar.render();
+
+    // Externe Auftraege draggable machen
+    const draggableEls = document.querySelectorAll('.draggable-order');
+    draggableEls.forEach(function(el) {
+        new FullCalendar.Draggable(el, {
+            eventData: function(eventEl) {
+                const durationHours = parseFloat(eventEl.dataset.duration) || 2;
+                const hours = Math.floor(durationHours);
+                const minutes = Math.round((durationHours - hours) * 60);
+                return {
+                    title: eventEl.dataset.orderId + ' — ' + eventEl.dataset.customer,
+                    duration: {hours: hours, minutes: minutes},
+                    color: eventEl.dataset.type === 'embroidery' ? '#0d6efd' : '#198754'
+                };
             }
         });
-    }
+    });
 
-    // Zeige Details einer geplanten Produktion
-    window.showScheduleDetails = function(scheduleId) {
-        event.stopPropagation(); // Verhindere Drag-Start
+    // Modal: Datum auf heute setzen
+    document.getElementById('modal-date').value = new Date().toISOString().split('T')[0];
 
-        const modal = new bootstrap.Modal(document.getElementById('scheduleDetailModal'));
-        const contentDiv = document.getElementById('scheduleDetailContent');
-        const actionsDiv = document.getElementById('scheduleDetailActions');
-
-        // Zeige Spinner
-        contentDiv.innerHTML = `
-            <div class="text-center">
-                <div class="spinner-border" role="status">
-                    <span class="visually-hidden">Laden...</span>
-                </div>
-            </div>
-        `;
-        actionsDiv.innerHTML = '';
-
-        // Lade Details vom Server (Fallback: verwende data-Attribute)
-        const scheduleElement = document.querySelector(`[data-schedule-id="${scheduleId}"]`);
-        if (scheduleElement) {
-            const orderId = scheduleElement.dataset.orderId;
-            const orderType = scheduleElement.dataset.orderType;
-            const customer = scheduleElement.dataset.customer;
-            const scheduleContent = scheduleElement.querySelector('.schedule-content').innerHTML;
-
-            contentDiv.innerHTML = `
-                <div class="mb-3">
-                    <h6>Auftrag: <strong>${orderId}</strong></h6>
-                    <p class="mb-1"><strong>Kunde:</strong> ${customer}</p>
-                    <p class="mb-1">
-                        <strong>Typ:</strong>
-                        ${orderType === 'embroidery' ? '🧵 Stickerei' : orderType === 'dtf' ? '🖨️ DTF' : orderType}
-                    </p>
-                    <p class="mb-1"><strong>Geplant:</strong><br>${scheduleContent}</p>
-                </div>
-                <div class="alert alert-info mb-0">
-                    <small>💡 Klicken Sie auf "Details anzeigen" für vollständige Auftragsinformationen</small>
-                </div>
-            `;
-
-            actionsDiv.innerHTML = `
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
-                <a href="/orders/${orderId}" class="btn btn-info" target="_blank">
-                    <i class="fas fa-eye"></i> Details anzeigen
-                </a>
-                <form method="POST" action="/production/order/${orderId}/start" style="display: inline;">
-                    <input type="hidden" name="machine_id" value="${scheduleElement.closest('.calendar-day').dataset.machineId}">
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-play"></i> Produktion starten
-                    </button>
-                </form>
-                <form method="POST" action="/production/schedule/${scheduleId}/cancel" style="display: inline;" onsubmit="return confirm('Planung wirklich stornieren?');">
-                    <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-times"></i> Stornieren
-                    </button>
-                </form>
-            `;
-        }
-
-        modal.show();
-    };
-
-    // Funktionen für manuelle Planung
-    window.loadOrderDetails = function() {
-        const orderSelect = document.getElementById('order_id');
-        const selectedOption = orderSelect.options[orderSelect.selectedIndex];
-
-        if (!selectedOption.value) {
-            document.getElementById('timeCalculation').innerHTML = '<p class="text-muted mb-1">Bitte wählen Sie einen Auftrag und eine Maschine aus.</p>';
-            return;
-        }
-
-        calculateProductionTime();
-    };
-
-    window.updateMachineDetails = function() {
-        calculateProductionTime();
-    };
-
-    function calculateProductionTime() {
-        const orderSelect = document.getElementById('order_id');
-        const machineSelect = document.getElementById('machine_id');
-        const selectedOrder = orderSelect.options[orderSelect.selectedIndex];
-        const selectedMachine = machineSelect.options[machineSelect.selectedIndex];
-
-        if (!selectedOrder.value || !selectedMachine.value) {
-            return;
-        }
-
-        // Hole Auftragsdaten
-        const stitchCount = parseInt(selectedOrder.dataset.stitchCount) || 0;
-        const quantity = parseInt(selectedOrder.dataset.quantity) || 1;
-        const orderType = selectedOrder.dataset.type;
-
-        // Hole Maschinendaten
-        const machineSpeed = parseInt(selectedMachine.dataset.speed) || 1000; // Stiche pro Minute
-        const setupTime = parseInt(selectedMachine.dataset.setupTime) || 15; // Minuten
-        const threadChangeTime = parseInt(selectedMachine.dataset.threadChangeTime) || 5; // Minuten
-        const machineType = selectedMachine.dataset.type;
-
-        let totalMinutes = 0;
-        let calculationDetails = '';
-
-        if (orderType === 'embroidery' && machineType === 'embroidery') {
-            // Stickereizeit berechnen
-            if (stitchCount > 0) {
-                // Reine Stickzeit pro Stück
-                const stitchTimePerPiece = stitchCount / machineSpeed; // Minuten
-
-                // Gesamtzeit für alle Stücke
-                const totalStitchTime = stitchTimePerPiece * quantity;
-
-                // Setup-Zeit (einmalig)
-                const totalSetupTime = setupTime;
-
-                // Fadenwechselzeit (geschätzt: 3 pro Design)
-                const estimatedThreadChanges = 3;
-                const totalThreadChangeTime = threadChangeTime * estimatedThreadChanges * quantity;
-
-                // Rahmenwechselzeit (geschätzt: 2 Min pro Stück)
-                const hoopChangeTime = 2 * quantity;
-
-                // Gesamt + 20% Puffer
-                totalMinutes = Math.ceil((totalStitchTime + totalSetupTime + totalThreadChangeTime + hoopChangeTime) * 1.2);
-
-                calculationDetails = `
-                    <div class="row small">
-                        <div class="col-md-6">
-                            <strong>Stichanzahl:</strong> ${stitchCount.toLocaleString()} Stiche<br>
-                            <strong>Anzahl:</strong> ${quantity} Stück<br>
-                            <strong>Maschinen-Geschw.:</strong> ${machineSpeed.toLocaleString()} St/Min
-                        </div>
-                        <div class="col-md-6">
-                            <strong>Stickzeit:</strong> ${Math.ceil(totalStitchTime)} Min<br>
-                            <strong>Setup:</strong> ${totalSetupTime} Min<br>
-                            <strong>Fadenwechsel:</strong> ~${totalThreadChangeTime} Min<br>
-                            <strong>Rahmenwechsel:</strong> ~${hoopChangeTime} Min
-                        </div>
-                    </div>
-                    <hr class="my-2">
-                    <div class="alert alert-success mb-0 py-2">
-                        <strong>Geschätzte Gesamtzeit:</strong> ${totalMinutes} Minuten (${(totalMinutes / 60).toFixed(1)} Stunden)
-                        <small class="d-block text-muted">Inkl. 20% Zeitpuffer</small>
-                    </div>
-                `;
-            } else {
-                // Fallback wenn keine Stichanzahl vorhanden
-                totalMinutes = Math.ceil((120 * quantity) * 1.2); // 2h pro Stück + Puffer
-                calculationDetails = `
-                    <div class="alert alert-warning mb-0">
-                        <strong>⚠️ Keine Stichanzahl vorhanden</strong><br>
-                        Standardwert: 2 Stunden pro Stück + 20% Puffer = ${totalMinutes} Minuten
-                    </div>
-                `;
-            }
-        } else if (orderType === 'dtf' || machineType === 'dtf') {
-            // DTF-Zeit berechnen (Platzhalter)
-            totalMinutes = Math.ceil((30 * quantity) * 1.2); // 30 Min pro Stück + Puffer
-            calculationDetails = `
-                <div class="alert alert-info mb-0">
-                    <strong>DTF-Druck</strong><br>
-                    Anzahl: ${quantity} Stück<br>
-                    Geschätzte Zeit: ${totalMinutes} Minuten (${(totalMinutes / 60).toFixed(1)} Stunden)
-                </div>
-            `;
-        } else {
-            // Generische Berechnung
-            totalMinutes = 60;
-            calculationDetails = `
-                <div class="alert alert-secondary mb-0">
-                    <strong>Standard-Schätzung</strong><br>
-                    Bitte passen Sie die Dauer manuell an.
-                </div>
-            `;
-        }
-
-        // Aktualisiere UI
-        document.getElementById('timeCalculation').innerHTML = calculationDetails;
-        document.getElementById('duration_minutes').value = totalMinutes;
-    }
-
-    // Setze heutiges Datum als Standard
-    const today = new Date().toISOString().split('T')[0];
-    const dateInput = document.getElementById('scheduled_date');
-    if (dateInput) {
-        dateInput.value = today;
-        dateInput.min = today; // Verhindere Vergangenheit
+    function formatDateTime(dt) {
+        if (!dt) return '';
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, '0');
+        const d = String(dt.getDate()).padStart(2, '0');
+        const h = String(dt.getHours()).padStart(2, '0');
+        const min = String(dt.getMinutes()).padStart(2, '0');
+        return `${y}-${m}-${d} ${h}:${min}`;
     }
 });
 </script>

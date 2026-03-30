@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Designs importieren - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 700px;">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('designs.index') }}">Design-Archiv</a></li>
+            <li class="breadcrumb-item active">Import</li>
+        </ol>
+    </nav>
+
+    <h1 class="h3 mb-4"><i class="bi bi-folder-plus me-2"></i>Designs aus Ordner importieren</h1>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Ordner-Pfad auf dem Server</label>
+                    <input type="text" name="folder_path" class="form-control" required
+                           placeholder="/pfad/zum/design-ordner">
+                    <div class="form-text">
+                        Alle Designs im Ordner und Unterordnern werden importiert.
+                        Unterordner-Namen werden als Kategorie uebernommen.
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Standard Design-Typ</label>
+                    <select name="design_type" class="form-select">
+                        <option value="embroidery">Stickerei</option>
+                        <option value="print">Druck</option>
+                        <option value="dtf">DTF</option>
+                    </select>
+                    <div class="form-text">Stickdateien (DST, PES, etc.) werden automatisch als Stickerei erkannt.</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Kunde (optional)</label>
+                    <select name="customer_id" class="form-select">
+                        <option value="">-- Kein Kunde --</option>
+                        {% for customer in customers %}
+                        <option value="{{ customer.id }}">{{ customer.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="alert alert-info small mb-3">
+                    <i class="bi bi-info-circle me-1"></i>
+                    <strong>Unterstuetzte Formate:</strong><br>
+                    Stickerei: DST, EMB, PES, JEF, EXP, VP3, HUS, XXX, SEW<br>
+                    Grafik: PNG, JPG, TIFF, BMP, SVG, PDF, AI, EPS<br><br>
+                    Duplikate werden automatisch erkannt (SHA-256 Hash) und uebersprungen.
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-folder-plus me-1"></i> Import starten
+                    </button>
+                    <a href="{{ url_for('designs.index') }}" class="btn btn-secondary">Abbrechen</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

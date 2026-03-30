@@ -36,26 +36,82 @@ crm_bp = Blueprint('crm', __name__, url_prefix='/crm')
 @login_required
 def dashboard():
     """
-    CRM Dashboard mit Kunden-Rankings
-    
-    Zeigt:
-    - VIP-Kunden (gewichteter Score)
-    - Top-Umsatz (gesamt & Jahr)
-    - Zahlungsmoral (beste & schlechteste)
-    - Kontakt-Alerts (kein Kontakt, fällige Wiedervorlagen)
-    - Neue Kunden
+    Kontaktmanager – Zentrale fuer alle Kommunikation
+
+    Kunden + Lieferanten, Timeline, Wiedervorlagen, Schnellaktionen
     """
     from src.utils.customer_analytics import CustomerAnalytics
-    
-    # Summary für Header-Karten
+    from src.models.models import Supplier
+    from datetime import timedelta
+    from sqlalchemy import or_
+
+    today = date.today()
+
+    # Summary
     summary = CustomerAnalytics.get_dashboard_summary()
-    
-    # Alle Rankings laden
+
+    # Rankings (fuer VIP-Tab)
     rankings = CustomerAnalytics.get_all_rankings(limit=20)
-    
+
+    # Letzte Kontakte / Aktivitaeten (Timeline)
+    letzte_kontakte = CustomerContact.query.order_by(
+        CustomerContact.contact_date.desc()
+    ).limit(30).all()
+
+    # Wiedervorlagen
+    wiedervorlagen = CustomerContact.query.filter(
+        CustomerContact.follow_up_date <= datetime.now(),
+        CustomerContact.status != ContactStatus.ERLEDIGT
+    ).order_by(CustomerContact.follow_up_date).all()
+
+    # Rueckrufe
+    rueckrufe = CustomerContact.query.filter(
+        CustomerContact.callback_required == True,
+        CustomerContact.status != ContactStatus.ERLEDIGT
+    ).order_by(CustomerContact.callback_date).all()
+
+    # Kalender-Aktivitaeten (Telefonate, Besuche)
+    try:
+        from src.models import ProductionBlock
+        crm_types = ProductionBlock.TYPE_CATEGORIES.get('crm', [])
+        kalender_aktivitaeten = ProductionBlock.query.filter(
+            ProductionBlock.is_active == True,
+            ProductionBlock.block_type.in_(crm_types),
+            ProductionBlock.start_date >= today - timedelta(days=7)
+        ).order_by(
+            ProductionBlock.start_date.desc(),
+            ProductionBlock.start_time.desc()
+        ).limit(20).all()
+
+        follow_ups_kalender = ProductionBlock.query.filter(
+            ProductionBlock.is_active == True,
+            ProductionBlock.follow_up_date <= today,
+            ProductionBlock.follow_up_date.isnot(None)
+        ).count()
+    except Exception:
+        kalender_aktivitaeten = []
+        follow_ups_kalender = 0
+
+    # Lieferanten (fuer Kontaktmanager)
+    lieferanten_count = Supplier.query.filter_by(active=True).count()
+
+    # Kunden ohne Kontakt > 30 Tage
+    kein_kontakt_count = 0
+    try:
+        kein_kontakt_count = rankings.get('no_contact', {}).get('count', 0) if isinstance(rankings.get('no_contact'), dict) else len(rankings.get('no_contact', []))
+    except Exception:
+        pass
+
     return render_template('crm/dashboard.html',
                          summary=summary,
-                         rankings=rankings)
+                         rankings=rankings,
+                         letzte_kontakte=letzte_kontakte,
+                         wiedervorlagen=wiedervorlagen,
+                         rueckrufe=rueckrufe,
+                         kalender_aktivitaeten=kalender_aktivitaeten,
+                         follow_ups_kalender=follow_ups_kalender,
+                         lieferanten_count=lieferanten_count,
+                         kein_kontakt_count=kein_kontakt_count)
 
 
 @crm_bp.route('/api/customer/<customer_id>/stats')
@@ -80,6 +136,105 @@ def api_customer_stats(customer_id):
         stats['engagement']['last_contact'] = stats['engagement']['last_contact'].strftime('%d.%m.%Y')
     
     return jsonify(stats)
+
+
+# ==========================================
+# SCHNELLERFASSUNG (Anruf, E-Mail, Notiz - ohne Produktionskalender)
+# ==========================================
+
+@crm_bp.route('/schnellkontakt', methods=['GET', 'POST'])
+@login_required
+def schnellkontakt():
+    """
+    Schnellerfassung fuer Anruf, E-Mail, Notiz, Termin.
+    Kunden-Suche direkt im Formular, kein Umweg ueber Produktionskalender.
+    """
+    from src.models.models import Supplier
+
+    # Typ aus URL: anruf, email, notiz, termin
+    typ = request.args.get('typ', 'anruf')
+    typ_mapping = {
+        'anruf_ein': ContactType.TELEFON_EINGANG,
+        'anruf_aus': ContactType.TELEFON_AUSGANG,
+        'anruf': ContactType.TELEFON_AUSGANG,
+        'email_ein': ContactType.EMAIL_EINGANG,
+        'email_aus': ContactType.EMAIL_AUSGANG,
+        'email': ContactType.EMAIL_AUSGANG,
+        'notiz': ContactType.NOTIZ,
+        'termin': ContactType.TERMIN,
+        'besuch': ContactType.BESUCH,
+    }
+    contact_type = typ_mapping.get(typ, ContactType.TELEFON_AUSGANG)
+
+    if request.method == 'POST':
+        try:
+            customer_id = request.form.get('customer_id')
+            if not customer_id:
+                flash('Bitte einen Kontakt auswählen.', 'warning')
+                return redirect(url_for('crm.schnellkontakt', typ=typ))
+
+            form_typ = request.form.get('contact_type', typ)
+            ct = typ_mapping.get(form_typ, contact_type)
+            contact = CustomerContact(
+                customer_id=customer_id,
+                contact_type=ct,
+                subject=request.form.get('subject', ''),
+                body_text=request.form.get('body_text', ''),
+                contact_date=datetime.now(),
+                created_by=current_user.username,
+                status=ContactStatus(request.form.get('status', 'erledigt'))
+            )
+
+            # Telefon-spezifisch
+            if ct in [ContactType.TELEFON_EINGANG, ContactType.TELEFON_AUSGANG]:
+                contact.phone_number = request.form.get('phone_number', '')
+                contact.callback_required = request.form.get('callback_required') == 'on'
+                if contact.callback_required and request.form.get('callback_date'):
+                    contact.callback_date = datetime.strptime(
+                        request.form.get('callback_date'), '%Y-%m-%dT%H:%M'
+                    )
+
+            # E-Mail-spezifisch
+            if ct in [ContactType.EMAIL_EINGANG, ContactType.EMAIL_AUSGANG]:
+                contact.email_to = request.form.get('email_to', '')
+
+            # Wiedervorlage
+            if request.form.get('follow_up_date'):
+                contact.follow_up_date = datetime.strptime(
+                    request.form.get('follow_up_date'), '%Y-%m-%dT%H:%M'
+                )
+                contact.follow_up_note = request.form.get('follow_up_note', '')
+
+            # Auftragsbezug
+            order_id = request.form.get('order_id')
+            if order_id:
+                contact.order_id = order_id
+
+            db.session.add(contact)
+            db.session.commit()
+
+            typ_labels = {
+                ContactType.TELEFON_EINGANG: 'Eingehender Anruf',
+                ContactType.TELEFON_AUSGANG: 'Ausgehender Anruf',
+                ContactType.EMAIL_EINGANG: 'E-Mail (Eingang)',
+                ContactType.EMAIL_AUSGANG: 'E-Mail (Ausgang)',
+                ContactType.NOTIZ: 'Notiz',
+                ContactType.TERMIN: 'Termin',
+                ContactType.BESUCH: 'Besuch',
+            }
+            flash(f'{typ_labels.get(ct, "Kontakt")} erfolgreich gespeichert!', 'success')
+            return redirect(url_for('crm.dashboard'))
+
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Fehler bei Schnellkontakt: {e}")
+            flash(f'Fehler: {str(e)}', 'danger')
+
+    return render_template('crm/schnellkontakt.html',
+        typ=typ,
+        contact_type=contact_type,
+        now=datetime.now()
+    )
 
 
 # ==========================================
@@ -164,7 +319,7 @@ def new_contact(customer_id):
             logger.error(f"Fehler beim Erstellen des Kontakts: {e}")
             flash(f'Fehler: {str(e)}', 'error')
 
-    # Auftraege des Kunden laden
+    # Aufträge des Kunden laden
     orders = Order.query.filter_by(customer_id=customer_id).order_by(Order.created_at.desc()).limit(20).all()
 
     return render_template('crm/new_contact.html',
@@ -236,9 +391,9 @@ def send_email(customer_id):
                 db.session.commit()
 
             if success:
-                flash('E-Mail wurde in Outlook geoeffnet!', 'success')
+                flash('E-Mail wurde in Outlook geöffnet!', 'success')
             else:
-                flash('E-Mail konnte nicht geoeffnet werden.', 'warning')
+                flash('E-Mail konnte nicht geöffnet werden.', 'warning')
 
             return redirect(url_for('crm.customer_contacts', customer_id=customer_id))
 
@@ -255,7 +410,7 @@ def send_email(customer_id):
     if template_id:
         selected_template = EmailTemplate.query.get(template_id)
 
-    # Auftraege des Kunden
+    # Aufträge des Kunden
     orders = Order.query.filter_by(customer_id=customer_id).order_by(Order.created_at.desc()).limit(10).all()
 
     return render_template('crm/send_email.html',
@@ -337,7 +492,7 @@ def phone_note(customer_id):
             logger.error(f"Fehler beim Speichern der Telefon-Notiz: {e}")
             flash(f'Fehler: {str(e)}', 'error')
 
-    # Auftraege des Kunden
+    # Aufträge des Kunden
     orders = Order.query.filter_by(customer_id=customer_id).order_by(Order.created_at.desc()).limit(10).all()
 
     return render_template('crm/phone_note.html',
@@ -354,7 +509,7 @@ def phone_note(customer_id):
 @crm_bp.route('/auftrag/<int:order_id>/email/<category>')
 @login_required
 def order_email(order_id, category):
-    """E-Mail zu einem Auftrag senden (Bestaetigung, Freigabe, Versand, etc.)"""
+    """E-Mail zu einem Auftrag senden (Bestätigung, Freigabe, Versand, etc.)"""
     order = Order.query.get_or_404(order_id)
     customer = order.customer
 
@@ -368,23 +523,32 @@ def order_email(order_id, category):
         flash('Unbekannte E-Mail-Kategorie!', 'error')
         return redirect(url_for('orders.show', order_id=order_id))
 
-    # Standard-Vorlage fuer diese Kategorie
+    # Standard-Vorlage für diese Kategorie
     template = EmailTemplate.get_default_for_category(cat)
     if not template:
-        flash(f'Keine Vorlage fuer Kategorie "{category}" gefunden!', 'warning')
+        flash(f'Keine Vorlage für Kategorie "{category}" gefunden!', 'warning')
         return redirect(url_for('crm.send_email', customer_id=customer.id))
+
+    # Status-Link für Kunden-Tracking
+    status_link = ''
+    if hasattr(order, 'tracking_token') and order.tracking_token:
+        try:
+            status_link = url_for('shop.status', token=order.tracking_token, _external=True)
+        except Exception:
+            pass
 
     # Kontext aufbauen
     context = {
-        'anrede': 'Frau' if customer.gender == 'female' else 'Herr' if customer.gender == 'male' else '',
+        'anrede': 'Frau' if getattr(customer, 'gender', None) == 'female' else 'Herr' if getattr(customer, 'gender', None) == 'male' else '',
         'kunde_name': customer.display_name,
         'firma': customer.company_name or '',
         'auftragsnummer': order.order_number,
         'auftragsdatum': order.created_at.strftime('%d.%m.%Y') if order.created_at else '',
         'gesamtbetrag': f'{order.total_price:.2f} EUR' if order.total_price else '',
+        'status_link': status_link,
     }
 
-    # Zusaetzliche Kontext-Variablen je nach Kategorie
+    # Zusätzliche Kontext-Variablen je nach Kategorie
     if cat == EmailTemplateCategory.VERSAND_INFO:
         context['versanddienstleister'] = order.shipping_carrier or 'DHL'
         context['sendungsnummer'] = order.tracking_number or ''
@@ -517,15 +681,15 @@ def edit_email_template(template_id):
 @crm_bp.route('/vorlagen/<int:template_id>/loeschen', methods=['POST'])
 @login_required
 def delete_email_template(template_id):
-    """E-Mail-Vorlage loeschen"""
+    """E-Mail-Vorlage löschen"""
     try:
         template = EmailTemplate.query.get_or_404(template_id)
         db.session.delete(template)
         db.session.commit()
-        flash('Vorlage geloescht!', 'success')
+        flash('Vorlage gelöscht!', 'success')
     except Exception as e:
         db.session.rollback()
-        logger.error(f"Fehler beim Loeschen der Vorlage: {e}")
+        logger.error(f"Fehler beim Löschen der Vorlage: {e}")
         flash(f'Fehler: {str(e)}', 'error')
 
     return redirect(url_for('crm.email_templates'))
@@ -552,7 +716,7 @@ def init_default_templates():
 @crm_bp.route('/wiedervorlagen')
 @login_required
 def follow_ups():
-    """Zeigt alle faelligen Wiedervorlagen"""
+    """Zeigt alle fälligen Wiedervorlagen"""
     today = datetime.now()
 
     follow_ups = CustomerContact.query.filter(
@@ -568,7 +732,8 @@ def follow_ups():
 
     return render_template('crm/follow_ups.html',
         follow_ups=follow_ups,
-        callbacks=callbacks
+        callbacks=callbacks,
+        now=today
     )
 
 
@@ -712,14 +877,14 @@ def activities_search():
         try:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
             query = query.filter(ProductionBlock.start_date >= start_date)
-        except:
+        except (ValueError, TypeError):
             pass
-    
+
     if end_date_str:
         try:
             end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
             query = query.filter(ProductionBlock.start_date <= end_date)
-        except:
+        except (ValueError, TypeError):
             pass
     
     # Sortieren und Limit
@@ -753,7 +918,7 @@ def activities_search():
     }
     
     # Kunden für Filter-Dropdown
-    customers = Customer.query.filter_by(is_active=True).order_by(Customer.display_name).all()
+    customers = Customer.query.filter_by(is_active=True).order_by(Customer.last_name, Customer.first_name).all()
     
     return render_template('crm/activities_search.html',
                          activities=activities,
@@ -781,7 +946,7 @@ def customer_activities(customer_id):
             ProductionBlock.start_date.desc(),
             ProductionBlock.start_time.desc()
         ).limit(100).all()
-    except:
+    except Exception:
         activities = []
     
     return render_template('crm/customer_activities.html',

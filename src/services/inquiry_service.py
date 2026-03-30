@@ -12,6 +12,7 @@ from datetime import datetime, date
 from werkzeug.utils import secure_filename
 from flask import current_app
 
+from flask import url_for
 from src.models.models import db, Customer
 from src.models.inquiry import Inquiry, InquiryStatus, INQUIRY_TYPE_LABELS
 from src.models.crm_contact import CustomerContact, ContactType, ContactStatus
@@ -64,7 +65,10 @@ def create_inquiry(form_data, files=None, remote_ip=None):
 
     # Falls nicht gefunden, neuen Kunden anlegen
     if not customer and email:
-        customer_id = str(uuid.uuid4())
+        # Fortlaufende Kundennummer generieren (KD001, KD002, ...)
+        from src.controllers.customer_controller_db import generate_customer_id
+        customer_id = generate_customer_id()
+
         customer_type = 'business' if form_data.get('company_name') else 'private'
         customer = Customer(
             id=customer_id,
@@ -149,6 +153,9 @@ def create_inquiry(form_data, files=None, remote_ip=None):
     db.session.commit()
     logger.info(f"Website-Anfrage {inquiry_number} erstellt (Token: {tracking_token})")
 
+    # 6. Bestätigungsmail an Kunden senden
+    _send_confirmation_email(inquiry)
+
     return inquiry
 
 
@@ -217,6 +224,86 @@ def _generate_inquiry_number():
             pass
 
     return f"{prefix}0001"
+
+
+def _send_confirmation_email(inquiry):
+    """Sendet automatische Bestätigungsmail mit Ticketnummer und Status-Link"""
+    try:
+        from src.services.email_service_new import EmailService
+        from src.models.company_settings import CompanySettings
+
+        settings = CompanySettings.get_settings()
+        company_name = settings.company_name or 'StitchAdmin'
+
+        status_url = url_for('inquiry.status', token=inquiry.tracking_token, _external=True)
+        type_label = INQUIRY_TYPE_LABELS.get(inquiry.inquiry_type, inquiry.inquiry_type)
+
+        subject = f'Ihre Anfrage {inquiry.inquiry_number} - Eingangsbestätigung'
+
+        body = f"""Guten Tag {inquiry.first_name} {inquiry.last_name},
+
+vielen Dank für Ihre Anfrage! Wir haben diese erfolgreich erhalten und werden uns schnellstmöglich bei Ihnen melden.
+
+Ihre Anfrage im Überblick:
+- Ticketnummer: {inquiry.inquiry_number}
+- Anfrageart: {type_label}
+- Eingegangen am: {inquiry.created_at.strftime('%d.%m.%Y um %H:%M Uhr')}
+
+Status Ihrer Anfrage jederzeit online einsehen:
+{status_url}
+
+Bei Rückfragen geben Sie bitte immer Ihre Ticketnummer {inquiry.inquiry_number} an.
+
+Mit freundlichen Grüßen
+{company_name}"""
+
+        html_body = f"""
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+    <div style="background: #0d6efd; color: white; padding: 20px 30px; border-radius: 8px 8px 0 0;">
+        <h2 style="margin: 0;">Eingangsbestätigung</h2>
+        <p style="margin: 5px 0 0; opacity: 0.9;">Ticketnummer: <strong>{inquiry.inquiry_number}</strong></p>
+    </div>
+    <div style="padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 8px 8px;">
+        <p>Guten Tag <strong>{inquiry.first_name} {inquiry.last_name}</strong>,</p>
+        <p>vielen Dank für Ihre Anfrage! Wir haben diese erfolgreich erhalten und werden uns schnellstmöglich bei Ihnen melden.</p>
+
+        <div style="background: #f8f9fa; border-left: 4px solid #0d6efd; padding: 15px 20px; margin: 20px 0; border-radius: 0 4px 4px 0;">
+            <p style="margin: 0 0 8px;"><strong>Ihre Anfrage im Überblick:</strong></p>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr><td style="padding: 4px 0; color: #666;">Ticketnummer:</td><td style="padding: 4px 0;"><strong>{inquiry.inquiry_number}</strong></td></tr>
+                <tr><td style="padding: 4px 0; color: #666;">Anfrageart:</td><td style="padding: 4px 0;">{type_label}</td></tr>
+                <tr><td style="padding: 4px 0; color: #666;">Eingegangen:</td><td style="padding: 4px 0;">{inquiry.created_at.strftime('%d.%m.%Y um %H:%M Uhr')}</td></tr>
+            </table>
+        </div>
+
+        <div style="text-align: center; margin: 25px 0;">
+            <a href="{status_url}" style="display: inline-block; background: #0d6efd; color: white; text-decoration: none; padding: 12px 30px; border-radius: 6px; font-weight: bold;">
+                Status online einsehen
+            </a>
+        </div>
+
+        <p style="font-size: 13px; color: #666;">Bei Rückfragen geben Sie bitte immer Ihre Ticketnummer <strong>{inquiry.inquiry_number}</strong> an.</p>
+
+        <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+        <p style="margin: 0; color: #666;">Mit freundlichen Grüßen<br><strong>{company_name}</strong></p>
+    </div>
+</div>"""
+
+        email_service = EmailService()
+        result = email_service.send_email(
+            to=inquiry.email,
+            subject=subject,
+            body=body,
+            html_body=html_body
+        )
+
+        if result.get('success'):
+            logger.info(f"Bestätigungsmail für {inquiry.inquiry_number} an {inquiry.email} gesendet")
+        else:
+            logger.warning(f"Bestätigungsmail für {inquiry.inquiry_number} fehlgeschlagen: {result.get('error')}")
+
+    except Exception as e:
+        logger.error(f"Fehler beim Senden der Bestätigungsmail für {inquiry.inquiry_number}: {e}")
 
 
 def _allowed_file(filename):

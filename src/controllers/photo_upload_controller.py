@@ -13,27 +13,13 @@ from src.models import db, Order, PackingList, ActivityLog
 from src.models.document import PostEntry
 from src.services.photo_service import PhotoService, ALLOWED_EXTENSIONS, MAX_FILE_SIZE
 from src.services.ocr_service import OCRService, OCR_AVAILABLE
+from src.utils.activity_logger import log_activity
 import logging
 import os
 
 logger = logging.getLogger(__name__)
 
 photo_upload_bp = Blueprint('photo_upload', __name__, url_prefix='/api/photos')
-
-
-def log_activity(action, details):
-    """Aktivität protokollieren"""
-    try:
-        activity = ActivityLog(
-            username=current_user.username if current_user.is_authenticated else 'System',
-            action=action,
-            details=details,
-            ip_address=request.remote_addr
-        )
-        db.session.add(activity)
-        db.session.commit()
-    except Exception as e:
-        logger.error(f"Fehler beim Protokollieren: {e}")
 
 
 @photo_upload_bp.route('/upload/order/<order_id>', methods=['POST'])

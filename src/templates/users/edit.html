@@ -5,42 +5,81 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-6">
-        <h1>Benutzer bearbeiten: {{ user.username }}</h1>
-        
+        <h1><i class="bi bi-person-gear me-2"></i>Benutzer bearbeiten: {{ user.username }}</h1>
+
         <div class="card">
             <div class="card-body">
-                <form method="POST">
+                <form method="POST" id="editForm">
                     <div class="mb-3">
                         <label for="username" class="form-label">Benutzername</label>
                         <input type="text" class="form-control" id="username" value="{{ user.username }}" disabled>
                     </div>
-                    
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="first_name" class="form-label">Vorname</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name"
+                                       value="{{ user.first_name or '' }}" placeholder="z.B. Hans">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="last_name" class="form-label">Nachname</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name"
+                                       value="{{ user.last_name or '' }}" placeholder="z.B. Hahn">
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="mb-3">
                         <label for="email" class="form-label">E-Mail</label>
                         <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
                     </div>
-                    
+
+                    <hr class="my-3">
+                    <p class="text-muted mb-3"><i class="bi bi-key me-1"></i>Passwort ändern (leer lassen für keine Änderung)</p>
+
                     <div class="mb-3">
-                        <label for="password" class="form-label">Neues Passwort (leer lassen für keine Änderung)</label>
-                        <input type="password" class="form-control" id="password" name="password">
+                        <label for="new_password" class="form-label">Neues Passwort</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="new_password" name="new_password" minlength="6">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePw('new_password')" title="Passwort anzeigen">
+                                <i class="bi bi-eye" id="icon_new_password"></i>
+                            </button>
+                        </div>
                     </div>
-                    
+
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Passwort bestätigen</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="confirm_password" minlength="6">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePw('confirm_password')" title="Passwort anzeigen">
+                                <i class="bi bi-eye" id="icon_confirm_password"></i>
+                            </button>
+                        </div>
+                        <div class="invalid-feedback" id="pw-mismatch">Passwörter stimmen nicht überein!</div>
+                    </div>
+
+                    {% if current_user.is_admin %}
+                    <hr class="my-3">
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="is_admin" name="is_admin" {% if user.is_admin %}checked{% endif %}>
                         <label class="form-check-label" for="is_admin">
-                            Administrator-Rechte
+                            <i class="bi bi-shield-check me-1"></i>Administrator-Rechte
                         </label>
                     </div>
-                    
+
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="is_active" name="is_active" {% if user.is_active %}checked{% endif %}>
                         <label class="form-check-label" for="is_active">
-                            Konto aktiv
+                            <i class="bi bi-toggle-on me-1"></i>Konto aktiv
                         </label>
                     </div>
-                    
+                    {% endif %}
+
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">Änderungen speichern</button>
+                        <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Speichern</button>
                         <a href="{{ url_for('users.index') }}" class="btn btn-secondary">Abbrechen</a>
                     </div>
                 </form>
@@ -48,4 +87,31 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePw(fieldId) {
+    var f = document.getElementById(fieldId);
+    var icon = document.getElementById('icon_' + fieldId);
+    if (f.type === 'password') {
+        f.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        f.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+}
+
+document.getElementById('editForm').addEventListener('submit', function(e) {
+    var pw = document.getElementById('new_password').value;
+    var confirm = document.getElementById('confirm_password').value;
+    if (pw && pw !== confirm) {
+        e.preventDefault();
+        document.getElementById('confirm_password').classList.add('is-invalid');
+        document.getElementById('pw-mismatch').style.display = 'block';
+        return false;
+    }
+});
+</script>
 {% endblock %}

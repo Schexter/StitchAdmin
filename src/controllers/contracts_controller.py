@@ -104,6 +104,13 @@ def new():
                 status=request.form.get('status', 'active'),
                 notes=request.form.get('notes', '').strip() or None,
                 created_by=current_user.username,
+                # Buchhaltung
+                cost_category=request.form.get('cost_category', 'sonstige'),
+                cost_center=request.form.get('cost_center', '').strip() or None,
+                booking_account=request.form.get('booking_account', '').strip() or None,
+                vat_deductible=request.form.get('vat_deductible') == 'on',
+                vat_rate=_parse_float(request.form.get('vat_rate')) or 19.0,
+                auto_booking=request.form.get('auto_booking') == 'on',
             )
 
             machine_id = request.form.get('machine_id')
@@ -112,6 +119,13 @@ def new():
 
             db.session.add(contract)
             db.session.commit()
+
+            # Naechste Faelligkeit berechnen
+            try:
+                contract.calculate_next_due_date()
+                db.session.commit()
+            except Exception:
+                pass
 
             flash(f'Vertrag "{contract.name}" erstellt.', 'success')
             return redirect(url_for('contracts.detail', contract_id=contract.id))
@@ -128,7 +142,8 @@ def new():
                          contract=None,
                          machines=machines,
                          type_labels=Contract.TYPE_LABELS,
-                         interval_labels=Contract.INTERVAL_LABELS)
+                         interval_labels=Contract.INTERVAL_LABELS,
+                         cost_categories=Contract.COST_CATEGORIES)
 
 
 @contracts_bp.route('/<int:contract_id>')
@@ -174,9 +189,22 @@ def edit(contract_id):
             contract.insurance_type = request.form.get('insurance_type', '').strip() or None
             contract.status = request.form.get('status', contract.status)
             contract.notes = request.form.get('notes', '').strip() or None
+            # Buchhaltung
+            contract.cost_category = request.form.get('cost_category', 'sonstige')
+            contract.cost_center = request.form.get('cost_center', '').strip() or None
+            contract.booking_account = request.form.get('booking_account', '').strip() or None
+            contract.vat_deductible = request.form.get('vat_deductible') == 'on'
+            contract.vat_rate = _parse_float(request.form.get('vat_rate')) or 19.0
+            contract.auto_booking = request.form.get('auto_booking') == 'on'
 
             machine_id = request.form.get('machine_id')
             contract.machine_id = int(machine_id) if machine_id else None
+
+            # Naechste Faelligkeit berechnen
+            try:
+                contract.calculate_next_due_date()
+            except Exception:
+                pass
 
             db.session.commit()
             flash(f'Vertrag "{contract.name}" aktualisiert.', 'success')
@@ -193,7 +221,8 @@ def edit(contract_id):
                          contract=contract,
                          machines=machines,
                          type_labels=Contract.TYPE_LABELS,
-                         interval_labels=Contract.INTERVAL_LABELS)
+                         interval_labels=Contract.INTERVAL_LABELS,
+                         cost_categories=Contract.COST_CATEGORIES)
 
 
 @contracts_bp.route('/<int:contract_id>/delete', methods=['POST'])

@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}Produktion starten - {{ order.order_number or order.id }} - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px;">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('production.index') }}" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+        <div>
+            <h4 class="mb-0"><i class="bi bi-play-circle me-2"></i>Produktion starten</h4>
+            <small class="text-muted">Auftrag {{ order.order_number or order.id }}
+                {% if order.customer %} &mdash; {{ order.customer.display_name }}{% endif %}
+            </small>
+        </div>
+    </div>
+
+    <!-- Stepper -->
+    <div class="d-flex justify-content-center mb-4">
+        <div class="d-flex align-items-center gap-0">
+            {% for i, label in [(1, 'Pr\u00fcfen'), (2, 'Maschine'), (3, 'Starten')] %}
+            <div class="text-center" id="si-{{ i }}">
+                <div class="rounded-circle {{ 'bg-primary text-white' if i == 1 else 'bg-light text-muted border' }} d-flex align-items-center justify-content-center mx-auto" style="width:36px;height:36px;font-weight:bold;">{{ i }}</div>
+                <small class="d-block mt-1 {{ 'fw-bold text-primary' if i == 1 else 'text-muted' }}">{{ label }}</small>
+            </div>
+            {% if i < 3 %}<div style="width:80px;height:2px;background:#dee2e6;" class="align-self-start mt-3"></div>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('production.start_production', order_id=order.id) }}">
+        <!-- STEP 1: Auftrag pruefen -->
+        <div id="step-1">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-clipboard-check me-1"></i> Auftragspr&uuml;fung</h6></div>
+                <div class="card-body">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0">
+                                <div class="card-body py-2 px-3">
+                                    <small class="text-muted">Auftrag</small>
+                                    <div class="fw-bold">{{ order.order_number or order.id }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0">
+                                <div class="card-body py-2 px-3">
+                                    <small class="text-muted">Kunde</small>
+                                    <div class="fw-bold">{{ order.customer.display_name if order.customer else 'Unbekannt' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0">
+                                <div class="card-body py-2 px-3">
+                                    <small class="text-muted">Wert</small>
+                                    <div class="fw-bold">{{ "%.2f"|format(order.total_price or 0) }} &euro;</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if order.rush_order %}
+                    <div class="alert alert-danger py-2 mb-3">
+                        <i class="bi bi-lightning-charge me-1"></i> <strong>EILAUFTRAG</strong> &mdash; Bevorzugt produzieren!
+                    </div>
+                    {% endif %}
+
+                    <!-- Positionen -->
+                    <h6><i class="bi bi-list-check me-1"></i> Positionen</h6>
+                    <table class="table table-sm mb-3">
+                        <thead class="table-light"><tr><th>Artikel</th><th>Gr&ouml;&szlig;e</th><th>Farbe</th><th class="text-end">Menge</th></tr></thead>
+                        <tbody>
+                            {% for p in positions %}
+                            <tr><td>{{ p.name }}</td><td>{{ p.size or '&mdash;' }}</td><td>{{ p.color or '&mdash;' }}</td><td class="text-end fw-bold">{{ p.quantity }}</td></tr>
+                            {% endfor %}
+                            {% if not positions %}
+                            <tr><td colspan="4" class="text-muted text-center">Keine Positionen</td></tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+
+                    {% if thread_needs %}
+                    <h6><i class="bi bi-palette me-1"></i> Garnbedarf (gesch&auml;tzt)</h6>
+                    <table class="table table-sm">
+                        <thead class="table-light"><tr><th>Artikel</th><th class="text-end">St&uuml;ck</th><th class="text-end">Stiche/St&uuml;ck</th><th class="text-end">Gesamt</th></tr></thead>
+                        <tbody>
+                            {% for t in thread_needs %}
+                            <tr><td>{{ t.article }}</td><td class="text-end">{{ t.quantity }}</td><td class="text-end">{{ "{:,}".format(t.stitch_count) }}</td><td class="text-end fw-bold">{{ "{:,}".format(t.total_stitches) }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+
+                    <!-- Checkliste -->
+                    <h6 class="mt-3"><i class="bi bi-check2-square me-1"></i> Checkliste</h6>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input check-item" type="checkbox" id="chk1" onchange="updateChecklist()">
+                        <label class="form-check-label" for="chk1">Design/Stickdatei vorhanden &amp; gepr&uuml;ft</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input check-item" type="checkbox" id="chk2" onchange="updateChecklist()">
+                        <label class="form-check-label" for="chk2">Material/Textilien bereitgestellt</label>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input check-item" type="checkbox" id="chk3" onchange="updateChecklist()">
+                        <label class="form-check-label" for="chk3">Garn in richtigen Farben vorhanden</label>
+                    </div>
+                    {% if order.rush_order %}
+                    <div class="form-check mb-2">
+                        <input class="form-check-input check-item" type="checkbox" id="chk4" onchange="updateChecklist()">
+                        <label class="form-check-label text-danger" for="chk4"><strong>Eilauftrag: Termin ist machbar</strong></label>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-primary" onclick="goStep(2)" id="btn-step2">
+                    Weiter: Maschine w&auml;hlen <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP 2: Maschine zuweisen -->
+        <div id="step-2" style="display:none;">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-cpu me-1"></i> Maschine zuweisen</h6></div>
+                <div class="card-body">
+                    {% if machines %}
+                    <div class="row g-2">
+                        {% for m in machines %}
+                        {% set is_busy = m.id in busy_machines %}
+                        <div class="col-md-4">
+                            <input type="radio" class="btn-check" name="machine_id" id="machine_{{ m.id }}" value="{{ m.id }}"
+                                   {% if is_busy %}disabled{% endif %} autocomplete="off">
+                            <label class="btn btn-outline-{{ 'danger' if is_busy else 'success' }} w-100 py-3" for="machine_{{ m.id }}">
+                                <i class="bi bi-cpu d-block fs-4"></i>
+                                <strong>{{ m.name }}</strong>
+                                {% if is_busy %}
+                                <br><small class="text-danger">Belegt</small>
+                                {% else %}
+                                <br><small class="text-success">Frei</small>
+                                {% endif %}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info mb-0">Keine Maschinen konfiguriert. Produktion wird ohne Maschinenzuordnung gestartet.</div>
+                    {% endif %}
+
+                    <div class="mt-3">
+                        <label class="form-label">Gesch&auml;tzte Produktionsdauer</label>
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <div class="input-group">
+                                    <input type="number" class="form-control" name="estimated_hours" min="0" value="0" placeholder="Std">
+                                    <span class="input-group-text">Std</span>
+                                </div>
+                            </div>
+                            <div class="col-4">
+                                <div class="input-group">
+                                    <input type="number" class="form-control" name="estimated_minutes" min="0" max="59" value="0" placeholder="Min">
+                                    <span class="input-group-text">Min</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(1)"><i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck</button>
+                <button type="button" class="btn btn-primary" onclick="goStep(3)">Weiter: Best&auml;tigen <i class="bi bi-arrow-right ms-1"></i></button>
+            </div>
+        </div>
+
+        <!-- STEP 3: Bestaetigen & Starten -->
+        <div id="step-3" style="display:none;">
+            <div class="card mb-3 border-success">
+                <div class="card-header bg-success bg-opacity-10">
+                    <h6 class="mb-0"><i class="bi bi-play-circle me-1 text-success"></i> Produktion starten</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 text-center">
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0 py-2">
+                                <small class="text-muted">Auftrag</small>
+                                <strong>{{ order.order_number or order.id }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0 py-2">
+                                <small class="text-muted">Kunde</small>
+                                <strong>{{ order.customer.display_name if order.customer else '?' }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light border-0 py-2">
+                                <small class="text-muted">Maschine</small>
+                                <strong id="sum-machine">Keine</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center mt-3">
+                        <small class="text-muted">{{ positions|length }} Positionen &middot; {{ positions|sum(attribute='quantity') }} St&uuml;ck gesamt</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(2)"><i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck</button>
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="bi bi-play-fill me-1"></i> Produktion jetzt starten
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+function goStep(n) {
+    for (var i = 1; i <= 3; i++) document.getElementById('step-' + i).style.display = 'none';
+    document.getElementById('step-' + n).style.display = 'block';
+    for (var i = 1; i <= 3; i++) {
+        var si = document.getElementById('si-' + i), c = si.querySelector('div'), s = si.querySelector('small');
+        if (i < n) { c.className = 'rounded-circle bg-success text-white d-flex align-items-center justify-content-center mx-auto'; c.innerHTML = '<i class="bi bi-check-lg"></i>'; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-success'; }
+        else if (i === n) { c.className = 'rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 fw-bold text-primary'; }
+        else { c.className = 'rounded-circle bg-light text-muted d-flex align-items-center justify-content-center mx-auto border'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-muted'; }
+    }
+    if (n === 3) {
+        var sel = document.querySelector('input[name="machine_id"]:checked');
+        document.getElementById('sum-machine').textContent = sel ? sel.closest('label').querySelector('strong').textContent : 'Keine';
+    }
+    window.scrollTo(0, 0);
+}
+
+function updateChecklist() {
+    // Optional: Visuelles Feedback wenn alle Checks erledigt
+    var all = document.querySelectorAll('.check-item');
+    var checked = document.querySelectorAll('.check-item:checked');
+    var btn = document.getElementById('btn-step2');
+    if (checked.length === all.length) {
+        btn.className = 'btn btn-success';
+        btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Alles gepr\u00fcft! Weiter';
+    } else {
+        btn.className = 'btn btn-primary';
+        btn.innerHTML = 'Weiter: Maschine w\u00e4hlen <i class="bi bi-arrow-right ms-1"></i>';
+    }
+}
+</script>
+{% endblock %}

@@ -248,7 +248,7 @@ def order_detail(order_id):
         try:
             order_ids = json.loads(order.linked_customer_orders)
             linked_orders = Order.query.filter(Order.id.in_(order_ids)).all()
-        except:
+        except (json.JSONDecodeError, TypeError, ValueError):
             pass
 
     # Alternativ: Aus den Items die verknüpften Aufträge ermitteln
@@ -288,9 +288,9 @@ def print_order_list(order_id):
         try:
             order_ids = json.loads(order.linked_customer_orders)
             linked_orders = Order.query.filter(Order.id.in_(order_ids)).all()
-        except:
+        except (json.JSONDecodeError, TypeError, ValueError):
             pass
-    
+
     # Druck-Tracking aktualisieren
     order.print_count = (order.print_count or 0) + 1
     order.last_printed_at = datetime.utcnow()
@@ -1090,7 +1090,7 @@ def update_status(order_id):
 
     valid_transitions = {
         'draft': ['ordered', 'cancelled'],
-        'ordered': ['confirmed', 'shipped', 'cancelled'],
+        'ordered': ['confirmed', 'shipped', 'delivered', 'cancelled'],
         'confirmed': ['shipped', 'delivered', 'cancelled'],
         'shipped': ['delivered', 'partial'],
         'partial': ['delivered'],
@@ -1148,3 +1148,233 @@ def cancel_order(order_id):
 
     flash('Bestellung wurde storniert', 'success')
     return redirect(url_for('purchasing.orders'))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BESTELLUNG BEARBEITEN
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@purchasing_bp.route('/orders/<order_id>/edit', methods=['POST'])
+@login_required
+def edit_order(order_id):
+    """Bestellung bearbeiten (Tracking, Lieferdatum, Lieferanten-Nr. etc.)"""
+    order = SupplierOrder.query.get_or_404(order_id)
+
+    if 'supplier_order_number' in request.form:
+        order.supplier_order_number = request.form['supplier_order_number'].strip() or None
+
+    if 'tracking_number' in request.form:
+        order.tracking_number = request.form['tracking_number'].strip() or None
+
+    if 'delivery_date' in request.form:
+        dd = request.form['delivery_date'].strip()
+        if dd:
+            try:
+                order.delivery_date = datetime.strptime(dd, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        else:
+            order.delivery_date = None
+
+    if 'shipping_method' in request.form:
+        order.shipping_method = request.form['shipping_method'].strip() or None
+
+    if 'internal_notes' in request.form:
+        order.internal_notes = request.form['internal_notes'].strip() or None
+
+    if 'subtotal' in request.form:
+        try:
+            order.subtotal = float(request.form['subtotal'] or 0)
+        except (ValueError, TypeError):
+            pass
+
+    if 'tax_amount' in request.form:
+        try:
+            order.tax_amount = float(request.form['tax_amount'] or 0)
+        except (ValueError, TypeError):
+            pass
+
+    if 'total_amount' in request.form:
+        try:
+            order.total_amount = float(request.form['total_amount'] or 0)
+        except (ValueError, TypeError):
+            pass
+
+    if 'status' in request.form:
+        new_status = request.form['status'].strip()
+        if new_status in ('draft', 'ordered', 'confirmed', 'shipped', 'partial', 'delivered', 'cancelled'):
+            order.status = new_status
+
+    order.updated_by = current_user.username
+    order.updated_at = datetime.utcnow()
+    db.session.commit()
+
+    flash('Bestellung aktualisiert', 'success')
+    return redirect(url_for('purchasing.order_detail', order_id=order_id))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LIEFERSCHEIN-FOTO UPLOAD
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@purchasing_bp.route('/orders/<order_id>/upload-delivery-note', methods=['POST'])
+@login_required
+def upload_delivery_note(order_id):
+    """Lieferschein-Foto hochladen beim Wareneingang"""
+    order = SupplierOrder.query.get_or_404(order_id)
+
+    if 'delivery_note_photo' not in request.files:
+        return jsonify({'success': False, 'error': 'Keine Datei ausgewaehlt'})
+
+    file = request.files['delivery_note_photo']
+    if not file or not file.filename:
+        return jsonify({'success': False, 'error': 'Keine Datei ausgewaehlt'})
+
+    allowed = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'}
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in allowed:
+        return jsonify({'success': False, 'error': 'Dateiformat nicht erlaubt'})
+
+    import os
+    import uuid
+    upload_dir = os.path.join('instance', 'uploads', 'delivery_notes')
+    os.makedirs(upload_dir, exist_ok=True)
+
+    filename = f"{order_id}_{uuid.uuid4().hex[:8]}.{ext}"
+    filepath = os.path.join(upload_dir, filename)
+    file.save(filepath)
+
+    order.delivery_note_photo = f"delivery_notes/{filename}"
+    order.updated_by = current_user.username
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'photo_url': f'/uploads/delivery_notes/{filename}'
+    })
+
+
+@purchasing_bp.route('/orders/<order_id>/delete-delivery-note', methods=['POST'])
+@login_required
+def delete_delivery_note(order_id):
+    """Lieferschein-Foto loeschen"""
+    order = SupplierOrder.query.get_or_404(order_id)
+
+    if order.delivery_note_photo:
+        import os
+        full_path = os.path.join('instance', 'uploads', order.delivery_note_photo)
+        if os.path.exists(full_path):
+            os.remove(full_path)
+        order.delivery_note_photo = None
+        order.updated_by = current_user.username
+        db.session.commit()
+
+    return jsonify({'success': True})
+
+
+# ==========================================
+# MANUELLE BESTELLUNG (ohne Bestellvorschlaege)
+# ==========================================
+
+@purchasing_bp.route('/new', methods=['GET', 'POST'])
+@login_required
+def new_manual_order():
+    """Manuelle Lieferantenbestellung erstellen mit Auftragsverknuepfung"""
+
+    if request.method == 'POST':
+        try:
+            supplier_id = request.form.get('supplier_id')
+            if not supplier_id:
+                flash('Bitte Lieferant auswaehlen.', 'warning')
+                return redirect(url_for('purchasing.new_manual_order'))
+
+            supplier = Supplier.query.get_or_404(supplier_id)
+
+            # Bestellnummer generieren
+            from src.services.id_generator_service import IdGenerator
+            try:
+                order_number = NumberSequenceService.next_number(DocumentType.BESTELLUNG)
+            except Exception:
+                order_number = f"PO-{datetime.now().strftime('%Y%m%d-%H%M')}"
+
+            # Verknuepfte Kundenauftraege
+            linked_orders = request.form.get('linked_customer_orders', '').strip()
+
+            order = SupplierOrder(
+                id=f"SO{datetime.now().strftime('%y%m%d%H%M%S')}",
+                supplier_id=supplier_id,
+                order_number=order_number,
+                supplier_order_number=request.form.get('supplier_order_number', ''),
+                linked_customer_orders=linked_orders,
+                order_date=datetime.strptime(request.form.get('order_date'), '%Y-%m-%d').date() if request.form.get('order_date') else date.today(),
+                delivery_date=datetime.strptime(request.form.get('delivery_date'), '%Y-%m-%d').date() if request.form.get('delivery_date') else None,
+                shipping_method=request.form.get('shipping_method', ''),
+                payment_method=request.form.get('payment_method', 'rechnung'),
+                notes=request.form.get('notes', ''),
+                internal_notes=request.form.get('internal_notes', ''),
+                status='ordered',
+                created_by=current_user.username,
+            )
+
+            # Positionen
+            pos_names = request.form.getlist('item_name[]')
+            pos_mengen = request.form.getlist('item_qty[]')
+            pos_preise = request.form.getlist('item_price[]')
+            pos_artikel_nrs = request.form.getlist('item_article_nr[]')
+
+            items = []
+            subtotal = 0
+            for i, name in enumerate(pos_names):
+                if not name.strip():
+                    continue
+                qty = float(pos_mengen[i]) if i < len(pos_mengen) and pos_mengen[i] else 1
+                price = float(pos_preise[i]) if i < len(pos_preise) and pos_preise[i] else 0
+                art_nr = pos_artikel_nrs[i] if i < len(pos_artikel_nrs) else ''
+                items.append({
+                    'name': name.strip(),
+                    'article_number': art_nr,
+                    'quantity': qty,
+                    'unit_price': price,
+                    'total': qty * price,
+                })
+                subtotal += qty * price
+
+            order.set_items(items)
+            shipping = float(request.form.get('shipping_cost', 0) or 0)
+            tax_rate = float(request.form.get('tax_rate', 19) or 19)
+            order.shipping_cost = shipping
+            order.subtotal = subtotal
+            order.tax_amount = round((subtotal + shipping) * tax_rate / 100, 2)
+            order.total_amount = round(subtotal + shipping + order.tax_amount, 2)
+
+            db.session.add(order)
+            db.session.commit()
+
+            log_activity('supplier_order_created',
+                        f'Manuelle Bestellung {order.order_number} bei {supplier.name}')
+
+            flash(f'Bestellung {order.order_number} bei {supplier.name} erstellt!', 'success')
+            return redirect(url_for('purchasing.order_detail', order_id=order.id))
+
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Fehler: {str(e)}', 'danger')
+
+    # GET: Formular
+    suppliers = Supplier.query.filter_by(active=True).order_by(Supplier.name).all()
+    # Offene Kundenauftraege (fuer Verknuepfung)
+    open_orders = Order.query.filter(
+        Order.status.in_(['new', 'accepted', 'in_progress'])
+    ).order_by(Order.created_at.desc()).limit(50).all()
+
+    # Vorausgefuellter Auftrag (von "Material bestellen" Button)
+    linked_order = None
+    linked_order_id = request.args.get('linked_order')
+    if linked_order_id:
+        linked_order = Order.query.get(linked_order_id)
+
+    return render_template('purchasing/new_order.html',
+                         suppliers=suppliers,
+                         open_orders=open_orders,
+                         linked_order=linked_order,
+                         today=date.today())

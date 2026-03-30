@@ -44,18 +44,50 @@ def approval_page(token):
         return render_template('design_approval/already_approved.html', order=order)
     
     # Hole Design-Informationen
+    def _parse_order_colors(raw):
+        """Parst Order.thread_colors: 'Nadel 1: 120 - Rot, Nadel 2: 123 - Blau'"""
+        colors = []
+        if not raw:
+            return colors
+        for part in raw.split(','):
+            part = part.strip()
+            if not part:
+                continue
+            if ':' in part:
+                label, rest = part.split(':', 1)
+                rest = rest.strip()
+                if ' - ' in rest:
+                    nr, name = rest.split(' - ', 1)
+                    colors.append({'madeira_nr': nr.strip(), 'color': name.strip(), 'label': label.strip()})
+                elif rest:
+                    colors.append({'madeira_nr': rest.strip(), 'color': '', 'label': label.strip()})
+            elif part:
+                colors.append({'color': part, 'madeira_nr': '', 'label': ''})
+        return colors
+
+    order_colors = _parse_order_colors(getattr(order, 'thread_colors', None))
+
     designs = []
-    if hasattr(order, 'designs') and order.designs:
-        for design in order.designs:
+    order_designs = order.designs.order_by(None).all() if hasattr(order, 'designs') else []
+    if order_designs:
+        for design in order_designs:
+            design_colors = design.get_thread_colors()
+            # Approval-Token aus thread_colors herausfiltern
+            if isinstance(design_colors, dict) and 'approval_token' in design_colors:
+                design_colors = []
+            # Fallback: Auftrags-Farben verwenden wenn Design keine eigenen hat
+            if not design_colors:
+                design_colors = order_colors
             designs.append({
                 'id': design.id,
                 'position': design.get_position_label(),
                 'type': design.get_design_type_label(),
-                'thumbnail': design.design_thumbnail_path,
+                'design_type': design.design_type,
+                'thumbnail': design.design_thumbnail_path or design.design_file_path,
                 'width_mm': design.width_mm,
                 'height_mm': design.height_mm,
                 'stitch_count': design.stitch_count,
-                'thread_colors': design.get_thread_colors()
+                'thread_colors': design_colors
             })
     else:
         # Fallback: Altes Single-Design-System
@@ -64,11 +96,11 @@ def approval_page(token):
                 'id': 0,
                 'position': order.embroidery_position or 'Standard',
                 'type': 'Stickerei' if order.order_type == 'embroidery' else 'Druck',
-                'thumbnail': order.design_thumbnail_path or order.design_file,
+                'thumbnail': order.design_thumbnail_path or order.design_file or order.design_file_path,
                 'width_mm': order.design_width_mm,
                 'height_mm': order.design_height_mm,
                 'stitch_count': order.stitch_count,
-                'thread_colors': []
+                'thread_colors': order_colors
             })
     
     # Hole Kunde
@@ -152,7 +184,25 @@ def approve_design(token):
             ip_address=ip_address
         )
         db.session.add(activity)
-        
+
+        # CRM-Kontakt: Kundenfreigabe als Eingehende Nachricht loggen
+        if order.customer_id:
+            try:
+                from src.models.crm_contact import CustomerContact, ContactType, ContactStatus
+                crm_contact = CustomerContact(
+                    customer_id=order.customer_id,
+                    order_id=order.id,
+                    contact_type=ContactType.EMAIL_EINGANG,
+                    status=ContactStatus.ERLEDIGT,
+                    subject=f'Design-Freigabe: Auftrag {order.order_number}',
+                    body_text=f'Kunde {customer_name or order.customer.display_name} hat das Design freigegeben.\n\nNotizen: {notes}',
+                    email_from=order.customer.email,
+                    created_by='system'
+                )
+                db.session.add(crm_contact)
+            except Exception as e:
+                logger.warning(f"CRM-Kontakt konnte nicht erstellt werden: {e}")
+
         db.session.commit()
         
         # Benachrichtigung an Team senden
@@ -229,7 +279,28 @@ def reject_design(token):
             ip_address=ip_address
         )
         db.session.add(activity)
-        
+
+        # CRM-Kontakt: Änderungswunsch als Eingehende Nachricht loggen
+        if order.customer_id:
+            try:
+                from src.models.crm_contact import CustomerContact, ContactType, ContactStatus
+                notes_text = f"Änderungswunsch von {customer_name or 'Kunde'}:\n{reason}"
+                if requested_changes:
+                    notes_text += f"\n\nGewünschte Änderungen:\n{requested_changes}"
+                crm_contact = CustomerContact(
+                    customer_id=order.customer_id,
+                    order_id=order.id,
+                    contact_type=ContactType.EMAIL_EINGANG,
+                    status=ContactStatus.OFFEN,
+                    subject=f'Änderungswunsch Design: Auftrag {order.order_number}',
+                    body_text=notes_text,
+                    email_from=order.customer.email if order.customer else None,
+                    created_by='system'
+                )
+                db.session.add(crm_contact)
+            except Exception as e:
+                logger.warning(f"CRM-Kontakt konnte nicht erstellt werden: {e}")
+
         db.session.commit()
         
         # Team benachrichtigen
@@ -291,22 +362,44 @@ def preview_image_watermarked(token, design_id):
     if not order:
         abort(404)
 
+    def _resolve_path(rel_or_abs):
+        """Gibt absoluten Pfad zurück – unterstützt relative Pfade aus verschiedenen Upload-Roots"""
+        if not rel_or_abs:
+            return None
+        if os.path.isabs(rel_or_abs) and os.path.exists(rel_or_abs):
+            return rel_or_abs
+        # Kandidaten in Reihenfolge durchsuchen
+        upload_folder = current_app.config.get('UPLOAD_FOLDER', '/opt/stitchadmin/data/uploads')
+        candidates = [
+            # 1. Relativ zu static/uploads (order_design_controller speichert so)
+            os.path.join(current_app.root_path, 'static', 'uploads', rel_or_abs),
+            # 2. Relativ zum Daten-Verzeichnis (data_dir/uploads/designs/...)
+            os.path.join(os.path.dirname(upload_folder), rel_or_abs),
+            # 3. Direkt im UPLOAD_FOLDER
+            os.path.join(upload_folder, rel_or_abs),
+            # 4. Nur Dateiname im UPLOAD_FOLDER/designs
+            os.path.join(upload_folder, 'designs', os.path.basename(rel_or_abs)),
+        ]
+        for c in candidates:
+            if os.path.exists(c):
+                return c
+        return None
+
     # Finde Design-Bildpfad
     if design_id == 0:
-        filepath = order.design_file_path
-        if not filepath:
-            # Fallback auf design_file (relative URL)
-            filepath = os.path.join(current_app.root_path, 'static', order.design_file) if order.design_file else None
+        filepath = _resolve_path(order.design_file_path)
+        if not filepath and order.design_file:
+            filepath = _resolve_path(order.design_file)
+        if not filepath and order.design_thumbnail_path:
+            filepath = _resolve_path(order.design_thumbnail_path)
     else:
         design = order.designs.filter_by(id=design_id).first()
         if not design:
             abort(404)
-        filepath = design.design_file_path or (
-            os.path.join(current_app.root_path, 'static', design.design_thumbnail_path)
-            if design.design_thumbnail_path else None
-        )
+        filepath = (_resolve_path(design.design_file_path)
+                    or _resolve_path(design.design_thumbnail_path))
 
-    if not filepath or not os.path.exists(filepath):
+    if not filepath:
         abort(404)
 
     # Wasserzeichen anwenden
@@ -362,11 +455,10 @@ def admin_index():
     """Dashboard für Design-Freigaben (On-Premise Workflow)"""
     from datetime import timedelta
 
-    # Ausstehend: Design vorhanden, aber noch nicht gesendet
+    # Ausstehend: Noch nicht zur Freigabe gesendet (mit oder ohne Design)
     pending_orders = Order.query.filter(
-        Order.design_approval_status.in_([None, 'pending']),
-        (Order.design_file.isnot(None)) | (Order.design_file_path.isnot(None))
-    ).order_by(Order.created_at.desc()).all()
+        Order.design_approval_status.in_([None, 'pending'])
+    ).order_by(Order.created_at.desc()).limit(100).all()
 
     # Gesendet: Warte auf Kundenreaktion
     sent_orders = Order.query.filter(
@@ -414,7 +506,7 @@ def admin_send_approval_request(order_id):
         order.workflow_status = 'design_pending'
         db.session.commit()
 
-        success = _send_approval_email(order)
+        success, err = _send_approval_email(order)
 
         if success:
             activity = ActivityLog(
@@ -423,6 +515,25 @@ def admin_send_approval_request(order_id):
                 details=f'Freigabe-Anfrage gesendet fuer Auftrag {order.order_number}'
             )
             db.session.add(activity)
+
+            # CRM-Kontakt: Freigabe-Anfrage als Ausgehende E-Mail loggen
+            if order.customer_id:
+                try:
+                    from src.models.crm_contact import CustomerContact, ContactType, ContactStatus
+                    crm_contact = CustomerContact(
+                        customer_id=order.customer_id,
+                        order_id=order.id,
+                        contact_type=ContactType.EMAIL_AUSGANG,
+                        status=ContactStatus.WARTE_ANTWORT,
+                        subject=f'Design-Freigabe gesendet: Auftrag {order.order_number}',
+                        body_text=f'Freigabe-Anfrage an {order.customer.email} gesendet.',
+                        email_to=order.customer.email,
+                        created_by=current_user.username
+                    )
+                    db.session.add(crm_contact)
+                except Exception as e:
+                    logger.warning(f"CRM-Kontakt konnte nicht erstellt werden: {e}")
+
             db.session.commit()
 
             return jsonify({
@@ -432,7 +543,7 @@ def admin_send_approval_request(order_id):
                                        token=order.design_approval_token, _external=True)
             })
         else:
-            return jsonify({'success': False, 'error': 'E-Mail konnte nicht gesendet werden'}), 500
+            return jsonify({'success': False, 'error': f'E-Mail konnte nicht gesendet werden: {err}'}), 500
 
     except Exception as e:
         db.session.rollback()
@@ -463,12 +574,12 @@ def admin_resend_request(order_id):
     order.design_approval_sent_at = datetime.utcnow()
     db.session.commit()
 
-    success = _send_approval_email(order)
+    success, err = _send_approval_email(order)
 
     if success:
         return jsonify({'success': True, 'message': 'Freigabe-Anfrage erneut versendet'})
     else:
-        return jsonify({'success': False, 'error': 'E-Mail-Versand fehlgeschlagen'}), 500
+        return jsonify({'success': False, 'error': f'E-Mail-Versand fehlgeschlagen: {err}'}), 500
 
 
 @design_approval_bp.route('/send/<order_id>', methods=['POST'])
@@ -488,12 +599,12 @@ def send_approval_request(order_id):
     order.design_approval_sent_at = datetime.utcnow()
     db.session.commit()
 
-    success = _send_approval_email(order)
+    success, err = _send_approval_email(order)
 
     if success:
         flash(f'Freigabe-Anfrage fuer Auftrag {order.order_number} wurde versendet', 'success')
     else:
-        flash('E-Mail konnte nicht gesendet werden', 'danger')
+        flash(f'E-Mail konnte nicht gesendet werden: {err}', 'danger')
 
     return redirect(url_for('design_approval.admin_index'))
 
@@ -523,7 +634,8 @@ def send_batch_approval_request():
         order.design_approval_status = 'sent'
         order.design_approval_sent_at = datetime.utcnow()
 
-        if _send_approval_email(order):
+        ok, _ = _send_approval_email(order)
+        if ok:
             sent_count += 1
         else:
             failed_count += 1
@@ -542,6 +654,65 @@ def send_batch_approval_request():
 def public_approval_page(token):
     """Öffentliche Design-Freigabe-Seite (Alias für approval_page)"""
     return approval_page(token)
+
+
+@design_approval_bp.route('/api/upload-designs/<order_id>', methods=['POST'])
+@login_required
+def api_upload_designs(order_id):
+    """Design-Bilder für Freigabe hochladen (unterstützt mehrere Bilder)"""
+    from src.models.order_workflow import OrderDesign
+    from werkzeug.utils import secure_filename
+
+    order = Order.query.get_or_404(order_id)
+    files = request.files.getlist('design_files')
+
+    valid_files = [f for f in files if f and f.filename]
+    if not valid_files:
+        return jsonify({'success': False, 'error': 'Keine Dateien ausgewählt'}), 400
+
+    upload_folder = current_app.config.get('UPLOAD_FOLDER', '/opt/stitchadmin/data/uploads')
+    designs_folder = os.path.join(upload_folder, 'designs')
+    os.makedirs(designs_folder, exist_ok=True)
+
+    # Standard-Positionen für mehrere Bilder
+    position_codes  = ['brust_mitte', 'ruecken', 'aermel_links', 'aermel_rechts', 'andere']
+    position_labels = ['Brust Mitte', 'Rücken', 'Ärmel links', 'Ärmel rechts', 'Weitere Position']
+
+    # Bestehende Designs für diesen Auftrag löschen (Neu-Upload ersetzt alte)
+    order.designs.delete()
+
+    saved = []
+    for idx, f in enumerate(valid_files):
+        ext = os.path.splitext(f.filename)[1].lower()
+        safe_name = f"{order.order_number}_{idx + 1}_{secure_filename(f.filename)}"
+        fpath = os.path.join(designs_folder, safe_name)
+        f.save(fpath)
+        rel_path = f"uploads/designs/{safe_name}"
+
+        pos_code  = position_codes[idx]  if idx < len(position_codes)  else 'andere'
+        pos_label = position_labels[idx] if idx < len(position_labels) else f'Position {idx + 1}'
+
+        design = OrderDesign(
+            order_id=order.id,
+            position=pos_code,
+            position_label=pos_label,
+            design_type='stick',
+            design_file_path=rel_path,
+            design_thumbnail_path=rel_path,
+            created_by=current_user.username
+        )
+        db.session.add(design)
+        saved.append(rel_path)
+
+    # Erstes Bild auch in Legacy-Feld (Rückwärtskompatibilität)
+    order.design_file_path = saved[0]
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'count': len(saved),
+        'message': f'{len(saved)} Design-Bild(er) hochgeladen'
+    })
 
 
 # ==========================================
@@ -630,19 +801,24 @@ def _send_approval_email(order):
             body=body,
             html_body=html_body
         )
-        
-        return result.get('success', False)
-        
+
+        if result.get('success'):
+            return True, None
+        else:
+            err = result.get('error', 'Unbekannter SMTP-Fehler')
+            logger.error(f"Email send failed: {err}")
+            return False, err
+
     except Exception as e:
         logger.error(f"Failed to send approval email: {e}")
-        return False
+        return False, str(e)
 
 
 def _notify_team_approval(order, customer_name):
     """Benachrichtigt das Team über erfolgte Freigabe"""
-    
+
     try:
-        from src.services.email_service import EmailService
+        from src.services.email_service_new import EmailService
         from src.models.company_settings import CompanySettings
 
         company = CompanySettings.get_settings()
@@ -842,13 +1018,13 @@ def api_resend(order_id):
             order.design_approval_status = 'pending'
             db.session.commit()
 
-        success = _send_approval_email(order)
+        success, err = _send_approval_email(order)
 
         if success:
             logger.info(f"Reminder sent for order {order.id}")
             return jsonify({'success': True, 'message': 'Erinnerung gesendet'})
         else:
-            return jsonify({'success': False, 'error': 'E-Mail-Versand fehlgeschlagen - E-Mail-Konfiguration pruefen'}), 500
+            return jsonify({'success': False, 'error': f'E-Mail-Versand fehlgeschlagen: {err}'}), 500
 
     except Exception as e:
         logger.error(f"Resend error: {e}")
@@ -1097,7 +1273,7 @@ def scan_incoming_emails():
     @login_required
     def _scan():
         try:
-            from src.services.email_service import EmailService
+            from src.services.email_service_new import EmailService
             from src.models.design_approval import DesignApprovalRequest
             from src.services.design_approval_service import get_design_approval_service
             
@@ -1293,7 +1469,7 @@ def _notify_team_rejection(order, customer_name, reason, requested_changes):
     """Benachrichtigt das Team über Änderungswunsch"""
     
     try:
-        from src.services.email_service import EmailService
+        from src.services.email_service_new import EmailService
         from src.models.company_settings import CompanySettings
 
         company = CompanySettings.get_settings()

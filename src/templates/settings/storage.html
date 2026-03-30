@@ -9,34 +9,46 @@
             <li class="breadcrumb-item active">Speicherpfade</li>
         </ol>
     </nav>
-    
+
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2><i class="fas fa-folder-open me-2"></i>Speichereinstellungen</h2>
+        <h2><i class="bi bi-folder2-open me-2"></i>Speichereinstellungen</h2>
     </div>
-    
+
     <form method="POST" class="needs-validation" novalidate>
         <div class="row">
             <div class="col-lg-8">
                 <!-- Hauptverzeichnis -->
                 <div class="card mb-4">
                     <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0"><i class="fas fa-hdd me-2"></i>Hauptverzeichnis (Dokumente)</h5>
+                        <h5 class="mb-0"><i class="bi bi-hdd me-2"></i>Hauptverzeichnis (Dokumente)</h5>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Basispfad für Geschäftsdokumente</label>
-                            <input type="text" name="base_path" class="form-control form-control-lg" 
-                                   value="{{ settings.base_path or '' }}"
-                                   placeholder="C:\StitchAdmin\Dokumente">
+                            <label class="form-label fw-bold">Basispfad fuer Geschaeftsdokumente</label>
+                            <div class="input-group">
+                                <input type="text" name="base_path" class="form-control form-control-lg"
+                                       value="{{ settings.base_path or '' }}"
+                                       placeholder="C:\StitchAdmin\Dokumente">
+                                <button type="button" class="btn btn-outline-secondary" onclick="openFolder('{{ settings.base_path or '' }}')" title="Ordner oeffnen">
+                                    <i class="bi bi-folder2-open"></i>
+                                </button>
+                            </div>
                             <div class="form-text">
-                                Angebote, Aufträge, Rechnungen, Lieferscheine werden hier gespeichert.<br>
-                                Leer lassen für Standard: <code>{{ default_base }}</code>
+                                Alle Dokumente werden hier gespeichert. In der Datenbank werden nur <strong>relative Pfade</strong> abgelegt.<br>
+                                Leer = Standard: <code>{{ default_base }}</code>
                             </div>
                         </div>
-                        
+
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Mehrplatz-Betrieb:</strong> Jeder Arbeitsplatz konfiguriert hier seinen lokalen Pfad.
+                            Ob <code>C:\StitchAdmin</code>, <code>D:\Nextcloud\StitchAdmin</code> oder <code>\\NAS\StitchAdmin</code> &ndash;
+                            die Datenbank speichert nur relative Pfade wie <code>Kunden/logo.png</code>.
+                        </div>
+
                         {% if validation_errors %}
-                        <div class="alert alert-danger">
-                            <strong><i class="fas fa-exclamation-triangle me-1"></i>Pfad-Probleme:</strong>
+                        <div class="alert alert-danger mt-3">
+                            <strong><i class="bi bi-exclamation-triangle me-1"></i>Pfad-Probleme:</strong>
                             <ul class="mb-0 mt-2">
                                 {% for error in validation_errors %}
                                 <li>{{ error }}</li>
@@ -46,268 +58,478 @@
                         {% endif %}
                     </div>
                 </div>
-                
+
                 <!-- SEPARATE ARCHIVE (NAS/Netzlaufwerk) -->
                 <div class="card mb-4 border-info">
                     <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><i class="fas fa-network-wired me-2"></i>Separate Archive (NAS / Netzlaufwerk)</h5>
+                        <h5 class="mb-0"><i class="bi bi-hdd-network me-2"></i>Separate Archive (NAS / Netzlaufwerk)</h5>
                     </div>
                     <div class="card-body">
                         <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Diese Verzeichnisse können auf einem <strong>NAS</strong> oder <strong>Netzlaufwerk</strong> liegen.
-                            Geben Sie den vollständigen Pfad an:
+                            <i class="bi bi-info-circle me-2"></i>
+                            Diese Verzeichnisse koennen auf einem <strong>NAS</strong> oder <strong>Netzlaufwerk</strong> liegen.
                             <ul class="mb-0 mt-2">
                                 <li>UNC-Pfad: <code>\\NAS\Freigabe\Ordner</code></li>
                                 <li>Netzlaufwerk: <code>Z:\Designs</code></li>
+                                <li>Cloud-Sync: <code>D:\Nextcloud\Designs</code></li>
                             </ul>
                         </div>
-                        
+
                         <!-- Design-Archiv -->
                         <div class="border rounded p-3 mb-3">
                             <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="design_archiv_aktiv" 
+                                <input class="form-check-input" type="checkbox" id="design_archiv_aktiv"
                                        name="design_archiv_aktiv" {% if settings.design_archiv_aktiv %}checked{% endif %}
                                        onchange="toggleArchive('design_archiv')">
                                 <label class="form-check-label fw-bold" for="design_archiv_aktiv">
-                                    <i class="fas fa-vector-square me-1 text-primary"></i> Design-Archiv
+                                    <i class="bi bi-vector-pen me-1 text-primary"></i> Design-Archiv
                                 </label>
                                 <small class="d-block text-muted">DST, EMB, PES und andere Stickdateien</small>
                             </div>
-                            <input type="text" name="design_archiv_path" id="design_archiv_path" class="form-control" 
-                                   value="{{ settings.design_archiv_path or '' }}"
-                                   placeholder="\\NAS\Designs oder Z:\Stickdateien"
-                                   {% if not settings.design_archiv_aktiv %}disabled{% endif %}>
+                            <div class="input-group">
+                                <input type="text" name="design_archiv_path" id="design_archiv_path" class="form-control"
+                                       value="{{ settings.design_archiv_path or '' }}"
+                                       placeholder="\\NAS\Designs oder Z:\Stickdateien"
+                                       {% if not settings.design_archiv_aktiv %}disabled{% endif %}>
+                                <button type="button" class="btn btn-outline-secondary btn-open-folder"
+                                        onclick="openFolder(document.getElementById('design_archiv_path').value)"
+                                        {% if not settings.design_archiv_aktiv %}disabled{% endif %}>
+                                    <i class="bi bi-folder2-open"></i>
+                                </button>
+                            </div>
                         </div>
-                        
+
                         <!-- Stickdateien (Produktion) -->
                         <div class="border rounded p-3 mb-3">
                             <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="stickdateien_aktiv" 
+                                <input class="form-check-input" type="checkbox" id="stickdateien_aktiv"
                                        name="stickdateien_aktiv" {% if settings.stickdateien_aktiv %}checked{% endif %}
                                        onchange="toggleArchive('stickdateien')">
                                 <label class="form-check-label fw-bold" for="stickdateien_aktiv">
-                                    <i class="fas fa-industry me-1 text-success"></i> Stickdateien (Produktion)
+                                    <i class="bi bi-gear me-1 text-success"></i> Stickdateien (Produktion)
                                 </label>
-                                <small class="d-block text-muted">Produktionsfertige DST-Dateien für die Maschinen</small>
+                                <small class="d-block text-muted">Produktionsfertige DST-Dateien fuer die Maschinen</small>
                             </div>
-                            <input type="text" name="stickdateien_path" id="stickdateien_path" class="form-control" 
-                                   value="{{ settings.stickdateien_path or '' }}"
-                                   placeholder="\\NAS\Produktion\DST"
-                                   {% if not settings.stickdateien_aktiv %}disabled{% endif %}>
+                            <div class="input-group">
+                                <input type="text" name="stickdateien_path" id="stickdateien_path" class="form-control"
+                                       value="{{ settings.stickdateien_path or '' }}"
+                                       placeholder="\\NAS\Produktion\DST"
+                                       {% if not settings.stickdateien_aktiv %}disabled{% endif %}>
+                                <button type="button" class="btn btn-outline-secondary btn-open-folder"
+                                        onclick="openFolder(document.getElementById('stickdateien_path').value)"
+                                        {% if not settings.stickdateien_aktiv %}disabled{% endif %}>
+                                    <i class="bi bi-folder2-open"></i>
+                                </button>
+                            </div>
                         </div>
-                        
+
                         <!-- Freigaben-Archiv -->
                         <div class="border rounded p-3 mb-3">
                             <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="freigaben_archiv_aktiv" 
+                                <input class="form-check-input" type="checkbox" id="freigaben_archiv_aktiv"
                                        name="freigaben_archiv_aktiv" {% if settings.freigaben_archiv_aktiv %}checked{% endif %}
                                        onchange="toggleArchive('freigaben_archiv')">
                                 <label class="form-check-label fw-bold" for="freigaben_archiv_aktiv">
-                                    <i class="fas fa-check-circle me-1 text-warning"></i> Freigaben-Archiv
+                                    <i class="bi bi-check-circle me-1 text-warning"></i> Freigaben-Archiv
                                 </label>
-                                <small class="d-block text-muted">Kunden-Freigabe-PDFs und Bestätigungen</small>
+                                <small class="d-block text-muted">Kunden-Freigabe-PDFs und Bestaetigungen</small>
                             </div>
-                            <input type="text" name="freigaben_archiv_path" id="freigaben_archiv_path" class="form-control" 
-                                   value="{{ settings.freigaben_archiv_path or '' }}"
-                                   placeholder="\\NAS\Freigaben"
-                                   {% if not settings.freigaben_archiv_aktiv %}disabled{% endif %}>
+                            <div class="input-group">
+                                <input type="text" name="freigaben_archiv_path" id="freigaben_archiv_path" class="form-control"
+                                       value="{{ settings.freigaben_archiv_path or '' }}"
+                                       placeholder="\\NAS\Freigaben"
+                                       {% if not settings.freigaben_archiv_aktiv %}disabled{% endif %}>
+                                <button type="button" class="btn btn-outline-secondary btn-open-folder"
+                                        onclick="openFolder(document.getElementById('freigaben_archiv_path').value)"
+                                        {% if not settings.freigaben_archiv_aktiv %}disabled{% endif %}>
+                                    <i class="bi bi-folder2-open"></i>
+                                </button>
+                            </div>
                         </div>
-                        
+
                         <!-- Motiv-Archiv -->
                         <div class="border rounded p-3 mb-3">
                             <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="motiv_archiv_aktiv" 
+                                <input class="form-check-input" type="checkbox" id="motiv_archiv_aktiv"
                                        name="motiv_archiv_aktiv" {% if settings.motiv_archiv_aktiv %}checked{% endif %}
                                        onchange="toggleArchive('motiv_archiv')">
                                 <label class="form-check-label fw-bold" for="motiv_archiv_aktiv">
-                                    <i class="fas fa-palette me-1 text-danger"></i> Motiv-Archiv
+                                    <i class="bi bi-palette me-1 text-danger"></i> Motiv-Archiv
                                 </label>
                                 <small class="d-block text-muted">Grafiken, Vorlagen, AI/PSD-Dateien</small>
                             </div>
-                            <input type="text" name="motiv_archiv_path" id="motiv_archiv_path" class="form-control" 
-                                   value="{{ settings.motiv_archiv_path or '' }}"
-                                   placeholder="\\NAS\Grafik\Motive"
-                                   {% if not settings.motiv_archiv_aktiv %}disabled{% endif %}>
+                            <div class="input-group">
+                                <input type="text" name="motiv_archiv_path" id="motiv_archiv_path" class="form-control"
+                                       value="{{ settings.motiv_archiv_path or '' }}"
+                                       placeholder="\\NAS\Grafik\Motive"
+                                       {% if not settings.motiv_archiv_aktiv %}disabled{% endif %}>
+                                <button type="button" class="btn btn-outline-secondary btn-open-folder"
+                                        onclick="openFolder(document.getElementById('motiv_archiv_path').value)"
+                                        {% if not settings.motiv_archiv_aktiv %}disabled{% endif %}>
+                                    <i class="bi bi-folder2-open"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
-                
+
+                <!-- Cloud-Speicher (Nextcloud / WebDAV) -->
+                <div class="card mb-4 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-cloud-arrow-up me-2"></i>Cloud-Speicher (Nextcloud / WebDAV)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="cloud_enabled"
+                                   name="cloud_enabled" {% if settings.cloud_enabled %}checked{% endif %}
+                                   onchange="toggleCloud()">
+                            <label class="form-check-label fw-bold" for="cloud_enabled">
+                                Cloud-Speicher aktivieren
+                            </label>
+                            <small class="d-block text-muted">Dokumente werden automatisch in die Cloud synchronisiert</small>
+                        </div>
+
+                        <div id="cloud-settings" {% if not settings.cloud_enabled %}style="display:none;"{% endif %}>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">Cloud-Typ</label>
+                                <div class="d-flex gap-2">
+                                    <div class="form-check card p-2 flex-fill {{ 'border-primary' if settings.cloud_type == 'nextcloud' or not settings.cloud_type }}">
+                                        <input class="form-check-input" type="radio" name="cloud_type" id="ct_nextcloud" value="nextcloud"
+                                               {% if settings.cloud_type == 'nextcloud' or not settings.cloud_type %}checked{% endif %}>
+                                        <label class="form-check-label" for="ct_nextcloud">
+                                            <i class="bi bi-cloud me-1"></i> <strong>Nextcloud</strong>
+                                        </label>
+                                    </div>
+                                    <div class="form-check card p-2 flex-fill {{ 'border-primary' if settings.cloud_type == 'webdav' }}">
+                                        <input class="form-check-input" type="radio" name="cloud_type" id="ct_webdav" value="webdav"
+                                               {% if settings.cloud_type == 'webdav' %}checked{% endif %}>
+                                        <label class="form-check-label" for="ct_webdav">
+                                            <i class="bi bi-hdd-network me-1"></i> <strong>WebDAV</strong>
+                                            <br><small class="text-muted">Synology, WD Cloud</small>
+                                        </label>
+                                    </div>
+                                    <div class="form-check card p-2 flex-fill {{ 'border-primary' if settings.cloud_type == 'hetzner_storage' }}">
+                                        <input class="form-check-input" type="radio" name="cloud_type" id="ct_hetzner" value="hetzner_storage"
+                                               {% if settings.cloud_type == 'hetzner_storage' %}checked{% endif %}>
+                                        <label class="form-check-label" for="ct_hetzner">
+                                            <i class="bi bi-server me-1"></i> <strong>Hetzner</strong>
+                                            <br><small class="text-muted">Storage Box</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-12">
+                                    <label class="form-label">Server-URL</label>
+                                    <input type="url" name="cloud_url" class="form-control"
+                                           value="{{ settings.cloud_url or '' }}"
+                                           placeholder="https://cloud.example.de">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Benutzername</label>
+                                    <input type="text" name="cloud_username" class="form-control"
+                                           value="{{ settings.cloud_username or '' }}" placeholder="admin">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Passwort / App-Passwort</label>
+                                    <div class="input-group">
+                                        <input type="password" name="cloud_password" id="cloud_password" class="form-control"
+                                               value="{{ settings.cloud_password or '' }}" placeholder="App-Passwort empfohlen">
+                                        <button type="button" class="btn btn-outline-secondary" onclick="togglePw()">
+                                            <i class="bi bi-eye" id="pw-icon"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label">Basispfad in der Cloud</label>
+                                    <input type="text" name="cloud_base_path" class="form-control"
+                                           value="{{ settings.cloud_base_path or '/StitchAdmin/Dokumente' }}"
+                                           placeholder="/StitchAdmin/Dokumente">
+                                </div>
+                            </div>
+
+                            <button type="button" class="btn btn-outline-primary mb-3" onclick="testCloudConnection()">
+                                <i class="bi bi-plug me-1"></i> Verbindung testen
+                            </button>
+                            <span id="cloud-test-result" class="ms-2"></span>
+
+                            <hr>
+                            <h6 class="mb-3"><i class="bi bi-arrow-repeat me-1"></i> Automatisch synchronisieren:</h6>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="cloud_sync_rechnungen" id="cs_rechnungen"
+                                               {% if settings.cloud_sync_rechnungen %}checked{% endif %}>
+                                        <label class="form-check-label" for="cs_rechnungen">Rechnungen</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="cloud_sync_angebote" id="cs_angebote"
+                                               {% if settings.cloud_sync_angebote %}checked{% endif %}>
+                                        <label class="form-check-label" for="cs_angebote">Angebote</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="cloud_sync_lieferscheine" id="cs_liefer"
+                                               {% if settings.cloud_sync_lieferscheine %}checked{% endif %}>
+                                        <label class="form-check-label" for="cs_liefer">Lieferscheine</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="cloud_sync_auftraege" id="cs_auftraege"
+                                               {% if settings.cloud_sync_auftraege %}checked{% endif %}>
+                                        <label class="form-check-label" for="cs_auftraege">Auftraege</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="cloud_sync_freigaben" id="cs_freigaben"
+                                               {% if settings.cloud_sync_freigaben %}checked{% endif %}>
+                                        <label class="form-check-label" for="cs_freigaben">Design-Freigaben</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="cloud_sync_mahnungen" id="cs_mahnungen"
+                                               {% if settings.cloud_sync_mahnungen %}checked{% endif %}>
+                                        <label class="form-check-label" for="cs_mahnungen">Mahnungen</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="cloud_sync_backups" id="cs_backups"
+                                               {% if settings.cloud_sync_backups %}checked{% endif %}>
+                                        <label class="form-check-label" for="cs_backups">Backups</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Ordnerstruktur -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-sitemap me-2"></i>Ordnerstruktur</h5>
+                        <h5 class="mb-0"><i class="bi bi-diagram-3 me-2"></i>Ordnerstruktur</h5>
                     </div>
                     <div class="card-body">
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <div class="form-check card p-3 h-100 {{ 'border-primary' if settings.folder_structure == 'year_month' }}">
-                                    <input class="form-check-input" type="radio" name="folder_structure" 
-                                           id="struct_year_month" value="year_month" 
+                                    <input class="form-check-input" type="radio" name="folder_structure"
+                                           id="struct_year_month" value="year_month"
                                            {% if settings.folder_structure == 'year_month' or not settings.folder_structure %}checked{% endif %}>
                                     <label class="form-check-label" for="struct_year_month">
                                         <strong>Jahr / Monat</strong>
-                                        <br><small class="text-muted">z.B. Designs/2025/01/</small>
+                                        <br><small class="text-muted">z.B. Rechnungen/2026/03/</small>
                                         <br><span class="badge bg-success">Empfohlen</span>
                                     </label>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-check card p-3 h-100 {{ 'border-primary' if settings.folder_structure == 'year' }}">
-                                    <input class="form-check-input" type="radio" name="folder_structure" 
+                                    <input class="form-check-input" type="radio" name="folder_structure"
                                            id="struct_year" value="year"
                                            {% if settings.folder_structure == 'year' %}checked{% endif %}>
                                     <label class="form-check-label" for="struct_year">
                                         <strong>Nur Jahr</strong>
-                                        <br><small class="text-muted">z.B. Designs/2025/</small>
+                                        <br><small class="text-muted">z.B. Rechnungen/2026/</small>
                                     </label>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-check card p-3 h-100 {{ 'border-primary' if settings.folder_structure == 'customer' }}">
-                                    <input class="form-check-input" type="radio" name="folder_structure" 
+                                    <input class="form-check-input" type="radio" name="folder_structure"
                                            id="struct_customer" value="customer"
                                            {% if settings.folder_structure == 'customer' %}checked{% endif %}>
                                     <label class="form-check-label" for="struct_customer">
                                         <strong>Nach Kunde</strong>
-                                        <br><small class="text-muted">z.B. Designs/Mustermann/</small>
+                                        <br><small class="text-muted">z.B. Rechnungen/Mustermann/</small>
                                     </label>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="form-check card p-3 h-100 {{ 'border-primary' if settings.folder_structure == 'customer_year' }}">
-                                    <input class="form-check-input" type="radio" name="folder_structure" 
+                                    <input class="form-check-input" type="radio" name="folder_structure"
                                            id="struct_customer_year" value="customer_year"
                                            {% if settings.folder_structure == 'customer_year' %}checked{% endif %}>
                                     <label class="form-check-label" for="struct_customer_year">
                                         <strong>Kunde / Jahr</strong>
-                                        <br><small class="text-muted">z.B. Designs/Mustermann/2025/</small>
+                                        <br><small class="text-muted">z.B. Rechnungen/Mustermann/2026/</small>
                                     </label>
                                 </div>
                             </div>
                         </div>
-                        
+
                         <hr>
-                        
+
                         <h6>Dateinamen-Optionen</h6>
                         <div class="form-check mb-2">
                             <input type="checkbox" class="form-check-input" id="include_customer" name="include_customer"
                                    {% if settings.include_customer_in_filename %}checked{% endif %}>
                             <label class="form-check-label" for="include_customer">
-                                Kundenname in Dateinamen einfügen
-                                <br><small class="text-muted">z.B. Design_20250107_Mustermann.dst</small>
+                                Kundenname in Dateinamen einfuegen
+                                <br><small class="text-muted">z.B. RE-2026-001_20260330_Mustermann.pdf</small>
                             </label>
                         </div>
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" id="include_date" name="include_date"
                                    {% if settings.include_date_in_filename %}checked{% endif %}>
                             <label class="form-check-label" for="include_date">
-                                Datum in Dateinamen einfügen
-                                <br><small class="text-muted">z.B. Design_20250107.dst</small>
+                                Datum in Dateinamen einfuegen
+                                <br><small class="text-muted">z.B. RE-2026-001_20260330.pdf</small>
                             </label>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Dokumentpfade (relativ) -->
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-folder me-2"></i>Dokumentpfade (relativ zum Basispfad)</h5>
+                        <h5 class="mb-0"><i class="bi bi-folder me-2"></i>Dokumentpfade (relativ zum Basispfad)</h5>
                     </div>
                     <div class="card-body">
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">Angebote</label>
-                                <input type="text" name="angebote_path" class="form-control" 
+                                <input type="text" name="angebote_path" class="form-control"
                                        value="{{ settings.angebote_path or 'Angebote' }}">
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Auftragsbestätigungen</label>
-                                <input type="text" name="auftraege_path" class="form-control" 
-                                       value="{{ settings.auftraege_path or 'Auftragsbestätigungen' }}">
+                                <label class="form-label">Auftragsbestaetigungen</label>
+                                <input type="text" name="auftraege_path" class="form-control"
+                                       value="{{ settings.auftraege_path or 'Auftragsbestaetigungen' }}">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Lieferscheine</label>
-                                <input type="text" name="lieferscheine_path" class="form-control" 
+                                <input type="text" name="lieferscheine_path" class="form-control"
                                        value="{{ settings.lieferscheine_path or 'Lieferscheine' }}">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Rechnungen (Ausgang)</label>
-                                <input type="text" name="rechnungen_ausgang_path" class="form-control" 
+                                <input type="text" name="rechnungen_ausgang_path" class="form-control"
                                        value="{{ settings.rechnungen_ausgang_path or 'Rechnungen\\Ausgang' }}">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Rechnungen (Eingang)</label>
-                                <input type="text" name="rechnungen_eingang_path" class="form-control" 
+                                <input type="text" name="rechnungen_eingang_path" class="form-control"
                                        value="{{ settings.rechnungen_eingang_path or 'Rechnungen\\Eingang' }}">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Gutschriften</label>
-                                <input type="text" name="gutschriften_path" class="form-control" 
+                                <input type="text" name="gutschriften_path" class="form-control"
                                        value="{{ settings.gutschriften_path or 'Gutschriften' }}">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Designs <small class="text-muted">(falls kein separates Archiv)</small></label>
-                                <input type="text" name="designs_path" class="form-control" 
+                                <input type="text" name="designs_path" class="form-control"
                                        value="{{ settings.designs_path or 'Designs' }}">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label">Backups</label>
-                                <input type="text" name="backup_path" class="form-control" 
+                                <input type="text" name="backup_path" class="form-control"
                                        value="{{ settings.backup_path or 'Backups' }}">
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
+
             <!-- Sidebar -->
             <div class="col-lg-4">
+                <!-- Aktionen -->
                 <div class="card mb-4 sticky-top" style="top: 80px;">
                     <div class="card-header bg-success text-white">
-                        <h5 class="mb-0"><i class="fas fa-save me-2"></i>Aktionen</h5>
+                        <h5 class="mb-0"><i class="bi bi-floppy me-2"></i>Aktionen</h5>
                     </div>
                     <div class="card-body">
                         <button type="submit" class="btn btn-success w-100 mb-2">
-                            <i class="fas fa-save me-1"></i> Einstellungen speichern
+                            <i class="bi bi-floppy me-1"></i> Einstellungen speichern
                         </button>
                         <button type="submit" name="create_folders" value="1" class="btn btn-outline-primary w-100 mb-2">
-                            <i class="fas fa-folder-plus me-1"></i> Ordner erstellen
+                            <i class="bi bi-folder-plus me-1"></i> Ordner erstellen
                         </button>
-                        <button type="button" class="btn btn-outline-secondary w-100" onclick="testPaths()">
-                            <i class="fas fa-check-circle me-1"></i> Pfade testen
+                        <button type="button" class="btn btn-outline-secondary w-100 mb-3" onclick="loadStats()">
+                            <i class="bi bi-bar-chart me-1"></i> Speicher-Statistik
+                        </button>
+                        <hr>
+                        <button type="button" class="btn btn-outline-info w-100 mb-2" onclick="testPaths()">
+                            <i class="bi bi-check-circle me-1"></i> Pfade testen
                         </button>
                     </div>
                 </div>
-                
+
+                <!-- Pfad-Migration -->
+                <div class="card mb-4 border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="bi bi-arrow-repeat me-2"></i>Pfad-Migration</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="small text-muted">
+                            Konvertiert absolute Dateipfade in der Datenbank zu relativen Pfaden.
+                            So funktioniert der Mehrplatz-Betrieb mit unterschiedlichen Basispfaden.
+                        </p>
+                        <button type="button" class="btn btn-outline-warning w-100 mb-2" onclick="migratePaths(true)">
+                            <i class="bi bi-search me-1"></i> Vorschau (Dry-Run)
+                        </button>
+                        <button type="button" class="btn btn-warning w-100" onclick="migratePaths(false)" id="btn-migrate">
+                            <i class="bi bi-arrow-repeat me-1"></i> Migration ausfuehren
+                        </button>
+                        <div id="migration-result" class="mt-3" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- Speicher-Statistik -->
+                <div class="card mb-4" id="stats-card" style="display:none;">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Speicher-Statistik</h5>
+                    </div>
+                    <div class="card-body" id="stats-body">
+                        <div class="text-center py-3">
+                            <div class="spinner-border spinner-border-sm"></div> Lade...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NAS-Hinweise -->
                 <div class="card mb-4">
                     <div class="card-header bg-light">
-                        <h5 class="mb-0"><i class="fas fa-network-wired me-2"></i>NAS-Hinweise</h5>
+                        <h5 class="mb-0"><i class="bi bi-hdd-network me-2"></i>NAS-Hinweise</h5>
                     </div>
                     <div class="card-body small">
                         <p><strong>Netzlaufwerk-Formate:</strong></p>
                         <ul>
-                            <li><code>\\NAS\Freigabe</code> - UNC-Pfad</li>
-                            <li><code>\\192.168.1.100\Share</code> - IP-basiert</li>
-                            <li><code>Z:\Ordner</code> - Verbundenes Laufwerk</li>
+                            <li><code>\\NAS\Freigabe</code> &ndash; UNC-Pfad</li>
+                            <li><code>\\192.168.1.100\Share</code> &ndash; IP-basiert</li>
+                            <li><code>Z:\Ordner</code> &ndash; Verbundenes Laufwerk</li>
+                        </ul>
+                        <p><strong>Cloud-Sync-Ordner:</strong></p>
+                        <ul>
+                            <li><code>D:\Nextcloud\StitchAdmin</code></li>
+                            <li><code>C:\Users\Nutzer\Dropbox\SA</code></li>
                         </ul>
                         <p class="mb-0 text-warning">
-                            <i class="fas fa-exclamation-triangle me-1"></i>
-                            NAS muss erreichbar sein wenn StitchAdmin läuft!
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            NAS/Cloud-Ordner muss erreichbar sein wenn StitchAdmin laeuft!
                         </p>
                     </div>
                 </div>
-                
+
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Hinweise</h5>
+                        <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Hinweise</h5>
                     </div>
                     <div class="card-body small">
                         <ul class="mb-0">
-                            <li>Ordnerstruktur gilt für <strong>alle</strong> Pfade</li>
-                            <li>Bestehende Dateien werden <strong>nicht</strong> verschoben</li>
-                            <li>Backup-Ordner sollte im lokalen Backup enthalten sein</li>
+                            <li>DB speichert nur <strong>relative Pfade</strong></li>
+                            <li>Jeder Arbeitsplatz hat seinen eigenen Basispfad</li>
+                            <li>Cloud-Sync laeuft automatisch im Hintergrund</li>
                             <li>Separate Archive haben Vorrang vor Standard-Pfaden</li>
+                            <li>Bestehende Dateien werden <strong>nicht</strong> verschoben</li>
                         </ul>
                     </div>
                 </div>
@@ -320,47 +542,209 @@
 function toggleArchive(archiveName) {
     const checkbox = document.getElementById(archiveName + '_aktiv');
     const input = document.getElementById(archiveName + '_path');
-    
+    const btn = input.parentElement.querySelector('.btn-open-folder');
+
     if (checkbox.checked) {
         input.disabled = false;
+        if (btn) btn.disabled = false;
         input.focus();
     } else {
         input.disabled = true;
+        if (btn) btn.disabled = true;
     }
 }
 
+function toggleCloud() {
+    var enabled = document.getElementById('cloud_enabled').checked;
+    document.getElementById('cloud-settings').style.display = enabled ? 'block' : 'none';
+}
+
+function togglePw() {
+    var input = document.getElementById('cloud_password');
+    var icon = document.getElementById('pw-icon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'bi bi-eye';
+    }
+}
+
+function openFolder(path) {
+    if (!path) {
+        alert('Kein Pfad konfiguriert.');
+        return;
+    }
+    // Oeffne Ordner ueber file:// Protokoll
+    var url = 'file:///' + path.replace(/\\/g, '/');
+    window.open(url, '_blank');
+}
+
+function testCloudConnection() {
+    var resultEl = document.getElementById('cloud-test-result');
+    resultEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Teste...';
+
+    fetch('{{ url_for("settings.test_cloud_connection") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            cloud_type: document.querySelector('input[name="cloud_type"]:checked').value,
+            cloud_url: document.querySelector('input[name="cloud_url"]').value,
+            cloud_username: document.querySelector('input[name="cloud_username"]').value,
+            cloud_password: document.getElementById('cloud_password').value,
+            cloud_base_path: document.querySelector('input[name="cloud_base_path"]').value
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            resultEl.innerHTML = '<span class="badge bg-success"><i class="bi bi-check-lg me-1"></i>' + data.message + '</span>';
+        } else {
+            resultEl.innerHTML = '<span class="badge bg-danger"><i class="bi bi-x-lg me-1"></i>' + data.message + '</span>';
+        }
+    })
+    .catch(err => {
+        resultEl.innerHTML = '<span class="badge bg-danger">Netzwerkfehler</span>';
+    });
+}
+
 function testPaths() {
-    // Sammle alle aktiven Pfade
     const paths = [];
-    
     const basePath = document.querySelector('[name="base_path"]').value;
     if (basePath) paths.push({name: 'Basispfad', path: basePath});
-    
-    if (document.getElementById('design_archiv_aktiv').checked) {
-        paths.push({name: 'Design-Archiv', path: document.getElementById('design_archiv_path').value});
-    }
-    if (document.getElementById('stickdateien_aktiv').checked) {
-        paths.push({name: 'Stickdateien', path: document.getElementById('stickdateien_path').value});
-    }
-    if (document.getElementById('freigaben_archiv_aktiv').checked) {
-        paths.push({name: 'Freigaben', path: document.getElementById('freigaben_archiv_path').value});
-    }
-    if (document.getElementById('motiv_archiv_aktiv').checked) {
-        paths.push({name: 'Motive', path: document.getElementById('motiv_archiv_path').value});
-    }
-    
+
+    ['design_archiv', 'stickdateien', 'freigaben_archiv', 'motiv_archiv'].forEach(name => {
+        if (document.getElementById(name + '_aktiv').checked) {
+            paths.push({name: name, path: document.getElementById(name + '_path').value});
+        }
+    });
+
     if (paths.length === 0) {
         alert('Keine Pfade konfiguriert.');
         return;
     }
-    
-    let message = 'Konfigurierte Pfade:\n\n';
-    paths.forEach(p => {
-        message += `${p.name}:\n${p.path}\n\n`;
+
+    let msg = 'Konfigurierte Pfade:\n\n';
+    paths.forEach(p => msg += p.name + ':\n' + p.path + '\n\n');
+    msg += 'Speichern und "Ordner erstellen" klicken um Pfade anzulegen.';
+    alert(msg);
+}
+
+function migratePaths(dryRun) {
+    const resultEl = document.getElementById('migration-result');
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm"></div> ' +
+        (dryRun ? 'Analysiere...' : 'Migriere...') + '</div>';
+
+    if (!dryRun && !confirm('Absolute Pfade in der Datenbank werden zu relativen Pfaden konvertiert. Fortfahren?')) {
+        resultEl.style.display = 'none';
+        return;
+    }
+
+    fetch('{{ url_for("settings.migrate_paths") }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({dry_run: dryRun})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            resultEl.innerHTML = '<div class="alert alert-danger mb-0"><i class="bi bi-x-circle me-1"></i>' + data.message + '</div>';
+            return;
+        }
+
+        let html = '<div class="alert ' + (dryRun ? 'alert-info' : 'alert-success') + ' mb-2">';
+        html += '<strong>' + (dryRun ? 'Vorschau' : 'Erledigt') + ':</strong> ';
+        html += data.total_migrated + ' Pfade ' + (dryRun ? 'zu konvertieren' : 'konvertiert');
+        html += ', ' + data.total_skipped + ' uebersprungen</div>';
+
+        if (data.results && data.results.length > 0) {
+            html += '<div class="small" style="max-height:300px;overflow-y:auto;">';
+            data.results.forEach(r => {
+                html += '<div class="mb-2"><strong>' + r.model + '.' + r.field + '</strong>';
+                html += ' <span class="badge bg-primary">' + r.migrated + '</span>';
+                if (r.details && r.details.length > 0) {
+                    html += '<ul class="mb-0 mt-1">';
+                    r.details.forEach(d => html += '<li class="text-muted">' + d + '</li>');
+                    html += '</ul>';
+                }
+                html += '</div>';
+            });
+            html += '</div>';
+        } else if (data.total_migrated === 0) {
+            html += '<div class="text-muted small"><i class="bi bi-check-circle me-1"></i>Alle Pfade sind bereits relativ.</div>';
+        }
+
+        resultEl.innerHTML = html;
+    })
+    .catch(err => {
+        resultEl.innerHTML = '<div class="alert alert-danger mb-0">Fehler: ' + err.message + '</div>';
     });
-    message += 'Speichern Sie die Einstellungen und klicken Sie "Ordner erstellen" um die Pfade zu testen.';
-    
-    alert(message);
+}
+
+function loadStats() {
+    const card = document.getElementById('stats-card');
+    const body = document.getElementById('stats-body');
+    card.style.display = 'block';
+    body.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm"></div> Lade...</div>';
+
+    fetch('{{ url_for("settings.storage_stats") }}')
+    .then(r => r.json())
+    .then(data => {
+        let html = '';
+
+        // Speicherplatz
+        if (data.disk_total_gb) {
+            const pct = data.disk_percent;
+            const color = pct > 90 ? 'danger' : pct > 75 ? 'warning' : 'success';
+            html += '<div class="mb-3">';
+            html += '<strong>Speicherplatz</strong>';
+            html += '<div class="progress mt-1" style="height:20px;">';
+            html += '<div class="progress-bar bg-' + color + '" style="width:' + pct + '%">' + pct + '%</div>';
+            html += '</div>';
+            html += '<small class="text-muted">' + data.disk_used_gb + ' / ' + data.disk_total_gb + ' GB belegt, ' + data.disk_free_gb + ' GB frei</small>';
+            html += '</div>';
+        }
+
+        // Basispfad
+        html += '<div class="mb-3">';
+        html += '<strong>Basispfad:</strong><br>';
+        html += '<code class="small">' + (data.base_path || '-') + '</code> ';
+        html += data.base_exists ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">Fehlt</span>';
+        html += '</div>';
+
+        // Dokumenttyp-Statistiken
+        if (data.doc_types && data.doc_types.length > 0) {
+            html += '<table class="table table-sm small mb-0">';
+            html += '<thead><tr><th>Typ</th><th class="text-end">Dateien</th><th class="text-end">MB</th></tr></thead><tbody>';
+            data.doc_types.forEach(dt => {
+                const icon = dt.exists ? '' : '<i class="bi bi-x-circle text-muted" title="Ordner fehlt"></i> ';
+                html += '<tr>';
+                html += '<td>' + icon + dt.type + '</td>';
+                html += '<td class="text-end">' + dt.file_count + '</td>';
+                html += '<td class="text-end">' + dt.total_size_mb + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+        }
+
+        // Speicherorte
+        if (data.roots && data.roots.length > 0) {
+            html += '<hr><strong>Aktive Speicherorte:</strong>';
+            html += '<ul class="small mb-0 mt-1">';
+            data.roots.forEach(r => {
+                const badge = r.available ? '<span class="badge bg-success">OK</span>' : '<span class="badge bg-danger">Offline</span>';
+                html += '<li>' + r.name + ' ' + badge + '</li>';
+            });
+            html += '</ul>';
+        }
+
+        body.innerHTML = html;
+    })
+    .catch(err => {
+        body.innerHTML = '<div class="alert alert-danger mb-0 small">Fehler: ' + err.message + '</div>';
+    });
 }
 </script>
 {% endblock %}

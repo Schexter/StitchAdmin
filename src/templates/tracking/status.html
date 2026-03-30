@@ -1,0 +1,190 @@
+{% extends "shop/base_shop.html" %}
+{% block title %}Auftragsstatus{% endblock %}
+{% block content %}
+<div style="padding-top: 80px;">
+    <section class="ws-section">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+
+                    <div class="text-center mb-4">
+                        <h2 class="fw-bold">Ihr Auftragsstatus</h2>
+                        {% if flow.customer_name %}
+                        <p class="text-muted">Hallo {{ flow.customer_name }}, hier sehen Sie den aktuellen Stand Ihres Vorgangs.</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Workflow-Timeline -->
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body py-4">
+                            <div class="d-flex justify-content-between position-relative" style="padding: 0 10px;">
+                                <!-- Hintergrund-Linie -->
+                                <div class="position-absolute" style="top: 20px; left: 30px; right: 30px; height: 3px; background: #e9ecef;"></div>
+                                <!-- Fortschritts-Linie -->
+                                {% set ns = namespace(last_completed=-1, current=-1) %}
+                                {% for step in flow.steps %}
+                                    {% if step.completed %}{% set ns.last_completed = loop.index0 %}{% endif %}
+                                    {% if step.current %}{% set ns.current = loop.index0 %}{% endif %}
+                                {% endfor %}
+                                {% set progress_to = ns.current if ns.current >= 0 else ns.last_completed %}
+                                {% if progress_to >= 0 %}
+                                <div class="position-absolute" style="top: 20px; left: 30px; height: 3px; background: var(--ws-primary, #1a6b5a); width: {{ (progress_to / (flow.steps|length - 1) * 100)|round }}%; transition: width 0.5s;"></div>
+                                {% endif %}
+
+                                {% for step in flow.steps %}
+                                <div class="text-center position-relative" style="z-index: 1; flex: 1;">
+                                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-2"
+                                         style="width: 40px; height: 40px;
+                                         {% if step.completed %}
+                                         background: var(--ws-primary, #1a6b5a); color: white;
+                                         {% elif step.current %}
+                                         background: var(--ws-primary, #1a6b5a); color: white; box-shadow: 0 0 0 4px rgba(26,107,90,0.2);
+                                         {% elif step.active %}
+                                         background: #ffc107; color: #333;
+                                         {% else %}
+                                         background: #e9ecef; color: #adb5bd;
+                                         {% endif %}">
+                                        {% if step.completed %}
+                                        <i class="bi bi-check-lg" style="font-size: 1.1rem;"></i>
+                                        {% elif step.current %}
+                                        <i class="{{ step.icon }}" style="font-size: 1rem;"></i>
+                                        {% else %}
+                                        <i class="{{ step.icon }}" style="font-size: 0.9rem;"></i>
+                                        {% endif %}
+                                    </div>
+                                    <div class="small {% if step.completed or step.current %}fw-semibold{% else %}text-muted{% endif %}" style="font-size: 0.75rem;">
+                                        {{ step.label }}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detail-Karten -->
+                    {% for step in flow.steps %}
+                    {% if step.active %}
+                    <div class="card border-0 shadow-sm mb-3 {% if step.current %}border-start border-4{% endif %}" style="{% if step.current %}border-left-color: var(--ws-primary, #1a6b5a) !important;{% endif %}">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <div class="rounded-circle d-inline-flex align-items-center justify-content-center me-3"
+                                     style="width: 36px; height: 36px; min-width: 36px;
+                                     {% if step.completed %}background: #d1e7dd; color: #198754;
+                                     {% elif step.current %}background: color-mix(in srgb, var(--ws-primary, #1a6b5a), white 85%); color: var(--ws-primary, #1a6b5a);
+                                     {% else %}background: #fff3cd; color: #ffc107;{% endif %}">
+                                    <i class="{{ step.icon }}"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-0">{{ step.label }}</h6>
+                                    {% if step.detail %}
+                                    <small class="text-muted">{{ step.detail }}</small>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end">
+                                    {% if step.completed %}
+                                    <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Erledigt</span>
+                                    {% elif step.current %}
+                                    <span class="badge" style="background: var(--ws-primary, #1a6b5a);"><i class="bi bi-arrow-right-circle me-1"></i>Aktuell</span>
+                                    {% endif %}
+                                    {% if step.date %}
+                                    <br><small class="text-muted">{{ step.date.strftime('%d.%m.%Y') if step.date }}</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {% if step.key == 'angebot' and step.betrag %}
+                            <div class="mt-2 pt-2 border-top">
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-muted">Angebotssumme:</span>
+                                    <strong>{{ '{:,.2f}'.format(step.betrag) }} &euro;</strong>
+                                </div>
+                                {% if step.status == 'verschickt' %}
+                                <div class="mt-2">
+                                    <small class="text-info"><i class="bi bi-clock me-1"></i>Wir warten auf Ihre Rückmeldung</small>
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+
+                    <!-- Anfrage-Details (wenn vorhanden) -->
+                    {% if flow.inquiry %}
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-white">
+                            <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Ihre Anfrage</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-2">
+                                <div class="col-6">
+                                    <small class="text-muted">Anfragen-Nr:</small><br>
+                                    <strong>{{ flow.inquiry.inquiry_number }}</strong>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted">Art:</small><br>
+                                    {{ flow.inquiry.type_label }}
+                                </div>
+                            </div>
+                            {% if flow.inquiry.description %}
+                            <div class="mb-2">
+                                <small class="text-muted">Beschreibung:</small><br>
+                                {{ flow.inquiry.description[:200] }}{% if flow.inquiry.description|length > 200 %}...{% endif %}
+                            </div>
+                            {% endif %}
+                            <div class="row">
+                                {% if flow.inquiry.quantity %}
+                                <div class="col-4"><small class="text-muted">Menge:</small><br>{{ flow.inquiry.quantity }} Stk.</div>
+                                {% endif %}
+                                {% if flow.inquiry.textile_type %}
+                                <div class="col-4"><small class="text-muted">Textil:</small><br>{{ flow.inquiry.textile_type }}</div>
+                                {% endif %}
+                                {% if flow.inquiry.desired_date %}
+                                <div class="col-4"><small class="text-muted">Wunschtermin:</small><br>{{ flow.inquiry.desired_date.strftime('%d.%m.%Y') }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Tracking-Link teilen -->
+                    <div class="card border-0 shadow-sm mb-4">
+                        <div class="card-body text-center">
+                            <small class="text-muted">
+                                <i class="bi bi-bookmark me-1"></i>
+                                Speichern Sie diesen Link, um den Status jederzeit abzurufen:
+                            </small>
+                            <div class="input-group input-group-sm mt-2 mx-auto" style="max-width: 500px;">
+                                <input type="text" class="form-control text-center" id="trackingUrl"
+                                       value="{{ url_for('tracking.unified_status', token=flow.token, _external=True) }}" readonly>
+                                <button class="btn btn-outline-secondary" onclick="copyUrl()" title="Link kopieren">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <a href="{{ url_for('website.home') }}" class="btn btn-outline-dark">
+                            <i class="bi bi-arrow-left me-2"></i>Zurück zur Startseite
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+function copyUrl() {
+    const input = document.getElementById('trackingUrl');
+    input.select();
+    navigator.clipboard.writeText(input.value).then(() => {
+        const btn = input.nextElementSibling;
+        btn.innerHTML = '<i class="bi bi-check-lg text-success"></i>';
+        setTimeout(() => btn.innerHTML = '<i class="bi bi-clipboard"></i>', 2000);
+    });
+}
+</script>
+{% endblock %}

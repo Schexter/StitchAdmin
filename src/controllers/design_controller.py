@@ -13,6 +13,7 @@ import uuid
 import os
 import json
 import hashlib
+import logging
 
 from src.models.models import db, Customer, Supplier, Order
 from src.models.design import (
@@ -20,6 +21,8 @@ from src.models.design import (
     ThreadBrand, ThreadColor, DesignOrder
 )
 from src.models.nummernkreis import NumberSequenceService, DocumentType
+
+logger = logging.getLogger(__name__)
 
 # Blueprint
 designs_bp = Blueprint('designs', __name__, url_prefix='/designs')
@@ -33,7 +36,7 @@ def generate_design_number():
     """Generiert eine neue Design-Nummer (D-2025-0001)"""
     try:
         return NumberSequenceService.generate_number(DocumentType.DESIGN)
-    except:
+    except Exception:
         # Fallback
         from datetime import datetime
         count = Design.query.count() + 1
@@ -44,7 +47,7 @@ def generate_design_order_number():
     """Generiert eine neue Design-Bestellnummer (DO-2025-0001)"""
     try:
         return NumberSequenceService.generate_number(DocumentType.DESIGN_ORDER)
-    except:
+    except Exception:
         # Fallback
         from datetime import datetime
         count = DesignOrder.query.count() + 1
@@ -100,23 +103,27 @@ def index():
     # Filter aus Request
     design_type = request.args.get('type', '')
     status = request.args.get('status', '')
+    show_archived = request.args.get('archiv', '') == '1'
     customer_id = request.args.get('customer', '')
     search = request.args.get('search', '')
     page = request.args.get('page', 1, type=int)
     per_page = 24  # Grid-Ansicht
-    
+
     # Query aufbauen
     query = Design.query
-    
+
     if design_type:
         query = query.filter(Design.design_type == design_type)
-    
+
     if status:
         query = query.filter(Design.status == status)
-    
+    elif not show_archived:
+        # Standardmaessig archivierte Designs ausblenden
+        query = query.filter(Design.status != 'archived')
+
     if customer_id:
         query = query.filter(Design.customer_id == customer_id)
-    
+
     if search:
         search_term = f"%{search}%"
         query = query.filter(
@@ -127,29 +134,31 @@ def index():
                 Design.tags.ilike(search_term)
             )
         )
-    
+
     # Sortierung
     query = query.order_by(Design.created_at.desc())
-    
+
     # Pagination
     designs = query.paginate(page=page, per_page=per_page, error_out=False)
-    
-    # Kunden für Filter
+
+    # Kunden fuer Filter
     customers = Customer.query.order_by(Customer.company_name, Customer.last_name).all()
-    
+
     # Statistiken
     stats = {
-        'total': Design.query.count(),
-        'embroidery': Design.query.filter_by(design_type='embroidery').count(),
-        'print': Design.query.filter_by(design_type='print').count(),
-        'dtf': Design.query.filter_by(design_type='dtf').count(),
-        'active': Design.query.filter_by(status='active').count()
+        'total': Design.query.filter(Design.status != 'archived').count(),
+        'embroidery': Design.query.filter_by(design_type='embroidery').filter(Design.status != 'archived').count(),
+        'print': Design.query.filter_by(design_type='print').filter(Design.status != 'archived').count(),
+        'dtf': Design.query.filter_by(design_type='dtf').filter(Design.status != 'archived').count(),
+        'active': Design.query.filter_by(status='active').count(),
+        'archived': Design.query.filter_by(status='archived').count()
     }
-    
+
     return render_template('designs/index.html',
                           designs=designs,
                           customers=customers,
                           stats=stats,
+                          show_archived=show_archived,
                           filters={
                               'type': design_type,
                               'status': status,
@@ -208,9 +217,11 @@ def new():
                     design.file_size_kb = os.path.getsize(filepath) // 1024
                     design.file_hash = get_file_hash(filepath)
                     
-                    # Stickdatei analysieren
-                    if design.design_type == 'embroidery' and ext in ('dst', 'emb', 'pes', 'jef', 'exp'):
+                    # Stickdatei analysieren (inkl. Thumbnail)
+                    if design.design_type == 'embroidery' and ext in ('dst', 'emb', 'pes', 'jef', 'exp', 'vp3', 'hus', 'xxx', 'sew'):
                         design.analyze_embroidery_file()
+                    elif ext in ('png', 'jpg', 'jpeg', 'tiff', 'tif', 'bmp'):
+                        design.generate_thumbnail()
             
             # Maße (falls manuell eingegeben)
             if request.form.get('width_mm'):
@@ -285,34 +296,69 @@ def new():
 def show(design_id):
     """Design-Details anzeigen"""
     design = Design.query.get_or_404(design_id)
-    
-    # Letzte Verwendungen
+
+    # Letzte Verwendungen aus DesignUsage
     recent_usage = DesignUsage.query.filter_by(design_id=design_id)\
         .order_by(DesignUsage.used_at.desc())\
         .limit(10).all()
-    
+
+    # Auftraege die dieses Design verwenden (ueber OrderDesign)
+    linked_orders = []
+    try:
+        from src.models.order_workflow import OrderDesign
+        order_designs = OrderDesign.query.filter(
+            db.or_(
+                OrderDesign.design_file_path == design.file_path,
+                OrderDesign.design_name.ilike(f'%{design.name}%') if design.name else db.false()
+            )
+        ).order_by(OrderDesign.created_at.desc()).limit(20).all()
+        for od in order_designs:
+            if od.order:
+                linked_orders.append({
+                    'order': od.order,
+                    'position': od.get_position_label(),
+                    'design_type': od.get_design_type_label(),
+                    'approval_status': od.get_approval_status_label(),
+                    'quantity': od.order.quantity if hasattr(od.order, 'quantity') else None,
+                    '_order_design': od
+                })
+    except Exception:
+        pass
+
     # Versionen
     versions = DesignVersion.query.filter_by(design_id=design_id)\
         .order_by(DesignVersion.version_number.desc()).all()
-    
-    # Garnfarben-Details laden
+
+    # Garnfarben-Details laden (aus Design selbst)
     thread_colors_detailed = []
     for color in design.get_thread_colors():
-        # Versuche passende Farbe aus DB zu finden
         db_color = None
         if color.get('color_code'):
             db_color = ThreadColor.query.filter_by(color_code=color['color_code']).first()
-        
-        thread_colors_detailed.append({
-            **color,
-            'db_color': db_color
-        })
-    
+        thread_colors_detailed.append({**color, 'db_color': db_color})
+
+    # Farben aus verknuepften Auftraegen uebernehmen (falls im Design-Archiv keine hinterlegt)
+    order_colors = []
+    if not thread_colors_detailed and linked_orders:
+        for lo in linked_orders:
+            try:
+                od = lo.get('_order_design')
+                if od and od.thread_colors:
+                    colors_data = json.loads(od.thread_colors) if isinstance(od.thread_colors, str) else od.thread_colors
+                    if isinstance(colors_data, list):
+                        for c in colors_data:
+                            if isinstance(c, dict) and c not in order_colors:
+                                order_colors.append(c)
+            except Exception:
+                pass
+
     return render_template('designs/show.html',
                           design=design,
                           recent_usage=recent_usage,
+                          linked_orders=linked_orders,
                           versions=versions,
-                          thread_colors=thread_colors_detailed)
+                          thread_colors=thread_colors_detailed,
+                          order_colors=order_colors)
 
 
 @designs_bp.route('/<design_id>/edit', methods=['GET', 'POST'])
@@ -404,6 +450,43 @@ def delete(design_id):
     return redirect(url_for('designs.index'))
 
 
+@designs_bp.route('/<design_id>/archive', methods=['POST'])
+def archive(design_id):
+    """Design archivieren oder wiederherstellen"""
+    design = Design.query.get_or_404(design_id)
+    if design.status == 'archived':
+        design.status = 'active'
+        db.session.commit()
+        flash(f'Design {design.design_number} wiederhergestellt.', 'success')
+    else:
+        design.status = 'archived'
+        db.session.commit()
+        flash(f'Design {design.design_number} archiviert.', 'success')
+
+    # Zurueck zur Herkunftsseite oder Index
+    next_url = request.referrer or url_for('designs.index')
+    return redirect(next_url)
+
+
+@designs_bp.route('/api/bulk-archive', methods=['POST'])
+def bulk_archive():
+    """Mehrere Designs auf einmal archivieren"""
+    data = request.get_json() or {}
+    design_ids = data.get('design_ids', [])
+    action = data.get('action', 'archive')  # archive oder restore
+
+    if not design_ids:
+        return jsonify({'success': False, 'error': 'Keine Designs ausgewaehlt'}), 400
+
+    new_status = 'archived' if action == 'archive' else 'active'
+    count = Design.query.filter(Design.id.in_(design_ids)).update(
+        {Design.status: new_status}, synchronize_session='fetch')
+    db.session.commit()
+
+    verb = 'archiviert' if action == 'archive' else 'wiederhergestellt'
+    return jsonify({'success': True, 'message': f'{count} Designs {verb}.'})
+
+
 @designs_bp.route('/<design_id>/analyze', methods=['POST'])
 def analyze(design_id):
     """Stickdatei neu analysieren"""
@@ -483,6 +566,221 @@ def duplicate(design_id):
         db.session.rollback()
         flash(f'Fehler beim Duplizieren: {str(e)}', 'danger')
         return redirect(url_for('designs.show', design_id=design_id))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DOWNLOAD & VORSCHAU
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@designs_bp.route('/<design_id>/download')
+def download(design_id):
+    """Original-Designdatei herunterladen"""
+    design = Design.query.get_or_404(design_id)
+
+    if not design.file_path or not os.path.exists(design.file_path):
+        flash('Design-Datei nicht gefunden!', 'danger')
+        return redirect(url_for('designs.show', design_id=design_id))
+
+    download_name = design.file_name or f"{design.design_number}.{design.file_type or 'bin'}"
+    return send_file(design.file_path, as_attachment=True, download_name=download_name)
+
+
+@designs_bp.route('/<design_id>/preview')
+def preview_image(design_id):
+    """Vorschaubild als Datei ausliefern"""
+    design = Design.query.get_or_404(design_id)
+
+    def resolve_static_path(path_str):
+        """Loest einen /static/... Pfad zur Datei auf"""
+        if not path_str:
+            return None
+        # Entferne fuehrendes /static/ falls vorhanden
+        rel = path_str
+        if rel.startswith('/static/'):
+            rel = rel[len('/static/'):]
+        elif rel.startswith('static/'):
+            rel = rel[len('static/'):]
+        full = os.path.join(current_app.root_path, 'static', rel)
+        return full if os.path.exists(full) else None
+
+    # Preview oder Thumbnail oder Originaldatei
+    img_path = resolve_static_path(design.preview_path)
+    if not img_path:
+        img_path = resolve_static_path(design.thumbnail_path)
+    if not img_path and design.file_path and os.path.exists(design.file_path):
+        ext = os.path.splitext(design.file_path)[1].lower()
+        if ext in ('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'):
+            img_path = design.file_path
+
+    if not img_path:
+        flash('Keine Vorschau verfuegbar.', 'warning')
+        return redirect(url_for('designs.show', design_id=design_id))
+
+    return send_file(img_path, mimetype='image/png')
+
+
+@designs_bp.route('/<design_id>/regenerate-thumbnail', methods=['POST'])
+def regenerate_thumbnail(design_id):
+    """Thumbnail neu generieren"""
+    design = Design.query.get_or_404(design_id)
+
+    if not design.file_path or not os.path.exists(design.file_path):
+        flash('Design-Datei nicht gefunden!', 'danger')
+        return redirect(url_for('designs.show', design_id=design_id))
+
+    try:
+        if design.generate_thumbnail():
+            db.session.commit()
+            flash('Vorschau erfolgreich generiert!', 'success')
+        else:
+            flash('Vorschau konnte nicht generiert werden.', 'warning')
+    except Exception as e:
+        flash(f'Fehler: {str(e)}', 'danger')
+
+    return redirect(url_for('designs.show', design_id=design_id))
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ORDNER-IMPORT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@designs_bp.route('/import', methods=['GET', 'POST'])
+def folder_import():
+    """Designs aus einem Verzeichnis importieren"""
+    if request.method == 'POST':
+        folder_path = request.form.get('folder_path', '').strip()
+        customer_id = request.form.get('customer_id') or None
+        default_type = request.form.get('design_type', 'embroidery')
+
+        if not folder_path or not os.path.isdir(folder_path):
+            flash('Verzeichnis nicht gefunden!', 'danger')
+            return redirect(url_for('designs.folder_import'))
+
+        # Erlaubte Dateiendungen
+        embroidery_ext = {'dst', 'emb', 'pes', 'jef', 'exp', 'vp3', 'hus', 'xxx', 'sew'}
+        image_ext = {'png', 'jpg', 'jpeg', 'tiff', 'tif', 'bmp', 'svg'}
+        print_ext = {'pdf', 'ai', 'eps'} | image_ext
+        all_ext = embroidery_ext | print_ext
+
+        imported = 0
+        skipped = 0
+        errors = []
+
+        for root, dirs, files in os.walk(folder_path):
+            # Relativer Pfad fuer Kategorisierung
+            rel_path = os.path.relpath(root, folder_path)
+            category = rel_path if rel_path != '.' else ''
+
+            for fname in sorted(files):
+                ext = fname.rsplit('.', 1)[-1].lower() if '.' in fname else ''
+                if ext not in all_ext:
+                    continue
+
+                source_path = os.path.join(root, fname)
+
+                # Duplikat-Check ueber Hash
+                try:
+                    file_hash = get_file_hash(source_path)
+                except Exception:
+                    errors.append(f"Kann {fname} nicht lesen")
+                    continue
+
+                existing = Design.query.filter_by(file_hash=file_hash).first()
+                if existing:
+                    skipped += 1
+                    continue
+
+                # Design-Typ bestimmen
+                if ext in embroidery_ext:
+                    d_type = 'embroidery'
+                elif ext in {'pdf', 'ai', 'eps'}:
+                    d_type = 'print'
+                else:
+                    d_type = default_type
+
+                # Datei ins Upload-Verzeichnis kopieren
+                try:
+                    design_id = str(uuid.uuid4())
+                    design_number = generate_design_number()
+                    new_filename = f"{design_number}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{ext}"
+
+                    upload_path = get_design_upload_path()
+                    dest_path = os.path.join(upload_path, new_filename)
+
+                    import shutil
+                    shutil.copy2(source_path, dest_path)
+
+                    # Name aus Dateiname (ohne Extension)
+                    name = os.path.splitext(fname)[0]
+
+                    design = Design(
+                        id=design_id,
+                        design_number=design_number,
+                        name=name,
+                        design_type=d_type,
+                        category=category or None,
+                        customer_id=customer_id,
+                        is_customer_design=bool(customer_id),
+                        source='customer' if customer_id else 'internal',
+                        status='active',
+                        file_path=dest_path,
+                        file_name=fname,
+                        file_type=ext,
+                        file_size_kb=os.path.getsize(dest_path) // 1024,
+                        file_hash=file_hash,
+                        created_by=session.get('username', 'System')
+                    )
+
+                    # Analyse + Thumbnail
+                    if d_type == 'embroidery' and ext in embroidery_ext:
+                        design.analyze_embroidery_file()
+                    elif ext in image_ext:
+                        design.generate_thumbnail()
+
+                    db.session.add(design)
+
+                    # Version erstellen
+                    version = DesignVersion(
+                        design_id=design_id,
+                        version_number=1,
+                        version_name='Import',
+                        change_description=f'Importiert aus {rel_path}/{fname}',
+                        file_path=dest_path,
+                        file_name=fname,
+                        is_active=True,
+                        created_by=session.get('username', 'System')
+                    )
+                    db.session.add(version)
+
+                    imported += 1
+
+                except Exception as e:
+                    errors.append(f"{fname}: {str(e)}")
+                    continue
+
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Datenbank-Fehler: {str(e)}', 'danger')
+            return redirect(url_for('designs.folder_import'))
+
+        msg = f'{imported} Designs importiert'
+        if skipped:
+            msg += f', {skipped} Duplikate uebersprungen'
+        if errors:
+            msg += f', {len(errors)} Fehler'
+        flash(msg, 'success' if imported > 0 else 'warning')
+
+        if errors:
+            for err in errors[:5]:
+                flash(f'Fehler: {err}', 'warning')
+
+        return redirect(url_for('designs.index'))
+
+    # GET: Formular
+    customers = Customer.query.order_by(Customer.company_name, Customer.last_name).all()
+    return render_template('designs/import.html', customers=customers)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

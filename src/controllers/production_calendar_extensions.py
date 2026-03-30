@@ -423,14 +423,14 @@ def register_calendar_routes(bp, load_production_settings, log_activity):
             try:
                 start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
                 query = query.filter(ProductionBlock.start_date >= start_date)
-            except:
+            except (ValueError, TypeError):
                 pass
-        
+
         if end_date_str:
             try:
                 end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
                 query = query.filter(ProductionBlock.end_date <= end_date)
-            except:
+            except (ValueError, TypeError):
                 pass
         
         # Sortieren und Limit
@@ -567,7 +567,7 @@ def register_calendar_routes(bp, load_production_settings, log_activity):
         try:
             start_dt = datetime.strptime(start_time_str, '%Y-%m-%d %H:%M')
             end_dt = start_dt + timedelta(hours=duration_hours)
-        except:
+        except (ValueError, TypeError):
             return jsonify({'error': 'Ungültiges Zeitformat'}), 400
         
         machine_types = []
@@ -630,9 +630,9 @@ def register_calendar_routes(bp, load_production_settings, log_activity):
                     block_end = datetime.combine(block_conflict.end_date, block_conflict.end_time)
                     if not (end_dt <= block_start or start_dt >= block_end):
                         continue
-            except:
+            except (ValueError, TypeError):
                 pass
-            
+
             current_order = Order.query.filter_by(
                 assigned_machine_id=machine.id,
                 status='in_progress'
@@ -670,7 +670,7 @@ def register_calendar_routes(bp, load_production_settings, log_activity):
         if block_type == 'production' or not str(block_id).startswith('block_'):
             try:
                 schedule_id = int(str(block_id).replace('block_', ''))
-            except:
+            except (ValueError, TypeError):
                 schedule_id = block_id
                 
             schedule = ProductionSchedule.query.get(schedule_id)

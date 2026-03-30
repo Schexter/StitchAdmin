@@ -41,13 +41,17 @@
 
     <form method="POST" id="step4Form">
         <input type="hidden" name="positionen_json" id="positionenJson">
-        
+        <input type="hidden" name="manuell_angepasst" id="manuellAngepasst" value="">
+
         <div class="row">
             <!-- Hauptbereich: Positionen -->
             <div class="col-lg-8">
                 <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-primary text-white">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <h5 class="mb-0"><i class="fas fa-calculator me-2"></i>Kalkulation</h5>
+                        <button type="button" class="btn btn-sm btn-outline-light" onclick="neuePosition()">
+                            <i class="fas fa-plus me-1"></i>Position hinzufügen
+                        </button>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -56,35 +60,13 @@
                                     <tr>
                                         <th style="width: 40px;">Pos.</th>
                                         <th>Bezeichnung</th>
-                                        <th class="text-center" style="width: 80px;">Menge</th>
-                                        <th class="text-end" style="width: 100px;">Einzelpreis</th>
+                                        <th class="text-center" style="width: 100px;">Menge</th>
+                                        <th class="text-end" style="width: 120px;">Einzelpreis</th>
                                         <th class="text-end" style="width: 120px;">Gesamt (netto)</th>
+                                        <th style="width: 80px;" class="text-center">Aktion</th>
                                     </tr>
                                 </thead>
                                 <tbody id="positionenTabelle">
-                                    {% for pos in kalkulation.positionen %}
-                                    <tr class="position-row" data-typ="{{ pos.typ }}">
-                                        <td class="text-muted">{{ pos.nr }}</td>
-                                        <td>
-                                            <strong>{{ pos.bezeichnung }}</strong>
-                                            {% if pos.beschreibung %}
-                                            <br><small class="text-muted">{{ pos.beschreibung }}</small>
-                                            {% endif %}
-                                            {% if pos.artikelnummer %}
-                                            <br><small class="text-muted">Art.-Nr.: {{ pos.artikelnummer }}</small>
-                                            {% endif %}
-                                        </td>
-                                        <td class="text-center">
-                                            {{ pos.menge }} {{ pos.einheit }}
-                                        </td>
-                                        <td class="text-end">
-                                            {{ "%.2f"|format(pos.einzelpreis) }} €
-                                        </td>
-                                        <td class="text-end fw-bold">
-                                            {{ "%.2f"|format(pos.gesamt_netto) }} €
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
                                 </tbody>
                             </table>
                         </div>
@@ -264,72 +246,267 @@
 .wizard-line { flex: 1; height: 3px; background: #e9ecef; margin: 0 10px; margin-bottom: 20px; }
 .wizard-line.completed { background: var(--bs-success); }
 
-.position-row[data-typ="textil"] { background: rgba(25, 135, 84, 0.05); }
-.position-row[data-typ^="veredelung"] { background: rgba(13, 110, 253, 0.05); }
-.position-row[data-typ="einrichtung"] { background: rgba(255, 193, 7, 0.05); }
+.position-row-textil { background: rgba(25, 135, 84, 0.05); }
+.position-row-veredelung { background: rgba(13, 110, 253, 0.05); }
+.position-row-einrichtung { background: rgba(255, 193, 7, 0.05); }
+.position-row[data-typ="manuell"] { background: rgba(108, 117, 125, 0.05); }
 </style>
 
+<!-- Position bearbeiten Modal -->
+<div class="modal fade" id="positionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="positionModalTitle">Position bearbeiten</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editIndex" value="-1">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Bezeichnung</label>
+                    <input type="text" class="form-control" id="editBezeichnung" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Beschreibung <small class="text-muted">(optional)</small></label>
+                    <input type="text" class="form-control" id="editBeschreibung">
+                </div>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Menge</label>
+                        <input type="number" class="form-control" id="editMenge" min="1" step="1" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold">Einheit</label>
+                        <select class="form-select" id="editEinheit">
+                            <option value="Stk.">Stk.</option>
+                            <option value="pauschal">pauschal</option>
+                            <option value="Std.">Std.</option>
+                            <option value="lfm.">lfm.</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3 mt-3">
+                    <label class="form-label fw-bold">Einzelpreis (netto)</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="editEinzelpreis" min="0" step="0.01" required>
+                        <span class="input-group-text">&euro;</span>
+                    </div>
+                </div>
+                <div class="alert alert-light mt-3 mb-0">
+                    <strong>Gesamt (netto):</strong> <span id="editGesamt">0,00</span> &euro;
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                <button type="button" class="btn btn-primary" onclick="positionSpeichern()">
+                    <i class="fas fa-save me-1"></i>Speichern
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-const kalkulationsDaten = {{ kalkulation|tojson|safe }};
+// Positionen als editierbares Array
+let positionen = {{ kalkulation.positionen|tojson|safe }};
+let gesamtmenge = {{ kalkulation.gesamtmenge|default(0) }};
 
 document.addEventListener('DOMContentLoaded', function() {
+    renderPositionen();
+    berechneNeu();
+
     // Rabatt-Änderung
-    document.getElementById('rabattProzent').addEventListener('input', function() {
-        berechneNeu();
-    });
-    
+    document.getElementById('rabattProzent').addEventListener('input', berechneNeu);
+
     // Zahlungsbedingung-Änderung
     document.getElementById('zahlungsbedingung').addEventListener('change', function() {
         const option = this.options[this.selectedIndex];
         const skonto = parseFloat(option.dataset.skonto) || 0;
         const anzahlung = parseFloat(option.dataset.anzahlung) || 0;
-        
-        // Skonto-Info
+
         const skontoInfo = document.getElementById('skontoInfo');
         if (skonto > 0) {
             skontoInfo.classList.remove('d-none');
             document.getElementById('skontoTage').textContent = option.dataset.tage;
-            const brutto = parseFloat(document.getElementById('summeBrutto').textContent);
-            document.getElementById('skontoBetrag').textContent = (brutto * skonto / 100).toFixed(2) + ' €';
+            const brutto = getSummeBrutto();
+            document.getElementById('skontoBetrag').textContent = (brutto * skonto / 100).toFixed(2) + ' \u20ac';
         } else {
             skontoInfo.classList.add('d-none');
         }
-        
-        // Anzahlung-Info
+
         const anzahlungInfo = document.getElementById('anzahlungInfo');
         if (anzahlung > 0) {
             anzahlungInfo.classList.remove('d-none');
             document.getElementById('anzahlungText').textContent = anzahlung + '% bei Auftragserteilung';
-            const brutto = parseFloat(document.getElementById('summeBrutto').textContent.replace(' €', '').replace(',', '.'));
-            document.getElementById('anzahlungBetrag').textContent = (brutto * anzahlung / 100).toFixed(2).replace('.', ',') + ' €';
+            const brutto = getSummeBrutto();
+            document.getElementById('anzahlungBetrag').textContent = (brutto * anzahlung / 100).toFixed(2).replace('.', ',') + ' \u20ac';
         } else {
             anzahlungInfo.classList.add('d-none');
         }
     });
+
+    // Modal: Gesamt live berechnen
+    ['editMenge', 'editEinzelpreis'].forEach(id => {
+        document.getElementById(id).addEventListener('input', function() {
+            const m = parseFloat(document.getElementById('editMenge').value) || 0;
+            const p = parseFloat(document.getElementById('editEinzelpreis').value) || 0;
+            document.getElementById('editGesamt').textContent = (m * p).toFixed(2);
+        });
+    });
+
+    // Form Submit: Positionen als JSON mitsenden
+    document.getElementById('step4Form').addEventListener('submit', function() {
+        document.getElementById('positionenJson').value = JSON.stringify(positionen);
+        if (document.getElementById('manuellAngepasst').value === 'on') {
+            // already set
+        }
+    });
 });
+
+function renderPositionen() {
+    const tbody = document.getElementById('positionenTabelle');
+    if (positionen.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Keine Positionen vorhanden</td></tr>';
+        return;
+    }
+    tbody.innerHTML = positionen.map((pos, idx) => {
+        const typClass = pos.typ === 'textil' ? 'position-row-textil' :
+                         pos.typ && pos.typ.startsWith('veredelung') ? 'position-row-veredelung' :
+                         pos.typ === 'einrichtung' ? 'position-row-einrichtung' : '';
+        return `
+        <tr class="position-row ${typClass}" data-typ="${pos.typ || ''}">
+            <td class="text-muted">${idx + 1}</td>
+            <td>
+                <strong>${escapeHtml(pos.bezeichnung)}</strong>
+                ${pos.beschreibung ? '<br><small class="text-muted">' + escapeHtml(pos.beschreibung) + '</small>' : ''}
+                ${pos.artikelnummer ? '<br><small class="text-muted">Art.-Nr.: ' + escapeHtml(pos.artikelnummer) + '</small>' : ''}
+            </td>
+            <td class="text-center">${pos.menge} ${pos.einheit || 'Stk.'}</td>
+            <td class="text-end">${parseFloat(pos.einzelpreis).toFixed(2)} \u20ac</td>
+            <td class="text-end fw-bold">${parseFloat(pos.gesamt_netto).toFixed(2)} \u20ac</td>
+            <td class="text-center">
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-primary" onclick="positionBearbeiten(${idx})" title="Bearbeiten">
+                        <i class="fas fa-pen"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" onclick="positionEntfernen(${idx})" title="Entfernen">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function positionBearbeiten(idx) {
+    const pos = positionen[idx];
+    document.getElementById('editIndex').value = idx;
+    document.getElementById('positionModalTitle').textContent = 'Position bearbeiten';
+    document.getElementById('editBezeichnung').value = pos.bezeichnung || '';
+    document.getElementById('editBeschreibung').value = pos.beschreibung || '';
+    document.getElementById('editMenge').value = pos.menge || 1;
+    document.getElementById('editEinheit').value = pos.einheit || 'Stk.';
+    document.getElementById('editEinzelpreis').value = parseFloat(pos.einzelpreis || 0).toFixed(2);
+    document.getElementById('editGesamt').textContent = parseFloat(pos.gesamt_netto || 0).toFixed(2);
+    new bootstrap.Modal(document.getElementById('positionModal')).show();
+}
+
+function neuePosition() {
+    document.getElementById('editIndex').value = -1;
+    document.getElementById('positionModalTitle').textContent = 'Neue Position';
+    document.getElementById('editBezeichnung').value = '';
+    document.getElementById('editBeschreibung').value = '';
+    document.getElementById('editMenge').value = 1;
+    document.getElementById('editEinheit').value = 'Stk.';
+    document.getElementById('editEinzelpreis').value = '0.00';
+    document.getElementById('editGesamt').textContent = '0.00';
+    new bootstrap.Modal(document.getElementById('positionModal')).show();
+}
+
+function positionSpeichern() {
+    const idx = parseInt(document.getElementById('editIndex').value);
+    const bezeichnung = document.getElementById('editBezeichnung').value.trim();
+    if (!bezeichnung) { alert('Bitte Bezeichnung eingeben.'); return; }
+
+    const menge = parseInt(document.getElementById('editMenge').value) || 1;
+    const einheit = document.getElementById('editEinheit').value;
+    const einzelpreis = parseFloat(document.getElementById('editEinzelpreis').value) || 0;
+    const beschreibung = document.getElementById('editBeschreibung').value.trim();
+
+    const posData = {
+        bezeichnung: bezeichnung,
+        beschreibung: beschreibung,
+        menge: menge,
+        einheit: einheit,
+        einzelpreis: einzelpreis,
+        gesamt_netto: menge * einzelpreis
+    };
+
+    if (idx >= 0 && idx < positionen.length) {
+        // Bestehende Position aktualisieren — vorhandene Felder beibehalten
+        Object.assign(positionen[idx], posData);
+    } else {
+        // Neue Position
+        posData.typ = 'manuell';
+        posData.nr = positionen.length + 1;
+        positionen.push(posData);
+    }
+
+    document.getElementById('manuellAngepasst').value = 'on';
+    bootstrap.Modal.getInstance(document.getElementById('positionModal')).hide();
+    renderPositionen();
+    berechneNeu();
+}
+
+function positionEntfernen(idx) {
+    const pos = positionen[idx];
+    if (!confirm('Position "' + pos.bezeichnung + '" wirklich entfernen?')) return;
+    positionen.splice(idx, 1);
+    document.getElementById('manuellAngepasst').value = 'on';
+    renderPositionen();
+    berechneNeu();
+}
+
+function getSummeNetto() {
+    return positionen.reduce((sum, p) => sum + parseFloat(p.gesamt_netto || 0), 0);
+}
+
+function getSummeBrutto() {
+    const txt = document.getElementById('summeBrutto').textContent.replace(/[^\d.,\-]/g, '').replace(',', '.');
+    return parseFloat(txt) || 0;
+}
 
 function berechneNeu() {
     const rabattProzent = parseFloat(document.getElementById('rabattProzent').value) || 0;
-    const summeNetto = kalkulationsDaten.summe_netto;
-    
+    const summeNetto = getSummeNetto();
+
     const rabattBetrag = summeNetto * rabattProzent / 100;
     const nettoNachRabatt = summeNetto - rabattBetrag;
     const mwstBetrag = nettoNachRabatt * 0.19;
     const brutto = nettoNachRabatt + mwstBetrag;
-    
-    // Anzeige aktualisieren
+
+    document.getElementById('summeNetto').textContent = summeNetto.toFixed(2) + ' \u20ac';
     document.getElementById('rabattProzentAnzeige').textContent = rabattProzent;
     document.getElementById('rabattBetrag').textContent = rabattBetrag.toFixed(2);
     document.getElementById('rabattZeile').style.display = rabattBetrag > 0 ? 'flex' : 'none';
-    
-    document.getElementById('nettoNachRabatt').textContent = nettoNachRabatt.toFixed(2) + ' €';
-    document.getElementById('mwstBetrag').textContent = mwstBetrag.toFixed(2) + ' €';
-    document.getElementById('summeBrutto').textContent = brutto.toFixed(2) + ' €';
-    
-    // Stückpreis
-    if (kalkulationsDaten.gesamtmenge > 0) {
-        document.getElementById('stueckpreis').textContent = (brutto / kalkulationsDaten.gesamtmenge).toFixed(2) + ' €';
+    document.getElementById('nettoNachRabatt').textContent = nettoNachRabatt.toFixed(2) + ' \u20ac';
+    document.getElementById('mwstBetrag').textContent = mwstBetrag.toFixed(2) + ' \u20ac';
+    document.getElementById('summeBrutto').textContent = brutto.toFixed(2) + ' \u20ac';
+
+    // Gesamtmenge: nur Textil-Positionen
+    gesamtmenge = positionen
+        .filter(p => p.typ === 'textil')
+        .reduce((sum, p) => sum + (parseInt(p.menge) || 0), 0);
+    if (gesamtmenge > 0) {
+        document.getElementById('stueckpreis').textContent = (brutto / gesamtmenge).toFixed(2) + ' \u20ac';
     }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
 }
 </script>
 {% endblock %}

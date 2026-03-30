@@ -415,23 +415,249 @@ class LShopImportService:
         return preview
     
     def import_articles(self, column_mapping, options=None):
-        """Importiert Artikel mit dem gegebenen Spalten-Mapping - REPARIERT"""
+        """Importiert Artikel mit dem gegebenen Spalten-Mapping"""
         if self.df is None:
             return {'success': False, 'error': 'Keine Excel-Daten verfügbar'}
-        
+
+        # Varianten-Import wenn aktiviert und Farbe/Groesse gemappt
+        if options and options.get('create_variants'):
+            has_color = bool(column_mapping.get('color'))
+            has_size = bool(column_mapping.get('size'))
+            has_sku = bool(column_mapping.get('supplier_article_number'))
+            if has_sku and (has_color or has_size):
+                return self._import_with_variants(column_mapping, options)
+
+        return self._import_single_articles(column_mapping, options)
+
+    def _extract_row_data(self, row, column_mapping):
+        """Extrahiert Artikel-Daten aus einer Zeile basierend auf Mapping"""
+        article_data = {}
+        for target_field, source_column in column_mapping.items():
+            if source_column:
+                if source_column.isdigit():
+                    col_index = int(source_column)
+                    if col_index < len(self.df.columns):
+                        column_name = self.df.columns[col_index]
+                    else:
+                        continue
+                else:
+                    column_name = source_column
+
+                if column_name in self.df.columns:
+                    value = row[column_name]
+                    if pd.notna(value) and str(value).strip():
+                        article_data[target_field] = str(value).strip()
+        return article_data
+
+    def _import_with_variants(self, column_mapping, options=None):
+        """Importiert Artikel mit Varianten-Gruppierung nach supplier_article_number"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            imported_count = 0
+            variant_count = 0
+            updated_count = 0
+            skipped_count = 0
+            error_count = 0
+            errors = []
+
+            try:
+                db.session.rollback()
+            except:
+                pass
+
+            # Spaltenname fuer supplier_article_number ermitteln
+            sku_col = column_mapping.get('supplier_article_number', '')
+            if sku_col.isdigit():
+                sku_col = self.df.columns[int(sku_col)] if int(sku_col) < len(self.df.columns) else None
+
+            has_color = bool(column_mapping.get('color'))
+            has_size = bool(column_mapping.get('size'))
+
+            # Zeilen nach supplier_article_number gruppieren
+            groups = {}
+            for index, row in self.df.iterrows():
+                if row.isna().all():
+                    continue
+                data = self._extract_row_data(row, column_mapping)
+                sku = data.get('supplier_article_number', '').strip()
+                if not sku and not data.get('name'):
+                    skipped_count += 1
+                    continue
+                key = sku if sku else f"_row_{index}"
+                if key not in groups:
+                    groups[key] = []
+                groups[key].append(data)
+
+            logger.info(f"Varianten-Import: {len(groups)} Artikelgruppen aus {len(self.df)} Zeilen")
+
+            for sku, rows in groups.items():
+                try:
+                    first_row = rows[0]
+                    has_multiple = len(rows) > 1
+                    row_has_color = any(r.get('color') for r in rows)
+                    row_has_size = any(r.get('size') for r in rows)
+                    create_variants = has_multiple or (row_has_color and row_has_size)
+
+                    # Pruefen ob Artikel schon existiert
+                    existing_article = None
+                    if first_row.get('supplier_article_number'):
+                        existing_article = Article.query.filter_by(
+                            supplier_article_number=first_row['supplier_article_number']
+                        ).first()
+
+                    if existing_article:
+                        # Bestehenden Artikel aktualisieren
+                        article = existing_article
+                        if create_variants and not article.has_variants:
+                            article.has_variants = True
+                            article.color = None
+                            article.size = None
+                        updated_count += 1
+                    else:
+                        # Neuen Artikel erstellen
+                        article_id = self.generate_article_id()
+                        art_nr = first_row.get('article_number') or f"SA-{first_row.get('supplier_article_number', article_id)}"
+
+                        brand_obj = self.create_or_get_brand(first_row.get('manufacturer'))
+                        category_obj = self.create_or_get_category(first_row.get('category'))
+
+                        article = Article(
+                            id=article_id,
+                            article_number=art_nr,
+                            supplier_article_number=first_row.get('supplier_article_number'),
+                            name=first_row.get('name', 'Unbenannter Artikel'),
+                            product_type=first_row.get('product_type'),
+                            brand=first_row.get('manufacturer'),
+                            brand_id=brand_obj.id if brand_obj else None,
+                            category=first_row.get('category'),
+                            category_id=category_obj.id if category_obj else None,
+                            manufacturer_number=first_row.get('manufacturer_number'),
+                            material=first_row.get('material'),
+                            units_per_carton=self._safe_int(first_row.get('units_per_carton')),
+                            purchase_price_single=self._safe_float(first_row.get('single_price')),
+                            purchase_price_carton=self._safe_float(first_row.get('carton_price')),
+                            purchase_price_10carton=self._safe_float(first_row.get('ten_carton_price')),
+                            description=first_row.get('description'),
+                            supplier='L-Shop',
+                            has_variants=create_variants,
+                            active=True,
+                            stock=0,
+                            min_stock=0,
+                            price=0,
+                            weight=0,
+                            created_by=current_user.username if current_user and current_user.is_authenticated else 'L-Shop Import',
+                            created_at=datetime.utcnow()
+                        )
+
+                        if not create_variants:
+                            article.color = first_row.get('color')
+                            article.size = first_row.get('size')
+
+                        if article.purchase_price_single and article.purchase_price_single > 0:
+                            try:
+                                article.calculate_prices()
+                            except:
+                                article.price = article.purchase_price_single * 2.0
+
+                        db.session.add(article)
+                        article.auto_assign_supplier()
+                        imported_count += 1
+
+                    # Varianten erstellen
+                    if create_variants:
+                        db.session.flush()  # Artikel-ID sicherstellen
+                        for row_data in rows:
+                            color = row_data.get('color', '').strip() or None
+                            size = row_data.get('size', '').strip() or None
+
+                            if not color and not size:
+                                continue
+
+                            # variant_type bestimmen
+                            if color and size:
+                                vtype = 'color_size'
+                            elif color:
+                                vtype = 'color'
+                            else:
+                                vtype = 'size'
+
+                            # Pruefen ob Variante schon existiert
+                            existing_var = ArticleVariant.query.filter_by(
+                                article_id=article.id, color=color, size=size
+                            ).first()
+
+                            if existing_var:
+                                # Update Preise
+                                existing_var.single_price = self._safe_float(row_data.get('single_price')) or existing_var.single_price
+                                existing_var.carton_price = self._safe_float(row_data.get('carton_price')) or existing_var.carton_price
+                                existing_var.ten_carton_price = self._safe_float(row_data.get('ten_carton_price')) or existing_var.ten_carton_price
+                            else:
+                                variant = ArticleVariant(
+                                    article_id=article.id,
+                                    variant_type=vtype,
+                                    color=color,
+                                    size=size,
+                                    ean=row_data.get('ean'),
+                                    single_price=self._safe_float(row_data.get('single_price')),
+                                    carton_price=self._safe_float(row_data.get('carton_price')),
+                                    ten_carton_price=self._safe_float(row_data.get('ten_carton_price')),
+                                    units_per_carton=self._safe_int(row_data.get('units_per_carton')),
+                                    active=True,
+                                    created_by=current_user.username if current_user and current_user.is_authenticated else 'L-Shop Import',
+                                )
+                                db.session.add(variant)
+                                variant_count += 1
+
+                    # Batch-Commit
+                    if (imported_count + updated_count) % 25 == 0:
+                        try:
+                            db.session.commit()
+                        except Exception as e:
+                            db.session.rollback()
+                            error_count += 1
+                            errors.append(f"Batch-Commit Fehler bei {sku}: {e}")
+
+                except Exception as e:
+                    error_count += 1
+                    errors.append(f"Artikel {sku}: {e}")
+                    continue
+
+            db.session.commit()
+
+            return {
+                'success': True,
+                'imported_count': imported_count,
+                'variant_count': variant_count,
+                'updated_count': updated_count,
+                'skipped_count': skipped_count,
+                'error_count': error_count,
+                'errors': errors[:10],
+                'total_processed': len(self.df)
+            }
+
+        except Exception as e:
+            db.session.rollback()
+            return {'success': False, 'error': str(e)}
+
+    def _import_single_articles(self, column_mapping, options=None):
+        """Importiert Artikel ohne Varianten-Gruppierung (Originalverhalten)"""
+        if self.df is None:
+            return {'success': False, 'error': 'Keine Excel-Daten verfügbar'}
+
         try:
             imported_count = 0
             updated_count = 0
             skipped_count = 0
             error_count = 0
             errors = []
-            
-            # *** REPARATUR: Session-Rollback bei Beginn ***
+
             try:
-                db.session.rollback()  # Bereinige vorherige Fehler
+                db.session.rollback()
             except:
                 pass
-            
+
             for index, row in self.df.iterrows():
                 try:
                     # Skip leere Zeilen

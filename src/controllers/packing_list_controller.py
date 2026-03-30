@@ -9,21 +9,11 @@ from flask_login import login_required, current_user
 from datetime import datetime
 from src.models import db, PackingList, Order, Customer, ActivityLog, PostEntry, DeliveryNote
 from sqlalchemy import or_
+from src.utils.activity_logger import log_activity
 import json
 
 # Blueprint erstellen
 packing_list_bp = Blueprint('packing_lists', __name__, url_prefix='/packing_lists')
-
-def log_activity(action, details):
-    """Aktivität in Datenbank protokollieren"""
-    activity = ActivityLog(
-        username=current_user.username,
-        action=action,
-        details=details,
-        ip_address=request.remote_addr
-    )
-    db.session.add(activity)
-    db.session.commit()
 
 
 @packing_list_bp.route('/')

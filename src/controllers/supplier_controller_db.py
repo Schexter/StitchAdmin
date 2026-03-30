@@ -18,16 +18,24 @@ supplier_bp = Blueprint('suppliers', __name__, url_prefix='/suppliers')
 
 # Verschlüsselung für Passwörter
 def get_encryption_key():
-    """Hole oder erstelle Verschlüsselungsschlüssel"""
-    key_file = 'encryption.key'
+    """Hole Verschluesselungsschluessel aus Environment oder Datei"""
+    # 1. Aus Environment-Variable (bevorzugt)
+    env_key = os.environ.get('STITCHADMIN_ENCRYPTION_KEY')
+    if env_key:
+        return env_key.encode() if isinstance(env_key, str) else env_key
+
+    # 2. Fallback: Aus Datei (Abwaertskompatibilitaet)
+    key_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'instance', 'encryption.key')
     if os.path.exists(key_file):
         with open(key_file, 'rb') as f:
             return f.read()
-    else:
-        key = Fernet.generate_key()
-        with open(key_file, 'wb') as f:
-            f.write(key)
-        return key
+
+    # 3. Neuen Key erstellen und in Datei speichern
+    key = Fernet.generate_key()
+    os.makedirs(os.path.dirname(key_file), exist_ok=True)
+    with open(key_file, 'wb') as f:
+        f.write(key)
+    return key
 
 def encrypt_password(password):
     """Verschlüssele Passwort"""
@@ -44,20 +52,9 @@ def decrypt_password(encrypted_password):
     return f.decrypt(encrypted_password.encode()).decode()
 
 def generate_supplier_id():
-    """Generiere neue Lieferanten-ID"""
-    # Finde die höchste existierende ID
-    last_supplier = Supplier.query.filter(Supplier.id.like('LF%')).order_by(Supplier.id.desc()).first()
-    
-    if not last_supplier:
-        return "LF001"
-    
-    # Extrahiere Nummer und erhöhe um 1
-    try:
-        last_num = int(last_supplier.id[2:])
-        return f"LF{last_num + 1:03d}"
-    except ValueError:
-        # Fallback wenn ID nicht dem erwarteten Format entspricht
-        return f"LF{Supplier.query.count() + 1:03d}"
+    """Generiere neue Lieferanten-ID - delegiert an IdGeneratorService"""
+    from src.services.id_generator_service import IdGenerator
+    return IdGenerator.supplier()
 
 @supplier_bp.route('/')
 @login_required
@@ -303,7 +300,7 @@ def new_order(supplier_id):
                     try:
                         last_num = int(last_order.order_number[2:])
                         order_number = f"PO{last_num + 1:06d}"
-                    except:
+                    except (ValueError, TypeError):
                         order_number = f"PO{datetime.now().strftime('%Y%m%d%H%M%S')}"
                 else:
                     order_number = f"PO{datetime.now().strftime('%Y%m%d')}001"
@@ -557,7 +554,7 @@ def get_webshop_credentials(supplier_id):
     if supplier.webshop_password_encrypted:
         try:
             password = decrypt_password(supplier.webshop_password_encrypted)
-        except:
+        except Exception:
             password = None
     
     return jsonify({
@@ -962,7 +959,7 @@ def print_supplier_order(supplier_id, order_id):
     if supplier_order.items:
         try:
             items = json.loads(supplier_order.items)
-        except:
+        except (json.JSONDecodeError, TypeError, ValueError):
             items = []
 
     return render_template('suppliers/print_order.html',
@@ -1011,7 +1008,7 @@ def receive_order(supplier_id, order_id):
     if supplier_order.items:
         try:
             items = json.loads(supplier_order.items)
-        except:
+        except (json.JSONDecodeError, TypeError, ValueError):
             items = []
 
     if request.method == 'POST':

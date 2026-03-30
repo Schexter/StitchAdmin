@@ -215,27 +215,27 @@ class Design(db.Model):
         """Analysiert Stickdatei mit pyembroidery"""
         if self.design_type != 'embroidery' or not self.file_path:
             return False
-        
+
         try:
             import pyembroidery
             import os
-            
+
             if not os.path.exists(self.file_path):
                 return False
-            
+
             pattern = pyembroidery.read(self.file_path)
             if not pattern:
                 return False
-            
+
             # Bounds berechnen
             bounds = pattern.bounds()
             if bounds:
                 self.width_mm = round((bounds[2] - bounds[0]) / 10, 1)
                 self.height_mm = round((bounds[3] - bounds[1]) / 10, 1)
-            
+
             # Stichzahl
             self.stitch_count = len([s for s in pattern.stitches if s[2] in (0, 1)])  # Nur echte Stiche
-            
+
             # Farben extrahieren
             colors = []
             for i, thread in enumerate(pattern.threadlist):
@@ -246,7 +246,7 @@ class Design(db.Model):
                     'rgb': '#000000',
                     'thread_brand': ''
                 }
-                
+
                 if hasattr(thread, 'hex_color'):
                     color_data['rgb'] = thread.hex_color()
                 if hasattr(thread, 'description'):
@@ -255,19 +255,19 @@ class Design(db.Model):
                     color_data['color_code'] = thread.catalog_number or ''
                 if hasattr(thread, 'brand'):
                     color_data['thread_brand'] = thread.brand or ''
-                
+
                 colors.append(color_data)
-            
+
             # Farbwechsel zählen
             self.color_changes = sum(1 for s in pattern.stitches if s[2] == pyembroidery.COLOR_CHANGE)
-            
+
             # Zeitschätzung (ca. 800 Stiche/Minute)
             if self.stitch_count:
                 self.estimated_time_minutes = max(1, round(self.stitch_count / 800))
-            
+
             # Farben speichern
             self.set_thread_colors(colors)
-            
+
             # Vollständige Analyse als JSON
             self.dst_analysis = json.dumps({
                 'bounds': bounds,
@@ -279,13 +279,150 @@ class Design(db.Model):
                 'height_mm': self.height_mm,
                 'analyzed_at': datetime.utcnow().isoformat()
             }, ensure_ascii=False)
-            
+
             self.preview_generated_at = datetime.utcnow()
-            
+
+            # Thumbnail generieren
+            self.generate_thumbnail(pattern=pattern)
+
             return True
-            
+
         except Exception as e:
-            print(f"Stickdatei-Analyse fehlgeschlagen: {e}")
+            import logging
+            logging.getLogger(__name__).error(f"Stickdatei-Analyse fehlgeschlagen: {e}")
+            return False
+
+    def generate_thumbnail(self, pattern=None):
+        """Generiert Vorschaubild aus Stickdatei oder Bilddatei"""
+        import os
+        if not self.file_path or not os.path.exists(self.file_path):
+            return False
+
+        try:
+            # Thumbnail-Verzeichnis
+            from flask import current_app
+            thumb_dir = os.path.join(current_app.static_folder, 'thumbnails', 'designs')
+            os.makedirs(thumb_dir, exist_ok=True)
+
+            base_name = self.design_number or self.id
+            thumb_filename = f"{base_name}_thumb.png"
+            preview_filename = f"{base_name}_preview.png"
+            thumb_path = os.path.join(thumb_dir, thumb_filename)
+            preview_path_full = os.path.join(thumb_dir, preview_filename)
+
+            ext = (self.file_type or '').lower()
+
+            if self.design_type == 'embroidery' and ext in ('dst', 'emb', 'pes', 'jef', 'exp', 'vp3', 'hus', 'xxx', 'sew'):
+                return self._generate_embroidery_thumbnail(thumb_path, preview_path_full, thumb_filename, preview_filename, pattern)
+            elif ext in ('png', 'jpg', 'jpeg', 'tiff', 'tif', 'bmp', 'svg'):
+                return self._generate_image_thumbnail(thumb_path, preview_path_full, thumb_filename, preview_filename)
+            return False
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Thumbnail-Generierung fehlgeschlagen: {e}")
+            return False
+
+    def _generate_embroidery_thumbnail(self, thumb_path, preview_path_full, thumb_filename, preview_filename, pattern=None):
+        """Rendert Stickdatei als Vorschaubild"""
+        try:
+            import pyembroidery
+            from PIL import Image, ImageDraw
+
+            if pattern is None:
+                pattern = pyembroidery.read(self.file_path)
+                if not pattern:
+                    return False
+
+            bounds = pattern.bounds()
+            if not bounds:
+                return False
+
+            min_x, min_y, max_x, max_y = bounds
+            design_w = max_x - min_x
+            design_h = max_y - min_y
+            if design_w == 0 or design_h == 0:
+                return False
+
+            # Preview (600px) und Thumbnail (200px)
+            for target_size, out_path, fname_attr in [(600, preview_path_full, 'preview'), (200, thumb_path, 'thumb')]:
+                scale = target_size / max(design_w, design_h)
+                img_w = max(int(design_w * scale), 1)
+                img_h = max(int(design_h * scale), 1)
+                padding = 10
+                img = Image.new('RGB', (img_w + padding * 2, img_h + padding * 2), (255, 255, 255))
+                draw = ImageDraw.Draw(img)
+
+                color_idx = 0
+                current_color = '#000000'
+                if pattern.threadlist:
+                    t = pattern.threadlist[0]
+                    current_color = t.hex_color() if hasattr(t, 'hex_color') else '#000000'
+
+                prev_x = prev_y = None
+                for stitch in pattern.stitches:
+                    x = (stitch[0] - min_x) * scale + padding
+                    y = (stitch[1] - min_y) * scale + padding
+                    cmd = stitch[2]
+
+                    if cmd == pyembroidery.COLOR_CHANGE:
+                        color_idx += 1
+                        if color_idx < len(pattern.threadlist):
+                            t = pattern.threadlist[color_idx]
+                            current_color = t.hex_color() if hasattr(t, 'hex_color') else '#000000'
+                        prev_x = prev_y = None
+                    elif cmd in (pyembroidery.TRIM, pyembroidery.JUMP):
+                        prev_x = prev_y = None
+                    elif cmd in (0, 1):  # STITCH
+                        if prev_x is not None:
+                            draw.line([(prev_x, prev_y), (x, y)], fill=current_color, width=max(1, int(scale * 3)))
+                        prev_x, prev_y = x, y
+                    elif cmd == pyembroidery.END:
+                        break
+
+                img.save(out_path, 'PNG')
+
+            self.thumbnail_path = f"/static/thumbnails/designs/{thumb_filename}"
+            self.preview_path = f"/static/thumbnails/designs/{preview_filename}"
+            self.preview_generated_at = datetime.utcnow()
+            return True
+
+        except ImportError:
+            return False
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Embroidery thumbnail error: {e}")
+            return False
+
+    def _generate_image_thumbnail(self, thumb_path, preview_path_full, thumb_filename, preview_filename):
+        """Erstellt Thumbnail aus Bilddatei"""
+        try:
+            from PIL import Image
+            img = Image.open(self.file_path)
+            if img.mode in ('RGBA', 'P'):
+                bg = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                bg.paste(img, mask=img.split()[3] if img.mode == 'RGBA' else None)
+                img = bg
+
+            # Preview
+            preview = img.copy()
+            preview.thumbnail((600, 600), Image.LANCZOS)
+            preview.save(preview_path_full, 'PNG')
+
+            # Thumbnail
+            thumb = img.copy()
+            thumb.thumbnail((200, 200), Image.LANCZOS)
+            thumb.save(thumb_path, 'PNG')
+
+            self.thumbnail_path = f"/static/thumbnails/designs/{thumb_filename}"
+            self.preview_path = f"/static/thumbnails/designs/{preview_filename}"
+            self.preview_generated_at = datetime.utcnow()
+            return True
+
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Image thumbnail error: {e}")
             return False
     
     def increment_usage(self):

@@ -2,256 +2,385 @@
 {% block title %}{{ 'Vertrag bearbeiten' if contract else 'Neuer Vertrag' }} - StitchAdmin{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>
-            <i class="bi bi-{{ 'pencil' if contract else 'plus-lg' }} me-2"></i>
-            {{ 'Vertrag bearbeiten' if contract else 'Neuer Vertrag' }}
-        </h2>
-        <a href="{{ url_for('contracts.index') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1"></i>Zurueck
-        </a>
+<div class="container" style="max-width: 850px;">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('contracts.index') }}" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+        <div>
+            <h4 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>{{ 'Vertrag bearbeiten' if contract else 'Neuer Vertrag / Police' }}</h4>
+            <small class="text-muted">Miete, Versicherung, Handy, Leasing, Wartung &mdash; alles an einem Ort</small>
+        </div>
     </div>
 
-    <form method="POST">
-        <div class="row g-4">
-            <!-- Linke Spalte: Grunddaten -->
-            <div class="col-lg-8">
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Grunddaten</h5>
+    <!-- Stepper -->
+    <div class="d-flex justify-content-center mb-4">
+        <div class="d-flex align-items-center gap-0">
+            {% for i, label in [(1, 'Was?'), (2, 'Wer & Wann?'), (3, 'Kosten & Buchhaltung')] %}
+            <div class="text-center" id="si-{{ i }}">
+                <div class="rounded-circle {{ 'bg-primary text-white' if i == 1 else 'bg-light text-muted border' }} d-flex align-items-center justify-content-center mx-auto" style="width:36px;height:36px;font-weight:bold;">{{ i }}</div>
+                <small class="d-block mt-1 {{ 'fw-bold text-primary' if i == 1 else 'text-muted' }}">{{ label }}</small>
+            </div>
+            {% if i < 3 %}<div style="width:80px;height:2px;background:#dee2e6;" class="align-self-start mt-3"></div>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <form method="POST" id="contractForm">
+        <!-- STEP 1: Was fuer ein Vertrag? -->
+        <div id="step-1">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-tag me-1"></i> Vertragstyp & Bezeichnung</h6></div>
+                <div class="card-body">
+                    <!-- Typ als Karten -->
+                    <label class="form-label fw-bold mb-2">Was f&uuml;r ein Vertrag?</label>
+                    <div class="row g-2 mb-3">
+                        {% for key, label in type_labels.items() %}
+                        {% set icons = {'insurance':'bi-shield-check','supplier':'bi-truck','maintenance':'bi-tools','lease':'bi-building','service':'bi-briefcase','other':'bi-file-earmark-text'} %}
+                        {% set colors = {'insurance':'primary','supplier':'success','maintenance':'warning','lease':'info','service':'secondary','other':'dark'} %}
+                        <div class="col-6 col-md-4">
+                            <input type="radio" class="btn-check" name="contract_type" id="ct_{{ key }}" value="{{ key }}" autocomplete="off"
+                                   {% if (contract and contract.contract_type == key) or (not contract and key == 'other') %}checked{% endif %}
+                                   onchange="onTypeChange('{{ key }}')">
+                            <label class="btn btn-outline-{{ colors.get(key, 'secondary') }} w-100 py-2" for="ct_{{ key }}">
+                                <i class="bi {{ icons.get(key, 'bi-file-text') }} d-block fs-4"></i>
+                                <small>{{ label }}</small>
+                            </label>
+                        </div>
+                        {% endfor %}
                     </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Vertragstyp</label>
-                                <select name="contract_type" class="form-select" id="contractType" onchange="toggleInsuranceFields()">
-                                    {% for key, label in type_labels.items() %}
-                                    <option value="{{ key }}"
-                                        {% if contract and contract.contract_type == key %}selected{% endif %}>
-                                        {{ label }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label class="form-label fw-bold">Bezeichnung *</label>
+                            <input type="text" name="name" class="form-control" required
+                                   value="{{ contract.name if contract else '' }}"
+                                   placeholder="z.B. B&uuml;romiete, Vodafone Handy, Allianz Haftpflicht">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Vertragsnummer</label>
+                            <input type="text" name="contract_number" class="form-control"
+                                   value="{{ contract.contract_number if contract else '' }}" placeholder="z.B. VN-123456">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status</label>
+                            <select name="status" class="form-select">
+                                <option value="active" {% if not contract or contract.status == 'active' %}selected{% endif %}>Aktiv</option>
+                                <option value="pending" {% if contract and contract.status == 'pending' %}selected{% endif %}>In Vorbereitung</option>
+                                <option value="cancelled" {% if contract and contract.status == 'cancelled' %}selected{% endif %}>Gek&uuml;ndigt</option>
+                                <option value="expired" {% if contract and contract.status == 'expired' %}selected{% endif %}>Abgelaufen</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label">Beschreibung</label>
+                            <textarea name="description" class="form-control" rows="2" placeholder="Optionale Notizen zum Vertrag">{{ contract.description if contract else '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Versicherungs-Felder -->
+                    <div id="insuranceFields" class="row g-3 mt-1" style="display:none;">
+                        <div class="col-12"><hr><h6 class="text-primary"><i class="bi bi-shield-check me-1"></i> Versicherungsdetails</h6></div>
+                        <div class="col-md-4">
+                            <label class="form-label">Art</label>
+                            <select name="insurance_type" class="form-select">
+                                <option value="">--</option>
+                                {% for val, label in [('haftpflicht','Betriebshaftpflicht'),('gebaude','Geb&auml;ude'),('inventar','Inventar'),('elektronik','Elektronik'),('kfz','KFZ'),('rechtsschutz','Rechtsschutz'),('transport','Transport'),('cyber','Cyber'),('sonstige','Sonstige')] %}
+                                <option value="{{ val }}" {% if contract and contract.insurance_type == val %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Deckungssumme</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" name="coverage_amount" class="form-control"
+                                       value="{{ '%.2f'|format(contract.coverage_amount) if contract and contract.coverage_amount else '' }}">
+                                <span class="input-group-text">&euro;</span>
                             </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Status</label>
-                                <select name="status" class="form-select">
-                                    <option value="active" {% if not contract or contract.status == 'active' %}selected{% endif %}>Aktiv</option>
-                                    <option value="pending" {% if contract and contract.status == 'pending' %}selected{% endif %}>In Vorbereitung</option>
-                                    <option value="cancelled" {% if contract and contract.status == 'cancelled' %}selected{% endif %}>Gekuendigt</option>
-                                    <option value="expired" {% if contract and contract.status == 'expired' %}selected{% endif %}>Abgelaufen</option>
-                                </select>
-                            </div>
-                            <div class="col-md-8">
-                                <label class="form-label">Bezeichnung *</label>
-                                <input type="text" name="name" class="form-control" required
-                                       value="{{ contract.name if contract else '' }}"
-                                       placeholder="z.B. Betriebshaftpflicht, Wartungsvertrag Tajima">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Vertragsnummer</label>
-                                <input type="text" name="contract_number" class="form-control"
-                                       value="{{ contract.contract_number if contract else '' }}">
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label">Beschreibung</label>
-                                <textarea name="description" class="form-control" rows="2">{{ contract.description if contract else '' }}</textarea>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Selbstbeteiligung</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" name="deductible" class="form-control"
+                                       value="{{ '%.2f'|format(contract.deductible) if contract and contract.deductible else '' }}">
+                                <span class="input-group-text">&euro;</span>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
+            <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-primary" onclick="goStep(2)">Weiter: Anbieter & Laufzeit <i class="bi bi-arrow-right ms-1"></i></button>
+            </div>
+        </div>
 
-                <!-- Anbieter -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-building me-2"></i>Anbieter / Vertragspartner</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label class="form-label">Firma / Anbieter</label>
-                                <input type="text" name="provider_name" class="form-control"
-                                       value="{{ contract.provider_name if contract else '' }}"
-                                       placeholder="z.B. Allianz, Brother, Tajima">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">Allg. Kontakt</label>
-                                <input type="text" name="provider_contact" class="form-control"
-                                       value="{{ contract.provider_contact if contract else '' }}">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Telefon</label>
-                                <input type="tel" name="provider_phone" class="form-control"
-                                       value="{{ contract.provider_phone if contract else '' }}">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">E-Mail</label>
-                                <input type="email" name="provider_email" class="form-control"
-                                       value="{{ contract.provider_email if contract else '' }}">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Website</label>
-                                <input type="url" name="provider_website" class="form-control"
-                                       value="{{ contract.provider_website if contract else '' }}"
-                                       placeholder="https://...">
-                            </div>
+        <!-- STEP 2: Anbieter & Laufzeit -->
+        <div id="step-2" style="display:none;">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-building me-1"></i> Anbieter / Vertragspartner</h6></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Firma / Anbieter</label>
+                            <input type="text" name="provider_name" class="form-control"
+                                   value="{{ contract.provider_name if contract else '' }}" placeholder="z.B. Allianz, Vodafone, Vermieter GmbH">
                         </div>
-                    </div>
-                </div>
-
-                <!-- Versicherungs-Felder (nur bei insurance sichtbar) -->
-                <div class="card mb-4" id="insuranceFields" style="display: none;">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-shield-check me-2"></i>Versicherungsdetails</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label class="form-label">Versicherungsart</label>
-                                <select name="insurance_type" class="form-select">
-                                    <option value="">-- Waehlen --</option>
-                                    {% for val, label in [('haftpflicht', 'Betriebshaftpflicht'), ('gebaude', 'Gebaeudeversicherung'), ('inventar', 'Inventarversicherung'), ('elektronik', 'Elektronikversicherung'), ('kfz', 'KFZ-Versicherung'), ('rechtsschutz', 'Rechtsschutz'), ('transport', 'Transportversicherung'), ('cyber', 'Cyberversicherung'), ('sonstige', 'Sonstige')] %}
-                                    <option value="{{ val }}" {% if contract and contract.insurance_type == val %}selected{% endif %}>{{ label }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Deckungssumme</label>
-                                <div class="input-group">
-                                    <input type="text" name="coverage_amount" class="form-control"
-                                           value="{{ '%.2f'|format(contract.coverage_amount) if contract and contract.coverage_amount else '' }}">
-                                    <span class="input-group-text">&euro;</span>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Selbstbeteiligung</label>
-                                <div class="input-group">
-                                    <input type="text" name="deductible" class="form-control"
-                                           value="{{ '%.2f'|format(contract.deductible) if contract and contract.deductible else '' }}">
-                                    <span class="input-group-text">&euro;</span>
-                                </div>
-                            </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Kontaktperson</label>
+                            <input type="text" name="provider_contact" class="form-control"
+                                   value="{{ contract.provider_contact if contract else '' }}">
                         </div>
-                    </div>
-                </div>
-
-                <!-- Notizen -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <label class="form-label">Notizen</label>
-                        <textarea name="notes" class="form-control" rows="3">{{ contract.notes if contract else '' }}</textarea>
+                        <div class="col-md-4">
+                            <label class="form-label">Telefon</label>
+                            <input type="tel" name="provider_phone" class="form-control"
+                                   value="{{ contract.provider_phone if contract else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">E-Mail</label>
+                            <input type="email" name="provider_email" class="form-control"
+                                   value="{{ contract.provider_email if contract else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Website</label>
+                            <input type="url" name="provider_website" class="form-control"
+                                   value="{{ contract.provider_website if contract else '' }}" placeholder="https://...">
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Rechte Spalte: Kosten & Laufzeit -->
-            <div class="col-lg-4">
-                <!-- Kosten -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-currency-euro me-2"></i>Kosten</h5>
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-calendar-range me-1"></i> Laufzeit</h6></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Vertragsbeginn</label>
+                            <input type="date" name="start_date" class="form-control"
+                                   value="{{ contract.start_date.strftime('%Y-%m-%d') if contract and contract.start_date else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Vertragsende</label>
+                            <input type="date" name="end_date" class="form-control"
+                                   value="{{ contract.end_date.strftime('%Y-%m-%d') if contract and contract.end_date else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">K&uuml;ndigungsfrist bis</label>
+                            <input type="date" name="renewal_date" class="form-control"
+                                   value="{{ contract.renewal_date.strftime('%Y-%m-%d') if contract and contract.renewal_date else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">K&uuml;ndigungsfrist (Tage)</label>
+                            <input type="number" name="notice_period_days" class="form-control"
+                                   value="{{ contract.notice_period_days if contract else 90 }}">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="auto_renew" id="autoRenew"
+                                       {% if contract and contract.auto_renew %}checked{% endif %}>
+                                <label class="form-check-label" for="autoRenew">Automatische Verl&auml;ngerung</label>
+                            </div>
+                        </div>
+                        {% if machines %}
+                        <div class="col-md-4">
+                            <label class="form-label">Maschine (optional)</label>
+                            <select name="machine_id" class="form-select">
+                                <option value="">-- Keine --</option>
+                                {% for m in machines %}
+                                <option value="{{ m.id }}" {% if contract and contract.machine_id == m.id %}selected{% endif %}>{{ m.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
                     </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">Betrag</label>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(1)"><i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck</button>
+                <button type="button" class="btn btn-primary" onclick="goStep(3)">Weiter: Kosten & Buchhaltung <i class="bi bi-arrow-right ms-1"></i></button>
+            </div>
+        </div>
+
+        <!-- STEP 3: Kosten & Buchhaltung -->
+        <div id="step-3" style="display:none;">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-currency-euro me-1"></i> Kosten</h6></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Betrag (brutto)</label>
                             <div class="input-group">
-                                <input type="text" name="amount" class="form-control"
-                                       value="{{ '%.2f'|format(contract.amount) if contract and contract.amount else '' }}">
+                                <input type="number" step="0.01" name="amount" class="form-control" id="inp-amount"
+                                       value="{{ '%.2f'|format(contract.amount) if contract and contract.amount else '' }}"
+                                       onchange="calcPreview()">
                                 <span class="input-group-text">&euro;</span>
                             </div>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">Zahlungsintervall</label>
-                            <select name="payment_interval" class="form-select">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Zahlungsintervall</label>
+                            <select name="payment_interval" class="form-select" id="inp-interval" onchange="calcPreview()">
                                 {% for key, label in interval_labels.items() %}
-                                <option value="{{ key }}"
-                                    {% if contract and contract.payment_interval == key %}selected{% endif %}>
+                                <option value="{{ key }}" {% if contract and contract.payment_interval == key %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">MwSt-Satz</label>
+                            <div class="input-group">
+                                <input type="number" step="0.01" name="vat_rate" class="form-control" id="inp-vat"
+                                       value="{{ contract.vat_rate if contract and contract.vat_rate is not none else 19.0 }}"
+                                       onchange="calcPreview()">
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kosten-Vorschau -->
+                    <div class="row g-2 mt-2" id="cost-preview">
+                        <div class="col-md-3">
+                            <div class="card bg-light border-0 text-center py-2">
+                                <small class="text-muted">Netto</small>
+                                <strong id="prev-netto">0,00 &euro;</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light border-0 text-center py-2">
+                                <small class="text-muted">MwSt</small>
+                                <strong id="prev-vat">0,00 &euro;</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-primary bg-opacity-10 border-0 text-center py-2">
+                                <small class="text-muted">Monatlich</small>
+                                <strong id="prev-monthly" class="text-primary">0,00 &euro;</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning bg-opacity-10 border-0 text-center py-2">
+                                <small class="text-muted">J&auml;hrlich</small>
+                                <strong id="prev-yearly" class="text-warning">0,00 &euro;</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-journal-bookmark me-1"></i> Buchhaltung / Kostenzuordnung</h6></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Kostenkategorie</label>
+                            <select name="cost_category" class="form-select" id="inp-category" onchange="suggestAccount()">
+                                {% for key, (label, icon, account) in cost_categories.items() %}
+                                <option value="{{ key }}" data-account="{{ account }}"
+                                    {% if contract and contract.cost_category == key %}selected{% endif %}>
                                     {{ label }}
                                 </option>
                                 {% endfor %}
                             </select>
                         </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Buchungskonto</label>
+                            <input type="text" name="booking_account" class="form-control" id="inp-account"
+                                   value="{{ contract.booking_account if contract else '' }}" placeholder="z.B. 4210">
+                            <small class="form-text text-muted" id="account-hint">SKR03 Vorschlag</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Kostenstelle</label>
+                            <input type="text" name="cost_center" class="form-control"
+                                   value="{{ contract.cost_center if contract else '' }}" placeholder="z.B. Verwaltung">
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="vat_deductible" id="vatDeductible"
+                                       {% if not contract or contract.vat_deductible != false %}checked{% endif %}>
+                                <label class="form-check-label" for="vatDeductible">Vorsteuer abziehbar</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" name="auto_booking" id="autoBooking"
+                                       {% if contract and contract.auto_booking %}checked{% endif %}>
+                                <label class="form-check-label" for="autoBooking">
+                                    Automatisch als Ausgabe erfassen
+                                    <small class="d-block text-muted">Erzeugt Eingangsrechnung bei F&auml;lligkeit</small>
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Laufzeit -->
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-calendar-range me-2"></i>Laufzeit</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">Vertragsbeginn</label>
-                            <input type="date" name="start_date" class="form-control"
-                                   value="{{ contract.start_date.strftime('%Y-%m-%d') if contract and contract.start_date else '' }}">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Vertragsende</label>
-                            <input type="date" name="end_date" class="form-control"
-                                   value="{{ contract.end_date.strftime('%Y-%m-%d') if contract and contract.end_date else '' }}">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Kuendigungsfrist</label>
-                            <input type="date" name="renewal_date" class="form-control"
-                                   value="{{ contract.renewal_date.strftime('%Y-%m-%d') if contract and contract.renewal_date else '' }}">
-                            <div class="form-text">Datum, bis zu dem gekuendigt werden muss</div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Kuendigungsfrist (Tage)</label>
-                            <input type="number" name="notice_period_days" class="form-control"
-                                   value="{{ contract.notice_period_days if contract else 90 }}">
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="auto_renew" id="autoRenew"
-                                   {% if contract and contract.auto_renew %}checked{% endif %}>
-                            <label class="form-check-label" for="autoRenew">
-                                Automatische Verlaengerung
-                            </label>
-                        </div>
-                    </div>
+            <div class="card mb-3">
+                <div class="card-body">
+                    <label class="form-label">Notizen</label>
+                    <textarea name="notes" class="form-control" rows="2">{{ contract.notes if contract else '' }}</textarea>
                 </div>
+            </div>
 
-                <!-- Maschine -->
-                {% if machines %}
-                <div class="card mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0"><i class="bi bi-gear me-2"></i>Maschine</h5>
-                    </div>
-                    <div class="card-body">
-                        <select name="machine_id" class="form-select">
-                            <option value="">-- Keine Zuordnung --</option>
-                            {% for m in machines %}
-                            <option value="{{ m.id }}"
-                                {% if contract and contract.machine_id == m.id %}selected{% endif %}>
-                                {{ m.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- Speichern -->
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-success btn-lg">
-                        <i class="bi bi-check-lg me-1"></i>{{ 'Speichern' if contract else 'Erstellen' }}
-                    </button>
-                    <a href="{{ url_for('contracts.index') }}" class="btn btn-outline-secondary">Abbrechen</a>
-                </div>
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(2)"><i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck</button>
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="bi bi-check-lg me-1"></i> {{ 'Speichern' if contract else 'Vertrag erstellen' }}
+                </button>
             </div>
         </div>
     </form>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
-function toggleInsuranceFields() {
-    const type = document.getElementById('contractType').value;
-    const fields = document.getElementById('insuranceFields');
-    fields.style.display = type === 'insurance' ? 'block' : 'none';
+function goStep(n) {
+    for (var i = 1; i <= 3; i++) document.getElementById('step-' + i).style.display = 'none';
+    document.getElementById('step-' + n).style.display = 'block';
+    for (var i = 1; i <= 3; i++) {
+        var si = document.getElementById('si-' + i);
+        var c = si.querySelector('div'), s = si.querySelector('small');
+        if (i < n) { c.className = 'rounded-circle bg-success text-white d-flex align-items-center justify-content-center mx-auto'; c.innerHTML = '<i class="bi bi-check-lg"></i>'; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-success'; }
+        else if (i === n) { c.className = 'rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 fw-bold text-primary'; }
+        else { c.className = 'rounded-circle bg-light text-muted d-flex align-items-center justify-content-center mx-auto border'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-muted'; }
+    }
+    if (n === 3) calcPreview();
+    window.scrollTo(0, 0);
 }
-document.addEventListener('DOMContentLoaded', toggleInsuranceFields);
+
+function onTypeChange(type) {
+    document.getElementById('insuranceFields').style.display = type === 'insurance' ? 'flex' : 'none';
+    // Auto-suggest Kostenkategorie
+    var catMap = {'insurance':'versicherung','lease':'leasing','maintenance':'wartung','supplier':'sonstige','service':'software','other':'sonstige'};
+    var sel = document.getElementById('inp-category');
+    if (sel && catMap[type]) sel.value = catMap[type];
+    suggestAccount();
+}
+
+function suggestAccount() {
+    var sel = document.getElementById('inp-category');
+    var opt = sel.options[sel.selectedIndex];
+    var account = opt.dataset.account || '';
+    var inp = document.getElementById('inp-account');
+    if (!inp.value || inp.value === inp.dataset.lastSuggested) {
+        inp.value = account;
+        inp.dataset.lastSuggested = account;
+    }
+    document.getElementById('account-hint').textContent = account ? 'SKR03: ' + account : '';
+}
+
+function calcPreview() {
+    var amount = parseFloat(document.getElementById('inp-amount').value) || 0;
+    var vatRate = parseFloat(document.getElementById('inp-vat').value) || 0;
+    var interval = document.getElementById('inp-interval').value;
+    var factors = {'monthly':12,'quarterly':4,'half_yearly':2,'yearly':1,'one-time':0};
+    var netto = amount / (1 + vatRate / 100);
+    var vat = amount - netto;
+    var monthly = amount * ({'monthly':1,'quarterly':1/3,'half_yearly':1/6,'yearly':1/12,'one-time':0}[interval] || 0);
+    var yearly = monthly * 12;
+    document.getElementById('prev-netto').textContent = netto.toFixed(2).replace('.', ',') + ' \u20ac';
+    document.getElementById('prev-vat').textContent = vat.toFixed(2).replace('.', ',') + ' \u20ac';
+    document.getElementById('prev-monthly').textContent = monthly.toFixed(2).replace('.', ',') + ' \u20ac';
+    document.getElementById('prev-yearly').textContent = yearly.toFixed(2).replace('.', ',') + ' \u20ac';
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var type = document.querySelector('input[name="contract_type"]:checked');
+    if (type) onTypeChange(type.value);
+    calcPreview();
+});
 </script>
 {% endblock %}

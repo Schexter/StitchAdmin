@@ -29,18 +29,40 @@
                                    style="border-radius: 8px; border-color: var(--ws-border);">
                         </div>
                         <h6 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ws-text-muted); margin-bottom: 0.5rem;">Kategorien</h6>
-                        <div class="d-flex flex-column gap-1">
-                            <a href="{{ url_for('shop.textilien') }}"
+                        <div class="d-flex flex-column gap-1 mb-3">
+                            <a href="{{ url_for('shop.textilien', brand=selected_brand, material=selected_material) }}"
                                class="ws-filter-link {{ 'active' if not selected_category else '' }}">
                                 Alle
                             </a>
                             {% for cat in categories %}
-                            <a href="{{ url_for('shop.textilien', kategorie=cat.id) }}"
+                            <a href="{{ url_for('shop.textilien', kategorie=cat.id, brand=selected_brand, material=selected_material) }}"
                                class="ws-filter-link {{ 'active' if selected_category == cat.id else '' }}">
                                 {{ cat.name }}
                             </a>
                             {% endfor %}
                         </div>
+
+                        {% if brands %}
+                        <h6 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ws-text-muted); margin-bottom: 0.5rem;">Marke</h6>
+                        <select class="form-select form-select-sm mb-3" id="brandFilter" onchange="applyShopFilters()"
+                                style="border-radius: 8px; border-color: var(--ws-border);">
+                            <option value="">Alle Marken</option>
+                            {% for b in brands %}
+                            <option value="{{ b }}" {% if selected_brand == b %}selected{% endif %}>{{ b }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
+
+                        {% if materials %}
+                        <h6 style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ws-text-muted); margin-bottom: 0.5rem;">Material</h6>
+                        <select class="form-select form-select-sm mb-3" id="materialFilter" onchange="applyShopFilters()"
+                                style="border-radius: 8px; border-color: var(--ws-border);">
+                            <option value="">Alle Materialien</option>
+                            {% for m in materials %}
+                            <option value="{{ m }}" {% if selected_material == m %}selected{% endif %}>{{ m }}</option>
+                            {% endfor %}
+                        </select>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -99,5 +121,17 @@ document.getElementById('searchInput').addEventListener('input', function() {
         item.style.display = item.dataset.name.includes(search) ? '' : 'none';
     });
 });
+
+function applyShopFilters() {
+    const params = new URLSearchParams();
+    {% if selected_category %}
+    params.set('kategorie', '{{ selected_category }}');
+    {% endif %}
+    const brandSel = document.getElementById('brandFilter');
+    const materialSel = document.getElementById('materialFilter');
+    if (brandSel && brandSel.value) params.set('brand', brandSel.value);
+    if (materialSel && materialSel.value) params.set('material', materialSel.value);
+    window.location.href = '{{ url_for("shop.textilien") }}?' + params.toString();
+}
 </script>
 {% endblock %}

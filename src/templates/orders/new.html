@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="col-md-12">
         <div class="card">
             <div class="card-header">
-                <h5><i class="bi bi-clipboard-plus"></i> Stickerei & Textildruck Auftrag</h5>
+                <h5><i class="bi bi-clipboard-plus"></i> Neuer Auftrag</h5>
             </div>
             <div class="card-body">
                 <form method="POST" enctype="multipart/form-data">
@@ -110,23 +110,59 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <option value="embroidery">Bestickung</option>
                                     <option value="printing">Textildruck</option>
                                     <option value="dtf">DTF (Direct to Film)</option>
+                                    <option value="sublimation">Sublimation</option>
                                     <option value="combined">Bestickung + Druck</option>
                                 </select>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Textil-Details -->
+                    <!-- Abweichender Rechnungsempfaenger -->
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="has_billing_customer" name="has_billing_customer"
+                                   onchange="toggleBillingCustomer()">
+                            <label class="form-check-label" for="has_billing_customer">
+                                <i class="bi bi-receipt me-1"></i> Abweichender Rechnungsempfaenger
+                            </label>
+                        </div>
+                    </div>
+                    <div id="billing-customer-section" style="display: none;">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="billing_customer_id">Rechnungsempfaenger</label>
+                                <select class="form-control" id="billing_customer_id" name="billing_customer_id">
+                                    <option value="">Rechnungsempfaenger waehlen...</option>
+                                    {% for cid, customer in customers.items() %}
+                                    <option value="{{ cid }}">
+                                        {% if customer.customer_type == 'business' %}
+                                            {{ customer.company_name or customer.display_name }}
+                                            {% if customer.contact_person %} ({{ customer.contact_person }}){% endif %}
+                                        {% else %}
+                                            {{ customer.display_name }}
+                                        {% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle"></i>
+                                    Rechnung geht an diesen Kunden statt an den Auftraggeber
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Artikel-Details -->
                     <div class="card mb-4">
                         <div class="card-header">
-                            <h6><i class="bi bi-shirt"></i> Textil-Details</h6>
+                            <h6><i class="bi bi-shirt"></i> Artikel-Details</h6>
                         </div>
                         <div class="card-body">
                             <!-- Textil-Items Container -->
                             <div id="textile-items">
                                 <div class="textile-item border p-3 mb-3">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <h6 class="mb-0">Textil #1</h6>
+                                        <h6 class="mb-0">Artikel #1</h6>
                                         <button type="button" class="btn btn-sm btn-outline-danger d-none remove-textile" onclick="removeTextileItem(this)">
                                             <i class="bi bi-trash"></i> Entfernen
                                         </button>
@@ -180,7 +216,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="row">
                                         <div class="col-md-4">
                                             <div class="mb-3">
-                                                <label class="form-label">Textil-Info</label>
+                                                <label class="form-label">Artikel-Info</label>
                                                 <input type="text" class="form-control textile-info" readonly 
                                                        placeholder="Automatisch aus Artikel">
                                             </div>
@@ -215,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             
                             <div class="text-center mb-3">
                                 <button type="button" class="btn btn-outline-primary" id="add-textile">
-                                    <i class="bi bi-plus-lg"></i> Weiteres Textil hinzufügen
+                                    <i class="bi bi-plus-lg"></i> Weiteren Artikel hinzufügen
                                 </button>
                             </div>
                         </div>
@@ -466,16 +502,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <div class="row">
                                     <div class="col-md-4">
                                         <div class="mb-3">
-                                            <label class="form-label" for="embroidery_position">Stickerei-Position</label>
+                                            <label class="form-label" for="embroidery_position">Veredelungsposition</label>
                                             <select class="form-control" id="embroidery_position" name="embroidery_position">
-                                                <option value="">Wählen...</option>
-                                                <option value="brust-links">Brust links</option>
-                                                <option value="brust-rechts">Brust rechts</option>
-                                                <option value="brust-mitte">Brust mittig</option>
-                                                <option value="ruecken">Rücken</option>
-                                                <option value="aermel">Ärmel</option>
-                                                <option value="cap-front">Cap vorne</option>
-                                                <option value="multiple">Mehrere Positionen</option>
+                                                <option value="">Wird geladen...</option>
                                             </select>
                                         </div>
                                     </div>
@@ -540,7 +569,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label" for="print_method">Druckverfahren</label>
-                                            <select class="form-control" id="print_method" name="print_method">
+                                            <select class="form-control" id="print_method" name="print_method" onchange="toggleSublimationFields()">
                                                 <option value="">Wählen...</option>
                                                 <option value="dtg">DTG (Direct to Garment)</option>
                                                 <option value="dtf">DTF (Direct to Film)</option>
@@ -613,9 +642,61 @@ document.addEventListener('DOMContentLoaded', function() {
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Sublimation-Sonderfelder -->
+                            <div id="sublimation-fields" style="display: none;">
+                                <hr>
+                                <h6 class="text-info"><i class="bi bi-droplet-half"></i> Sublimation-Details</h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Sublimation-Position</label>
+                                            <select class="form-control" id="sublimation_position" name="sublimation_position">
+                                                <option value="">Position waehlen...</option>
+                                                <option value="vorne">Vorne</option>
+                                                <option value="hinten">Hinten</option>
+                                                <option value="seite">Seite</option>
+                                                <option value="allover">All-Over</option>
+                                                <option value="vorne_hinten">Vorne + Hinten</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <div class="form-check mt-4">
+                                                <input class="form-check-input" type="checkbox" id="is_non_textile" name="is_non_textile"
+                                                       onchange="toggleNonTextileType()">
+                                                <label class="form-check-label" for="is_non_textile">
+                                                    <strong>Sonderartikel</strong> (Tasse, Mousepad, etc.)
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="non-textile-type-section" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">Sonderartikel-Typ</label>
+                                                <select class="form-control" id="non_textile_type" name="non_textile_type">
+                                                    <option value="">Typ waehlen...</option>
+                                                    <option value="tasse">Tasse / Becher</option>
+                                                    <option value="mousepad">Mousepad</option>
+                                                    <option value="kissen">Kissen / Kissenbezug</option>
+                                                    <option value="handyhuelle">Handyhuelle</option>
+                                                    <option value="puzzle">Puzzle</option>
+                                                    <option value="schneidebrett">Schneidebrett</option>
+                                                    <option value="untersetzer">Untersetzer</option>
+                                                    <option value="sonstiges">Sonstiges</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    
+
                     <!-- Auftrags-Details -->
                     <div class="card mb-4">
                         <div class="card-header">
@@ -672,6 +753,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                                 <strong>Express-Auftrag</strong> (Aufpreis)
                                             </label>
                                         </div>
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input" type="checkbox" id="is_kundenware" name="is_kundenware">
+                                            <label class="form-check-label" for="is_kundenware">
+                                                <i class="bi bi-box-seam me-1"></i><strong>Kundenware</strong> (Artikel vom Kunden)
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -705,21 +792,67 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <script>
+function toggleSublimationFields() {
+    const method = document.getElementById('print_method').value;
+    const section = document.getElementById('sublimation-fields');
+    if (section) {
+        section.style.display = method === 'sublimation' ? 'block' : 'none';
+    }
+}
+
+function toggleNonTextileType() {
+    const checkbox = document.getElementById('is_non_textile');
+    const section = document.getElementById('non-textile-type-section');
+    if (section) {
+        section.style.display = checkbox.checked ? 'block' : 'none';
+    }
+}
+
+function toggleBillingCustomer() {
+    const checkbox = document.getElementById('has_billing_customer');
+    const section = document.getElementById('billing-customer-section');
+    section.style.display = checkbox.checked ? 'block' : 'none';
+    if (!checkbox.checked) {
+        document.getElementById('billing_customer_id').value = '';
+    }
+}
+
 function toggleFields() {
     const orderType = document.getElementById('order_type').value;
     const embroideryFields = document.getElementById('embroidery-fields');
     const printingFields = document.getElementById('printing-fields');
-    
+
     if (orderType === 'embroidery') {
         embroideryFields.style.display = 'block';
         printingFields.style.display = 'none';
-    } else if (orderType === 'printing' || orderType === 'dtf') {
+    } else if (orderType === 'printing' || orderType === 'dtf' || orderType === 'sublimation') {
         embroideryFields.style.display = 'none';
         printingFields.style.display = 'block';
     } else if (orderType === 'combined') {
         embroideryFields.style.display = 'block';
         printingFields.style.display = 'block';
     }
+    loadPositionenDropdown(orderType);
+}
+
+function loadPositionenDropdown(code) {
+    const select = document.getElementById('embroidery_position');
+    if (!select) return;
+    select.innerHTML = '<option value="">Laden...</option>';
+    fetch('/veredelung/api/positionen/' + code, {credentials: 'same-origin'})
+        .then(r => r.json())
+        .then(positionen => {
+            select.innerHTML = '<option value="">Position waehlen...</option>';
+            positionen.forEach(p => {
+                select.innerHTML += '<option value="' + p.name + '">' + p.name + '</option>';
+            });
+            if (positionen.length === 0) {
+                select.innerHTML += '<option value="" disabled>Keine Positionen konfiguriert</option>';
+            }
+        })
+        .catch(() => {
+            select.innerHTML = '<option value="">Position waehlen...</option>';
+        });
 }
 
 // Verbessertes Design-Workflow Toggle
@@ -1060,7 +1193,7 @@ function addTextileItem() {
     const newItem = firstItem.cloneNode(true);
     
     // Update counter and clear values
-    newItem.querySelector('h6').textContent = `Textil #${textileItemCounter}`;
+    newItem.querySelector('h6').textContent = `Artikel #${textileItemCounter}`;
     newItem.querySelector('.article-select').selectedIndex = 0;
     newItem.querySelector('.quantity-input').value = 1;
     newItem.querySelector('.textile-info').value = '';
@@ -1093,7 +1226,7 @@ function removeTextileItem(button) {
 function updateTextileNumbers() {
     const items = document.querySelectorAll('.textile-item');
     items.forEach((item, index) => {
-        item.querySelector('h6').textContent = `Textil #${index + 1}`;
+        item.querySelector('h6').textContent = `Artikel #${index + 1}`;
     });
     textileItemCounter = items.length;
 }
@@ -1138,7 +1271,7 @@ function calculatePrice() {
     if (textileData.length === 0) {
         document.getElementById('price-calculation').innerHTML = `
             <div class="alert alert-warning">
-                <i class="bi bi-exclamation-triangle"></i> Bitte wählen Sie mindestens ein Textil aus
+                <i class="bi bi-exclamation-triangle"></i> Bitte wählen Sie mindestens einen Artikel aus
             </div>`;
         return;
     }
@@ -1153,7 +1286,7 @@ function calculatePrice() {
         data.stitch_count = document.getElementById('stitch_count').value || 0;
     }
     
-    if (order_type === 'printing' || order_type === 'dtf' || order_type === 'combined') {
+    if (order_type === 'printing' || order_type === 'dtf' || order_type === 'sublimation' || order_type === 'combined') {
         data.print_width_cm = document.getElementById('print_width_cm').value || 0;
         data.print_height_cm = document.getElementById('print_height_cm').value || 0;
         data.ink_coverage_percent = document.getElementById('ink_coverage_percent').value || 50;

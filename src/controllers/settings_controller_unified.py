@@ -196,20 +196,67 @@ def sumup_integration():
         flash('SumUp-Modul ist nicht verfügbar. Bitte prüfen Sie die Installation.', 'error')
         return redirect(url_for('settings.index'))
 
-    # Hole aktuellen Token-Status
+    # Hole aktuellen Status
     token = None
     is_connected = False
+    api_key_status = None
 
-    try:
-        token = SumUpToken.get_current_token()
-        if token and token.is_valid():
-            is_connected = True
-    except Exception as e:
-        logger.error(f"Fehler beim Laden des SumUp Tokens: {e}")
+    settings = CompanySettings.get_settings() if COMPANY_SETTINGS_AVAILABLE else None
+
+    # Pruefe API-Key Verbindung
+    if settings and settings.sumup_api_key:
+        try:
+            check = sumup_service.check_connection()
+            if check.get('success'):
+                is_connected = True
+                api_key_status = 'ok'
+            else:
+                api_key_status = check.get('error', 'Unbekannter Fehler')
+        except Exception as e:
+            api_key_status = str(e)
+
+    # Fallback: OAuth Token
+    if not is_connected:
+        try:
+            token = SumUpToken.get_current_token()
+            if token and token.is_valid():
+                is_connected = True
+        except Exception as e:
+            logger.error(f"Fehler beim Laden des SumUp Tokens: {e}")
 
     return render_template('settings/sumup.html',
                          is_connected=is_connected,
-                         token=token)
+                         token=token,
+                         settings=settings,
+                         api_key_status=api_key_status)
+
+
+@settings_bp.route('/integrations/sumup/save', methods=['POST'])
+@login_required
+def sumup_save_keys():
+    """SumUp API Key und Merchant Code speichern"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können SumUp konfigurieren.', 'danger')
+        return redirect(url_for('settings.index'))
+
+    if not COMPANY_SETTINGS_AVAILABLE:
+        flash('Firmeneinstellungen-Modul nicht verfügbar.', 'error')
+        return redirect(url_for('settings.index'))
+
+    settings = CompanySettings.get_settings()
+    settings.sumup_api_key = request.form.get('sumup_api_key', '').strip()
+    settings.sumup_merchant_code = request.form.get('sumup_merchant_code', '').strip()
+    settings.updated_by = current_user.username
+
+    try:
+        db.session.commit()
+        flash('SumUp-Zugangsdaten gespeichert.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Fehler beim Speichern: {e}', 'danger')
+
+    return redirect(url_for('settings.sumup_integration'))
+
 
 @settings_bp.route('/integrations/sumup/authorize', methods=['POST'])
 @login_required
@@ -270,6 +317,48 @@ def sumup_callback():
         flash(f'Fehler: {str(e)}', 'error')
 
     return redirect(url_for('settings.sumup_integration'))
+
+@settings_bp.route('/integrations/sumup/readers')
+@login_required
+def sumup_readers():
+    """Liste aller registrierten SumUp-Terminals (AJAX)"""
+    if not current_user.is_admin or not SUMUP_AVAILABLE:
+        return jsonify({'success': False, 'error': 'Nicht berechtigt'})
+    result = sumup_service.list_readers()
+    return jsonify(result)
+
+
+@settings_bp.route('/integrations/sumup/readers/pair', methods=['POST'])
+@login_required
+def sumup_pair_reader():
+    """Neues SumUp-Terminal per Pairing-Code registrieren"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Nicht berechtigt'})
+    if not SUMUP_AVAILABLE:
+        return jsonify({'success': False, 'error': 'SumUp nicht verfuegbar'})
+
+    name = request.form.get('reader_name', '').strip()
+    pairing_code = request.form.get('pairing_code', '').strip()
+
+    if not name or not pairing_code:
+        return jsonify({'success': False, 'error': 'Name und Pairing-Code sind erforderlich'})
+
+    result = sumup_service.create_reader(name, pairing_code)
+    return jsonify(result)
+
+
+@settings_bp.route('/integrations/sumup/readers/<reader_id>/delete', methods=['POST'])
+@login_required
+def sumup_delete_reader(reader_id):
+    """Registriertes SumUp-Terminal entfernen"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Nicht berechtigt'})
+    if not SUMUP_AVAILABLE:
+        return jsonify({'success': False, 'error': 'SumUp nicht verfuegbar'})
+
+    result = sumup_service.delete_reader(reader_id)
+    return jsonify(result)
+
 
 @settings_bp.route('/integrations/sumup/disconnect', methods=['POST'])
 @login_required
@@ -351,10 +440,22 @@ def company_settings():
         settings.default_tax_rate = float(request.form.get('default_tax_rate', 19.0))
         settings.invoice_footer_text = request.form.get('invoice_footer_text', '')
 
+        # Besteuerungsart
+        settings.steuerart = request.form.get('steuerart', 'soll')
+
         # Kleinunternehmer
         settings.small_business = request.form.get('small_business') == 'on'
         if settings.small_business:
             settings.small_business_text = request.form.get('small_business_text', '')
+
+        # Express-Aufpreis
+        settings.express_surcharge_percent = float(request.form.get('express_surcharge_percent', 0) or 0)
+        settings.express_surcharge_fixed = float(request.form.get('express_surcharge_fixed', 0) or 0)
+        settings.express_delivery_days = int(request.form.get('express_delivery_days', 1) or 1)
+
+        # Rechtliche Texte
+        settings.haftungsausschluss_kundenware = request.form.get('haftungsausschluss_kundenware', '')
+        settings.agb_text = request.form.get('agb_text', '')
 
         settings.updated_by = current_user.username
         settings.updated_at = datetime.now()
@@ -417,6 +518,23 @@ def storage():
         settings.include_customer_in_filename = request.form.get('include_customer') == 'on'
         settings.include_date_in_filename = request.form.get('include_date') == 'on'
         
+        # === CLOUD-SPEICHER (Nextcloud / WebDAV) ===
+        settings.cloud_enabled = request.form.get('cloud_enabled') == 'on'
+        settings.cloud_type = request.form.get('cloud_type', 'nextcloud')
+        settings.cloud_url = request.form.get('cloud_url', '').strip()
+        settings.cloud_username = request.form.get('cloud_username', '').strip()
+        cloud_pw = request.form.get('cloud_password', '').strip()
+        if cloud_pw:
+            settings.cloud_password = cloud_pw
+        settings.cloud_base_path = request.form.get('cloud_base_path', '/StitchAdmin/Dokumente').strip()
+        settings.cloud_sync_rechnungen = request.form.get('cloud_sync_rechnungen') == 'on'
+        settings.cloud_sync_angebote = request.form.get('cloud_sync_angebote') == 'on'
+        settings.cloud_sync_lieferscheine = request.form.get('cloud_sync_lieferscheine') == 'on'
+        settings.cloud_sync_auftraege = request.form.get('cloud_sync_auftraege') == 'on'
+        settings.cloud_sync_freigaben = request.form.get('cloud_sync_freigaben') == 'on'
+        settings.cloud_sync_mahnungen = request.form.get('cloud_sync_mahnungen') == 'on'
+        settings.cloud_sync_backups = request.form.get('cloud_sync_backups') == 'on'
+
         # Dokumentpfade (relativ)
         settings.angebote_path = request.form.get('angebote_path', 'Angebote')
         settings.auftraege_path = request.form.get('auftraege_path', 'Auftragsbestätigungen')
@@ -454,6 +572,254 @@ def storage():
                          validation_errors=validation_errors)
 
 
+@settings_bp.route('/test-cloud', methods=['POST'])
+@login_required
+def test_cloud_connection():
+    """API: Cloud-Verbindung testen (Nextcloud/WebDAV)"""
+    from flask import jsonify
+
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Nur Admins'}), 403
+
+    data = request.json or {}
+
+    # Temporaeres Settings-Objekt fuer den Test
+    from src.models.storage_settings import StorageSettings
+    test_settings = StorageSettings()
+    test_settings.cloud_enabled = True
+    test_settings.cloud_type = data.get('cloud_type', 'nextcloud')
+    test_settings.cloud_url = data.get('cloud_url', '')
+    test_settings.cloud_username = data.get('cloud_username', '')
+    test_settings.cloud_password = data.get('cloud_password', '')
+    test_settings.cloud_base_path = data.get('cloud_base_path', '/StitchAdmin/Dokumente')
+
+    try:
+        from src.services.webdav_service import WebDAVService
+        service = WebDAVService(settings=test_settings)
+        result = service.test_connection()
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Fehler: {str(e)}'})
+
+
+@settings_bp.route('/storage/migrate-paths', methods=['POST'])
+@login_required
+def migrate_paths():
+    """Migriert absolute Dateipfade in der DB zu relativen Pfaden"""
+    from flask import jsonify
+
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Nur Admins'}), 403
+
+    dry_run = request.json.get('dry_run', True) if request.json else True
+
+    try:
+        from src.services.file_storage_service import FileStorageService
+        storage = FileStorageService()
+
+        # Alle Models mit Dateipfad-Feldern
+        migration_targets = []
+
+        # Design
+        try:
+            from src.models.design import Design, DesignVersion
+            migration_targets.extend([
+                (Design, 'file_path'),
+                (Design, 'thumbnail_path'),
+                (Design, 'preview_path'),
+                (Design, 'production_file_path'),
+                (DesignVersion, 'file_path'),
+                (DesignVersion, 'thumbnail_path'),
+            ])
+        except ImportError:
+            pass
+
+        # Document
+        try:
+            from src.models.document import Document, EmailAttachment
+            migration_targets.extend([
+                (Document, 'file_path'),
+                (EmailAttachment, 'file_path'),
+            ])
+        except ImportError:
+            pass
+
+        # Order-Workflow
+        try:
+            from src.models.order_workflow import OrderDesign
+            migration_targets.extend([
+                (OrderDesign, 'design_file_path'),
+                (OrderDesign, 'design_thumbnail_path'),
+                (OrderDesign, 'print_file_path'),
+            ])
+        except ImportError:
+            pass
+
+        # Angebot
+        try:
+            from src.models.angebot import Angebot, AngebotsPosition
+            migration_targets.extend([
+                (Angebot, 'pdf_path'),
+                (AngebotsPosition, 'design_file_path'),
+                (AngebotsPosition, 'design_thumbnail_path'),
+            ])
+        except ImportError:
+            pass
+
+        # Inquiry
+        try:
+            from src.models.inquiry import Inquiry
+            migration_targets.append((Inquiry, 'design_file_path'))
+        except ImportError:
+            pass
+
+        # Contracts
+        try:
+            from src.models.contracts import Contract
+            migration_targets.append((Contract, 'document_path'))
+        except ImportError:
+            pass
+
+        # Models (Article, LogoDesign)
+        try:
+            from src.models.models import Article
+            migration_targets.extend([
+                (Article, 'image_path'),
+                (Article, 'image_thumbnail_path'),
+            ])
+        except ImportError:
+            pass
+
+        # Company / Branding / Tenant
+        try:
+            from src.models.company_settings import CompanySettings
+            migration_targets.append((CompanySettings, 'logo_path'))
+        except ImportError:
+            pass
+
+        try:
+            from src.models.tenant import Tenant
+            migration_targets.append((Tenant, 'logo_path'))
+        except ImportError:
+            pass
+
+        # Feedback
+        try:
+            from src.models.feedback import FeedbackReport
+            migration_targets.append((FeedbackReport, 'screenshot_path'))
+        except ImportError:
+            pass
+
+        # Todo
+        try:
+            from src.models.todo import Todo
+            migration_targets.extend([
+                (Todo, 'document_path'),
+                (Todo, 'source_file_path'),
+                (Todo, 'result_file_path'),
+            ])
+        except ImportError:
+            pass
+
+        all_results = []
+        total_migrated = 0
+        total_skipped = 0
+
+        for model_class, field_name in migration_targets:
+            try:
+                result = storage.migrate_absolute_paths(model_class, field_name, dry_run=dry_run)
+                if result['migrated'] > 0:
+                    all_results.append({
+                        'model': model_class.__name__,
+                        'field': field_name,
+                        'migrated': result['migrated'],
+                        'skipped': result['skipped'],
+                        'details': result.get('details', [])[:10]  # Max 10 Details
+                    })
+                total_migrated += result['migrated']
+                total_skipped += result['skipped']
+            except Exception as e:
+                all_results.append({
+                    'model': model_class.__name__,
+                    'field': field_name,
+                    'error': str(e)
+                })
+
+        return jsonify({
+            'success': True,
+            'dry_run': dry_run,
+            'total_migrated': total_migrated,
+            'total_skipped': total_skipped,
+            'results': all_results,
+            'message': f"{'Vorschau' if dry_run else 'Migration'}: {total_migrated} Pfade konvertiert, {total_skipped} uebersprungen"
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Fehler: {str(e)}'})
+
+
+@settings_bp.route('/storage/stats')
+@login_required
+def storage_stats():
+    """Statistiken ueber Dateispeicher"""
+    from flask import jsonify
+
+    if not current_user.is_admin:
+        return jsonify({'success': False}), 403
+
+    try:
+        from src.services.file_storage_service import FileStorageService
+        storage = FileStorageService()
+
+        roots = storage.get_storage_roots()
+        stats = {
+            'base_path': storage.base_path,
+            'base_exists': os.path.exists(storage.base_path),
+            'roots': roots,
+        }
+
+        # Speicherplatz pruefen
+        try:
+            import shutil
+            usage = shutil.disk_usage(storage.base_path)
+            stats['disk_total_gb'] = round(usage.total / (1024**3), 1)
+            stats['disk_used_gb'] = round(usage.used / (1024**3), 1)
+            stats['disk_free_gb'] = round(usage.free / (1024**3), 1)
+            stats['disk_percent'] = round(usage.used / usage.total * 100, 1)
+        except Exception:
+            pass
+
+        # Dateien zaehlen pro Dokumenttyp
+        doc_types = ['angebot', 'auftrag', 'rechnung_ausgang', 'rechnung_eingang',
+                     'lieferschein', 'design', 'design_freigabe', 'backup']
+        type_stats = []
+        for dt in doc_types:
+            path = storage.settings.get_full_path(dt)
+            count = 0
+            total_size = 0
+            if os.path.exists(path):
+                for root, dirs, files in os.walk(path):
+                    count += len(files)
+                    for f in files:
+                        try:
+                            total_size += os.path.getsize(os.path.join(root, f))
+                        except OSError:
+                            pass
+            type_stats.append({
+                'type': dt,
+                'path': path,
+                'exists': os.path.exists(path),
+                'file_count': count,
+                'total_size_mb': round(total_size / (1024*1024), 1) if total_size else 0
+            })
+        stats['doc_types'] = type_stats
+
+        return jsonify(stats)
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
 @settings_bp.route('/users')
 @login_required
 def users():
@@ -465,3 +831,205 @@ def users():
 def new_user():
     """Neuer Benutzer"""
     return redirect(url_for('users.new'))
+
+
+# ==================== VEREDELUNGSARTEN & POSITIONEN ====================
+
+@settings_bp.route('/positionen')
+@login_required
+def positionen():
+    """Veredelungsarten und Positionstypen verwalten"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können Positionen verwalten.', 'danger')
+        return redirect(url_for('settings.index'))
+
+    from src.models.order_workflow import VeredelungsArt, PositionTyp
+    arten = VeredelungsArt.query.order_by(VeredelungsArt.sort_order, VeredelungsArt.name).all()
+    typen = PositionTyp.query.order_by(PositionTyp.sort_order, PositionTyp.name).all()
+    return render_template('settings/positionen.html', arten=arten, typen=typen)
+
+
+@settings_bp.route('/positionen/veredelungsart', methods=['POST'])
+@login_required
+def veredelungsart_save():
+    """Veredelungsart erstellen oder bearbeiten"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Keine Berechtigung'}), 403
+
+    from src.models.order_workflow import VeredelungsArt
+    art_id = request.form.get('id')
+    code = request.form.get('code', '').strip().lower()
+    name = request.form.get('name', '').strip()
+
+    if not code or not name:
+        flash('Code und Name sind Pflichtfelder.', 'danger')
+        return redirect(url_for('settings.positionen'))
+
+    if art_id:
+        art = VeredelungsArt.query.get(int(art_id))
+        if not art:
+            flash('Veredelungsart nicht gefunden.', 'danger')
+            return redirect(url_for('settings.positionen'))
+    else:
+        existing = VeredelungsArt.query.filter_by(code=code).first()
+        if existing:
+            flash(f'Code "{code}" existiert bereits.', 'danger')
+            return redirect(url_for('settings.positionen'))
+        art = VeredelungsArt(code=code)
+        db.session.add(art)
+
+    art.name = name
+    art.beschreibung = request.form.get('beschreibung', '').strip()
+    art.icon = request.form.get('icon', 'bi-brush').strip()
+    art.farbe = request.form.get('farbe', 'primary').strip()
+    art.sort_order = int(request.form.get('sort_order', 0))
+    art.aktiv = request.form.get('aktiv') == 'on'
+
+    db.session.commit()
+    flash(f'Veredelungsart "{name}" gespeichert.', 'success')
+    return redirect(url_for('settings.positionen'))
+
+
+@settings_bp.route('/positionen/veredelungsart/<int:art_id>/delete', methods=['POST'])
+@login_required
+def veredelungsart_delete(art_id):
+    """Veredelungsart löschen"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Keine Berechtigung'}), 403
+
+    from src.models.order_workflow import VeredelungsArt
+    art = VeredelungsArt.query.get_or_404(art_id)
+    db.session.delete(art)
+    db.session.commit()
+    flash(f'Veredelungsart "{art.name}" gelöscht.', 'success')
+    return redirect(url_for('settings.positionen'))
+
+
+@settings_bp.route('/positionen/typ', methods=['POST'])
+@login_required
+def positiontyp_save():
+    """Positionstyp erstellen oder bearbeiten"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Keine Berechtigung'}), 403
+
+    from src.models.order_workflow import PositionTyp
+    typ_id = request.form.get('id')
+    code = request.form.get('code', '').strip().lower()
+    name = request.form.get('name', '').strip()
+
+    if not code or not name:
+        flash('Code und Name sind Pflichtfelder.', 'danger')
+        return redirect(url_for('settings.positionen'))
+
+    if typ_id:
+        typ = PositionTyp.query.get(int(typ_id))
+        if not typ:
+            flash('Positionstyp nicht gefunden.', 'danger')
+            return redirect(url_for('settings.positionen'))
+    else:
+        existing = PositionTyp.query.filter_by(code=code).first()
+        if existing:
+            flash(f'Code "{code}" existiert bereits.', 'danger')
+            return redirect(url_for('settings.positionen'))
+        typ = PositionTyp(code=code)
+        db.session.add(typ)
+
+    typ.name = name
+    # Mehrfachauswahl: Liste der gewählten Veredelungsart-IDs
+    art_ids = request.form.getlist('veredelungsart_ids')
+    art_ids = [x for x in art_ids if x.strip().isdigit()]
+    typ.veredelungsart_ids = ','.join(art_ids) if art_ids else None
+    typ.veredelungsart_id = int(art_ids[0]) if art_ids else None  # Rückwärtskompatibilität
+    typ.sort_order = int(request.form.get('sort_order', 0))
+    typ.aktiv = request.form.get('aktiv') == 'on'
+
+    db.session.commit()
+    flash(f'Positionstyp "{name}" gespeichert.', 'success')
+    return redirect(url_for('settings.positionen'))
+
+
+@settings_bp.route('/positionen/typ/<int:typ_id>/delete', methods=['POST'])
+@login_required
+def positiontyp_delete(typ_id):
+    """Positionstyp löschen"""
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Keine Berechtigung'}), 403
+
+    from src.models.order_workflow import PositionTyp
+    typ = PositionTyp.query.get_or_404(typ_id)
+    db.session.delete(typ)
+    db.session.commit()
+    flash(f'Positionstyp "{typ.name}" gelöscht.', 'success')
+    return redirect(url_for('settings.positionen'))
+
+
+# ==================== TEXTBAUSTEINE ====================
+
+@settings_bp.route('/textbausteine')
+@login_required
+def textbausteine():
+    """Textbausteine für Angebote verwalten"""
+    if not current_user.is_admin:
+        flash('Nur Administratoren können Textbausteine verwalten.', 'danger')
+        return redirect(url_for('settings.index'))
+
+    from src.models.textbaustein import Textbaustein, TEXTBAUSTEIN_CATEGORIES
+    bausteine = Textbaustein.query.order_by(Textbaustein.kategorie, Textbaustein.sort_order, Textbaustein.titel).all()
+    return render_template('settings/textbausteine.html',
+                         bausteine=bausteine,
+                         kategorien=TEXTBAUSTEIN_CATEGORIES)
+
+
+@settings_bp.route('/textbausteine/save', methods=['POST'])
+@login_required
+def textbaustein_save():
+    """Textbaustein erstellen oder bearbeiten"""
+    if not current_user.is_admin:
+        flash('Keine Berechtigung.', 'danger')
+        return redirect(url_for('settings.textbausteine'))
+
+    from src.models.textbaustein import Textbaustein
+    tb_id = request.form.get('id')
+    titel = request.form.get('titel', '').strip()
+    inhalt = request.form.get('inhalt', '').strip()
+
+    if not titel or not inhalt:
+        flash('Titel und Inhalt sind Pflichtfelder.', 'danger')
+        return redirect(url_for('settings.textbausteine'))
+
+    if tb_id:
+        tb = Textbaustein.query.get(int(tb_id))
+        if not tb:
+            flash('Textbaustein nicht gefunden.', 'danger')
+            return redirect(url_for('settings.textbausteine'))
+    else:
+        tb = Textbaustein(created_by=current_user.username)
+        db.session.add(tb)
+
+    tb.titel = titel
+    tb.inhalt = inhalt
+    tb.kategorie = request.form.get('kategorie', 'sonstiges')
+    tb.sort_order = int(request.form.get('sort_order', 0))
+    tb.aktiv = request.form.get('aktiv') == 'on'
+    tb.ist_standard = request.form.get('ist_standard') == 'on'
+
+    db.session.commit()
+    flash(f'Textbaustein "{titel}" gespeichert.', 'success')
+    return redirect(url_for('settings.textbausteine'))
+
+
+@settings_bp.route('/textbausteine/<int:tb_id>/delete', methods=['POST'])
+@login_required
+def textbaustein_delete(tb_id):
+    """Textbaustein löschen"""
+    if not current_user.is_admin:
+        flash('Keine Berechtigung.', 'danger')
+        return redirect(url_for('settings.textbausteine'))
+
+    from src.models.textbaustein import Textbaustein
+    tb = Textbaustein.query.get_or_404(tb_id)
+    name = tb.titel
+    db.session.delete(tb)
+    db.session.commit()
+    flash(f'Textbaustein "{name}" gelöscht.', 'success')
+    return redirect(url_for('settings.textbausteine'))

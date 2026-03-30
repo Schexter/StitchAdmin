@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+{% block title %}Neues Angebot - Wizard - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 900px;">
+    <div class="d-flex align-items-center mb-4">
+        <a href="{{ url_for('angebote.index') }}" class="btn btn-outline-secondary btn-sm me-3"><i class="bi bi-arrow-left"></i></a>
+        <div>
+            <h4 class="mb-0"><i class="bi bi-file-earmark-plus me-2"></i>Neues Angebot</h4>
+            <small class="text-muted">Schritt f&uuml;r Schritt zum fertigen Angebot</small>
+        </div>
+    </div>
+
+    <!-- Stepper -->
+    <div class="d-flex justify-content-center mb-4">
+        <div class="d-flex align-items-center gap-0">
+            {% for i, label in [(1, 'Kunde'), (2, 'Positionen'), (3, 'Veredelung'), (4, 'Kalkulation')] %}
+            <div class="text-center" id="si-{{ i }}">
+                <div class="rounded-circle {{ 'bg-primary text-white' if i == 1 else 'bg-light text-muted border' }} d-flex align-items-center justify-content-center mx-auto" style="width:36px;height:36px;font-weight:bold;">{{ i }}</div>
+                <small class="d-block mt-1 {{ 'fw-bold text-primary' if i == 1 else 'text-muted' }}">{{ label }}</small>
+            </div>
+            {% if i < 4 %}<div style="width:60px;height:2px;background:#dee2e6;" class="align-self-start mt-3"></div>{% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <form method="POST" action="{{ url_for('angebote.wizard') }}" id="wizardForm">
+
+        <!-- STEP 1: Kunde -->
+        <div id="step-1">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-person me-1"></i> Kunde ausw&auml;hlen</h6></div>
+                <div class="card-body">
+                    <select class="form-select mb-3" name="kunde_id" id="kunde_id" required onchange="onKundeSelect()">
+                        <option value="">Kunde w&auml;hlen...</option>
+                        {% for k in kunden %}
+                        <option value="{{ k.id }}"
+                                data-name="{{ k.display_name }}"
+                                data-email="{{ k.email or '' }}"
+                                data-adresse="{{ k.street or '' }} {{ k.house_number or '' }}, {{ k.postal_code or '' }} {{ k.city or '' }}"
+                                {{ 'selected' if preselected_kunde_id == k.id or (anfrage and anfrage.customer_id == k.id) }}>
+                            {{ k.display_name }}{% if k.company_name %} ({{ k.company_name }}){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <div id="kunde-info" class="alert alert-info" style="display:none;">
+                        <strong id="ki-name"></strong><br>
+                        <small id="ki-adresse" class="text-muted"></small><br>
+                        <small id="ki-email" class="text-muted"></small>
+                    </div>
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-md-4">
+                            <label class="form-label">Auftragstyp</label>
+                            <select class="form-select" name="auftragstyp" id="auftragstyp">
+                                <option value="embroidery">Bestickung</option>
+                                <option value="printing">Textildruck</option>
+                                <option value="dtf">DTF-Druck</option>
+                                <option value="sublimation">Sublimation</option>
+                                <option value="combined">Kombi</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch mt-4">
+                                <input class="form-check-input" type="checkbox" id="is_kundenware" name="is_kundenware">
+                                <label class="form-check-label" for="is_kundenware"><strong>Kundenware</strong></label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">G&uuml;ltigkeit (Tage)</label>
+                            <input type="number" class="form-control" name="gueltig_tage" value="30" min="1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex justify-content-end">
+                <button type="button" class="btn btn-primary" onclick="goStep(2)" id="btn-s2" disabled>
+                    Weiter: Positionen <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP 2: Positionen (Artikel / Textilien) -->
+        <div id="step-2" style="display:none;">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between">
+                    <h6 class="mb-0"><i class="bi bi-list-check me-1"></i> Artikel / Positionen</h6>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addPos()">
+                        <i class="bi bi-plus-lg"></i> Position
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0" id="pos-table">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:40px;">Pos</th>
+                                <th>Bezeichnung</th>
+                                <th style="width:80px;">Menge</th>
+                                <th style="width:100px;">Einzelpreis</th>
+                                <th style="width:90px;">Rabatt</th>
+                                <th style="width:90px;" class="text-end">Netto</th>
+                                <th style="width:35px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="pos-body">
+                            <!-- Erste Position -->
+                            <tr class="pos-row">
+                                <td class="text-center pos-nr">1</td>
+                                <td><input type="text" class="form-control form-control-sm" name="pos_name[]" placeholder="z.B. T-Shirt bestickt" required>
+                                    <input type="hidden" name="pos_artikel_id[]" value=""><input type="hidden" name="pos_is_veredelung[]" value="0">
+                                    <input type="text" class="form-control form-control-sm mt-1" name="pos_beschreibung[]" placeholder="Beschreibung (optional)" style="font-size:0.8rem;">
+                                </td>
+                                <td><input type="number" class="form-control form-control-sm text-end pos-menge" name="pos_menge[]" min="1" value="1" onchange="calcRow(this)"></td>
+                                <td><div class="input-group input-group-sm"><input type="number" class="form-control text-end pos-preis" name="pos_einzelpreis[]" step="0.01" value="0.00" onchange="calcRow(this)"><span class="input-group-text">&euro;</span></div></td>
+                                <td><div class="input-group input-group-sm"><input type="number" class="form-control text-end pos-rabatt" name="pos_rabatt_wert[]" step="0.01" value="0" onchange="calcRow(this)"><button class="btn btn-outline-secondary btn-sm pos-rabatt-toggle" type="button" onclick="toggleRT(this)">%</button><input type="hidden" class="pos-rabatt-typ" name="pos_rabatt_typ[]" value="prozent"></div></td>
+                                <td class="text-end align-middle fw-bold pos-gesamt">0.00 &euro;</td>
+                                <td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-x"></i></button></td>
+                            </tr>
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr><td colspan="5" class="text-end">Artikel-Netto:</td><td class="text-end fw-bold" id="sum-artikel">0.00 &euro;</td><td></td></tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(1)"><i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck</button>
+                <button type="button" class="btn btn-primary" onclick="goStep(3)">Weiter: Veredelung <i class="bi bi-arrow-right ms-1"></i></button>
+            </div>
+        </div>
+
+        <!-- STEP 3: Veredelung / Design -->
+        <div id="step-3" style="display:none;">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between">
+                    <h6 class="mb-0"><i class="bi bi-palette me-1"></i> Design / Veredelung</h6>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addDesignPos()">
+                        <i class="bi bi-plus-lg"></i> Designposition
+                    </button>
+                </div>
+                <div class="card-body" id="design-container">
+                    <div class="design-pos border rounded p-3 mb-2">
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label class="form-label small">Position</label>
+                                <input type="text" class="form-control form-control-sm" name="design_position[]" placeholder="z.B. Brust links, R&uuml;cken">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Verfahren</label>
+                                <select class="form-select form-select-sm" name="design_verfahren[]">
+                                    <option value="">Wie Auftragstyp</option>
+                                    {% for v in veredelungsverfahren %}
+                                    <option value="{{ v.id }}">{{ v.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">Stichzahl</label>
+                                <input type="number" class="form-control form-control-sm" name="design_stichzahl[]" placeholder="z.B. 8000">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small">Kosten/St.</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" class="form-control text-end" name="design_kosten[]" step="0.01" value="0.00">
+                                    <span class="input-group-text">&euro;</span>
+                                </div>
+                            </div>
+                            <div class="col-md-1 d-flex align-items-end">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('.design-pos').remove()"><i class="bi bi-x"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-brush me-1"></i> Designkosten (einmalig)</h6></div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Designerstellung</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="design_erstellung_kosten" step="0.01" value="0.00" id="design-kosten">
+                                <span class="input-group-text">&euro;</span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Anpassung/Digitalisierung</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" name="design_anpassung_kosten" step="0.01" value="0.00" id="anpassung-kosten">
+                                <span class="input-group-text">&euro;</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(2)"><i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck</button>
+                <button type="button" class="btn btn-primary" onclick="goStep(4)">Weiter: Kalkulation <i class="bi bi-arrow-right ms-1"></i></button>
+            </div>
+        </div>
+
+        <!-- STEP 4: Kalkulation & Senden -->
+        <div id="step-4" style="display:none;">
+            <div class="card mb-3">
+                <div class="card-header"><h6 class="mb-0"><i class="bi bi-calculator me-1"></i> Kalkulation</h6></div>
+                <div class="card-body">
+                    <div class="row g-3 text-center mb-3">
+                        <div class="col-md-3">
+                            <div class="card bg-light border-0 py-2">
+                                <small class="text-muted">Artikel</small>
+                                <strong id="calc-artikel">0.00 &euro;</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light border-0 py-2">
+                                <small class="text-muted">Design</small>
+                                <strong id="calc-design">0.00 &euro;</strong>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-light border-0 py-2">
+                                <small class="text-muted">Versand</small>
+                                <div class="input-group input-group-sm mt-1" style="max-width:120px;margin:auto;">
+                                    <input type="number" class="form-control text-end" name="versandkosten" step="0.01" value="0" id="versand" onchange="calcFinal()">
+                                    <span class="input-group-text">&euro;</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success bg-opacity-10 border-success py-2">
+                                <small class="text-muted">Netto gesamt</small>
+                                <strong class="text-success fs-5" id="calc-total">0.00 &euro;</strong>
+                                <input type="hidden" name="preis_schaetzung" id="preis_schaetzung">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Lieferzeit</label>
+                            <input type="text" class="form-control" name="lieferzeit" placeholder="z.B. 2-3 Wochen">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Bemerkungen (intern)</label>
+                            <input type="text" class="form-control" name="bemerkungen" placeholder="Nicht f&uuml;r Kunden sichtbar">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zusammenfassung -->
+            <div class="card mb-3 border-success">
+                <div class="card-body py-2">
+                    <div class="row small text-center">
+                        <div class="col-3"><span class="text-muted">Kunde:</span> <strong id="sum-kunde"></strong></div>
+                        <div class="col-3"><span class="text-muted">Typ:</span> <strong id="sum-typ"></strong></div>
+                        <div class="col-3"><span class="text-muted">Positionen:</span> <strong id="sum-pos"></strong></div>
+                        <div class="col-3"><span class="text-muted">Netto:</span> <strong id="sum-netto" class="text-success"></strong></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-secondary" onclick="goStep(3)"><i class="bi bi-arrow-left me-1"></i> Zur&uuml;ck</button>
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="bi bi-check-lg me-1"></i> Angebot erstellen
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+var maxStep = 4;
+function goStep(n) {
+    if (n > 1 && !document.getElementById('kunde_id').value) { alert('Bitte Kunden w\u00e4hlen.'); return; }
+    for (var i = 1; i <= maxStep; i++) document.getElementById('step-' + i).style.display = 'none';
+    document.getElementById('step-' + n).style.display = 'block';
+    for (var i = 1; i <= maxStep; i++) {
+        var si = document.getElementById('si-' + i), c = si.querySelector('div'), s = si.querySelector('small');
+        if (i < n) { c.className = 'rounded-circle bg-success text-white d-flex align-items-center justify-content-center mx-auto'; c.innerHTML = '<i class="bi bi-check-lg"></i>'; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-success'; }
+        else if (i === n) { c.className = 'rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 fw-bold text-primary'; }
+        else { c.className = 'rounded-circle bg-light text-muted d-flex align-items-center justify-content-center mx-auto border'; c.textContent = i; c.style.cssText = 'width:36px;height:36px;font-weight:bold;'; s.className = 'd-block mt-1 text-muted'; }
+    }
+    if (n === 4) calcFinal();
+    window.scrollTo(0, 0);
+}
+
+function onKundeSelect() {
+    var sel = document.getElementById('kunde_id');
+    var opt = sel.options[sel.selectedIndex];
+    if (opt.value) {
+        document.getElementById('ki-name').textContent = opt.dataset.name;
+        document.getElementById('ki-adresse').textContent = opt.dataset.adresse;
+        document.getElementById('ki-email').textContent = opt.dataset.email;
+        document.getElementById('kunde-info').style.display = 'block';
+        document.getElementById('btn-s2').disabled = false;
+    } else {
+        document.getElementById('kunde-info').style.display = 'none';
+        document.getElementById('btn-s2').disabled = true;
+    }
+}
+
+function addPos() {
+    var tbody = document.getElementById('pos-body');
+    var nr = tbody.querySelectorAll('.pos-row').length + 1;
+    var tr = document.createElement('tr'); tr.className = 'pos-row';
+    tr.innerHTML = '<td class="text-center pos-nr">'+nr+'</td><td><input type="text" class="form-control form-control-sm" name="pos_name[]" placeholder="Bezeichnung" required><input type="hidden" name="pos_artikel_id[]" value=""><input type="hidden" name="pos_is_veredelung[]" value="0"><input type="text" class="form-control form-control-sm mt-1" name="pos_beschreibung[]" placeholder="Beschreibung" style="font-size:0.8rem;"></td><td><input type="number" class="form-control form-control-sm text-end pos-menge" name="pos_menge[]" min="1" value="1" onchange="calcRow(this)"></td><td><div class="input-group input-group-sm"><input type="number" class="form-control text-end pos-preis" name="pos_einzelpreis[]" step="0.01" value="0.00" onchange="calcRow(this)"><span class="input-group-text">\u20ac</span></div></td><td><div class="input-group input-group-sm"><input type="number" class="form-control text-end pos-rabatt" name="pos_rabatt_wert[]" step="0.01" value="0" onchange="calcRow(this)"><button class="btn btn-outline-secondary btn-sm pos-rabatt-toggle" type="button" onclick="toggleRT(this)">%</button><input type="hidden" class="pos-rabatt-typ" name="pos_rabatt_typ[]" value="prozent"></div></td><td class="text-end align-middle fw-bold pos-gesamt">0.00 \u20ac</td><td><button type="button" class="btn btn-sm btn-outline-danger" onclick="removeRow(this)"><i class="bi bi-x"></i></button></td>';
+    tbody.appendChild(tr);
+}
+function removeRow(btn) { btn.closest('.pos-row').remove(); renumber(); calcTotal(); }
+function renumber() { document.querySelectorAll('.pos-nr').forEach(function(td,i){td.textContent=i+1;}); }
+function toggleRT(btn) { var t=btn.parentElement.querySelector('.pos-rabatt-typ'); if(t.value==='prozent'){t.value='euro';btn.textContent='\u20ac';}else{t.value='prozent';btn.textContent='%';} calcRow(btn); }
+
+function calcRow(el) {
+    var row = el.closest('.pos-row');
+    var m = parseInt(row.querySelector('.pos-menge').value)||0;
+    var p = parseFloat(row.querySelector('.pos-preis').value)||0;
+    var rw = parseFloat(row.querySelector('.pos-rabatt').value)||0;
+    var rt = row.querySelector('.pos-rabatt-typ').value;
+    var n = m * p;
+    if (rw > 0) { n -= rt === 'euro' ? Math.min(rw, n) : n * (rw / 100); }
+    row.querySelector('.pos-gesamt').textContent = n.toFixed(2) + ' \u20ac';
+    calcTotal();
+}
+function calcTotal() {
+    var t = 0;
+    document.querySelectorAll('.pos-gesamt').forEach(function(td){t+=parseFloat(td.textContent)||0;});
+    document.getElementById('sum-artikel').textContent = t.toFixed(2) + ' \u20ac';
+}
+
+function addDesignPos() {
+    var c = document.getElementById('design-container');
+    var div = document.createElement('div'); div.className = 'design-pos border rounded p-3 mb-2';
+    div.innerHTML = '<div class="row g-2"><div class="col-md-4"><input type="text" class="form-control form-control-sm" name="design_position[]" placeholder="z.B. Brust links"></div><div class="col-md-3"><select class="form-select form-select-sm" name="design_verfahren[]"><option value="">Wie Auftragstyp</option></select></div><div class="col-md-2"><input type="number" class="form-control form-control-sm" name="design_stichzahl[]" placeholder="Stichzahl"></div><div class="col-md-2"><div class="input-group input-group-sm"><input type="number" class="form-control text-end" name="design_kosten[]" step="0.01" value="0.00"><span class="input-group-text">\u20ac</span></div></div><div class="col-md-1 d-flex align-items-end"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest(\'.design-pos\').remove()"><i class="bi bi-x"></i></button></div></div>';
+    c.appendChild(div);
+}
+
+function calcFinal() {
+    var artikel = 0;
+    document.querySelectorAll('.pos-gesamt').forEach(function(td){artikel+=parseFloat(td.textContent)||0;});
+    var design = (parseFloat(document.getElementById('design-kosten').value)||0) + (parseFloat(document.getElementById('anpassung-kosten').value)||0);
+    var versand = parseFloat(document.getElementById('versand').value)||0;
+    var total = artikel + design + versand;
+
+    document.getElementById('calc-artikel').textContent = artikel.toFixed(2) + ' \u20ac';
+    document.getElementById('calc-design').textContent = design.toFixed(2) + ' \u20ac';
+    document.getElementById('calc-total').textContent = total.toFixed(2) + ' \u20ac';
+    document.getElementById('preis_schaetzung').value = total.toFixed(2);
+
+    // Summary
+    var sel = document.getElementById('kunde_id');
+    document.getElementById('sum-kunde').textContent = sel.options[sel.selectedIndex].dataset.name || '?';
+    document.getElementById('sum-typ').textContent = document.getElementById('auftragstyp').value;
+    document.getElementById('sum-pos').textContent = document.querySelectorAll('.pos-row').length;
+    document.getElementById('sum-netto').textContent = total.toFixed(2) + ' \u20ac';
+}
+
+// Init
+if (document.getElementById('kunde_id').value) onKundeSelect();
+</script>
+{% endblock %}

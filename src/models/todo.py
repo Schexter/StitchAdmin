@@ -58,6 +58,9 @@ class Todo(db.Model):
     
     # Wer hat sie erstellt?
     created_by = db.Column(db.String(80))
+
+    # Sichtbarkeit: privat (nur Ersteller sieht es) oder öffentlich
+    is_private = db.Column(db.Boolean, default=True)
     
     # ═══════════════════════════════════════════════════════════════
     # ZEITPLANUNG

@@ -1,47 +1,94 @@
 {% extends "base.html" %}
-{% block title %}SEO & Footer{% endblock %}
+{% block title %}Rechtliche Seiten & SEO{% endblock %}
 {% block content %}
 <div class="container-fluid py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="fw-bold mb-0"><i class="bi bi-search me-2"></i>SEO & Footer</h2>
-        <a href="{{ url_for('website_admin.dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Zurück</a>
+        <h2 class="fw-bold mb-0"><i class="bi bi-shield-check me-2"></i>Rechtliche Seiten & SEO</h2>
+        <a href="{{ url_for('website_admin.dashboard') }}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Zurueck</a>
     </div>
 
     <form method="POST">
-        <div class="row g-4">
-            <div class="col-lg-6">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white"><h6 class="mb-0">SEO / Meta-Tags</h6></div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Seitentitel</label>
-                            <input type="text" class="form-control" name="seo_title" value="{{ content.get('seo_title', '') }}" placeholder="Wird im Browser-Tab angezeigt">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Meta-Beschreibung</label>
-                            <textarea class="form-control" name="meta_description" rows="3" placeholder="Für Suchmaschinen (max. 160 Zeichen)">{{ content.get('meta_description', '') }}</textarea>
-                        </div>
-                    </div>
-                </div>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- SEO -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-search me-2"></i>SEO / Meta-Tags</h5>
             </div>
-            <div class="col-lg-6">
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white"><h6 class="mb-0">Footer-Links</h6></div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Impressum-Text</label>
-                            <textarea class="form-control" name="impressum_link" rows="4" placeholder="Impressum-Inhalt (wird auf /impressum angezeigt)">{{ content.get('impressum_link', '') }}</textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">Datenschutz-Text</label>
-                            <textarea class="form-control" name="datenschutz_link" rows="4" placeholder="Datenschutzerklärung (wird auf /datenschutz angezeigt)">{{ content.get('datenschutz_link', '') }}</textarea>
-                        </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Seitentitel</label>
+                        <input type="text" class="form-control" name="seo_title" value="{{ content.get('seo_title', '') }}" placeholder="Wird im Browser-Tab angezeigt">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">Meta-Beschreibung</label>
+                        <textarea class="form-control" name="meta_description" rows="2" placeholder="Fuer Suchmaschinen (max. 160 Zeichen)">{{ content.get('meta_description', '') }}</textarea>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="mt-4">
-            <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1"></i>Speichern</button>
+
+        <!-- Impressum -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-building me-2"></i>Impressum</h5>
+                <a href="{{ url_for('website.impressum') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Vorschau
+                </a>
+            </div>
+            <div class="card-body">
+                <textarea class="form-control" name="impressum_link" rows="15" placeholder="Impressum-Inhalt (HTML erlaubt)&#10;&#10;Beispiel:&#10;<h5>Angaben gemaess § 5 TMG</h5>&#10;<p>Firma GmbH<br>Strasse 1<br>12345 Stadt</p>">{{ content.get('impressum_link', '') }}</textarea>
+                <small class="text-muted">HTML-Formatierung moeglich. Wird auf /site/impressum angezeigt.</small>
+            </div>
+        </div>
+
+        <!-- Datenschutz -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-lock me-2"></i>Datenschutzerklaerung</h5>
+                <a href="{{ url_for('website.datenschutz') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Vorschau
+                </a>
+            </div>
+            <div class="card-body">
+                <textarea class="form-control" name="datenschutz_link" rows="15" placeholder="Datenschutzerklaerung (HTML erlaubt)">{{ content.get('datenschutz_link', '') }}</textarea>
+                <small class="text-muted">HTML-Formatierung moeglich. Wird auf /site/datenschutz angezeigt.</small>
+            </div>
+        </div>
+
+        <!-- AGB -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-file-text me-2"></i>AGB (Allgemeine Geschaeftsbedingungen)</h5>
+                <a href="{{ url_for('website.agb') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Vorschau
+                </a>
+            </div>
+            <div class="card-body">
+                <textarea class="form-control" name="agb_text" rows="15" placeholder="Allgemeine Geschaeftsbedingungen (HTML erlaubt)">{{ content.get('agb_text', '') }}</textarea>
+                <small class="text-muted">HTML-Formatierung moeglich. Wird auf /site/agb angezeigt.</small>
+            </div>
+        </div>
+
+        <!-- Widerrufsbelehrung -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-arrow-return-left me-2"></i>Widerrufsbelehrung</h5>
+                <a href="{{ url_for('website.widerruf') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Vorschau
+                </a>
+            </div>
+            <div class="card-body">
+                <textarea class="form-control" name="widerruf_text" rows="15" placeholder="Widerrufsbelehrung (HTML erlaubt)">{{ content.get('widerruf_text', '') }}</textarea>
+                <small class="text-muted">HTML-Formatierung moeglich. Wird auf /site/widerruf angezeigt.</small>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mb-4">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-save me-1"></i>Alle Seiten speichern
+            </button>
         </div>
     </form>
 </div>

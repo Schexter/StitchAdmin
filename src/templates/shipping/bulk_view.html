@@ -57,8 +57,11 @@
 
 <!-- Aktionen -->
 <div class="mb-3">
-    <a href="{{ url_for('shipping_bulk.export_csv', bulk_id=bulk.id) }}" class="btn btn-success">
-        <i class="bi bi-download"></i> CSV Export (DPD/DHL)
+    <a href="{{ url_for('shipping_bulk.export_csv', bulk_id=bulk.id) }}" class="btn btn-outline-success">
+        <i class="bi bi-download"></i> CSV Export (generisch)
+    </a>
+    <a href="{{ url_for('shipping_bulk.export_dpd', bulk_id=bulk.id) }}" class="btn btn-success">
+        <i class="bi bi-file-earmark-arrow-down"></i> DPD Export (myDPD)
     </a>
     <form action="{{ url_for('shipping_bulk.mark_printed', bulk_id=bulk.id) }}" method="POST" style="display:inline;">
         <button type="submit" class="btn btn-warning" {% if bulk.labels_printed %}disabled{% endif %}>

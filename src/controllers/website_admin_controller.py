@@ -7,11 +7,15 @@ Erstellt von Hans Hahn - Alle Rechte vorbehalten
 """
 
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+import subprocess
+import logging
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from src.models.models import db
 from src.models.website_content import WebsiteContent
+
+logger = logging.getLogger(__name__)
 
 website_admin_bp = Blueprint('website_admin', __name__, url_prefix='/admin/website')
 
@@ -54,7 +58,7 @@ def dashboard():
 @website_admin_bp.route('/custom-domain', methods=['POST'])
 @login_required
 def save_custom_domain():
-    """Eigene Domain fuer Website speichern"""
+    """Eigene Domain fuer Website speichern + Auto-SSL"""
     domain = request.form.get('custom_domain', '').strip().lower()
     # Domain bereinigen (https://, trailing slash entfernen)
     domain = domain.replace('https://', '').replace('http://', '').rstrip('/')
@@ -62,11 +66,59 @@ def save_custom_domain():
     if domain:
         WebsiteContent.set('domain', 'custom_domain', domain,
                           updated_by=current_user.username)
-        flash(f'Domain "{domain}" gespeichert. Bitte richten Sie den A-Eintrag bei Ihrem Domain-Anbieter ein.', 'success')
+
+        # Auto-SSL Provisioning versuchen
+        ssl_result = _provision_ssl(domain)
+        if ssl_result:
+            flash(f'Domain "{domain}" gespeichert und SSL-Zertifikat erstellt!', 'success')
+        else:
+            flash(f'Domain "{domain}" gespeichert. SSL konnte noch nicht erstellt werden - '
+                  f'bitte erst den A-Eintrag bei Ihrem Domain-Anbieter auf unseren Server richten, '
+                  f'dann "SSL erstellen" klicken.', 'warning')
     else:
         flash('Bitte geben Sie eine Domain ein.', 'warning')
 
     return redirect(url_for('website_admin.dashboard'))
+
+
+@website_admin_bp.route('/custom-domain/provision-ssl', methods=['POST'])
+@login_required
+def provision_ssl():
+    """SSL-Zertifikat fuer Custom Domain manuell anfordern"""
+    domain = WebsiteContent.get('domain', 'custom_domain')
+    if not domain:
+        flash('Keine Custom Domain hinterlegt.', 'warning')
+        return redirect(url_for('website_admin.dashboard'))
+
+    if _provision_ssl(domain):
+        flash(f'SSL-Zertifikat fuer {domain} erfolgreich erstellt!', 'success')
+    else:
+        flash(f'SSL-Erstellung fehlgeschlagen. Bitte pruefen Sie, dass der '
+              f'A-Eintrag fuer {domain} auf unseren Server zeigt.', 'danger')
+
+    return redirect(url_for('website_admin.dashboard'))
+
+
+def _provision_ssl(domain):
+    """SSL-Provisioning via Script ausfuehren"""
+    script = '/opt/stitchadmin/provision-ssl.sh'
+    if not os.path.exists(script):
+        logger.warning(f'SSL-Script nicht gefunden: {script}')
+        return False
+    try:
+        result = subprocess.run(
+            ['sudo', script, domain],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode == 0:
+            logger.info(f'SSL provisioniert fuer {domain}: {result.stdout}')
+            return True
+        else:
+            logger.warning(f'SSL-Provisioning fehlgeschlagen fuer {domain}: {result.stderr}')
+            return False
+    except Exception as e:
+        logger.error(f'SSL-Provisioning Fehler: {e}')
+        return False
 
 
 @website_admin_bp.route('/custom-domain/remove')
@@ -248,14 +300,16 @@ def edit_shop():
 @website_admin_bp.route('/meta', methods=['GET', 'POST'])
 @login_required
 def edit_meta():
-    """SEO/Meta bearbeiten"""
+    """Rechtliche Seiten & SEO bearbeiten"""
     if request.method == 'POST':
         WebsiteContent.set('meta', 'seo_title', request.form.get('seo_title', ''), updated_by=current_user.username)
         WebsiteContent.set('meta', 'meta_description', request.form.get('meta_description', ''), updated_by=current_user.username)
         WebsiteContent.set('footer', 'impressum_link', request.form.get('impressum_link', ''), updated_by=current_user.username)
         WebsiteContent.set('footer', 'datenschutz_link', request.form.get('datenschutz_link', ''), updated_by=current_user.username)
+        WebsiteContent.set('footer', 'agb_text', request.form.get('agb_text', ''), updated_by=current_user.username)
+        WebsiteContent.set('footer', 'widerruf_text', request.form.get('widerruf_text', ''), updated_by=current_user.username)
         db.session.commit()
-        flash('Meta-Daten gespeichert.', 'success')
+        flash('Rechtliche Seiten gespeichert.', 'success')
         return redirect(url_for('website_admin.edit_meta'))
 
     content = {**WebsiteContent.get_section('meta'), **WebsiteContent.get_section('footer')}

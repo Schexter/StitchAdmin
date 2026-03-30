@@ -94,7 +94,7 @@
                         <div class="alert alert-info">
                             <i class="bi bi-person-circle me-1"></i>
                             Guten Tag{% if customer %} <strong>{{ customer.display_name }}</strong>{% endif %},
-                            bitte pruefen Sie das Design und geben Sie es frei, damit wir mit der Produktion beginnen koennen.
+                            bitte prüfen Sie das Design und geben Sie es frei, damit wir mit der Produktion beginnen können.
                         </div>
 
                         <div class="row">
@@ -108,7 +108,7 @@
                                     <img src="{{ url_for('design_approval.preview_image_watermarked', token=token, design_id=design.id) }}"
                                          alt="Design {{ design.position }}"
                                          class="design-preview img-fluid"
-                                         onerror="this.src='{{ url_for('static', filename=design.thumbnail) }}'">
+                                         onerror="this.onerror=null; this.src='/{{ design.thumbnail }}'">
                                     {% else %}
                                     <div class="py-5 text-muted">
                                         <i class="bi bi-image fs-1"></i>
@@ -141,7 +141,7 @@
                                     {% endif %}
                                     {% if design.width_mm and design.height_mm %}
                                     <div class="spec-item">
-                                        <small class="text-muted">Groesse</small>
+                                        <small class="text-muted">Größe</small>
                                         <div class="fw-bold">{{ design.width_mm }} x {{ design.height_mm }} mm</div>
                                     </div>
                                     {% endif %}
@@ -155,6 +155,30 @@
                                         <small class="text-muted">Veredelungsart</small>
                                         <div class="fw-bold">{{ design.type }}</div>
                                     </div>
+                                    {% if design.thread_colors %}
+                                    <div class="spec-item">
+                                        <small class="text-muted">
+                                            {% if design.design_type == 'stick' %}Garnfarben{% else %}Druckfarben{% endif %}
+                                        </small>
+                                        <div class="mt-1">
+                                            {% for color in design.thread_colors %}
+                                            <div class="d-flex align-items-center gap-2 mb-1">
+                                                {% if color.hex %}
+                                                <span style="display:inline-block;width:18px;height:18px;border-radius:4px;
+                                                             border:1px solid #ccc;background:{{ color.hex }};flex-shrink:0"></span>
+                                                {% endif %}
+                                                <span class="small">
+                                                    {% if color.label %}<span class="text-muted">{{ color.label }}:</span> {% endif %}
+                                                    <strong>{{ color.color or color.name or '-' }}</strong>
+                                                    {% if color.pantone %}<span class="badge bg-secondary ms-1" style="font-size:0.75em">Pantone {{ color.pantone }}</span>{% endif %}
+                                                    {% if color.madeira_nr %}<span class="text-muted ms-1">Nr. {{ color.madeira_nr }}</span>{% endif %}
+                                                    {% if color.hex and not color.pantone %}<span class="text-muted ms-1">{{ color.hex }}</span>{% endif %}
+                                                </span>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    {% endif %}
                                 {% endfor %}
 
                                 {% if order.description %}
@@ -195,7 +219,7 @@
                             <canvas id="signature-pad"></canvas>
                         </div>
                         <button type="button" class="btn btn-sm btn-outline-secondary mb-3" onclick="clearSignature()">
-                            <i class="bi bi-eraser me-1"></i>Unterschrift loeschen
+                            <i class="bi bi-eraser me-1"></i>Unterschrift löschen
                         </button>
 
                         <!-- Anmerkungen -->
@@ -209,8 +233,8 @@
                         <div class="form-check mb-4">
                             <input class="form-check-input" type="checkbox" id="confirmCheck">
                             <label class="form-check-label" for="confirmCheck">
-                                Ich bestaetige, dass ich das Design geprueft habe und es fuer die Produktion freigebe.
-                                Mir ist bewusst, dass nach Freigabe keine Aenderungen mehr moeglich sind.
+                                Ich bestätige, dass ich das Design geprüft habe und es für die Produktion freigebe.
+                                Mir ist bewusst, dass nach Freigabe keine Änderungen mehr möglich sind.
                             </label>
                         </div>
 
@@ -318,6 +342,7 @@
                     action: action,
                     signature: signature,
                     notes: notes,
+                    reason: notes,
                     customer_name: customerName,
                     confirmed: confirmed
                 })

@@ -6,8 +6,9 @@ Artikel-Verwaltung mit Datenbank
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import login_required, current_user
 from datetime import datetime
-from src.models import db, Article, ActivityLog, Supplier, ProductCategory, Brand, PriceCalculationSettings
+from src.models import db, Article, ArticleVariant, ActivityLog, Supplier, ProductCategory, Brand, PriceCalculationSettings
 from src.services import LShopImportService
+from src.utils.activity_logger import log_activity
 from werkzeug.utils import secure_filename
 import os
 import tempfile
@@ -16,41 +17,24 @@ import json
 # Blueprint erstellen
 article_bp = Blueprint('articles', __name__, url_prefix='/articles')
 
-def log_activity(action, details):
-    """Aktivität in Datenbank protokollieren"""
-    activity = ActivityLog(
-        username=current_user.username,  # Geändert von 'user' zu 'username'
-        action=action,
-        details=details,
-        ip_address=request.remote_addr
-    )
-    db.session.add(activity)
-    db.session.commit()
-
 def generate_article_id():
-    """Generiere neue Artikel-ID"""
-    last_article = Article.query.filter(
-        Article.id.like('ART%')
-    ).order_by(Article.id.desc()).first()
-    
-    if last_article:
-        try:
-            last_num = int(last_article.id[3:])
-            return f"ART{last_num + 1:03d}"
-        except:
-            return "ART001"
-    return "ART001"
+    """Generiere neue Artikel-ID - delegiert an IdGeneratorService"""
+    from src.services.id_generator_service import IdGenerator
+    return IdGenerator.article()
 
 @article_bp.route('/')
 @login_required
 def index():
-    """Artikel-Übersicht"""
-    search_query = request.args.get('search', '').lower()
+    """Artikel-Übersicht mit Smart-Filtern"""
+    search_query = request.args.get('search', '').strip()
     category_filter = request.args.get('category', '')
-    
-    # Query erstellen
+    brand_filter = request.args.get('brand', '')
+    supplier_filter = request.args.get('supplier', '')
+    material_filter = request.args.get('material', '')
+    stock_filter = request.args.get('stock', '')
+
     query = Article.query
-    
+
     if search_query:
         query = query.filter(
             db.or_(
@@ -60,29 +44,50 @@ def index():
                 Article.supplier.ilike(f'%{search_query}%')
             )
         )
-    
+
     if category_filter:
         query = query.filter_by(category=category_filter)
-    
-    # Nach Name sortieren
+    if brand_filter:
+        query = query.filter(Article.brand.ilike(f'%{brand_filter}%'))
+    if supplier_filter:
+        query = query.filter(Article.supplier.ilike(f'%{supplier_filter}%'))
+    if material_filter:
+        query = query.filter(Article.material == material_filter)
+    if stock_filter == 'available':
+        query = query.filter(Article.stock > 0)
+    elif stock_filter == 'low':
+        query = query.filter(Article.stock > 0, Article.stock <= 10)
+    elif stock_filter == 'out':
+        query = query.filter(db.or_(Article.stock == 0, Article.stock.is_(None)))
+
     articles_list = query.order_by(Article.name).all()
-    
-    # In Dictionary umwandeln für Template-Kompatibilität
+
     articles = {}
     for article in articles_list:
-        # Preisberechnung beim Laden entfernt (vermeidet Database Lock)
-        # Verwende existierende Preise aus der Datenbank
         articles[article.id] = article
-    
-    # Kategorien für Filter
-    categories = db.session.query(Article.category).distinct().filter(Article.category.isnot(None)).all()
-    categories = [c[0] for c in categories if c[0]]
-    
+
+    # Filter-Optionen aus DB (distinct values)
+    categories = [c[0] for c in db.session.query(Article.category).distinct().filter(
+        Article.category.isnot(None), Article.category != '').order_by(Article.category).all()]
+    brands = [b[0] for b in db.session.query(Article.brand).distinct().filter(
+        Article.brand.isnot(None), Article.brand != '').order_by(Article.brand).all()]
+    suppliers = [s[0] for s in db.session.query(Article.supplier).distinct().filter(
+        Article.supplier.isnot(None), Article.supplier != '').order_by(Article.supplier).all()]
+    materials = [m[0] for m in db.session.query(Article.material).distinct().filter(
+        Article.material.isnot(None), Article.material != '').order_by(Article.material).all()]
+
     return render_template('articles/index.html',
                          articles=articles,
                          categories=categories,
+                         brands=brands,
+                         suppliers=suppliers,
+                         materials=materials,
                          search_query=search_query,
-                         category_filter=category_filter)
+                         category_filter=category_filter,
+                         brand_filter=brand_filter,
+                         supplier_filter=supplier_filter,
+                         material_filter=material_filter,
+                         stock_filter=stock_filter)
 
 @article_bp.route('/new', methods=['GET', 'POST'])
 @login_required
@@ -95,7 +100,7 @@ def new():
         # Neuen Artikel erstellen
         article = Article(
             id=generate_article_id(),
-            article_number=request.form.get('article_number', ''),
+            article_number=request.form.get('article_number', '').strip() or None,
             name=request.form.get('name'),
             category=request.form.get('category', ''),
             description=request.form.get('description', ''),
@@ -164,15 +169,18 @@ def new():
             article.calculate_prices(use_new_system=False)
         
         # In Datenbank speichern
-        db.session.add(article)
-        db.session.commit()
-        
-        # Aktivität protokollieren
-        log_activity('article_created', 
-                    f'Artikel erstellt: {article.id} - {article.name}')
-        
-        flash(f'Artikel {article.name} wurde erstellt!', 'success')
-        return redirect(url_for('articles.show', article_id=article.id))
+        try:
+            db.session.add(article)
+            db.session.commit()
+
+            log_activity('article_created',
+                        f'Artikel erstellt: {article.id} - {article.name}')
+
+            flash(f'Artikel {article.name} wurde erstellt!', 'success')
+            return redirect(url_for('articles.show', article_id=article.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Fehler beim Speichern: {str(e)}', 'danger')
     
     # Kategorien für Dropdown
     categories = db.session.query(Article.category).distinct().filter(Article.category.isnot(None)).all()
@@ -511,6 +519,8 @@ def import_lshop():
             
             if result['success']:
                 message = f"Import erfolgreich! {result['imported_count']} neue Artikel, {result.get('updated_count', 0)} aktualisiert, {result['skipped_count']} übersprungen"
+                if result.get('variant_count'):
+                    message += f", {result['variant_count']} Varianten erstellt"
                 if result['errors']:
                     message += f" ({len(result['errors'])} Fehler)"
                 flash(message, 'success')
@@ -678,32 +688,356 @@ def print_datasheet(article_id):
                          now=now)
 
 
+@article_bp.route('/<string:article_id>/image/search')
+@login_required
+def image_search(article_id):
+    """Sucht Produktbilder per Artikelnummer/Bezeichnung"""
+    article = Article.query.get_or_404(article_id)
+    try:
+        from src.services.article_image_service import ArticleImageSearchService
+        from flask import current_app
+        upload_dir = current_app.config.get('UPLOAD_FOLDER', 'instance/uploads')
+        service = ArticleImageSearchService(upload_base_dir=upload_dir)
+        images = service.search_images(article)
+        return jsonify({'success': True, 'images': images})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@article_bp.route('/<string:article_id>/image/save', methods=['POST'])
+@login_required
+def image_save(article_id):
+    """Laedt ein Bild herunter und speichert es zum Artikel"""
+    article = Article.query.get_or_404(article_id)
+    image_url = request.json.get('image_url', '').strip() if request.is_json else request.form.get('image_url', '').strip()
+    if not image_url:
+        return jsonify({'success': False, 'error': 'Keine Bild-URL angegeben'})
+
+    try:
+        from src.services.article_image_service import ArticleImageSearchService
+        from flask import current_app
+        upload_dir = current_app.config.get('UPLOAD_FOLDER', 'instance/uploads')
+        service = ArticleImageSearchService(upload_base_dir=upload_dir)
+
+        # Altes Bild loeschen falls vorhanden
+        if article.image_path:
+            service.delete_image(article.image_path, article.image_thumbnail_path)
+
+        result = service.download_and_save(article.id, image_url)
+        if result['success']:
+            article.image_url = image_url
+            article.image_path = result['image_path']
+            article.image_thumbnail_path = result['thumbnail_path']
+            article.updated_by = current_user.username
+            article.updated_at = datetime.now()
+            db.session.commit()
+            log_activity('article_image_saved', f'Artikelbild gespeichert: {article.name}')
+            return jsonify({
+                'success': True,
+                'image_path': f"/uploads/{result['image_path']}",
+                'thumbnail_path': f"/uploads/{result['thumbnail_path']}",
+            })
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@article_bp.route('/<string:article_id>/image/delete', methods=['POST'])
+@login_required
+def image_delete(article_id):
+    """Loescht das Artikelbild"""
+    article = Article.query.get_or_404(article_id)
+    try:
+        if article.image_path:
+            from src.services.article_image_service import ArticleImageSearchService
+            from flask import current_app
+            upload_dir = current_app.config.get('UPLOAD_FOLDER', 'instance/uploads')
+            service = ArticleImageSearchService(upload_base_dir=upload_dir)
+            service.delete_image(article.image_path, article.image_thumbnail_path)
+
+        article.image_url = None
+        article.image_path = None
+        article.image_thumbnail_path = None
+        article.updated_by = current_user.username
+        article.updated_at = datetime.now()
+        db.session.commit()
+        log_activity('article_image_deleted', f'Artikelbild geloescht: {article.name}')
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@article_bp.route('/images/mass-import', methods=['POST'])
+@login_required
+def mass_image_import():
+    """Massen-Bildimport: Sucht fuer alle Artikel ohne Bild ein Bild vom L-Shop"""
+    import threading
+    from flask import current_app
+
+    app = current_app._get_current_object()
+    upload_dir = current_app.config.get('UPLOAD_FOLDER', 'instance/uploads')
+
+    def run_import(app_ctx, upload_dir):
+        with app_ctx:
+            from src.services.article_image_service import ArticleImageSearchService
+            import time
+
+            service = ArticleImageSearchService(upload_base_dir=upload_dir)
+            articles = Article.query.filter(
+                Article.supplier_article_number.isnot(None),
+                Article.supplier_article_number != '',
+                db.or_(
+                    Article.image_path.is_(None),
+                    Article.image_path == ''
+                )
+            ).all()
+
+            total = len(articles)
+            success_count = 0
+            fail_count = 0
+            logger.info(f"Massen-Bildimport gestartet: {total} Artikel ohne Bild")
+
+            for idx, article in enumerate(articles):
+                try:
+                    # Priorität 1: Bereits gespeicherte Bild-URL (aus LShop-Import)
+                    image_url_to_use = None
+                    if article.image_url:
+                        image_url_to_use = article.image_url
+                    else:
+                        # Priorität 2: L-Shop Suche (nur wenn keine URL gespeichert)
+                        images = service._search_lshop(
+                            article.supplier_article_number,
+                            article.name or ''
+                        )
+                        if images:
+                            image_url_to_use = images[0]['url']
+
+                    if image_url_to_use:
+                        result = service.download_and_save(article.id, image_url_to_use)
+                        if result.get('success'):
+                            article.image_url = image_url_to_use
+                            article.image_path = result['image_path']
+                            article.image_thumbnail_path = result['thumbnail_path']
+                            db.session.commit()
+                            success_count += 1
+                        else:
+                            fail_count += 1
+                    else:
+                        fail_count += 1
+
+                    # Rate limiting - nicht den L-Shop ueberlasten
+                    if idx % 10 == 0 and idx > 0:
+                        time.sleep(2)
+                        logger.info(f"Bildimport Fortschritt: {idx}/{total} ({success_count} OK, {fail_count} fehlgeschlagen)")
+
+                except Exception as e:
+                    fail_count += 1
+                    logger.warning(f"Bildimport Fehler fuer {article.supplier_article_number}: {e}")
+                    try:
+                        db.session.rollback()
+                    except Exception:
+                        pass
+
+            logger.info(f"Massen-Bildimport abgeschlossen: {success_count} OK, {fail_count} fehlgeschlagen von {total}")
+
+    thread = threading.Thread(target=run_import, args=(app.app_context(), upload_dir))
+    thread.daemon = True
+    thread.start()
+
+    # Zaehle Artikel ohne Bild
+    count = Article.query.filter(
+        Article.supplier_article_number.isnot(None),
+        Article.supplier_article_number != '',
+        db.or_(
+            Article.image_path.is_(None),
+            Article.image_path == ''
+        )
+    ).count()
+
+    return jsonify({
+        'success': True,
+        'message': f'Bildimport fuer {count} Artikel gestartet (laeuft im Hintergrund)',
+        'total': count
+    })
+
+
+@article_bp.route('/images/import-status')
+@login_required
+def image_import_status():
+    """Status des Bildimports"""
+    total = Article.query.filter(
+        Article.supplier_article_number.isnot(None),
+        Article.supplier_article_number != ''
+    ).count()
+
+    with_image = Article.query.filter(
+        Article.image_path.isnot(None),
+        Article.image_path != ''
+    ).count()
+
+    return jsonify({
+        'success': True,
+        'total': total,
+        'with_image': with_image,
+        'without_image': total - with_image,
+        'percent': round((with_image / total * 100), 1) if total > 0 else 0
+    })
+
+
+@article_bp.route('/import/printequipment', methods=['POST'])
+@login_required
+def import_printequipment():
+    """Importiert Sublimationsprodukte von Printequipment"""
+    import threading
+    from flask import current_app
+
+    app = current_app._get_current_object()
+    upload_dir = current_app.config.get('UPLOAD_FOLDER', 'instance/uploads')
+
+    from src.services.printequipment_import_service import run_full_import
+
+    thread = threading.Thread(
+        target=run_full_import,
+        args=(app.app_context(), upload_dir)
+    )
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({
+        'success': True,
+        'message': 'Printequipment Sublimation-Import gestartet (laeuft im Hintergrund)'
+    })
+
+
+@article_bp.route('/api/filter-options')
+@login_required
+def api_filter_options():
+    """Liefert alle verfuegbaren Filter-Werte aus der Artikeltabelle (auto-populated)."""
+    filter_data = {}
+
+    # Brands: aus Brand-Tabelle falls vorhanden, sonst aus article.brand
+    brands_from_table = Brand.query.filter_by(active=True).order_by(Brand.name).all()
+    if brands_from_table:
+        filter_data['brands'] = [{'id': b.id, 'name': b.name} for b in brands_from_table]
+    else:
+        raw = db.session.query(Article.brand).filter(
+            Article.active == True, Article.brand.isnot(None), Article.brand != ''
+        ).distinct().order_by(Article.brand).all()
+        filter_data['brands'] = [{'id': None, 'name': r[0]} for r in raw]
+
+    # Kategorien: aus ProductCategory-Tabelle falls vorhanden
+    cats = ProductCategory.query.filter_by(active=True).order_by(ProductCategory.name).all()
+    if cats:
+        filter_data['categories'] = [{'id': c.id, 'name': c.name} for c in cats]
+    else:
+        raw = db.session.query(Article.category).filter(
+            Article.active == True, Article.category.isnot(None), Article.category != ''
+        ).distinct().order_by(Article.category).all()
+        filter_data['categories'] = [{'id': None, 'name': r[0]} for r in raw]
+
+    # Lieferanten
+    raw = db.session.query(Article.supplier).filter(
+        Article.active == True, Article.supplier.isnot(None), Article.supplier != ''
+    ).distinct().order_by(Article.supplier).all()
+    filter_data['suppliers'] = [r[0] for r in raw]
+
+    # Materialien
+    raw = db.session.query(Article.material).filter(
+        Article.active == True, Article.material.isnot(None), Article.material != ''
+    ).distinct().order_by(Article.material).all()
+    filter_data['materials'] = [r[0] for r in raw]
+
+    # Farben
+    raw = db.session.query(Article.color).filter(
+        Article.active == True, Article.color.isnot(None), Article.color != ''
+    ).distinct().order_by(Article.color).all()
+    filter_data['colors'] = [r[0] for r in raw]
+
+    # Produkttypen
+    raw = db.session.query(Article.product_type).filter(
+        Article.active == True, Article.product_type.isnot(None), Article.product_type != ''
+    ).distinct().order_by(Article.product_type).all()
+    filter_data['product_types'] = [r[0] for r in raw]
+
+    return jsonify(filter_data)
+
+
 @article_bp.route('/api/search')
 @login_required
 def api_search():
-    """
-    API-Endpunkt für Artikel-Suche (für Rechnungen, Aufträge etc.)
-    """
-    query = request.args.get('q', '').strip()
-    limit = request.args.get('limit', 20, type=int)
+    """Unified Artikel-Suche mit Smart-Filtern."""
+    query_text = request.args.get('q', '').strip()
+    limit = min(request.args.get('limit', 50, type=int), 200)
+    offset = request.args.get('offset', 0, type=int)
 
-    if len(query) < 2:
-        return jsonify({'articles': []})
+    q = Article.query.filter(Article.active == True)
 
-    # Suche in Name, Artikelnummer, Beschreibung
-    from sqlalchemy import or_
+    # Textsuche
+    if query_text and len(query_text) >= 2:
+        q = q.filter(db.or_(
+            Article.name.ilike(f'%{query_text}%'),
+            Article.article_number.ilike(f'%{query_text}%'),
+            Article.description.ilike(f'%{query_text}%'),
+            Article.supplier_article_number.ilike(f'%{query_text}%')
+        ))
 
-    articles = Article.query.filter(
-        or_(
-            Article.name.ilike(f'%{query}%'),
-            Article.article_number.ilike(f'%{query}%'),
-            Article.description.ilike(f'%{query}%'),
-            Article.supplier_article_number.ilike(f'%{query}%')
-        ),
-        Article.active == True
-    ).limit(limit).all()
+    # Brand-Filter
+    brand_id = request.args.get('brand_id', type=int)
+    if brand_id:
+        q = q.filter(Article.brand_id == brand_id)
+    else:
+        brand_name = request.args.get('brand', '').strip()
+        if brand_name:
+            q = q.filter(Article.brand.ilike(f'%{brand_name}%'))
+
+    # Kategorie-Filter
+    category_id = request.args.get('category_id', type=int)
+    if category_id:
+        q = q.filter(Article.category_id == category_id)
+    else:
+        category_name = request.args.get('category', '').strip()
+        if category_name:
+            q = q.filter(Article.category.ilike(f'%{category_name}%'))
+
+    # Lieferant-Filter
+    supplier_name = request.args.get('supplier', '').strip()
+    if supplier_name:
+        q = q.filter(Article.supplier.ilike(f'%{supplier_name}%'))
+
+    # Material-Filter
+    material = request.args.get('material', '').strip()
+    if material:
+        q = q.filter(Article.material == material)
+
+    # Farbe-Filter (Teilmatch fuer "Schwarz" -> "Schwarz/Rot")
+    color = request.args.get('color', '').strip()
+    if color:
+        q = q.filter(Article.color.ilike(f'%{color}%'))
+
+    # Produkttyp-Filter
+    product_type = request.args.get('product_type', '').strip()
+    if product_type:
+        q = q.filter(Article.product_type == product_type)
+
+    # Shop-Filter
+    show_in_shop = request.args.get('show_in_shop')
+    if show_in_shop == 'true':
+        q = q.filter(Article.show_in_shop == True)
+
+    # Lagerbestand-Filter
+    stock_filter = request.args.get('stock', '').strip()
+    if stock_filter == 'available':
+        q = q.filter(Article.stock > 0)
+    elif stock_filter == 'low':
+        q = q.filter(Article.stock > 0, Article.stock <= 10)
+    elif stock_filter == 'out':
+        q = q.filter(db.or_(Article.stock == 0, Article.stock.is_(None)))
+
+    total = q.count()
+    articles = q.order_by(Article.name).offset(offset).limit(limit).all()
 
     return jsonify({
+        'total': total,
         'articles': [{
             'id': a.id,
             'name': a.name,
@@ -714,7 +1048,172 @@ def api_search():
             'purchase_price': float(a.purchase_price_single or 0),
             'stock': a.stock or 0,
             'category': a.category,
-            'brand': a.brand
+            'category_id': a.category_id,
+            'brand': a.brand,
+            'brand_id': a.brand_id,
+            'supplier': a.supplier or '',
+            'material': a.material or '',
+            'color': a.color or '',
+            'size': a.size or '',
+            'product_type': a.product_type or '',
+            'weight': float(a.weight or 0)
         } for a in articles]
     })
 
+
+# ============================================================
+# VARIANTEN CRUD API
+# ============================================================
+
+@article_bp.route('/api/<article_id>/variants')
+@login_required
+def api_variants_list(article_id):
+    """Liste aller Varianten eines Artikels"""
+    article = Article.query.get_or_404(article_id)
+    variants = article.get_all_variants()
+    return jsonify([v.to_dict() for v in variants])
+
+
+@article_bp.route('/api/<article_id>/variants', methods=['POST'])
+@login_required
+def api_variant_create(article_id):
+    """Neue Variante erstellen"""
+    article = Article.query.get_or_404(article_id)
+    data = request.get_json() or {}
+
+    color = data.get('color', '').strip() or None
+    size = data.get('size', '').strip() or None
+
+    if not color and not size:
+        return jsonify({'success': False, 'error': 'Farbe oder Groesse erforderlich'}), 400
+
+    # Duplikat-Check
+    existing = ArticleVariant.query.filter_by(
+        article_id=article_id, color=color, size=size
+    ).first()
+    if existing:
+        return jsonify({'success': False, 'error': 'Diese Variante existiert bereits'}), 400
+
+    vtype = 'color_size' if (color and size) else ('color' if color else 'size')
+
+    variant = ArticleVariant(
+        article_id=article_id,
+        variant_type=vtype,
+        color=color,
+        size=size,
+        ean=data.get('ean', '').strip() or None,
+        single_price=float(data['single_price']) if data.get('single_price') else None,
+        carton_price=float(data['carton_price']) if data.get('carton_price') else None,
+        ten_carton_price=float(data['ten_carton_price']) if data.get('ten_carton_price') else None,
+        units_per_carton=int(data['units_per_carton']) if data.get('units_per_carton') else None,
+        stock=int(data.get('stock', 0)),
+        min_stock=int(data.get('min_stock', 0)),
+        active=True,
+        created_by=current_user.username if current_user.is_authenticated else None,
+    )
+    db.session.add(variant)
+
+    if not article.has_variants:
+        article.has_variants = True
+
+    db.session.commit()
+    return jsonify({'success': True, 'variant': variant.to_dict()})
+
+
+@article_bp.route('/api/variants/<int:variant_id>', methods=['PUT'])
+@login_required
+def api_variant_update(variant_id):
+    """Variante aktualisieren"""
+    variant = ArticleVariant.query.get_or_404(variant_id)
+    data = request.get_json() or {}
+
+    if 'color' in data:
+        variant.color = data['color'].strip() or None
+    if 'size' in data:
+        variant.size = data['size'].strip() or None
+    if 'ean' in data:
+        variant.ean = data['ean'].strip() or None
+    if 'single_price' in data:
+        variant.single_price = float(data['single_price']) if data['single_price'] else None
+    if 'carton_price' in data:
+        variant.carton_price = float(data['carton_price']) if data['carton_price'] else None
+    if 'ten_carton_price' in data:
+        variant.ten_carton_price = float(data['ten_carton_price']) if data['ten_carton_price'] else None
+    if 'units_per_carton' in data:
+        variant.units_per_carton = int(data['units_per_carton']) if data['units_per_carton'] else None
+    if 'stock' in data:
+        variant.stock = int(data['stock'])
+    if 'min_stock' in data:
+        variant.min_stock = int(data['min_stock'])
+    if 'active' in data:
+        variant.active = bool(data['active'])
+
+    # variant_type aktualisieren
+    if variant.color and variant.size:
+        variant.variant_type = 'color_size'
+    elif variant.color:
+        variant.variant_type = 'color'
+    else:
+        variant.variant_type = 'size'
+
+    variant.updated_by = current_user.username if current_user.is_authenticated else None
+    db.session.commit()
+    return jsonify({'success': True, 'variant': variant.to_dict()})
+
+
+@article_bp.route('/api/variants/<int:variant_id>', methods=['DELETE'])
+@login_required
+def api_variant_delete(variant_id):
+    """Variante loeschen"""
+    variant = ArticleVariant.query.get_or_404(variant_id)
+    article_id = variant.article_id
+    db.session.delete(variant)
+
+    # Pruefen ob Artikel noch Varianten hat
+    remaining = ArticleVariant.query.filter_by(article_id=article_id).count()
+    if remaining <= 1:  # Die geloeschte wird noch gezaehlt bis commit
+        article = Article.query.get(article_id)
+        if article and remaining <= 1:
+            article.has_variants = False
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@article_bp.route('/api/<article_id>/convert-to-variants', methods=['POST'])
+@login_required
+def api_convert_to_variants(article_id):
+    """Wandelt einen Einzel-Artikel in einen Varianten-Artikel um"""
+    article = Article.query.get_or_404(article_id)
+
+    if article.has_variants:
+        return jsonify({'success': False, 'error': 'Artikel hat bereits Varianten'}), 400
+
+    # Erste Variante aus den aktuellen Artikeldaten erstellen
+    color = article.color or None
+    size = article.size or None
+    vtype = 'color_size' if (color and size) else ('color' if color else 'size')
+
+    if color or size:
+        variant = ArticleVariant(
+            article_id=article.id,
+            variant_type=vtype,
+            color=color,
+            size=size,
+            single_price=article.purchase_price_single,
+            carton_price=article.purchase_price_carton,
+            ten_carton_price=getattr(article, 'purchase_price_10carton', None),
+            units_per_carton=article.units_per_carton,
+            stock=article.stock or 0,
+            min_stock=article.min_stock or 0,
+            active=True,
+            created_by=current_user.username if current_user.is_authenticated else None,
+        )
+        db.session.add(variant)
+
+    article.has_variants = True
+    article.color = None
+    article.size = None
+    db.session.commit()
+
+    return jsonify({'success': True})

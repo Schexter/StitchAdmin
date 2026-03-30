@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Textbausteine - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1><i class="bi bi-card-text"></i> Textbausteine</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('settings.index') }}">Einstellungen</a></li>
+                <li class="breadcrumb-item active">Textbausteine</li>
+            </ol>
+        </nav>
+        <p class="text-muted">Wiederverwendbare Textblöcke für Angebote (Zahlungsbedingungen, Gültigkeit, Lieferung etc.)</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Linke Seite: Liste -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-list-ul"></i> Alle Textbausteine</h5>
+                <button class="btn btn-primary btn-sm" onclick="showForm()">
+                    <i class="bi bi-plus-lg"></i> Neuer Textbaustein
+                </button>
+            </div>
+            <div class="card-body p-0">
+                {% if bausteine %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 30%">Titel</th>
+                                <th style="width: 30%">Inhalt</th>
+                                <th>Kategorie</th>
+                                <th class="text-center">Standard</th>
+                                <th class="text-center">Aktiv</th>
+                                <th class="text-end">Aktionen</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tb in bausteine %}
+                            <tr>
+                                <td><strong>{{ tb.titel }}</strong></td>
+                                <td><small class="text-muted">{{ tb.inhalt[:80] }}{% if tb.inhalt|length > 80 %}...{% endif %}</small></td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ kategorien.get(tb.kategorie, tb.kategorie) }}</span>
+                                </td>
+                                <td class="text-center">
+                                    {% if tb.ist_standard %}
+                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                    {% else %}
+                                    <i class="bi bi-circle text-muted"></i>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if tb.aktiv %}
+                                    <span class="badge bg-success">Aktiv</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Inaktiv</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <button class="btn btn-sm btn-outline-primary" title="Bearbeiten"
+                                            onclick="editBaustein({{ tb.id }}, '{{ tb.titel|e }}', `{{ tb.inhalt|e }}`, '{{ tb.kategorie }}', {{ tb.sort_order }}, {{ 'true' if tb.aktiv else 'false' }}, {{ 'true' if tb.ist_standard else 'false' }})">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <form method="POST" action="{{ url_for('settings.textbaustein_delete', tb_id=tb.id) }}"
+                                          class="d-inline" onsubmit="return confirm('Textbaustein wirklich löschen?')">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Löschen">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-card-text text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mt-2">Noch keine Textbausteine vorhanden.</p>
+                    <button class="btn btn-primary" onclick="showForm()">
+                        <i class="bi bi-plus-lg"></i> Ersten Textbaustein anlegen
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Rechte Seite: Formular -->
+    <div class="col-md-4">
+        <div class="card" id="form-card">
+            <div class="card-header">
+                <h5 class="mb-0" id="form-title"><i class="bi bi-plus-circle"></i> Neuer Textbaustein</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('settings.textbaustein_save') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="id" id="tb_id" value="">
+
+                    <div class="mb-3">
+                        <label class="form-label">Titel *</label>
+                        <input type="text" class="form-control" name="titel" id="tb_titel" required
+                               placeholder="z.B. 50% Anzahlung">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Kategorie</label>
+                        <select class="form-select" name="kategorie" id="tb_kategorie">
+                            {% for key, label in kategorien.items() %}
+                            <option value="{{ key }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Inhalt *</label>
+                        <textarea class="form-control" name="inhalt" id="tb_inhalt" rows="5" required
+                                  placeholder="Der vollständige Text des Bausteins..."></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Reihenfolge</label>
+                                <input type="number" class="form-control" name="sort_order" id="tb_sort" value="0" min="0">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3 pt-4">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="aktiv" id="tb_aktiv" checked>
+                                    <label class="form-check-label" for="tb_aktiv">Aktiv</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="ist_standard" id="tb_standard">
+                            <label class="form-check-label" for="tb_standard">
+                                <strong>Standard</strong> — Wird bei neuem Angebot automatisch vorausgewählt
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg"></i> Speichern
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="resetForm()">
+                            <i class="bi bi-x-lg"></i> Abbrechen
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Info-Card -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Hinweis</h6>
+            </div>
+            <div class="card-body">
+                <p class="small">Textbausteine sind wiederverwendbare Textblöcke, die beim Erstellen eines Angebots ausgewählt werden können.</p>
+                <p class="small mb-0"><strong>Standard-Bausteine</strong> werden bei einem neuen Angebot automatisch vorausgewählt, können aber jederzeit abgewählt werden.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function showForm() {
+    resetForm();
+    document.getElementById('form-card').scrollIntoView({behavior: 'smooth'});
+}
+
+function resetForm() {
+    document.getElementById('tb_id').value = '';
+    document.getElementById('tb_titel').value = '';
+    document.getElementById('tb_inhalt').value = '';
+    document.getElementById('tb_kategorie').value = 'sonstiges';
+    document.getElementById('tb_sort').value = '0';
+    document.getElementById('tb_aktiv').checked = true;
+    document.getElementById('tb_standard').checked = false;
+    document.getElementById('form-title').innerHTML = '<i class="bi bi-plus-circle"></i> Neuer Textbaustein';
+}
+
+function editBaustein(id, titel, inhalt, kategorie, sort, aktiv, standard) {
+    document.getElementById('tb_id').value = id;
+    document.getElementById('tb_titel').value = titel;
+    document.getElementById('tb_inhalt').value = inhalt;
+    document.getElementById('tb_kategorie').value = kategorie;
+    document.getElementById('tb_sort').value = sort;
+    document.getElementById('tb_aktiv').checked = aktiv;
+    document.getElementById('tb_standard').checked = standard;
+    document.getElementById('form-title').innerHTML = '<i class="bi bi-pencil"></i> Textbaustein bearbeiten';
+    document.getElementById('form-card').scrollIntoView({behavior: 'smooth'});
+}
+</script>
+{% endblock %}

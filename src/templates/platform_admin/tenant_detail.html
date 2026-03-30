@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tenant.name }} - Plattform-Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .detail-label { font-size: 0.85rem; color: #6c757d; margin-bottom: 2px; }
+    .detail-value { font-weight: 600; }
+    .plan-card { border-radius: 12px; transition: all 0.15s; cursor: pointer; }
+    .plan-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .plan-card.active-plan { border: 2px solid var(--sa-primary, #1a6b5a); background: var(--sa-primary-light, #f0faf7); }
+    .plan-price { font-size: 1.5rem; font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{{ url_for('platform_admin.dashboard') }}">Plattform-Admin</a></li>
+        <li class="breadcrumb-item active">{{ tenant.name }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+        <h1 class="mb-1">
+            <i class="bi bi-building me-2"></i>{{ tenant.name }}
+            {% if not tenant.is_active %}
+                <span class="badge bg-danger fs-6 ms-2">Inaktiv</span>
+            {% endif %}
+        </h1>
+        <p class="text-muted mb-0">
+            <code>{{ tenant.subdomain }}.stitchadmin.de</code>
+            {% if tenant.custom_domain %}
+                &middot; <code>{{ tenant.custom_domain }}</code>
+            {% endif %}
+        </p>
+    </div>
+    <div class="d-flex gap-2">
+        <form method="POST" action="{{ url_for('platform_admin.toggle_active', tenant_id=tenant.id) }}">
+            <button type="submit" class="btn {% if tenant.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}">
+                <i class="bi {% if tenant.is_active %}bi-pause-circle{% else %}bi-play-circle{% endif %} me-1"></i>
+                {{ 'Deaktivieren' if tenant.is_active else 'Aktivieren' }}
+            </button>
+        </form>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Linke Spalte: Details -->
+    <div class="col-lg-8">
+        <!-- Tenant-Info -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Tenant-Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="detail-label">Kontakt-E-Mail</div>
+                        <div class="detail-value">{{ tenant.contact_email }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="detail-label">Telefon</div>
+                        <div class="detail-value">{{ tenant.contact_phone or '-' }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="detail-label">Adresse</div>
+                        <div class="detail-value">
+                            {% if tenant.street %}
+                                {{ tenant.street }}<br>
+                                {{ tenant.postal_code }} {{ tenant.city }}<br>
+                                {{ tenant.country }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="detail-label">USt-ID</div>
+                        <div class="detail-value">{{ tenant.tax_id or '-' }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="detail-label">Erstellt am</div>
+                        <div class="detail-value">{{ tenant.created_at|format_datetime }}</div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="detail-label">Speicher</div>
+                        <div class="detail-value">
+                            {{ tenant.storage_used_mb }} / {{ tenant.storage_limit_mb }} MB
+                            {% set usage_pct = (tenant.storage_used_mb / tenant.storage_limit_mb * 100) if tenant.storage_limit_mb > 0 else 0 %}
+                            <div class="progress mt-1" style="height: 6px;">
+                                <div class="progress-bar {% if usage_pct > 90 %}bg-danger{% elif usage_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                                     style="width: {{ usage_pct }}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plan aendern -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-credit-card me-2"></i>Plan & Abrechnung</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('platform_admin.update_plan', tenant_id=tenant.id) }}">
+                    <div class="row g-3 mb-3">
+                        {% for tier_key, tier in plan_config.items() %}
+                        <div class="col-sm-6 col-md-3">
+                            <div class="card plan-card text-center p-3 {% if tenant.plan_tier == tier_key %}active-plan{% endif %}"
+                                 onclick="document.getElementById('plan_{{ tier_key }}').checked = true; document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('active-plan')); this.classList.add('active-plan');">
+                                <input type="radio" name="plan_tier" id="plan_{{ tier_key }}" value="{{ tier_key }}"
+                                       {% if tenant.plan_tier == tier_key %}checked{% endif %} class="d-none">
+                                <div class="fw-semibold mb-1">{{ tier['label'] }}</div>
+                                <div class="plan-price">
+                                    {% if tier['price_monthly'] == 0 %}
+                                        Gratis
+                                    {% else %}
+                                        {{ tier['price_monthly'] }}&euro;
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">/Monat</small>
+                                <hr class="my-2">
+                                <small class="text-muted">
+                                    {{ tier.get('max_users', '?') }} User<br>
+                                    {{ tier.get('max_customers', '?') }} Kunden
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label class="form-label">Billing-Status</label>
+                            <select name="billing_status" class="form-select">
+                                <option value="active" {% if tenant.billing_status == 'active' %}selected{% endif %}>Aktiv</option>
+                                <option value="past_due" {% if tenant.billing_status == 'past_due' %}selected{% endif %}>Ueberfaellig</option>
+                                <option value="grace_period" {% if tenant.billing_status == 'grace_period' %}selected{% endif %}>Karenzzeit</option>
+                                <option value="suspended" {% if tenant.billing_status == 'suspended' %}selected{% endif %}>Gesperrt</option>
+                                <option value="cancelled" {% if tenant.billing_status == 'cancelled' %}selected{% endif %}>Gekuendigt</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-6 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-lg me-1"></i>Plan aktualisieren
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                {% if tenant.next_billing_date %}
+                <div class="mt-3 p-3 bg-light rounded">
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <div class="detail-label">Naechste Abrechnung</div>
+                            <div class="detail-value">{{ tenant.next_billing_date|format_date }}</div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="detail-label">Letzte Zahlung</div>
+                            <div class="detail-value">
+                                {% if tenant.last_payment_date %}
+                                    {{ tenant.last_payment_date|format_date }} ({{ tenant.last_payment_amount }} &euro;)
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="detail-label">Abrechnungszyklus</div>
+                            <div class="detail-value">{{ 'Monatlich' if tenant.billing_cycle == 'monthly' else 'Jaehrlich' }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Mitglieder -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-people me-2"></i>Mitglieder ({{ members|length }})</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Benutzer</th>
+                                <th>Rolle</th>
+                                <th>Status</th>
+                                <th>Beigetreten</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for member in members %}
+                            <tr>
+                                <td>
+                                    <i class="bi bi-person me-1"></i>
+                                    {% if member.user %}
+                                        {{ member.user.username }}
+                                        <br><small class="text-muted">{{ member.user.email }}</small>
+                                    {% else %}
+                                        <span class="text-muted">User #{{ member.user_id }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if member.role == 'system_admin' %}
+                                        <span class="badge bg-danger">System-Admin</span>
+                                    {% elif member.role == 'tenant_admin' %}
+                                        <span class="badge bg-primary">Admin</span>
+                                    {% elif member.role == 'manager' %}
+                                        <span class="badge bg-info">Manager</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ member.role }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if member.is_active %}
+                                        <span class="text-success"><i class="bi bi-check-circle-fill"></i> Aktiv</span>
+                                    {% else %}
+                                        <span class="text-muted"><i class="bi bi-pause-circle"></i> Inaktiv</span>
+                                    {% endif %}
+                                </td>
+                                <td><small>{{ member.joined_at|format_date if member.joined_at else '-' }}</small></td>
+                            </tr>
+                            {% endfor %}
+                            {% if not members %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">Keine Mitglieder</td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rechte Spalte: Zahlung erfassen & Historie -->
+    <div class="col-lg-4">
+        <!-- Zahlung erfassen -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Zahlung erfassen</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('platform_admin.add_payment', tenant_id=tenant.id) }}">
+                    <div class="mb-3">
+                        <label class="form-label">Betrag (&euro;)</label>
+                        <input type="text" name="amount" class="form-control" placeholder="z.B. 99,00"
+                               value="{{ plan_config[tenant.plan_tier]['price_monthly'] }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Zahlungsart</label>
+                        <select name="payment_method" class="form-select">
+                            <option value="bank_transfer">Ueberweisung</option>
+                            <option value="stripe">Stripe</option>
+                            <option value="paypal">PayPal</option>
+                            <option value="manual">Manuell/Bar</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Zeitraum (Monate)</label>
+                        <select name="period_months" class="form-select">
+                            <option value="1">1 Monat</option>
+                            <option value="3">3 Monate</option>
+                            <option value="6">6 Monate</option>
+                            <option value="12" selected>12 Monate</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Referenz (optional)</label>
+                        <input type="text" name="reference" class="form-control" placeholder="z.B. Ueberweisungsreferenz">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Beschreibung (optional)</label>
+                        <input type="text" name="description" class="form-control"
+                               placeholder="z.B. Professional Plan - Feb 2026">
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">
+                        <i class="bi bi-receipt me-1"></i>Zahlung erfassen
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Zahlungshistorie -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Zahlungshistorie</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if payments %}
+                <div class="list-group list-group-flush">
+                    {% for payment in payments %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <div class="fw-semibold">{{ payment.amount }} &euro;</div>
+                                <small class="text-muted">{{ payment.description or '-' }}</small>
+                            </div>
+                            <div class="text-end">
+                                <small>{{ payment.created_at|format_date }}</small>
+                                <br>
+                                <span class="badge {% if payment.status == 'completed' %}bg-success{% elif payment.status == 'pending' %}bg-warning{% elif payment.status == 'refunded' %}bg-info{% else %}bg-danger{% endif %}">
+                                    {{ payment.status }}
+                                </span>
+                            </div>
+                        </div>
+                        {% if payment.invoice_number %}
+                        <small class="text-muted"><i class="bi bi-hash me-1"></i>{{ payment.invoice_number }}</small>
+                        {% endif %}
+                        {% if payment.reference %}
+                        <br><small class="text-muted"><i class="bi bi-link-45deg me-1"></i>{{ payment.reference }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-receipt fs-1 d-block mb-2"></i>
+                    Noch keine Zahlungen.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

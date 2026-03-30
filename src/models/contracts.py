@@ -54,7 +54,24 @@ class Contract(db.Model):
     document_path = db.Column(db.String(500))
 
     # Verknuepfung zu Maschinen (optional)
-    machine_id = db.Column(db.Integer, db.ForeignKey('machines.id', ondelete='SET NULL'), nullable=True)
+    machine_id = db.Column(db.String(50), db.ForeignKey('machines.id', ondelete='SET NULL'), nullable=True)
+
+    # === BUCHHALTUNG / KOSTENZUORDNUNG ===
+    # Kostenkategorie fuer Buchhaltung
+    cost_category = db.Column(db.String(50), default='sonstige')  # miete, telefon, versicherung, leasing, wartung, software, sonstige
+    # Kostenstelle (optional, z.B. "Produktion", "Verwaltung", "Vertrieb")
+    cost_center = db.Column(db.String(100))
+    # Buchungskonto (SKR03/SKR04)
+    booking_account = db.Column(db.String(20))  # z.B. "4210" fuer Miete
+    # Steuer: Vorsteuer abziehbar?
+    vat_deductible = db.Column(db.Boolean, default=True)
+    vat_rate = db.Column(db.Float, default=19.0)
+    # Naechste Faelligkeit (wird automatisch berechnet/aktualisiert)
+    next_due_date = db.Column(db.Date)
+    # Letzte Buchung (wann wurde zuletzt eine Ausgabe erfasst)
+    last_booked_date = db.Column(db.Date)
+    # Automatisch Buchungen erzeugen?
+    auto_booking = db.Column(db.Boolean, default=False)
 
     # Status: active, expired, cancelled, pending
     status = db.Column(db.String(20), default='active')
@@ -108,6 +125,21 @@ class Contract(db.Model):
         'half_yearly': 'Halbjährlich',
         'yearly': 'Jährlich',
         'one-time': 'Einmalig',
+    }
+
+    COST_CATEGORIES = {
+        'miete': ('Miete & Nebenkosten', 'bi-house-door', '4210'),
+        'telefon': ('Telefon & Internet', 'bi-phone', '4920'),
+        'versicherung': ('Versicherungen', 'bi-shield-check', '4360'),
+        'leasing': ('Leasing & Finanzierung', 'bi-credit-card', '4570'),
+        'wartung': ('Wartung & Reparatur', 'bi-tools', '4805'),
+        'software': ('Software & Lizenzen', 'bi-laptop', '4964'),
+        'fahrzeug': ('Fahrzeugkosten', 'bi-car-front', '4510'),
+        'energie': ('Strom & Gas', 'bi-lightning', '4240'),
+        'entsorgung': ('Entsorgung & Reinigung', 'bi-trash', '4250'),
+        'marketing': ('Marketing & Werbung', 'bi-megaphone', '4600'),
+        'mitgliedschaft': ('Beitraege & Mitgliedschaften', 'bi-people', '4380'),
+        'sonstige': ('Sonstige Kosten', 'bi-three-dots', '4900'),
     }
 
     STATUS_LABELS = {
@@ -185,6 +217,53 @@ class Contract(db.Model):
         if not self.renewal_date:
             return None
         return (self.renewal_date - date.today()).days
+
+    @property
+    def cost_category_label(self):
+        cat = self.COST_CATEGORIES.get(self.cost_category)
+        return cat[0] if cat else self.cost_category
+
+    @property
+    def cost_category_icon(self):
+        cat = self.COST_CATEGORIES.get(self.cost_category)
+        return cat[1] if cat else 'bi-three-dots'
+
+    @property
+    def suggested_account(self):
+        """Vorgeschlagenes Buchungskonto basierend auf Kostenkategorie"""
+        cat = self.COST_CATEGORIES.get(self.cost_category)
+        return cat[2] if cat else '4900'
+
+    @property
+    def netto_amount(self):
+        """Netto-Betrag (ohne MwSt)"""
+        if not self.amount:
+            return 0
+        if self.vat_deductible and self.vat_rate:
+            return round(self.amount / (1 + self.vat_rate / 100), 2)
+        return self.amount
+
+    @property
+    def vat_amount(self):
+        """MwSt-Betrag"""
+        if not self.amount or not self.vat_deductible or not self.vat_rate:
+            return 0
+        return round(self.amount - self.netto_amount, 2)
+
+    def calculate_next_due_date(self):
+        """Berechnet die naechste Faelligkeit basierend auf Intervall"""
+        from dateutil.relativedelta import relativedelta
+        base = self.last_booked_date or self.start_date or date.today()
+        intervals = {
+            'monthly': relativedelta(months=1),
+            'quarterly': relativedelta(months=3),
+            'half_yearly': relativedelta(months=6),
+            'yearly': relativedelta(years=1),
+        }
+        delta = intervals.get(self.payment_interval)
+        if delta:
+            self.next_due_date = base + delta
+        return self.next_due_date
 
     def __repr__(self):
         return f"<Contract {self.id} '{self.name}' [{self.status}]>"

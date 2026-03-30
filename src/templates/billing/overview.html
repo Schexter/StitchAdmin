@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Mein Plan & Abrechnung - StitchAdmin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .plan-card-select {
+        border: 2px solid #dee2e6;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: all 0.15s;
+        cursor: pointer;
+        height: 100%;
+    }
+    .plan-card-select:hover { border-color: var(--sa-primary, #1a6b5a); transform: translateY(-2px); }
+    .plan-card-select.current {
+        border-color: var(--sa-primary, #1a6b5a);
+        background: var(--sa-primary-light, #f0faf7);
+    }
+    .plan-price-big { font-size: 2rem; font-weight: 700; }
+    .usage-bar { height: 8px; border-radius: 4px; }
+    .limit-item { padding: 0.75rem 0; border-bottom: 1px solid #f0f0f0; }
+    .limit-item:last-child { border-bottom: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="mb-1"><i class="bi bi-credit-card me-2"></i>Mein Plan & Abrechnung</h1>
+        <p class="text-muted mb-0">Ihr aktueller Plan, Nutzung und Zahlungshistorie</p>
+    </div>
+</div>
+
+<!-- Aktueller Plan -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h5 class="text-muted mb-1">Aktueller Plan</h5>
+                <h2 class="mb-0">
+                    {{ tenant.plan_label }}
+                    {% if tenant.plan_tier == 'trial' %}
+                        <span class="badge bg-warning text-dark fs-6 ms-2">Testphase</span>
+                    {% endif %}
+                </h2>
+                {% if tenant.plan_tier == 'trial' and tenant.trial_days_remaining is not none %}
+                <p class="text-warning mt-2 mb-0">
+                    <i class="bi bi-hourglass-split me-1"></i>
+                    Noch {{ tenant.trial_days_remaining }} Tage verbleibend
+                </p>
+                {% endif %}
+            </div>
+            <div class="col-md-3 text-center">
+                <div class="plan-price-big" style="color: var(--sa-primary, #1a6b5a);">
+                    {% if tenant.price_monthly == 0 %}
+                        Gratis
+                    {% else %}
+                        {{ tenant.price_monthly }} &euro;
+                    {% endif %}
+                </div>
+                <small class="text-muted">pro Monat</small>
+            </div>
+            <div class="col-md-3 text-end">
+                {% if tenant.billing_status == 'active' %}
+                    <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i>Aktiv</span>
+                {% elif tenant.billing_status == 'past_due' %}
+                    <span class="badge bg-danger fs-6"><i class="bi bi-exclamation-triangle me-1"></i>Ueberfaellig</span>
+                {% elif tenant.billing_status == 'grace_period' %}
+                    <span class="badge bg-warning fs-6"><i class="bi bi-clock me-1"></i>Karenzzeit</span>
+                {% else %}
+                    <span class="badge bg-secondary fs-6">{{ tenant.billing_status }}</span>
+                {% endif %}
+                {% if tenant.next_billing_date %}
+                <div class="mt-2">
+                    <small class="text-muted">Naechste Abrechnung: {{ tenant.next_billing_date|format_date }}</small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Nutzung / Limits -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-speedometer me-2"></i>Nutzung & Limits</h5>
+            </div>
+            <div class="card-body">
+                {% for key, data in usage.items() %}
+                <div class="limit-item">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="fw-semibold">
+                            {% if key == 'users' %}Benutzer
+                            {% elif key == 'customers' %}Kunden
+                            {% elif key == 'orders' %}Auftraege
+                            {% elif key == 'storage' %}Speicher (MB)
+                            {% else %}{{ key }}
+                            {% endif %}
+                        </span>
+                        <span>
+                            {{ data.current }} / {{ data.limit }}
+                            <small class="text-muted">({{ data.percent }}%)</small>
+                        </span>
+                    </div>
+                    <div class="progress usage-bar">
+                        <div class="progress-bar {% if data.percent > 90 %}bg-danger{% elif data.percent > 70 %}bg-warning{% else %}bg-success{% endif %}"
+                             style="width: {{ data.percent }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Zahlungshistorie -->
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Zahlungshistorie</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if payments %}
+                <div class="list-group list-group-flush">
+                    {% for payment in payments %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="fw-semibold">{{ payment.amount }} &euro;</div>
+                                <small class="text-muted">{{ payment.description or '-' }}</small>
+                            </div>
+                            <div class="text-end">
+                                <small>{{ payment.created_at|format_date }}</small>
+                                <br>
+                                <span class="badge {% if payment.status == 'completed' %}bg-success{% elif payment.status == 'pending' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {% if payment.status == 'completed' %}Bezahlt
+                                    {% elif payment.status == 'pending' %}Ausstehend
+                                    {% elif payment.status == 'refunded' %}Erstattet
+                                    {% else %}{{ payment.status }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        {% if payment.invoice_number %}
+                        <small class="text-muted"><i class="bi bi-receipt me-1"></i>{{ payment.invoice_number }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-receipt fs-1 d-block mb-2"></i>
+                    Noch keine Zahlungen vorhanden.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Plan-Vergleich & Upgrade -->
+<div class="card shadow-sm mt-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0"><i class="bi bi-arrow-up-circle me-2"></i>Plan-Vergleich & Upgrade</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            {% for tier_key, tier in plan_config.items() %}
+            <div class="col-sm-6 col-lg-3">
+                <div class="plan-card-select {% if tenant.plan_tier == tier_key %}current{% endif %}">
+                    <h5>{{ tier['label'] }}</h5>
+                    <div class="plan-price-big" style="color: var(--sa-primary, #1a6b5a);">
+                        {% if tier['price_monthly'] == 0 %}
+                            Gratis
+                        {% else %}
+                            {{ tier['price_monthly'] }}&euro;
+                        {% endif %}
+                    </div>
+                    <small class="text-muted d-block mb-3">/Monat</small>
+
+                    <ul class="list-unstyled text-start small">
+                        <li class="mb-1"><i class="bi bi-check text-success me-1"></i>{{ tier.get('max_users', '?') }} Benutzer</li>
+                        <li class="mb-1"><i class="bi bi-check text-success me-1"></i>{{ tier.get('max_customers', '?') }} Kunden</li>
+                        <li class="mb-1"><i class="bi bi-check text-success me-1"></i>{{ tier.get('max_orders', '?') }} Auftraege</li>
+                        <li class="mb-1"><i class="bi bi-check text-success me-1"></i>{{ tier.get('storage_mb', '?') }} MB Speicher</li>
+                        <li class="mb-1">
+                            <i class="bi bi-check text-success me-1"></i>
+                            {% if tier.get('modules') == '__all__' %}
+                                Alle Module
+                            {% else %}
+                                {{ tier.get('modules', [])|length }} Module
+                            {% endif %}
+                        </li>
+                    </ul>
+
+                    {% if tenant.plan_tier == tier_key %}
+                        <span class="badge bg-success">Aktueller Plan</span>
+                    {% elif tier['price_monthly'] > tenant.price_monthly %}
+                        <form method="POST" action="{{ url_for('billing.request_upgrade') }}" class="d-inline">
+                            <input type="hidden" name="plan_tier" value="{{ tier_key }}">
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="bi bi-arrow-up me-1"></i>Upgraden
+                            </button>
+                        </form>
+                    {% else %}
+                        <small class="text-muted">Kontakt fuer Downgrade</small>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

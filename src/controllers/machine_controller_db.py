@@ -7,20 +7,10 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from datetime import datetime, date, timedelta
 from src.models import db, Machine, Order, ProductionSchedule, ActivityLog
+from src.utils.activity_logger import log_activity
 
 # Blueprint erstellen
 machine_bp = Blueprint('machines', __name__, url_prefix='/machines')
-
-def log_activity(action, details):
-    """Aktivität in Datenbank protokollieren"""
-    activity = ActivityLog(
-        username=current_user.username,  # Geändert von 'user' zu 'username'
-        action=action,
-        details=details,
-        ip_address=request.remote_addr
-    )
-    db.session.add(activity)
-    db.session.commit()
 
 def generate_machine_id():
     """Generiere neue Maschinen-ID"""
@@ -32,7 +22,7 @@ def generate_machine_id():
         try:
             last_num = int(last_machine.id[1:])
             return f"M{last_num + 1:03d}"
-        except:
+        except (ValueError, IndexError):
             return "M001"
     return "M001"
 
@@ -93,7 +83,7 @@ def machine_threads(machine_id):
                                 'order': order,
                                 'estimated_usage': estimated_usage
                             })
-            except:
+            except (ValueError, TypeError):
                 pass
 
     # Gesamtstatistik

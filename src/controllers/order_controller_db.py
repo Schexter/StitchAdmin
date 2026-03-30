@@ -8,6 +8,7 @@ from flask_login import login_required, current_user
 from datetime import datetime
 from src.models import db, Order, Customer, Article, OrderItem, ActivityLog, Supplier, CompanySettings
 from sqlalchemy import text
+from src.utils.activity_logger import log_activity
 from src.utils.dst_analyzer import analyze_dst_file_robust
 from werkzeug.utils import secure_filename
 import json
@@ -16,34 +17,10 @@ import os
 # Blueprint erstellen
 order_bp = Blueprint('orders', __name__, url_prefix='/orders')
 
-def log_activity(action, details):
-    """Aktivität in Datenbank protokollieren"""
-    activity = ActivityLog(
-        username=current_user.username,  # Geändert von 'user' zu 'username'
-        action=action,
-        details=details,
-        ip_address=request.remote_addr
-    )
-    db.session.add(activity)
-    db.session.commit()
-
 def generate_order_id():
-    """Generiere neue Auftrags-ID im Format A2025-XXX"""
-    current_year = datetime.now().year
-    prefix = f"A{current_year}-"
-    
-    # Finde höchste ID für dieses Jahr
-    last_order = Order.query.filter(
-        Order.id.like(f'{prefix}%')
-    ).order_by(Order.id.desc()).first()
-    
-    if last_order:
-        try:
-            last_num = int(last_order.id.split('-')[1])
-            return f"{prefix}{last_num + 1:03d}"
-        except:
-            return f"{prefix}001"
-    return f"{prefix}001"
+    """Generiere neue Auftrags-ID - delegiert an IdGeneratorService"""
+    from src.services.id_generator_service import IdGenerator
+    return IdGenerator.order()
 
 @order_bp.route('/')
 @login_required
@@ -51,13 +28,26 @@ def index():
     """Auftrags-Übersicht"""
     status_filter = request.args.get('status', '')
     search_query = request.args.get('search', '').lower()
-    
+    show_archived = request.args.get('show_archived', '0') == '1'
+
     # Query erstellen
     query = Order.query
-    
+
+    # Standardmäßig: Stornierte und bereits abgerechnete (invoiced) ausblenden
+    HIDDEN_STATUSES = ['cancelled', 'invoiced']
+    if not show_archived:
+        query = query.filter(Order.archived_at == None)
+        if not status_filter:
+            # Kein expliziter Filter → verstecke abgeschlossene
+            query = query.filter(Order.status.notin_(HIDDEN_STATUSES))
+            query = query.filter(db.or_(
+                Order.workflow_status == None,
+                Order.workflow_status.notin_(['invoiced', 'completed'])
+            ))
+
     if status_filter:
         query = query.filter_by(status=status_filter)
-    
+
     if search_query:
         query = query.join(Customer).filter(
             db.or_(
@@ -69,19 +59,30 @@ def index():
                 Order.description.ilike(f'%{search_query}%')
             )
         )
-    
+
     # Nach Datum sortieren (neueste zuerst)
     orders = query.order_by(Order.created_at.desc()).all()
-    
+
     return render_template('orders/index.html',
                          orders=orders,
                          status_filter=status_filter,
-                         search_query=search_query)
+                         search_query=search_query,
+                         show_archived=show_archived)
 
-@order_bp.route('/new', methods=['GET', 'POST'])
+@order_bp.route('/new')
 @login_required
 def new():
-    """Neuen Auftrag erstellen"""
+    """Weiterleitung zum Auftrags-Wizard (Step-by-Step)"""
+    customer_id = request.args.get('customer_id')
+    if customer_id:
+        return redirect(url_for('wizard.step1', customer_id=customer_id))
+    return redirect(url_for('wizard.start', reset=1))
+
+
+@order_bp.route('/new-classic', methods=['GET', 'POST'])
+@login_required
+def new_classic():
+    """Klassisches Auftragsformular (Fallback)"""
     if request.method == 'POST':
         # Hilfsfunktion zum Parsen von Datumsfeldern
         def parse_date(date_str):
@@ -102,11 +103,17 @@ def new():
             except (ValueError, AttributeError):
                 return None
 
+        # Abweichender Rechnungsempfaenger
+        billing_customer_id = None
+        if request.form.get('has_billing_customer') == 'on':
+            billing_customer_id = request.form.get('billing_customer_id') or None
+
         # Neuen Auftrag erstellen
         order = Order(
             id=generate_order_id(),
             order_number=generate_order_id(),  # Gleich wie ID
             customer_id=request.form.get('customer_id'),
+            billing_customer_id=billing_customer_id,
             order_type=request.form.get('order_type', 'embroidery'),
             status='accepted',
             description=request.form.get('description', ''),
@@ -115,6 +122,7 @@ def new():
             total_price=float(request.form.get('price', 0) or 0),
             due_date=parse_datetime(request.form.get('pickup_date')),
             rush_order=request.form.get('rush_order', False) == 'on',
+            is_kundenware=request.form.get('is_kundenware', False) == 'on',
             created_by=current_user.username
         )
         
@@ -132,7 +140,8 @@ def new():
             order.print_height_cm = float(request.form.get('print_height_cm', 0) or 0)
             order.print_method = request.form.get('print_method', '')
             order.ink_coverage_percent = int(request.form.get('ink_coverage_percent', 50) or 50)
-        
+            order.print_colors = request.form.get('selected_print_colors') or None
+
         # Design-Workflow-Felder (NEU)
         design_status = request.form.get('design_status', 'none')
         order.design_status = design_status
@@ -220,6 +229,11 @@ def new():
         sizes = request.form.getlist('size[]')
         colors = request.form.getlist('color[]')
         
+        # Sublimation-Felder (global für den Auftrag)
+        sublimation_position = request.form.get('sublimation_position', '')
+        is_non_textile = request.form.get('is_non_textile') == 'on'
+        non_textile_type = request.form.get('non_textile_type', '')
+
         for i, article_id in enumerate(article_ids):
             if article_id:
                 item = OrderItem(
@@ -229,20 +243,31 @@ def new():
                     textile_size=sizes[i] if i < len(sizes) else '',
                     textile_color=colors[i] if i < len(colors) else ''
                 )
-                
+
+                # Sublimation-Felder auf Item setzen
+                if order.order_type in ['printing', 'dtf', 'combined'] and order.print_method == 'sublimation':
+                    item.sublimation_position = sublimation_position
+                    item.is_non_textile = is_non_textile
+                    item.non_textile_type = non_textile_type if is_non_textile else ''
+
                 # Preis aus Artikel übernehmen
                 article = Article.query.get(article_id)
                 if article:
                     item.unit_price = article.price
-                
+
                 db.session.add(item)
         
         db.session.commit()
-        
+
+        # Auto-Berechnung: Wenn Preis 0, aus Komponenten berechnen (zentral ueber OrderService)
+        from src.services.order_service import OrderService
+        OrderService.aktualisiere_preis_wenn_noetig(order)
+        db.session.commit()
+
         # Aktivität protokollieren
-        log_activity('order_created', 
+        log_activity('order_created',
                     f'Auftrag erstellt: {order.id} für {order.customer.display_name if order.customer else "Unbekannt"}')
-        
+
         flash(f'Auftrag {order.id} wurde erstellt! Sie können jetzt mehrere Design-Positionen hinzufügen.', 'success')
         # Zur Edit-Seite weiterleiten, damit Multi-Designs hinzugefügt werden können
         return redirect(url_for('orders.edit', order_id=order.id))
@@ -320,6 +345,24 @@ def show(order_id):
         # ProductionBlock noch nicht migriert - ignorieren
         pass
 
+    # Letzte Kunden-Benachrichtigungen laden
+    notification_logs = []
+    try:
+        from src.models.email_automation import EmailAutomationLog
+        notification_logs = EmailAutomationLog.query.filter_by(
+            order_id=order_id
+        ).order_by(EmailAutomationLog.created_at.desc()).limit(5).all()
+    except Exception:
+        pass
+
+    # Workflow-Timeline
+    timeline = order.get_workflow_timeline()
+
+    # Design-Positionen und -Typen für Multi-Position-Management
+    from src.models.order_workflow import OrderDesign
+    position_choices = OrderDesign.get_position_choices_dynamic()
+    design_type_choices = OrderDesign.get_design_type_choices_dynamic()
+
     return render_template('orders/show.html',
                          order=order,
                          suppliers=suppliers,
@@ -328,7 +371,50 @@ def show(order_id):
                          items_ordered=items_ordered,
                          items_delivered=items_delivered,
                          machines=machines,
-                         activities=activities)
+                         activities=activities,
+                         notification_logs=notification_logs,
+                         timeline=timeline,
+                         position_choices=position_choices,
+                         design_type_choices=design_type_choices)
+
+
+@order_bp.route('/<order_id>/manual-design-approval', methods=['POST'])
+@login_required
+def manual_design_approval(order_id):
+    """Design manuell freigeben (ohne E-Mail-Versand, z.B. telefonische Zusage)"""
+    order = Order.query.get_or_404(order_id)
+
+    reason = request.form.get('approval_reason', 'telefon')
+    notes = request.form.get('approval_notes', '')
+    reason_labels = {
+        'telefon': 'Telefonische Zusage',
+        'persoenlich': 'Persoenliche Absprache',
+        'email': 'E-Mail Bestaetigung',
+        'stammkunde': 'Stammkunde',
+        'intern': 'Intern freigegeben',
+    }
+
+    order.design_approval_status = 'approved'
+    order.design_approval_date = datetime.utcnow()
+    order.design_approval_notes = f"[Manuell] {reason_labels.get(reason, reason)}: {notes}".strip()
+
+    # Auch order_designs als approved markieren
+    try:
+        from src.models.order_workflow import OrderDesign
+        designs = OrderDesign.query.filter_by(order_id=order_id).all()
+        for d in designs:
+            d.approval_status = 'approved'
+            d.approved_at = datetime.utcnow()
+    except Exception:
+        pass
+
+    db.session.commit()
+
+    log_activity('design_approved_manual',
+                f'Design manuell freigegeben: Auftrag {order_id} ({reason_labels.get(reason, reason)})')
+
+    flash(f'Design fuer Auftrag {order_id} manuell freigegeben ({reason_labels.get(reason, reason)}).', 'success')
+    return redirect(url_for('orders.show', order_id=order_id))
 
 
 @order_bp.route('/<order_id>/photos')
@@ -357,6 +443,13 @@ def edit(order_id):
 
         # Auftrag aktualisieren
         order.customer_id = request.form.get('customer_id')
+
+        # Abweichender Rechnungsempfaenger
+        if request.form.get('has_billing_customer') == 'on':
+            order.billing_customer_id = request.form.get('billing_customer_id') or None
+        else:
+            order.billing_customer_id = None
+
         order.order_type = request.form.get('order_type', 'embroidery')
         order.description = request.form.get('description', '')
         order.internal_notes = request.form.get('notes', '')
@@ -364,6 +457,7 @@ def edit(order_id):
         order.total_price = float(request.form.get('price', 0) or 0)
         order.due_date = parse_datetime(request.form.get('pickup_date'))
         order.rush_order = request.form.get('rush_order', False) == 'on'
+        order.is_kundenware = request.form.get('is_kundenware', False) == 'on'
         order.updated_at = datetime.utcnow()
         order.updated_by = current_user.username
         
@@ -381,14 +475,119 @@ def edit(order_id):
             order.print_height_cm = float(request.form.get('print_height_cm', 0) or 0)
             order.print_method = request.form.get('print_method', '')
             order.ink_coverage_percent = int(request.form.get('ink_coverage_percent', 50) or 50)
-        
-        # Änderungen speichern
+            order.print_colors = request.form.get('selected_print_colors') or None
+
+        # Design-Workflow Felder
+        design_status = request.form.get('design_status', '').strip()
+        if design_status:
+            order.design_status = design_status
+        else:
+            order.design_status = 'none'
+
+        if design_status == 'logo_needs_creation':
+            order.designer_id = request.form.get('designer_id') or None
+            order.design_expected_date = parse_datetime(request.form.get('design_expected_date'))
+            order.design_requirements = request.form.get('design_requirements', '').strip() or None
+            order.design_priority = request.form.get('design_priority', 'normal')
+            order.design_cost = float(request.form.get('design_cost', 0) or 0)
+
+        elif design_status == 'logo_needs_adaptation':
+            order.original_logo_path = request.form.get('original_logo_path', '').strip() or None
+            order.adaptation_days = int(request.form.get('adaptation_days', 0) or 0) or None
+            order.adaptation_details = request.form.get('adaptation_details', '').strip() or None
+            order.target_format = request.form.get('target_format', '').strip() or None
+            order.adaptation_cost = float(request.form.get('adaptation_cost', 0) or 0)
+
+        elif design_status == 'logo_available':
+            # Design-Datei Upload
+            design_file_processed = False
+            if 'design_file' in request.files:
+                file = request.files['design_file']
+                if file and file.filename:
+                    filename = f"{order.id}_{secure_filename(file.filename)}"
+                    upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'designs')
+                    os.makedirs(upload_dir, exist_ok=True)
+                    upload_path = os.path.join(upload_dir, filename)
+                    file.save(upload_path)
+                    order.design_file_path = upload_path
+                    order.design_file = f"uploads/designs/{filename}"
+                    design_file_processed = True
+                    order.design_status = 'customer_provided'
+
+            # Dateipfad ueber File-Browser
+            design_file_path_input = request.form.get('design_file_path', '').strip()
+            if design_file_path_input and not design_file_processed:
+                if os.path.exists(design_file_path_input):
+                    import shutil
+                    original_filename = os.path.basename(design_file_path_input)
+                    filename = f"{order.id}_{secure_filename(original_filename)}"
+                    upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'designs')
+                    os.makedirs(upload_dir, exist_ok=True)
+                    upload_path = os.path.join(upload_dir, filename)
+                    shutil.copy2(design_file_path_input, upload_path)
+                    order.design_file_path = upload_path
+                    order.design_file = f"uploads/designs/{filename}"
+                    order.design_status = 'customer_provided'
+
+        # Bestehende Artikel aktualisieren
+        existing_ids = request.form.getlist('existing_item_id[]')
+        existing_quantities = request.form.getlist('existing_quantity[]')
+        existing_unit_prices = request.form.getlist('existing_unit_price[]')
+        existing_sizes = request.form.getlist('existing_size[]')
+        existing_colors = request.form.getlist('existing_color[]')
+        delete_ids = [x for x in request.form.getlist('delete_item[]') if x]
+
+        for i, item_id_str in enumerate(existing_ids):
+            item_id = int(item_id_str)
+            if str(item_id) in delete_ids:
+                item = OrderItem.query.get(item_id)
+                if item:
+                    db.session.delete(item)
+            else:
+                item = OrderItem.query.get(item_id)
+                if item:
+                    item.quantity = int(existing_quantities[i]) if i < len(existing_quantities) else item.quantity
+                    if i < len(existing_unit_prices):
+                        item.unit_price = float(existing_unit_prices[i] or 0)
+                    item.textile_size = existing_sizes[i] if i < len(existing_sizes) else item.textile_size
+                    item.textile_color = existing_colors[i] if i < len(existing_colors) else item.textile_color
+
+        # Neue Artikel hinzufuegen
+        new_article_ids = request.form.getlist('new_article_id[]')
+        new_quantities = request.form.getlist('new_quantity[]')
+        new_unit_prices = request.form.getlist('new_unit_price[]')
+        new_sizes = request.form.getlist('new_size[]')
+        new_colors = request.form.getlist('new_color[]')
+
+        for i, article_id in enumerate(new_article_ids):
+            if article_id:
+                article = Article.query.get(article_id)
+                # Benutzer-Preis hat Vorrang, sonst Artikel-Preis
+                user_price = float(new_unit_prices[i] or 0) if i < len(new_unit_prices) else 0
+                if user_price == 0 and article and article.price:
+                    user_price = article.price
+                new_item = OrderItem(
+                    order_id=order.id,
+                    article_id=article_id,
+                    quantity=int(new_quantities[i]) if i < len(new_quantities) else 1,
+                    textile_size=new_sizes[i] if i < len(new_sizes) else '',
+                    textile_color=new_colors[i] if i < len(new_colors) else '',
+                    unit_price=user_price
+                )
+                db.session.add(new_item)
+
+        # Auto-Berechnung: Wenn Preis 0, aus Komponenten berechnen (zentral ueber OrderService)
+        db.session.flush()
+        from src.services.order_service import OrderService
+        OrderService.aktualisiere_preis_wenn_noetig(order)
+
+        # Aenderungen speichern
         db.session.commit()
-        
+
         # Aktivität protokollieren
-        log_activity('order_updated', 
+        log_activity('order_updated',
                     f'Auftrag aktualisiert: {order.id}')
-        
+
         flash(f'Auftrag {order.id} wurde aktualisiert!', 'success')
         return redirect(url_for('orders.show', order_id=order.id))
     
@@ -400,6 +599,9 @@ def edit(order_id):
     from src.models.models import Machine
     machines = Machine.query.filter_by(status='active').order_by(Machine.name).all()
 
+    # Lieferanten für externe Design-Bestellung
+    suppliers = Supplier.query.filter_by(active=True).order_by(Supplier.name).all()
+
     # In Dictionary umwandeln für Template-Kompatibilität
     customers = {}
     for customer in customers_list:
@@ -409,80 +611,119 @@ def edit(order_id):
     for article in articles_list:
         articles[article.id] = article
 
+    # Design-Positionen und -Typen für Multi-Position-Management
+    from src.models.order_workflow import OrderDesign
+    position_choices = OrderDesign.get_position_choices_dynamic()
+    design_type_choices = OrderDesign.get_design_type_choices_dynamic()
+
     return render_template('orders/edit.html',
                          order=order,
                          customers=customers,
                          articles=articles,
-                         machines=machines)
+                         machines=machines,
+                         suppliers=suppliers,
+                         position_choices=position_choices,
+                         design_type_choices=design_type_choices)
 
 @order_bp.route('/<order_id>/status', methods=['POST'])
 @login_required
 def update_status(order_id):
-    """Auftragsstatus aktualisieren"""
-    order = Order.query.get_or_404(order_id)
-    
-    old_status = order.status
+    """Auftragsstatus aktualisieren - zentral ueber OrderService"""
+    from src.services.order_service import OrderService
+
     new_status = request.form.get('status')
     comment = request.form.get('comment', '')
-    
-    # Design-Validierung für Produktionsstart
-    if new_status == 'in_progress':
-        # Prüfe ob Design-Workflow abgeschlossen ist
-        if hasattr(order, 'can_start_production'):
-            can_start, message = order.can_start_production()
-            if not can_start:
-                flash(f'Produktion kann nicht gestartet werden: {message}', 'danger')
-                return redirect(url_for('orders.show', order_id=order_id))
-        else:
-            # Fallback für ältere Aufträge ohne Design-Workflow
-            if not order.design_file and not order.design_file_path:
-                flash('Produktion kann nicht gestartet werden: Design fehlt!', 'danger')
-                return redirect(url_for('orders.show', order_id=order_id))
-    
-    if new_status and new_status != old_status:
-        # Status aktualisieren
-        order.status = new_status
-        order.updated_at = datetime.utcnow()
-        order.updated_by = current_user.username
-        
-        # Spezielle Felder für bestimmte Status
-        if new_status == 'in_progress':
-            order.production_start = datetime.utcnow()
-        elif new_status == 'ready':
-            order.production_end = datetime.utcnow()
-        elif new_status == 'completed':
-            order.completed_at = datetime.utcnow()
-            order.completed_by = current_user.username
-        
-        # Status-Historie hinzufügen
-        from src.models import OrderStatusHistory
-        history = OrderStatusHistory(
-            order_id=order_id,
-            from_status=old_status,
-            to_status=new_status,
-            comment=comment,
-            changed_by=current_user.username
-        )
-        db.session.add(history)
-        
-        db.session.commit()
 
-        # E-Mail Automation pruefen und ausfuehren
+    if not new_status:
+        flash('Kein Status angegeben.', 'warning')
+        return redirect(url_for('orders.show', order_id=order_id))
+
+    ok, msg = OrderService.update_status(order_id, new_status, comment)
+    if ok:
+        log_activity('order_status_changed', f'Auftrag {order_id}: {msg}')
+        flash(msg, 'success')
+    else:
+        flash(msg, 'danger')
+
+    return redirect(url_for('orders.show', order_id=order_id))
+
+
+@order_bp.route('/<order_id>/notify', methods=['POST'])
+@login_required
+def send_customer_notification(order_id):
+    """Manuelle Kunden-Benachrichtigung senden"""
+    order = Order.query.get_or_404(order_id)
+
+    if not order.customer or not order.customer.email:
+        flash('Keine Kunden-E-Mail hinterlegt!', 'danger')
+        return redirect(url_for('orders.show', order_id=order_id))
+
+    notification_type = request.form.get('type', '')
+
+    # Vordefinierte Benachrichtigungstypen
+    type_map = {
+        'accepted': ('order_status', 'accepted'),
+        'confirmed': ('workflow_status', 'confirmed'),
+        'in_progress': ('order_status', 'in_progress'),
+        'ready': ('order_status', 'ready'),
+        'shipped': ('workflow_status', 'shipped'),
+    }
+
+    if notification_type in type_map:
+        trigger_event, trigger_value = type_map[notification_type]
         try:
             from src.services.email_automation_service import EmailAutomationService
             automation = EmailAutomationService()
-            automation.check_and_send(order, 'order_status', new_status, old_status)
+            automation.check_and_send(order, trigger_event, trigger_value)
+            flash(f'Benachrichtigung an {order.customer.email} gesendet!', 'success')
         except Exception as e:
-            import logging
-            logging.getLogger(__name__).warning(f'Email-Automation Fehler: {e}')
+            flash(f'Fehler beim Senden: {e}', 'danger')
 
-        # Aktivität protokollieren
-        log_activity('order_status_changed',
-                    f'Auftrag {order.id}: Status von {old_status} auf {new_status} geändert')
-
-        flash(f'Status wurde auf {new_status} geändert!', 'success')
+    elif notification_type == 'custom':
+        # Freitext-Nachricht
+        subject = request.form.get('subject', '')
+        body = request.form.get('body', '')
+        if subject and body:
+            try:
+                from src.services.email_service_new import EmailService
+                service = EmailService()
+                html_body = f'<p>{body.replace(chr(10), "<br>")}</p>'
+                result = service.send_email(
+                    to=order.customer.email,
+                    subject=subject,
+                    body_html=html_body,
+                    body_text=body,
+                )
+                if result.get('success'):
+                    # CRM-Kontakthistorie
+                    try:
+                        from src.models.crm_contact import CustomerContact
+                        contact = CustomerContact(
+                            customer_id=order.customer.id,
+                            contact_type='email_ausgang',
+                            subject=subject,
+                            body_html=html_body,
+                            email_to=order.customer.email,
+                            status='gesendet',
+                            order_id=order.id,
+                            created_by=current_user.username,
+                        )
+                        db.session.add(contact)
+                        db.session.commit()
+                    except Exception:
+                        pass
+                    flash(f'Nachricht an {order.customer.email} gesendet!', 'success')
+                else:
+                    flash(f'E-Mail-Versand fehlgeschlagen: {result.get("error", "Unbekannter Fehler")}', 'danger')
+            except Exception as e:
+                flash(f'Fehler: {e}', 'danger')
+        else:
+            flash('Betreff und Nachricht erforderlich!', 'warning')
+    else:
+        flash('Unbekannter Benachrichtigungstyp.', 'warning')
 
     return redirect(url_for('orders.show', order_id=order_id))
+
 
 @order_bp.route('/<order_id>/delete', methods=['POST'])
 @login_required
@@ -1081,10 +1322,166 @@ def print_order_sheet(order_id):
     log_activity('order_sheet_printed',
                 f'Auftragsblatt gedruckt für Bestellung: {order.id}')
 
+    no_prices = request.args.get('production') == '1'
+
     return render_template('orders/order_sheet.html',
                          order=order,
                          company=company,
-                         now=now)
+                         now=now,
+                         no_prices=no_prices)
+
+@order_bp.route('/<string:order_id>/stammblatt')
+@login_required
+def stammblatt_pdf(order_id):
+    """Stammblatt (Design-Datenblatt) als PDF generieren"""
+    order = Order.query.get_or_404(order_id)
+    company = CompanySettings.query.first()
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import mm
+        from reportlab.lib import colors
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        import io as _io
+
+        buf = _io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=A4,
+                                leftMargin=20*mm, rightMargin=20*mm,
+                                topMargin=20*mm, bottomMargin=20*mm)
+
+        styles = getSampleStyleSheet()
+        green = colors.HexColor('#1a6b5a')
+        light_green = colors.HexColor('#e8f5f0')
+
+        title_style = ParagraphStyle('Title', parent=styles['Heading1'],
+                                     textColor=green, fontSize=18, spaceAfter=4)
+        label_style = ParagraphStyle('Label', parent=styles['Normal'],
+                                     textColor=colors.grey, fontSize=8, spaceAfter=2)
+        value_style = ParagraphStyle('Value', parent=styles['Normal'],
+                                     fontSize=10, spaceAfter=6, fontName='Helvetica-Bold')
+
+        story = []
+
+        # Header
+        company_name = company.company_name if company else 'StitchAdmin'
+        story.append(Paragraph(company_name, ParagraphStyle('Co', parent=styles['Normal'],
+                                                             fontSize=10, textColor=green)))
+        story.append(Spacer(1, 4*mm))
+        story.append(Paragraph(f'STAMMBLATT - Auftrag {order.order_number or order.id}', title_style))
+        story.append(HRFlowable(width='100%', thickness=2, color=green))
+        story.append(Spacer(1, 4*mm))
+
+        def row(label, value):
+            return [Paragraph(label, label_style), Paragraph(str(value or '-'), value_style)]
+
+        # Kundendaten
+        customer = order.get_billing_customer() if hasattr(order, 'get_billing_customer') else order.customer
+        customer_name = customer.display_name if customer else '-'
+
+        data = [
+            row('Auftragnummer', order.order_number or order.id),
+            row('Kunde / Auftraggeber', order.customer.display_name if order.customer else '-'),
+            row('Rechnungsempfaenger', customer_name if customer != order.customer else '-'),
+            row('Auftragstyp', {'embroidery': 'Bestickung', 'printing': 'Textildruck',
+                                'dtf': 'DTF', 'combined': 'Kombi', 'sublimation': 'Sublimation'
+                                }.get(order.order_type, order.order_type or '-')),
+            row('Status', order.status or '-'),
+            row('Freigabestatus', {'pending': 'Ausstehend', 'approved': 'Freigegeben',
+                                   'revision_requested': 'Änderung gewünscht', 'none': '-'
+                                   }.get(order.design_approval_status or 'none', '-')),
+        ]
+
+        if order.design_approval_date:
+            data.append(row('Freigabe am', order.design_approval_date.strftime('%d.%m.%Y %H:%M')))
+
+        # Design-Spezifikationen
+        if order.order_type in ('embroidery', 'combined'):
+            data += [
+                row('Stichzahl', f"{order.stitch_count:,}".replace(',', '.') if order.stitch_count else '-'),
+                row('Design-Breite', f"{order.design_width_mm} mm" if order.design_width_mm else '-'),
+                row('Design-Hoehe', f"{order.design_height_mm} mm" if order.design_height_mm else '-'),
+                row('Stickposition', order.embroidery_position or '-'),
+                row('Garnfarben', order.thread_colors or '-'),
+            ]
+        if order.order_type in ('printing', 'dtf', 'combined'):
+            data += [
+                row('Druckbreite', f"{order.print_width_cm} cm" if order.print_width_cm else '-'),
+                row('Druckhoehe', f"{order.print_height_cm} cm" if order.print_height_cm else '-'),
+                row('Druckverfahren', order.print_method or '-'),
+                row('Druckposition', order.embroidery_position or '-'),
+            ]
+
+        data += [
+            row('Beschreibung', order.description or '-'),
+            row('Interne Notizen', order.internal_notes or '-'),
+            row('Faelligkeitsdatum', order.due_date.strftime('%d.%m.%Y') if order.due_date else '-'),
+        ]
+
+        t = Table(data, colWidths=[55*mm, 115*mm])
+        t.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), light_green),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.white, colors.HexColor('#f9fcfb')]),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#ccddda')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 2),
+        ]))
+        story.append(t)
+
+        # Artikel-Positionen
+        if order.items.count() > 0:
+            story.append(Spacer(1, 6*mm))
+            story.append(Paragraph('Artikel / Textilien', ParagraphStyle('Sec', parent=styles['Heading2'],
+                                                                          textColor=green, fontSize=12)))
+            story.append(HRFlowable(width='100%', thickness=1, color=green))
+            story.append(Spacer(1, 2*mm))
+
+            item_data = [['Artikel', 'Art.Nr.', 'Menge', 'Groesse', 'Farbe', 'Position']]
+            for item in order.items:
+                item_data.append([
+                    item.article.name if item.article else '-',
+                    item.article.article_number if item.article else '-',
+                    str(item.quantity),
+                    item.textile_size or '-',
+                    item.textile_color or '-',
+                    item.sublimation_position if hasattr(item, 'sublimation_position') and item.sublimation_position else '-'
+                ])
+
+            it = Table(item_data, colWidths=[55*mm, 25*mm, 15*mm, 18*mm, 30*mm, 27*mm])
+            it.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), green),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#ccddda')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f9fcfb')]),
+            ]))
+            story.append(it)
+
+        # Footer
+        story.append(Spacer(1, 10*mm))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=colors.grey))
+        from datetime import datetime as _dt
+        story.append(Paragraph(
+            f'Erstellt am {_dt.now().strftime("%d.%m.%Y %H:%M")} von {current_user.username} | StitchAdmin',
+            ParagraphStyle('Footer', parent=styles['Normal'], fontSize=7, textColor=colors.grey, alignment=TA_CENTER)
+        ))
+
+        doc.build(story)
+        buf.seek(0)
+
+        from flask import send_file as _send_file
+        return _send_file(buf, mimetype='application/pdf',
+                          download_name=f'Stammblatt_{order.order_number or order.id}.pdf',
+                          as_attachment=False)
+
+    except Exception as e:
+        current_app.logger.error(f"Stammblatt-Fehler: {e}")
+        flash(f'Fehler beim Erstellen des Stammblatts: {str(e)}', 'danger')
+        return redirect(url_for('orders.show', order_id=order_id))
+
 
 @order_bp.route('/<string:order_id>/print/production_labels')
 @login_required
@@ -1205,7 +1602,7 @@ def upload_design(order_id):
                     order.stitch_count = analysis.get('stitch_count', 0)
                     order.file_analysis = json.dumps(analysis)
                     db.session.commit()
-            except:
+            except Exception:
                 pass
 
     return redirect(url_for('orders.show', order_id=order_id))
@@ -1428,4 +1825,58 @@ def complete_packing(order_id):
 
     except Exception as e:
         db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_bp.route('/api/calculate-total', methods=['GET'])
+@login_required
+def api_calculate_total():
+    """Berechnet Gesamtpreis aus Artikeln + Druckpositionen"""
+    order_id = request.args.get('order_id')
+    if not order_id:
+        return jsonify({'success': False, 'error': 'order_id fehlt'})
+
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'})
+
+    try:
+        # Artikel-Summe
+        artikel_total = 0.0
+        items = OrderItem.query.filter_by(order_id=order_id).all()
+        for item in items:
+            price = item.unit_price or 0
+            if not price and item.article_id:
+                article = Article.query.get(item.article_id)
+                if article and hasattr(article, 'price') and article.price:
+                    price = article.price
+            artikel_total += (item.quantity or 0) * price
+
+        # Gesamt-Stückzahl für Druck/Stick-Kalkulation
+        total_qty = sum((item.quantity or 0) for item in items) or 1
+
+        # Design-Positionen-Summe
+        from src.models.order_workflow import OrderDesign
+        design_total = 0.0
+        erstellkosten = 0.0
+        designs = OrderDesign.query.filter_by(order_id=order_id).all()
+        for design in designs:
+            design_total += (design.setup_price or 0) + (design.price_per_piece or 0) * total_qty
+            erstellkosten += float(design.supplier_cost or 0)  # Design-Erstellkosten
+
+        # Design-Kosten vom Order
+        design_kosten = float(order.design_cost or 0) + float(order.adaptation_cost or 0)
+
+        total = artikel_total + design_total + erstellkosten + design_kosten
+
+        return jsonify({
+            'success': True,
+            'artikel_total': round(artikel_total, 2),
+            'design_total': round(design_total, 2),
+            'erstellkosten': round(erstellkosten, 2),
+            'design_kosten': round(design_kosten, 2),
+            'total': round(total, 2)
+        })
+
+    except Exception as e:
         return jsonify({'success': False, 'error': str(e)})

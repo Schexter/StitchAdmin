@@ -73,6 +73,9 @@ def create_design():
         design.setup_price = float(request.form.get('setup_price') or 0)
         design.price_per_piece = float(request.form.get('price_per_piece') or 0)
 
+        # Notizen
+        design.notes = request.form.get('notes') or None
+
         # Sortierung
         existing_count = OrderDesign.query.filter_by(order_id=order_id).count()
         design.sort_order = existing_count
@@ -122,7 +125,19 @@ def get_design(design_id):
             'approval_status': design.approval_status,
             'setup_price': design.setup_price,
             'price_per_piece': design.price_per_piece,
-            'sort_order': design.sort_order
+            'notes': design.notes,
+            'sort_order': design.sort_order,
+            'supplier_id': design.supplier_id,
+            'supplier_order_status': design.supplier_order_status or 'none',
+            'supplier_order_date': design.supplier_order_date.isoformat() if design.supplier_order_date else None,
+            'supplier_expected_date': design.supplier_expected_date.isoformat() if design.supplier_expected_date else None,
+            'supplier_delivered_date': design.supplier_delivered_date.isoformat() if design.supplier_delivered_date else None,
+            'supplier_order_notes': design.supplier_order_notes,
+            'supplier_cost': design.supplier_cost or 0,
+            'supplier_reference': design.supplier_reference,
+            'supplier_order_id': design.supplier_order_id,
+            'print_file_path': design.print_file_path,
+            'print_file_name': design.print_file_name,
         }
     })
 
@@ -171,6 +186,9 @@ def update_design(design_id):
         # Preise
         design.setup_price = float(request.form.get('setup_price') or 0)
         design.price_per_piece = float(request.form.get('price_per_piece') or 0)
+
+        # Notizen
+        design.notes = request.form.get('notes') or None
 
         design.updated_at = datetime.utcnow()
 
@@ -458,6 +476,7 @@ bitte prüfen und genehmigen Sie das Design für Ihren Auftrag {order.order_numb
 
 Position: {design.get_position_label()}
 Typ: {'Stickerei' if design.design_type == 'stick' else 'Druck'}
+Groesse: {f'{design.width_mm:.0f} x {design.height_mm:.0f} mm' if design.design_type == 'stick' and design.width_mm and design.height_mm else f'{design.print_width_cm:.1f} x {design.print_height_cm:.1f} cm' if design.print_width_cm and design.print_height_cm else 'Nicht angegeben'}
 
 Im Anhang finden Sie das Freigabeformular mit der Design-Vorschau.
 Bitte prüfen Sie das Design sorgfältig und senden Sie uns das unterschriebene
@@ -481,6 +500,7 @@ Mit freundlichen Grüßen
         <table style="width: 100%; background: white; padding: 15px; border-radius: 8px; margin: 15px 0;">
             <tr><td><strong>Position:</strong></td><td>{design.get_position_label()}</td></tr>
             <tr><td><strong>Typ:</strong></td><td>{'Stickerei' if design.design_type == 'stick' else 'Druck'}</td></tr>
+            <tr><td><strong>Gr&ouml;&szlig;e:</strong></td><td>{f'{design.width_mm:.0f} x {design.height_mm:.0f} mm' if design.design_type == 'stick' and design.width_mm and design.height_mm else f'{design.print_width_cm:.1f} x {design.print_height_cm:.1f} cm' if design.print_width_cm and design.print_height_cm else 'Nicht angegeben'}</td></tr>
         </table>
         <div style="background: #e8f5e9; border-left: 4px solid #4caf50; padding: 15px; margin: 20px 0;">
             <p style="margin: 0;"><strong>📎 Freigabeformular im Anhang</strong></p>
@@ -781,28 +801,262 @@ def get_price_suggestion():
         return jsonify({'success': False, 'error': str(e)})
 
 
+@order_design_bp.route('/design/<int:design_id>/supplier-status', methods=['POST'])
+@login_required
+def update_supplier_status(design_id):
+    """Lieferanten-Bestellstatus aktualisieren"""
+    try:
+        design = OrderDesign.query.get(design_id)
+        if not design:
+            return jsonify({'success': False, 'error': 'Design nicht gefunden'})
+
+        data = request.get_json() or request.form
+
+        design.supplier_order_status = data.get('supplier_order_status', design.supplier_order_status)
+        design.supplier_id = data.get('supplier_id') or None
+        design.supplier_order_notes = data.get('supplier_order_notes') or None
+        design.supplier_cost = float(data.get('supplier_cost') or 0)
+        design.supplier_reference = data.get('supplier_reference') or None
+
+        # Datum-Felder
+        if data.get('supplier_order_date'):
+            from datetime import date as dt_date
+            design.supplier_order_date = datetime.strptime(data['supplier_order_date'], '%Y-%m-%d').date()
+        if data.get('supplier_expected_date'):
+            design.supplier_expected_date = datetime.strptime(data['supplier_expected_date'], '%Y-%m-%d').date()
+        if data.get('supplier_delivered_date'):
+            design.supplier_delivered_date = datetime.strptime(data['supplier_delivered_date'], '%Y-%m-%d').date()
+
+        # Auto-Datum setzen
+        if design.supplier_order_status == 'ordered' and not design.supplier_order_date:
+            design.supplier_order_date = datetime.utcnow().date()
+        if design.supplier_order_status == 'delivered' and not design.supplier_delivered_date:
+            design.supplier_delivered_date = datetime.utcnow().date()
+
+        # Auto SupplierOrder erstellen wenn bestellt aber noch keine Bestellung existiert
+        if design.supplier_order_status == 'ordered' and not design.supplier_order_id and design.supplier_id:
+            try:
+                from src.models.models import SupplierOrder, Supplier, Order
+                from datetime import date as dt_date
+
+                supplier = Supplier.query.get(design.supplier_id)
+                order = Order.query.get(design.order_id)
+
+                order_id_str = f"SDO{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                try:
+                    from src.controllers.purchasing_controller import generate_purchase_order_number
+                    order_number = generate_purchase_order_number(created_by=current_user.username)
+                except Exception:
+                    order_number = f"PO-{datetime.now().strftime('%Y%m%d-%H%M')}"
+
+                delivery_days = supplier.delivery_time_days or 7 if supplier else 7
+                expected_delivery = dt_date.today() + __import__('datetime').timedelta(days=delivery_days)
+
+                type_labels = {'stick': 'Stickerei', 'druck': 'Druck', 'dtf': 'DTF-Transfer',
+                               'flex': 'Flex', 'flock': 'Flock', 'sublimation': 'Sublimation'}
+
+                items_list = [{
+                    'design_id': design.id,
+                    'design_name': design.design_name or design.get_position_label(),
+                    'design_type': type_labels.get(design.design_type, design.design_type or ''),
+                    'position': design.get_position_label(),
+                    'order_number': order.order_number if order else design.order_id,
+                    'quantity': 1,
+                    'unit_price': float(design.supplier_cost or 0),
+                    'total': float(design.supplier_cost or 0),
+                }]
+
+                new_so = SupplierOrder(
+                    id=order_id_str,
+                    supplier_id=str(design.supplier_id),
+                    order_number=order_number,
+                    supplier_order_number=design.supplier_reference or '',
+                    status='ordered',
+                    order_date=dt_date.today(),
+                    delivery_date=expected_delivery,
+                    created_by=current_user.username,
+                    linked_customer_orders=design.order_id,
+                    notes=f"Design-Bestellung fuer Auftrag {order.order_number if order else design.order_id}",
+                )
+                new_so.set_items(items_list)
+                new_so.subtotal = design.supplier_cost or 0
+                new_so.total_amount = design.supplier_cost or 0
+
+                db.session.add(new_so)
+                design.supplier_order_id = new_so.id
+
+                current_app.logger.info(f"Auto-SupplierOrder {order_number} fuer Design #{design.id} erstellt")
+            except Exception as e:
+                current_app.logger.warning(f"Auto-SupplierOrder fehlgeschlagen: {e}")
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Bestellstatus aktualisiert',
+            'status': design.supplier_order_status,
+            'status_label': design.get_supplier_status_label(),
+            'badge_class': design.get_supplier_status_badge()
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Fehler beim Aktualisieren des Supplier-Status: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_design_bp.route('/design/<int:design_id>/print-file', methods=['POST'])
+@login_required
+def upload_print_file(design_id):
+    """Druckdatei für externen Lieferanten hochladen"""
+    try:
+        design = OrderDesign.query.get(design_id)
+        if not design:
+            return jsonify({'success': False, 'error': 'Design nicht gefunden'})
+
+        print_file = request.files.get('print_file')
+        if not print_file or not print_file.filename:
+            return jsonify({'success': False, 'error': 'Keine Datei ausgewählt'})
+
+        filename = secure_filename(print_file.filename)
+        upload_folder = os.path.join(current_app.root_path, 'static', 'uploads', 'designs', 'print')
+        os.makedirs(upload_folder, exist_ok=True)
+
+        filepath = os.path.join(upload_folder, f"{design.order_id}_{design.position}_{filename}")
+        print_file.save(filepath)
+
+        design.print_file_path = f"designs/print/{design.order_id}_{design.position}_{filename}"
+        design.print_file_name = print_file.filename
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Druckdatei hochgeladen',
+            'file_name': design.print_file_name,
+            'file_path': design.print_file_path
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Fehler beim Upload der Druckdatei: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_design_bp.route('/design/<int:design_id>/print-file', methods=['DELETE'])
+@login_required
+def delete_print_file(design_id):
+    """Druckdatei löschen"""
+    try:
+        design = OrderDesign.query.get(design_id)
+        if not design:
+            return jsonify({'success': False, 'error': 'Design nicht gefunden'})
+
+        if design.print_file_path:
+            full_path = os.path.join(current_app.root_path, 'static', 'uploads', design.print_file_path)
+            if os.path.exists(full_path):
+                os.remove(full_path)
+
+        design.print_file_path = None
+        design.print_file_name = None
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Druckdatei gelöscht'})
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+
+
+@order_design_bp.route('/design/<int:design_id>/create-supplier-order', methods=['POST'])
+@login_required
+def create_supplier_order_for_design(design_id):
+    """Erstellt eine Lieferantenbestellung aus einer Design-Position"""
+    try:
+        design = OrderDesign.query.get(design_id)
+        if not design:
+            return jsonify({'success': False, 'error': 'Design nicht gefunden'})
+
+        if not design.supplier_id:
+            return jsonify({'success': False, 'error': 'Kein Lieferant ausgewählt'})
+
+        from src.models.models import Supplier, SupplierOrder
+        supplier = Supplier.query.get(design.supplier_id)
+        if not supplier:
+            return jsonify({'success': False, 'error': 'Lieferant nicht gefunden'})
+
+        order = Order.query.get(design.order_id)
+
+        # Bestellnummer generieren
+        from datetime import date as dt_date
+        from src.controllers.purchasing_controller import generate_purchase_order_number
+        order_id_str = f"SDO{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        order_number = generate_purchase_order_number(created_by=current_user.username)
+
+        # Lieferzeit berechnen
+        delivery_days = supplier.delivery_time_days or 7
+        expected_delivery = dt_date.today() + __import__('datetime').timedelta(days=delivery_days)
+
+        # SupplierOrder erstellen
+        type_labels = {'stick': 'Stickerei', 'druck': 'Druck', 'dtf': 'DTF-Transfer',
+                       'flex': 'Flex', 'flock': 'Flock', 'sublimation': 'Sublimation'}
+
+        items_list = [{
+            'design_id': design.id,
+            'design_name': design.design_name or design.get_position_label(),
+            'design_type': type_labels.get(design.design_type, design.design_type),
+            'position': design.get_position_label(),
+            'order_number': order.order_number if order else design.order_id,
+            'quantity': 1,
+            'unit_price': float(design.supplier_cost or 0),
+            'total': float(design.supplier_cost or 0),
+        }]
+
+        new_order = SupplierOrder(
+            id=order_id_str,
+            supplier_id=str(design.supplier_id),
+            order_number=order_number,
+            status='draft',
+            order_date=dt_date.today(),
+            delivery_date=expected_delivery,
+            created_by=current_user.username,
+            notes=f"Design-Bestellung für Auftrag {order.order_number if order else design.order_id}",
+        )
+        new_order.set_items(items_list)
+        new_order.subtotal = design.supplier_cost or 0
+        new_order.total_amount = design.supplier_cost or 0
+
+        db.session.add(new_order)
+
+        # Design mit Bestellung verknüpfen
+        design.supplier_order_id = new_order.id
+        design.supplier_order_status = 'ordered'
+        if not design.supplier_order_date:
+            design.supplier_order_date = dt_date.today()
+        design.supplier_expected_date = expected_delivery
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Bestellung {order_number} erstellt',
+            'order_id': new_order.id,
+            'order_number': order_number,
+            'supplier_name': supplier.name
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Fehler beim Erstellen der Lieferantenbestellung: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+
 def get_position_label(position_code):
-    """Gibt das Label für einen Position-Code zurück"""
-    position_map = {
-        'vorne': 'Vorne',
-        'hinten': 'Hinten',
-        'seite_links': 'Seite links',
-        'seite_rechts': 'Seite rechts',
-        'rundum': 'Rundum / Umlaufend',
-        'brust_links': 'Brust links',
-        'brust_rechts': 'Brust rechts',
-        'brust_mitte': 'Brust Mitte',
-        'bauch': 'Bauch',
-        'aermel_links': 'Ärmel links',
-        'aermel_rechts': 'Ärmel rechts',
-        'ruecken': 'Rücken',
-        'ruecken_oben': 'Rücken oben',
-        'ruecken_unten': 'Rücken unten',
-        'kragen': 'Kragen/Nacken',
-        'hosenbein_links': 'Hosenbein links',
-        'hosenbein_rechts': 'Hosenbein rechts',
-        'kappe_vorne': 'Kappe vorne',
-        'kappe_seite': 'Kappe Seite',
-        'andere': 'Andere Position'
-    }
-    return position_map.get(position_code, position_code)
+    """Gibt das Label für einen Position-Code zurück (dynamisch aus DB)"""
+    try:
+        from src.models.order_workflow import OrderDesign
+        for code, label in OrderDesign.get_position_choices_dynamic():
+            if code == position_code:
+                return label
+    except Exception:
+        pass
+    return position_code

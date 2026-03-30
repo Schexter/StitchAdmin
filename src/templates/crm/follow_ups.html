@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Wiedervorlagen - StitchAdmin{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3><i class="bi bi-bell me-2"></i>Wiedervorlagen & Rückrufe</h3>
+            <small class="text-muted">Fällige Aufgaben und offene Rückrufe</small>
+        </div>
+        <a href="{{ url_for('crm.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Kontaktmanager
+        </a>
+    </div>
+
+    <div class="row">
+        <!-- Wiedervorlagen -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-warning bg-opacity-10">
+                    <h5 class="mb-0"><i class="bi bi-clock-history me-2 text-warning"></i>Wiedervorlagen
+                        <span class="badge bg-warning text-dark ms-1">{{ follow_ups|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if follow_ups %}
+                    <div class="list-group list-group-flush">
+                        {% for fu in follow_ups %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="fw-bold">
+                                        {% if fu.customer %}
+                                        <a href="{{ url_for('customers.show', customer_id=fu.customer_id) }}">{{ fu.customer.display_name }}</a>
+                                        {% else %}
+                                        Kunde #{{ fu.customer_id }}
+                                        {% endif %}
+                                    </div>
+                                    <div class="small">{{ fu.subject or 'Kein Betreff' }}</div>
+                                    {% if fu.follow_up_note %}
+                                    <div class="small text-muted"><i class="bi bi-sticky me-1"></i>{{ fu.follow_up_note }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end">
+                                    {% set days_overdue = (now - fu.follow_up_date).days if fu.follow_up_date else 0 %}
+                                    {% if days_overdue > 0 %}
+                                    <span class="badge bg-danger">{{ days_overdue }} Tage überfällig</span>
+                                    {% elif days_overdue == 0 %}
+                                    <span class="badge bg-warning text-dark">Heute</span>
+                                    {% else %}
+                                    <span class="badge bg-info">In {{ -days_overdue }} Tagen</span>
+                                    {% endif %}
+                                    <div class="small text-muted mt-1">{{ fu.follow_up_date.strftime('%d.%m.%Y %H:%M') if fu.follow_up_date else '' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-check-circle display-4 d-block mb-2"></i>
+                        Keine offenen Wiedervorlagen
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Rückrufe -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-danger bg-opacity-10">
+                    <h5 class="mb-0"><i class="bi bi-telephone-forward me-2 text-danger"></i>Offene Rückrufe
+                        <span class="badge bg-danger ms-1">{{ callbacks|length }}</span>
+                    </h5>
+                </div>
+                <div class="card-body p-0">
+                    {% if callbacks %}
+                    <div class="list-group list-group-flush">
+                        {% for cb in callbacks %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <div class="fw-bold">
+                                        {% if cb.customer %}
+                                        <a href="{{ url_for('customers.show', customer_id=cb.customer_id) }}">{{ cb.customer.display_name }}</a>
+                                        {% else %}
+                                        Kunde #{{ cb.customer_id }}
+                                        {% endif %}
+                                    </div>
+                                    <div class="small">{{ cb.subject or 'Rückruf' }}</div>
+                                    {% if cb.phone_number %}
+                                    <a href="tel:{{ cb.phone_number }}" class="small text-decoration-none">
+                                        <i class="bi bi-telephone me-1"></i>{{ cb.phone_number }}
+                                    </a>
+                                    {% endif %}
+                                </div>
+                                <div class="text-end">
+                                    {% if cb.callback_date %}
+                                    <div class="small text-muted">{{ cb.callback_date.strftime('%d.%m.%Y %H:%M') }}</div>
+                                    {% endif %}
+                                    <a href="{{ url_for('crm.schnellkontakt', typ='anruf_aus') }}" class="btn btn-sm btn-outline-success mt-1">
+                                        <i class="bi bi-telephone-outbound me-1"></i>Anrufen
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-check-circle display-4 d-block mb-2"></i>
+                        Keine offenen Rückrufe
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

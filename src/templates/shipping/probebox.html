@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Probebox erstellen{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('shipping.index') }}">Versand</a></li>
+            <li class="breadcrumb-item active">Probebox</li>
+        </ol>
+    </nav>
+
+    <h1 class="h3 mb-4"><i class="bi bi-box-seam me-2"></i>Probebox erstellen</h1>
+
+    {% if inquiry %}
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-info-circle me-1"></i>
+        Probebox fuer Anfrage <strong>{{ inquiry.inquiry_number }}</strong>
+        ({{ inquiry.type_label }}, {{ inquiry.full_name }})
+    </div>
+    {% endif %}
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% if inquiry %}
+        <input type="hidden" name="inquiry_id" value="{{ inquiry.id }}">
+        {% endif %}
+
+        <div class="row g-4">
+            <!-- Empfaenger -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-person me-1"></i> Empfaenger</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Name / Firma</label>
+                            <input type="text" name="recipient_name" class="form-control" required
+                                   value="{{ prefill.name or '' }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Strasse</label>
+                            <input type="text" name="recipient_street" class="form-control"
+                                   value="{{ prefill.street or '' }}">
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-4">
+                                <label class="form-label">PLZ</label>
+                                <input type="text" name="recipient_postal_code" class="form-control"
+                                       value="{{ prefill.postal_code or '' }}">
+                            </div>
+                            <div class="col-8">
+                                <label class="form-label">Stadt</label>
+                                <input type="text" name="recipient_city" class="form-control"
+                                       value="{{ prefill.city or '' }}">
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <input type="hidden" name="recipient_country" value="{{ prefill.country or 'Deutschland' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Versanddetails -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-truck me-1"></i> Versand</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Beschreibung</label>
+                            <input type="text" name="description" class="form-control"
+                                   value="Probebox{% if inquiry %} - {{ inquiry.inquiry_number }}{% endif %}"
+                                   placeholder="z.B. Probebox, Muster, Stoffproben...">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Versanddienstleister</label>
+                                <select name="carrier" class="form-select">
+                                    {% for c in carriers %}
+                                    <option value="{{ c }}">{{ c }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Service</label>
+                                <select name="service" class="form-select">
+                                    <option value="Standard">Standard</option>
+                                    <option value="Express">Express</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Sendungsnummer</label>
+                            <input type="text" name="tracking_number" class="form-control"
+                                   placeholder="Wird nach Versand eingetragen">
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label">Gewicht (kg)</label>
+                                <input type="number" name="weight" class="form-control" step="0.1" value="0.5">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Versandkosten</label>
+                                <div class="input-group">
+                                    <input type="number" name="shipping_cost" class="form-control" step="0.01" value="0">
+                                    <span class="input-group-text">&euro;</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inhalt der Probebox -->
+        <div class="card mt-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-list-check me-1"></i> Inhalt der Probebox</h6>
+                <button type="button" class="btn btn-sm btn-outline-success" onclick="addItem()">
+                    <i class="bi bi-plus"></i> Position
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="items-container">
+                    <div class="row g-2 mb-2 item-row">
+                        <div class="col-2">
+                            <input type="number" name="item_quantity" class="form-control" value="1" min="1">
+                        </div>
+                        <div class="col-9">
+                            <input type="text" name="item_description" class="form-control"
+                                   placeholder="z.B. T-Shirt BC01 weiss L, Stoffprobe, Bestickte Probe...">
+                        </div>
+                        <div class="col-1">
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('.item-row').remove()">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Absenden -->
+        <div class="d-flex gap-2 mt-4">
+            <button type="submit" class="btn btn-success btn-lg">
+                <i class="bi bi-box-seam me-1"></i> Probebox erstellen
+            </button>
+            {% if inquiry %}
+            <a href="{{ url_for('inquiry_admin.detail', id=inquiry.id) }}" class="btn btn-secondary btn-lg">Abbrechen</a>
+            {% else %}
+            <a href="{{ url_for('shipping.index') }}" class="btn btn-secondary btn-lg">Abbrechen</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<script>
+function addItem() {
+    const container = document.getElementById('items-container');
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2 item-row';
+    row.innerHTML = `
+        <div class="col-2">
+            <input type="number" name="item_quantity" class="form-control" value="1" min="1">
+        </div>
+        <div class="col-9">
+            <input type="text" name="item_description" class="form-control"
+                   placeholder="z.B. T-Shirt BC01 weiss L, Stoffprobe...">
+        </div>
+        <div class="col-1">
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('.item-row').remove()">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+    `;
+    container.appendChild(row);
+}
+</script>
+{% endblock %}

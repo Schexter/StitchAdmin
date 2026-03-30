@@ -20,7 +20,7 @@
     </div>
 </div>
 
-<form method="POST">
+<form method="POST" enctype="multipart/form-data">
     <div class="row">
         <div class="col-md-8">
             <!-- Auftrags-Grundinformationen -->
@@ -52,6 +52,38 @@
                         </div>
                     </div>
 
+                    <!-- Abweichender Rechnungsempfaenger -->
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="has_billing_customer" name="has_billing_customer"
+                                   {% if order.billing_customer_id %}checked{% endif %}
+                                   onchange="toggleBillingCustomer()">
+                            <label class="form-check-label" for="has_billing_customer">
+                                <i class="bi bi-receipt me-1"></i> Abweichender Rechnungsempfaenger
+                            </label>
+                        </div>
+                    </div>
+                    <div id="billing-customer-section" style="{% if not order.billing_customer_id %}display: none;{% endif %}">
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <label class="form-label" for="billing_customer_id">Rechnungsempfaenger</label>
+                                <select class="form-select" id="billing_customer_id" name="billing_customer_id">
+                                    <option value="">Rechnungsempfaenger waehlen...</option>
+                                    {% for cid, customer_data in customers.items() %}
+                                    <option value="{{ cid }}" {% if order.billing_customer_id == cid %}selected{% endif %}>
+                                        {{ customer_data.display_name }}
+                                        {% if customer_data.customer_number %} ({{ customer_data.customer_number }}){% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle"></i>
+                                    Rechnung geht an diesen Kunden statt an den Auftraggeber
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label"><strong>Auftragstyp</strong></label>
@@ -59,6 +91,7 @@
                                 <option value="embroidery" {% if order.order_type == 'embroidery' %}selected{% endif %}>Bestickung</option>
                                 <option value="printing" {% if order.order_type == 'printing' %}selected{% endif %}>Textildruck</option>
                                 <option value="dtf" {% if order.order_type == 'dtf' %}selected{% endif %}>DTF</option>
+                                <option value="sublimation" {% if order.order_type == 'sublimation' %}selected{% endif %}>Sublimation</option>
                                 <option value="combined" {% if order.order_type == 'combined' %}selected{% endif %}>Kombiniert</option>
                             </select>
                         </div>
@@ -80,45 +113,48 @@
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="description" class="form-label">Beschreibung</label>
-                            <textarea class="form-control" id="description" name="description" rows="3">{{ order.description or '' }}</textarea>
-                        </div>
-                        
-                        <div class="col-md-3 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="price" class="form-label">Preis</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" id="price" name="price" 
-                                       value="{{ order.total_price }}" step="0.01" min="0.01" required>
-                                <span class="input-group-text">€</span>
+                                <input type="number" class="form-control" id="price" name="price"
+                                       value="{{ '%.2f'|format(order.total_price or 0) }}" step="0.01" min="0">
+                                <span class="input-group-text">&euro;</span>
+                                <button type="button" class="btn btn-outline-secondary" title="Preis aus Artikel + Druckpositionen berechnen" onclick="calculateOrderTotal()">
+                                    <i class="bi bi-calculator"></i>
+                                </button>
                             </div>
+                            <div id="price-calc-info" class="form-text text-muted d-none small mt-1"></div>
                         </div>
-                        
-                        <div class="col-md-3 mb-3">
-                            <label for="priority" class="form-label">Priorität</label>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="priority">Prioritaet</label>
                             <select class="form-control" id="priority" name="priority">
-                                <option value="low">Niedrig</option>
-                                <option value="normal" selected>Normal</option>
+                                <option value="normal" {% if not order.rush_order %}selected{% endif %}>Normal</option>
                                 <option value="high">Hoch</option>
-                                <option value="urgent">Dringend</option>
+                                <option value="urgent" {% if order.rush_order %}selected{% endif %}>Dringend</option>
+                                <option value="low">Niedrig</option>
                             </select>
                         </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="pickup_date" class="form-label">Gewünschtes Abholdatum</label>
-                            <input type="date" class="form-control" id="pickup_date" name="pickup_date" 
+                        <div class="col-md-4 mb-3">
+                            <label for="pickup_date" class="form-label">Gewuenschtes Abholdatum</label>
+                            <input type="date" class="form-control" id="pickup_date" name="pickup_date"
                                    value="{{ order.due_date.strftime('%Y-%m-%d') if order.due_date else '' }}">
                         </div>
-                        
+                    </div>
+
+                    <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label for="rush_order" class="form-label">Express-Auftrag</label>
                             <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="rush_order" name="rush_order" 
+                                <input class="form-check-input" type="checkbox" id="rush_order" name="rush_order"
                                        {% if order.rush_order %}checked{% endif %}>
                                 <label class="form-check-label" for="rush_order">
-                                    Eilauftrag mit höherer Priorität
+                                    <strong>Express-Auftrag</strong> (Aufpreis)
+                                </label>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="is_kundenware" name="is_kundenware"
+                                       {% if order.is_kundenware %}checked{% endif %}>
+                                <label class="form-check-label" for="is_kundenware">
+                                    <i class="bi bi-box-seam me-1"></i><strong>Kundenware</strong> (Artikel vom Kunden)
                                 </label>
                             </div>
                         </div>
@@ -126,135 +162,247 @@
                 </div>
             </div>
             
-            <!-- Artikel-Details -->
+            <!-- Artikel-Positionen (editierbar) -->
             <div class="card mb-4">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-cart"></i> Artikel-Positionen</h5>
                 </div>
                 <div class="card-body">
                     {% if order.items.count() > 0 %}
                     <div class="table-responsive">
-                        <table class="table table-sm">
+                        <table class="table table-sm align-middle">
                             <thead>
                                 <tr>
                                     <th>Artikel</th>
-                                    <th>Menge</th>
-                                    <th>Größe</th>
-                                    <th>Farbe</th>
-                                    <th>Einzelpreis</th>
+                                    <th style="width:80px">Menge</th>
+                                    <th style="width:100px">Einzelpreis</th>
+                                    <th style="width:90px">Groesse</th>
+                                    <th style="width:110px">Farbe</th>
+                                    <th style="width:50px"></th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="existing-items">
                                 {% for item in order.items %}
-                                <tr>
-                                    <td>{{ item.article.name if item.article else 'Gelöscht' }}</td>
-                                    <td>{{ item.quantity }}</td>
-                                    <td>{{ item.textile_size or '-' }}</td>
-                                    <td>{{ item.textile_color or '-' }}</td>
-                                    <td>{{ "%.2f"|format(item.unit_price) }} €</td>
+                                <tr id="item-row-{{ item.id }}">
+                                    <td>
+                                        <strong>{{ item.article.name if item.article else 'Geloescht' }}</strong>
+                                        {% if item.article and item.article.article_number %}
+                                            <br><small class="text-muted">{{ item.article.article_number }}</small>
+                                        {% endif %}
+                                        <input type="hidden" name="existing_item_id[]" value="{{ item.id }}">
+                                    </td>
+                                    <td>
+                                        <input type="number" class="form-control form-control-sm" name="existing_quantity[]"
+                                               value="{{ item.quantity }}" min="1">
+                                    </td>
+                                    <td>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" class="form-control form-control-sm" name="existing_unit_price[]"
+                                                   value="{{ '%.2f'|format(item.unit_price or 0) }}" step="0.01" min="0">
+                                            <span class="input-group-text">€</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <select class="form-select form-select-sm" name="existing_size[]">
+                                            <option value="">-</option>
+                                            {% for s in ['XS','S','M','L','XL','XXL','XXXL'] %}
+                                            <option value="{{ s }}" {% if item.textile_size == s %}selected{% endif %}>{{ s }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input type="text" class="form-control form-control-sm" name="existing_color[]"
+                                               value="{{ item.textile_color or '' }}" placeholder="Farbe">
+                                    </td>
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                                onclick="removeExistingItem({{ item.id }}, this)"
+                                                title="Position entfernen">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                        <input type="hidden" name="delete_item[]" value="" class="delete-flag">
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
-                    <p class="text-muted small mt-2">
-                        <i class="bi bi-info-circle"></i> Artikel können nur bei der Auftragserstellung hinzugefügt werden.
-                    </p>
                     {% else %}
                     <p class="text-muted">Keine Artikel-Positionen vorhanden.</p>
                     {% endif %}
+
+                    <!-- Neue Artikel hinzufuegen -->
+                    <hr>
+                    <h6 class="text-muted mb-3"><i class="bi bi-plus-circle me-1"></i>Neue Artikel hinzufuegen</h6>
+                    <div id="new-items-container"></div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addNewItemRow()">
+                        <i class="bi bi-plus-lg me-1"></i>Artikel hinzufuegen
+                    </button>
+
                 </div>
             </div>
 
-            <!-- Design-Details (Legacy - für alte Aufträge ohne Multi-Position) -->
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="bi bi-palette"></i> Design-Details (Legacy)</h5>
-                    <small class="text-muted">Nur für Aufträge ohne Multi-Position-Designs</small>
+            <!-- Design-Workflow -->
+            <div class="card mb-4" id="design-workflow-card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-palette"></i> Design-Workflow</h5>
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <label for="description" class="form-label">Design-Beschreibung</label>
-                        <textarea class="form-control" id="description" name="description" rows="3">{{ order.description or '' }}</textarea>
-                    </div>
-
-                    {% if order.order_type == 'embroidery' or order.order_type == 'combined' %}
-                    <div class="mb-3">
-                        <label for="embroidery_position" class="form-label">Stickerei-Position</label>
-                        <input type="text" class="form-control" id="embroidery_position" name="embroidery_position" 
-                               value="{{ order.embroidery_position or '' }}">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="thread_colors" class="form-label">Garn-Farben</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="thread_colors" name="thread_colors" 
-                                   value="{{ order.thread_colors or '' }}" placeholder="Farben auswählen..." readonly>
-                            <button type="button" class="btn btn-outline-secondary" onclick="openThreadSelector()">
-                                <i class="bi bi-palette"></i> Auswählen
-                            </button>
-                        </div>
-                        <input type="hidden" id="selected_threads" name="selected_threads" value="{{ order.selected_threads or '[]' }}">
-                        <div id="selected-threads-display" class="mt-2"></div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="stitch_count" class="form-label">Stichzahl</label>
-                        <input type="number" class="form-control" id="stitch_count" name="stitch_count" 
-                               value="{{ order.stitch_count or '' }}">
-                    </div>
-                    {% endif %}
-                    
-                    {% if order.order_type == 'printing' or order.order_type == 'dtf' or order.order_type == 'combined' %}
-                    <div class="mb-3">
-                        <label for="print_method" class="form-label">Druckverfahren</label>
-                        <select class="form-control" id="print_method" name="print_method">
-                            <option value="">Wählen...</option>
-                            <option value="dtg" {% if order.print_method == 'dtg' %}selected{% endif %}>DTG</option>
-                            <option value="dtf" {% if order.print_method == 'dtf' %}selected{% endif %}>DTF</option>
-                            <option value="flex" {% if order.print_method == 'flex' %}selected{% endif %}>Flexdruck</option>
-                            <option value="flock" {% if order.print_method == 'flock' %}selected{% endif %}>Flockdruck</option>
-                            <option value="screen" {% if order.print_method == 'screen' %}selected{% endif %}>Siebdruck</option>
-                            <option value="sublimation" {% if order.print_method == 'sublimation' %}selected{% endif %}>Sublimation</option>
+                        <label class="form-label">Design-Status</label>
+                        <select class="form-control" id="design_status" name="design_status" onchange="toggleDesignWorkflow()">
+                            <option value="" {% if not order.design_status or order.design_status == 'none' %}selected{% endif %}>Kein Design-Workflow</option>
+                            <option value="logo_available" {% if order.design_status == 'logo_available' or order.design_status == 'customer_provided' %}selected{% endif %}>Logo vorhanden</option>
+                            <option value="logo_needs_creation" {% if order.design_status == 'logo_needs_creation' %}selected{% endif %}>Logo muss erstellt werden</option>
+                            <option value="logo_needs_adaptation" {% if order.design_status == 'logo_needs_adaptation' %}selected{% endif %}>Logo muss angepasst werden</option>
                         </select>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="print_position" class="form-label">Druck-Position</label>
-                        <input type="text" class="form-control" id="print_position" name="print_position" 
-                               value="{{ order.embroidery_position or '' }}">
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="print_colors" class="form-label">Druckfarben</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="print_colors" name="print_colors" 
-                                   value="{{ order.print_colors or '' }}" placeholder="Farben auswählen..." readonly>
-                            <button type="button" class="btn btn-outline-secondary" onclick="openPrintColorSelector()">
-                                <i class="bi bi-palette"></i> Auswählen
-                            </button>
+
+                    <!-- Logo vorhanden -->
+                    <div id="logo-available-section" style="display: none;">
+                        <div class="alert alert-success py-2">
+                            <i class="bi bi-check-circle"></i> Logo vorhanden
+                            {% if order.design_file_path %}
+                                - aktuelle Datei: <strong>{{ order.design_file_path|basename if order.design_file_path else '' }}</strong>
+                            {% endif %}
                         </div>
-                        <input type="hidden" id="selected_print_colors" name="selected_print_colors" 
-                               value="{{ order.print_colors or '[]' }}">
-                        <div id="selected-print-colors-display" class="mt-2"></div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="print_width_cm" class="form-label">Breite (cm)</label>
-                            <input type="number" class="form-control" id="print_width_cm" name="print_width_cm" 
-                                   value="{{ order.print_width_cm or '' }}" step="0.1">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-primary mb-2">
+                                    <div class="card-body text-center py-2">
+                                        <h6 class="mb-1"><i class="bi bi-folder"></i> Aus Verzeichnis</h6>
+                                        <div class="mb-2">
+                                            <input type="text" class="form-control form-control-sm" id="design_file_path" name="design_file_path"
+                                                   value="{{ order.design_file_path or '' }}" placeholder="Pfad zur Design-Datei" readonly>
+                                        </div>
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectDesignFile()">
+                                            <i class="bi bi-search"></i> Auswaehlen
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-success mb-2">
+                                    <div class="card-body text-center py-2">
+                                        <h6 class="mb-1"><i class="bi bi-cloud-upload"></i> Hochladen</h6>
+                                        <div class="mb-2">
+                                            <input type="file" class="form-control form-control-sm" name="design_file"
+                                                   accept=".dst,.pes,.jef,.exp,.svg,.ai,.pdf,.png,.jpg">
+                                        </div>
+                                        <small class="text-muted">DST, PES, SVG, AI, PDF, PNG, JPG</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="print_height_cm" class="form-label">Höhe (cm)</label>
-                            <input type="number" class="form-control" id="print_height_cm" name="print_height_cm" 
-                                   value="{{ order.print_height_cm or '' }}" step="0.1">
+                        <!-- Urheberrechts-Bestätigung -->
+                        <div class="alert alert-warning py-2 mt-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="copyright_confirmed" id="copyright_confirmed" required>
+                                <label class="form-check-label fw-semibold" for="copyright_confirmed">
+                                    <i class="bi bi-shield-check me-1"></i>
+                                    Ich bestätige, dass das verwendete Logo/Design urheberrechtlich für diesen Verwendungszweck freigegeben ist und der Auftraggeber über die erforderlichen Nutzungsrechte verfügt.
+                                </label>
+                            </div>
                         </div>
                     </div>
-                    {% endif %}
+
+                    <!-- Logo muss erstellt werden -->
+                    <div id="logo-creation-section" style="display: none;">
+                        <div class="alert alert-warning py-2">
+                            <i class="bi bi-exclamation-triangle"></i> Logo muss erstellt werden
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label">Zustaendiger Designer</label>
+                                <select class="form-control" name="designer_id">
+                                    <option value="">Designer waehlen...</option>
+                                    <option value="internal" {% if order.designer_id == 'internal' %}selected{% endif %}>Interne Erstellung</option>
+                                    <option value="external" {% if order.designer_id == 'external' %}selected{% endif %}>Externer Designer</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label">Fertigstellungstermin</label>
+                                <input type="date" class="form-control" name="design_expected_date"
+                                       value="{{ order.design_expected_date.strftime('%Y-%m-%d') if order.design_expected_date else '' }}">
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Design-Anforderungen</label>
+                            <textarea class="form-control" name="design_requirements" rows="2"
+                                      placeholder="Farben, Stil, Groesse, etc.">{{ order.design_requirements or '' }}</textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label">Prioritaet</label>
+                                <select class="form-control" name="design_priority">
+                                    <option value="normal" {% if order.design_priority == 'normal' or not order.design_priority %}selected{% endif %}>Normal</option>
+                                    <option value="high" {% if order.design_priority == 'high' %}selected{% endif %}>Hoch</option>
+                                    <option value="urgent" {% if order.design_priority == 'urgent' %}selected{% endif %}>Dringend</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label">Design-Kosten</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" name="design_cost"
+                                           step="0.01" min="0" value="{{ '%.2f'|format(order.design_cost or 0) }}">
+                                    <span class="input-group-text">&euro;</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Logo muss angepasst werden -->
+                    <div id="logo-adaptation-section" style="display: none;">
+                        <div class="alert alert-info py-2">
+                            <i class="bi bi-info-circle"></i> Logo muss angepasst werden
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label">Original Logo</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="original_logo_path" name="original_logo_path"
+                                           value="{{ order.original_logo_path or '' }}" placeholder="Pfad zum Original-Logo" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="selectOriginalLogo()">
+                                        <i class="bi bi-search"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label">Bearbeitungszeit (Tage)</label>
+                                <input type="number" class="form-control" name="adaptation_days"
+                                       min="1" max="30" value="{{ order.adaptation_days or 2 }}">
+                            </div>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label">Anpassungsdetails</label>
+                            <textarea class="form-control" name="adaptation_details" rows="2"
+                                      placeholder="Groesse, Farbe, Format, etc.">{{ order.adaptation_details or '' }}</textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label">Gewuenschtes Format</label>
+                                <select class="form-control" name="target_format">
+                                    <option value="">Format waehlen...</option>
+                                    <option value="dst" {% if order.target_format == 'dst' %}selected{% endif %}>DST (Stickerei)</option>
+                                    <option value="svg" {% if order.target_format == 'svg' %}selected{% endif %}>SVG (Vektor)</option>
+                                    <option value="png" {% if order.target_format == 'png' %}selected{% endif %}>PNG (Raster)</option>
+                                    <option value="pdf" {% if order.target_format == 'pdf' %}selected{% endif %}>PDF (Druck)</option>
+                                    <option value="ai" {% if order.target_format == 'ai' %}selected{% endif %}>AI (Illustrator)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <label class="form-label">Anpassungskosten</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" name="adaptation_cost"
+                                           step="0.01" min="0" value="{{ '%.2f'|format(order.adaptation_cost or 0) }}">
+                                    <span class="input-group-text">&euro;</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
+
             <!-- Notizen und Anweisungen -->
             <div class="card mb-4">
                 <div class="card-header">
@@ -265,54 +413,19 @@
                         <label for="customer_notes" class="form-label">Kundenhinweise</label>
                         <textarea class="form-control" id="customer_notes" name="customer_notes" rows="3">{{ order.customer_notes or '' }}</textarea>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label for="notes" class="form-label">Interne Notizen</label>
                         <textarea class="form-control" id="notes" name="notes" rows="3">{{ order.internal_notes or '' }}</textarea>
                     </div>
-                    
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" id="rush_order" name="rush_order" 
-                               {% if order.rush_order %}checked{% endif %}>
-                        <label class="form-check-label" for="rush_order">
-                            Express-Auftrag
-                        </label>
-                    </div>
                 </div>
             </div>
-            
-            <!-- Status-Info -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Status</h5>
-                </div>
-                <div class="card-body">
-                    <p><strong>Aktueller Status:</strong></p>
-                    {% if order.status == 'accepted' %}
-                        <span class="badge bg-primary fs-6">Angenommen</span>
-                    {% elif order.status == 'in_progress' %}
-                        <span class="badge bg-warning fs-6">In Arbeit</span>
-                    {% elif order.status == 'ready' %}
-                        <span class="badge bg-info fs-6">Abholbereit</span>
-                    {% elif order.status == 'completed' %}
-                        <span class="badge bg-success fs-6">Abgeholt</span>
-                    {% elif order.status == 'cancelled' %}
-                        <span class="badge bg-danger fs-6">Storniert</span>
-                    {% endif %}
-                    
-                    <hr>
-                    
-                    <p class="text-muted small">
-                        Status kann über die Auftragsübersicht oder die Detailansicht geändert werden.
-                    </p>
-                </div>
-            </div>
-            
+
         </div>
-        
+
         <div class="col-md-4">
             <!-- Aktionen -->
-            <div class="card">
+            <div class="card mb-4">
                 <div class="card-body">
                     <button type="submit" class="btn btn-success w-100 mb-2">
                         <i class="bi bi-save"></i> Änderungen speichern
@@ -327,12 +440,188 @@
 </form>
 
 <!-- MULTI-POSITION DESIGN-VERWALTUNG (außerhalb des Hauptformulars) -->
-<div class="row mt-4">
+<div class="row">
     <div class="col-md-12">
         {% include 'orders/includes/design_positions.html' %}
     </div>
 </div>
 
+<script>
+// Design-Workflow Toggle
+function toggleDesignWorkflow() {
+    const status = document.getElementById('design_status').value;
+    document.getElementById('logo-available-section').style.display = (status === 'logo_available') ? 'block' : 'none';
+    document.getElementById('logo-creation-section').style.display = (status === 'logo_needs_creation') ? 'block' : 'none';
+    document.getElementById('logo-adaptation-section').style.display = (status === 'logo_needs_adaptation') ? 'block' : 'none';
+}
+
+// Design-Datei aus Datei-Browser auswaehlen
+function selectDesignFile() {
+    const input = document.getElementById('design_file_path');
+    // Datei-Browser oeffnen wenn verfuegbar
+    if (typeof openFileBrowser === 'function') {
+        openFileBrowser(function(path) { input.value = path; });
+    } else {
+        const path = prompt('Pfad zur Design-Datei eingeben:');
+        if (path) input.value = path;
+    }
+}
+
+function selectOriginalLogo() {
+    const input = document.getElementById('original_logo_path');
+    if (typeof openFileBrowser === 'function') {
+        openFileBrowser(function(path) { input.value = path; });
+    } else {
+        const path = prompt('Pfad zum Original-Logo eingeben:');
+        if (path) input.value = path;
+    }
+}
+
+// Design-Workflow beim Laden initialisieren
+document.addEventListener('DOMContentLoaded', function() {
+    toggleDesignWorkflow();
+});
+
+function toggleBillingCustomer() {
+    const checkbox = document.getElementById('has_billing_customer');
+    const section = document.getElementById('billing-customer-section');
+    section.style.display = checkbox.checked ? 'block' : 'none';
+    if (!checkbox.checked) {
+        document.getElementById('billing_customer_id').value = '';
+    }
+}
+
+function removeExistingItem(itemId, btn) {
+    const row = btn.closest('tr');
+    const deleteFlag = row.querySelector('.delete-flag');
+    if (deleteFlag.value) {
+        // Undo: Zeile wieder einblenden
+        row.style.opacity = '1';
+        row.style.textDecoration = '';
+        deleteFlag.value = '';
+        btn.innerHTML = '<i class="bi bi-trash"></i>';
+        btn.classList.replace('btn-warning', 'btn-outline-danger');
+    } else {
+        // Markiere zum Loeschen
+        row.style.opacity = '0.4';
+        row.style.textDecoration = 'line-through';
+        deleteFlag.value = itemId;
+        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i>';
+        btn.classList.replace('btn-outline-danger', 'btn-warning');
+    }
+}
+
+let newItemCounter = 0;
+let _articleSearchTimer = null;
+
+function addNewItemRow() {
+    newItemCounter++;
+    const idx = newItemCounter;
+    const container = document.getElementById('new-items-container');
+
+    const row = document.createElement('div');
+    row.className = 'row g-2 mb-2 align-items-start new-item-row';
+    row.id = 'new-item-' + idx;
+    row.innerHTML =
+        '<div class="col-md-3 position-relative">' +
+            '<input type="text" class="form-control form-control-sm article-search-input" placeholder="Artikel suchen..." autocomplete="off">' +
+            '<input type="hidden" name="new_article_id[]" class="article-id-input">' +
+            '<div class="article-search-results list-group shadow" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:1050;max-height:220px;overflow-y:auto;"></div>' +
+        '</div>' +
+        '<div class="col-md-2"><input type="number" class="form-control form-control-sm" name="new_quantity[]" value="1" min="1" placeholder="Menge"></div>' +
+        '<div class="col-md-2"><div class="input-group input-group-sm"><input type="number" class="form-control form-control-sm new-price-input" name="new_unit_price[]" value="0.00" step="0.01" min="0" placeholder="Preis"><span class="input-group-text">€</span></div></div>' +
+        '<div class="col-md-2"><select class="form-select form-select-sm" name="new_size[]"><option value="">Groesse</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option><option>XXXL</option></select></div>' +
+        '<div class="col-md-2"><input type="text" class="form-control form-control-sm" name="new_color[]" placeholder="Farbe"></div>' +
+        '<div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest(\'.new-item-row\').remove()"><i class="bi bi-x-lg"></i></button></div>';
+
+    container.appendChild(row);
+
+    const searchInput = row.querySelector('.article-search-input');
+    const idInput = row.querySelector('.article-id-input');
+    const resultsBox = row.querySelector('.article-search-results');
+    const sizeSelect = row.querySelector('[name="new_size[]"]');
+    const colorInput = row.querySelector('[name="new_color[]"]');
+    const priceInput = row.querySelector('.new-price-input');
+
+    searchInput.addEventListener('input', function() {
+        const q = this.value.trim();
+        idInput.value = '';
+        clearTimeout(_articleSearchTimer);
+        if (q.length < 2) { resultsBox.style.display = 'none'; resultsBox.innerHTML = ''; return; }
+        _articleSearchTimer = setTimeout(function() {
+            fetch('/orders/api/articles/search?q=' + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(items => {
+                    resultsBox.innerHTML = '';
+                    if (!items.length) {
+                        resultsBox.innerHTML = '<div class="list-group-item list-group-item-action text-muted small py-1">Kein Ergebnis</div>';
+                        resultsBox.style.display = 'block';
+                        return;
+                    }
+                    items.forEach(function(a) {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'list-group-item list-group-item-action py-1 small';
+                        btn.innerHTML =
+                            '<strong>' + (a.article_number ? a.article_number + ' – ' : '') + a.name + '</strong>' +
+                            (a.color ? ' <span class="text-muted">| ' + a.color + '</span>' : '') +
+                            (a.size ? ' <span class="text-muted">| ' + a.size + '</span>' : '') +
+                            ' <span class="badge bg-light text-dark ms-1">' + a.price.toFixed(2) + ' €</span>';
+                        btn.addEventListener('click', function() {
+                            searchInput.value = (a.article_number ? a.article_number + ' – ' : '') + a.name;
+                            idInput.value = a.id;
+                            if (a.price) priceInput.value = a.price.toFixed(2);
+                            if (a.color) colorInput.value = a.color;
+                            if (a.size) {
+                                for (let opt of sizeSelect.options) {
+                                    if (opt.value === a.size || opt.text === a.size) { opt.selected = true; break; }
+                                }
+                            }
+                            resultsBox.style.display = 'none';
+                            resultsBox.innerHTML = '';
+                        });
+                        resultsBox.appendChild(btn);
+                    });
+                    resultsBox.style.display = 'block';
+                })
+                .catch(function() { resultsBox.style.display = 'none'; });
+        }, 250);
+    });
+
+    // Suchergebnisse bei Klick außerhalb schliessen
+    document.addEventListener('click', function closeResults(e) {
+        if (!row.contains(e.target)) {
+            resultsBox.style.display = 'none';
+        }
+    });
+
+    searchInput.focus();
+}
+
+// Preis-Kalkulation aus Artikeln + Druckpositionen
+function calculateOrderTotal() {
+    const infoDiv = document.getElementById('price-calc-info');
+    infoDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> Berechne...';
+    infoDiv.classList.remove('d-none');
+
+    fetch('/orders/api/calculate-total?order_id={{ order.id }}')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                document.getElementById('price').value = data.total.toFixed(2);
+                let info = [];
+                if (data.artikel_total > 0) info.push('Artikel: ' + data.artikel_total.toFixed(2) + ' €');
+                if (data.design_total > 0) info.push('Druck/Stick: ' + data.design_total.toFixed(2) + ' €');
+                infoDiv.innerHTML = info.join(' + ') + ' = <strong>' + data.total.toFixed(2) + ' €</strong>';
+            } else {
+                infoDiv.innerHTML = '<span class="text-warning">' + (data.error || 'Kein Preis berechnet') + '</span>';
+            }
+        })
+        .catch(() => {
+            infoDiv.innerHTML = '<span class="text-danger">Fehler bei der Berechnung</span>';
+        });
+}
+</script>
 <script src="{{ url_for('static', filename='js/thread_selector.js') }}"></script>
 <script src="{{ url_for('static', filename='js/print_color_selector.js') }}"></script>
 

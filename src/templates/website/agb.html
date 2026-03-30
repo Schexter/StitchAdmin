@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGB - {{ company.display_name if company and company.company_name else 'StitchAdmin' }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/website.css') }}">
+</head>
+<body>
+    <nav class="ws-nav ws-nav-scrolled" id="wsNav">
+        <div class="container">
+            <div class="ws-nav-inner">
+                <a href="/" class="ws-nav-brand">
+                    <span>{{ company.company_name if company and company.company_name else 'StitchAdmin' }}</span>
+                </a>
+                <a href="/" class="ws-btn ws-btn-outline ws-btn-sm">
+                    <i class="bi bi-arrow-left"></i> Zurueck
+                </a>
+            </div>
+        </div>
+    </nav>
+    <div class="container py-5" style="margin-top: 80px;">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <h1 class="fw-bold mb-4">Allgemeine Geschaeftsbedingungen</h1>
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-4">
+                        {% if page_text %}
+                            {{ page_text|safe }}
+                        {% else %}
+                            <p class="text-muted">AGB werden noch erstellt.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer class="ws-footer">
+        <div class="container">
+            <div class="ws-footer-inner">
+                <div class="ws-footer-brand">
+                    <span>{{ company.display_name if company and company.company_name else 'StitchAdmin' }}</span>
+                </div>
+                <div class="ws-footer-links">
+                    <a href="{{ url_for('website.impressum') }}">Impressum</a>
+                    <a href="{{ url_for('website.datenschutz') }}">Datenschutz</a>
+                    <a href="/">Startseite</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

@@ -16,8 +16,11 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h2">📋 Alle Bestellungen</h1>
         <div>
-            <a href="{{ url_for('purchasing.suggestions') }}" class="btn btn-primary">
+            <a href="{{ url_for('purchasing.new_manual_order') }}" class="btn btn-success">
                 <i class="bi bi-plus-lg"></i> Neue Bestellung
+            </a>
+            <a href="{{ url_for('purchasing.suggestions') }}" class="btn btn-outline-primary">
+                <i class="bi bi-lightbulb"></i> Bestellvorschl&auml;ge
             </a>
         </div>
     </div>

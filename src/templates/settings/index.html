@@ -99,6 +99,18 @@
                         <i class="bi bi-building"></i> Firmeneinstellungen
                     </a>
                     
+                    <a href="{{ url_for('settings.positionen') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-brush"></i> Veredelungsarten & Positionen
+                    </a>
+
+                    <a href="{{ url_for('veredelung.einstellungen') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-sliders"></i> Veredelungsverfahren (Positionen & Parameter)
+                    </a>
+
+                    <a href="{{ url_for('settings.textbausteine') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-card-text"></i> Textbausteine (Angebote)
+                    </a>
+
                     <a href="{{ url_for('settings.storage') }}" class="btn btn-outline-secondary">
                         <i class="bi bi-folder"></i> Speicherpfade konfigurieren
                     </a>
@@ -113,6 +125,10 @@
 
                     <a href="{{ url_for('shelly.index') }}" class="btn btn-outline-secondary">
                         <i class="bi bi-plug"></i> Shelly-Geräte verwalten
+                    </a>
+
+                    <a href="{{ url_for('feedback.liste') }}" class="btn btn-outline-danger">
+                        <i class="bi bi-bug"></i> Bug-Reports / Feedback
                     </a>
 
                     <hr class="my-2">

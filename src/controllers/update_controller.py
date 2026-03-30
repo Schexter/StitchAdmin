@@ -65,7 +65,7 @@ def backup_list():
             try:
                 dt = datetime.fromisoformat(backup['timestamp'])
                 backup['date_formatted'] = dt.strftime('%d.%m.%Y %H:%M')
-            except:
+            except (ValueError, TypeError):
                 backup['date_formatted'] = backup['timestamp'][:19]
     
     return render_template('updates/backup_list.html', backups=backups)
@@ -186,7 +186,7 @@ def index():
             try:
                 dt = datetime.fromisoformat(entry['timestamp'])
                 entry['date_formatted'] = dt.strftime('%d.%m.%Y %H:%M')
-            except:
+            except (ValueError, TypeError):
                 entry['date_formatted'] = entry['timestamp'][:19]
     
     return render_template('updates/index.html',

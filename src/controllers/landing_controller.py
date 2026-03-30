@@ -34,6 +34,128 @@ def index():
     return render_template('landing/index.html')
 
 
+@landing_bp.route('/demo')
+def demo_login():
+    """Demo-Account: Readonly-Zugang zum Anschauen"""
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+
+    # Demo-User finden oder erstellen
+    demo_user = User.query.filter_by(username='demo').first()
+    if not demo_user:
+        demo_user = User(
+            username='demo',
+            email='demo@stitchadmin.de',
+            first_name='Demo',
+            last_name='Benutzer',
+            is_active=True,
+            is_admin=False,
+            is_demo=True,
+        )
+        demo_user.set_password('demo-readonly-2026')
+        db.session.add(demo_user)
+        db.session.commit()
+        logger.info("Demo-User erstellt")
+
+    # Sicherstellen dass is_demo gesetzt ist
+    if not demo_user.is_demo:
+        demo_user.is_demo = True
+        db.session.commit()
+
+    login_user(demo_user, remember=False)
+    demo_user.last_login = db.session.query(db.func.now()).scalar()
+    db.session.commit()
+
+    flash('Demo-Modus: Sie koennen sich umschauen, aber nichts aendern.', 'info')
+    return redirect(url_for('dashboard'))
+
+
+def _seed_demo_data():
+    """Erstellt Fantasie-Demodaten wenn noch nicht vorhanden"""
+    from src.models.models import Customer, Article, Order, OrderItem
+    from src.models.inquiry import Inquiry
+    import uuid
+
+    # Nur seeden wenn keine Demo-Kunden existieren
+    if Customer.query.filter(Customer.company_name.ilike('%Muster%Stickerei%')).first():
+        return
+
+    try:
+        # Demo-Kunden
+        kunden = [
+            Customer(id=f'DEMO-K{i+1:03d}', first_name=fn, last_name=ln, company_name=cn,
+                     email=em, phone=ph, city=ct, postal_code=plz, street=st)
+            for i, (fn, ln, cn, em, ph, ct, plz, st) in enumerate([
+                ('Stefan', 'Weber', 'Weber Sportswear GmbH', 'info@weber-sport.de', '0202-555100', 'Wuppertal', '42103', 'Hofkamp 12'),
+                ('Maria', 'Schneider', 'FC Bergisch Lions e.V.', 'vorstand@bergisch-lions.de', '0202-555200', 'Solingen', '42651', 'Klingenstr. 8'),
+                ('Thomas', 'Fischer', 'Fischer Workwear AG', 'tf@fischer-workwear.de', '0211-555300', 'Duesseldorf', '40213', 'Koenigsallee 55'),
+                ('Anna', 'Mueller', 'Gasthaus Zur Linde', 'kontakt@gasthaus-linde.de', '0202-555400', 'Wuppertal', '42275', 'Berliner Str. 20'),
+                ('Klaus', 'Berger', 'Berger Dachdecker OHG', 'buero@berger-dach.de', '0212-555500', 'Remscheid', '42853', 'Alleestr. 3'),
+            ])
+        ]
+        for k in kunden:
+            db.session.add(k)
+
+        # Demo-Artikel
+        artikel = [
+            Article(id=f'DEMO-A{i+1:03d}', name=n, article_number=sku, category=cat)
+            for i, (n, sku, cat) in enumerate([
+                ('Polo-Shirt Premium Weiss', 'POLO-W-001', 'Textilien'),
+                ('T-Shirt Baumwolle Schwarz', 'TS-BK-001', 'Textilien'),
+                ('Softshell-Jacke Navy', 'SJ-NV-001', 'Textilien'),
+                ('Arbeits-Latzhose Grau', 'ALH-GR-001', 'Textilien'),
+                ('Cap mit Klettverschluss', 'CAP-001', 'Accessoires'),
+            ])
+        ]
+        for a in artikel:
+            db.session.add(a)
+
+        db.session.flush()
+
+        # Demo-Auftraege
+        from datetime import date, timedelta
+        today = date.today()
+
+        auftraege = [
+            ('DEMO-2026-001', 'DEMO-K001', 'in_progress', today - timedelta(days=5), '50x Polo bestickt Brust links'),
+            ('DEMO-2026-002', 'DEMO-K002', 'pending', today - timedelta(days=2), '30x Trikot-Set Ruecken + Brust'),
+            ('DEMO-2026-003', 'DEMO-K003', 'approved', today - timedelta(days=8), '100x Arbeits-Shirts mit Flex'),
+            ('DEMO-2026-004', 'DEMO-K004', 'completed', today - timedelta(days=15), '20x Schuerzen Gasthaus Linde'),
+            ('DEMO-2026-005', 'DEMO-K005', 'ready', today - timedelta(days=3), '15x Softshell bestickt'),
+        ]
+        for oid, kid, status, created, desc in auftraege:
+            order = Order(
+                id=oid, order_number=oid, customer_id=kid,
+                status=status, description=desc,
+                created_at=datetime.combine(created, datetime.min.time()),
+            )
+            db.session.add(order)
+
+        # Demo-Anfragen
+        for i, (fn, ln, em, desc, st) in enumerate([
+            ('Laura', 'Klein', 'laura@example.de', '80 Vereins-Shirts mit Logo vorne + Ruecken', 'neu'),
+            ('Markus', 'Braun', 'mb@example.de', 'Angebot fuer 200 Poloshirts bestickt', 'in_bearbeitung'),
+            ('Petra', 'Hoffmann', 'ph@example.de', 'Muster fuer Workwear mit DTF-Transfer', 'angebot_erstellt'),
+        ]):
+            inq = Inquiry(
+                inquiry_number=f'DEMO-ANF-{i+1:03d}',
+                tracking_token=uuid.uuid4().hex,
+                first_name=fn, last_name=ln, email=em,
+                description=desc, status=st,
+                inquiry_type='stickerei' if i < 2 else 'druck',
+                source='manual',
+                dsgvo_consent=True,
+                dsgvo_consent_at=datetime.utcnow(),
+            )
+            db.session.add(inq)
+
+        db.session.commit()
+        logger.info("Demo-Daten erfolgreich erstellt")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Demo-Daten konnten nicht erstellt werden: {e}")
+
+
 @landing_bp.route('/register', methods=['POST'])
 def register():
     """Neuen Tenant + Admin-User registrieren"""
@@ -172,3 +294,21 @@ def check_subdomain():
         return jsonify({'available': False, 'message': 'Bereits vergeben'})
 
     return jsonify({'available': True, 'message': 'Verfuegbar'})
+
+
+@landing_bp.route('/impressum')
+def impressum():
+    """Impressum"""
+    return render_template('landing/impressum.html')
+
+
+@landing_bp.route('/datenschutz')
+def datenschutz():
+    """Datenschutzerklaerung"""
+    return render_template('landing/datenschutz.html')
+
+
+@landing_bp.route('/agb')
+def agb():
+    """Allgemeine Geschaeftsbedingungen"""
+    return render_template('landing/agb.html')

@@ -7,10 +7,13 @@
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
-            <h1 class="h3 mb-1">🎨 Design-Archiv</h1>
-            <p class="text-muted mb-0">Zentrale Bibliothek für Stick-, Druck- und DTF-Designs</p>
+            <h1 class="h3 mb-1"><i class="bi bi-palette2 me-2"></i>Design-Archiv</h1>
+            <p class="text-muted mb-0">Zentrale Bibliothek fuer Stick-, Druck- und DTF-Designs</p>
         </div>
         <div class="d-flex gap-2">
+            <a href="{{ url_for('designs.folder_import') }}" class="btn btn-outline-info" title="Ordner importieren">
+                <i class="bi bi-folder-plus"></i> Import
+            </a>
             <a href="{{ url_for('designs.colors') }}" class="btn btn-outline-secondary">
                 <i class="bi bi-palette"></i> Garnfarben
             </a>
@@ -25,54 +28,47 @@
 
     <!-- Statistik-Cards -->
     <div class="row g-3 mb-4">
-        <div class="col-md-3 col-sm-6">
+        <div class="col-md-2 col-sm-4">
             <div class="card bg-primary text-white h-100">
-                <div class="card-body py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="mb-1 text-white-50">Gesamt</h6>
-                            <h3 class="mb-0">{{ stats.total }}</h3>
-                        </div>
-                        <i class="bi bi-collection fs-1 opacity-50"></i>
-                    </div>
+                <div class="card-body py-3 text-center">
+                    <h6 class="mb-1 text-white-50 small">Gesamt</h6>
+                    <h3 class="mb-0">{{ stats.total }}</h3>
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6">
-            <div class="card h-100" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
-                <div class="card-body py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="mb-1 opacity-75">🧵 Stickerei</h6>
-                            <h3 class="mb-0">{{ stats.embroidery }}</h3>
-                        </div>
-                    </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="card h-100" style="background: linear-gradient(135deg, #667eea, #764ba2); color: white;">
+                <div class="card-body py-3 text-center">
+                    <h6 class="mb-1 opacity-75 small">Stickerei</h6>
+                    <h3 class="mb-0">{{ stats.embroidery }}</h3>
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6">
-            <div class="card h-100" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
-                <div class="card-body py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="mb-1 opacity-75">🖨️ Druck</h6>
-                            <h3 class="mb-0">{{ stats.print }}</h3>
-                        </div>
-                    </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="card h-100" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: white;">
+                <div class="card-body py-3 text-center">
+                    <h6 class="mb-1 opacity-75 small">Druck</h6>
+                    <h3 class="mb-0">{{ stats.print }}</h3>
                 </div>
             </div>
         </div>
-        <div class="col-md-3 col-sm-6">
-            <div class="card h-100" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
-                <div class="card-body py-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <h6 class="mb-1 opacity-75">🎨 DTF</h6>
-                            <h3 class="mb-0">{{ stats.dtf }}</h3>
-                        </div>
-                    </div>
+        <div class="col-md-2 col-sm-4">
+            <div class="card h-100" style="background: linear-gradient(135deg, #4facfe, #00f2fe); color: white;">
+                <div class="card-body py-3 text-center">
+                    <h6 class="mb-1 opacity-75 small">DTF</h6>
+                    <h3 class="mb-0">{{ stats.dtf }}</h3>
                 </div>
             </div>
+        </div>
+        <div class="col-md-2 col-sm-4">
+            <a href="{{ url_for('designs.index', archiv='1') }}" class="text-decoration-none">
+                <div class="card h-100 bg-dark text-white">
+                    <div class="card-body py-3 text-center">
+                        <h6 class="mb-1 opacity-75 small">Archiviert</h6>
+                        <h3 class="mb-0">{{ stats.archived }}</h3>
+                    </div>
+                </div>
+            </a>
         </div>
     </div>
 
@@ -84,22 +80,22 @@
                     <label class="form-label small">Typ</label>
                     <select name="type" class="form-select form-select-sm">
                         <option value="">Alle Typen</option>
-                        <option value="embroidery" {{ 'selected' if filters.type == 'embroidery' }}>🧵 Stickerei</option>
-                        <option value="print" {{ 'selected' if filters.type == 'print' }}>🖨️ Druck</option>
-                        <option value="dtf" {{ 'selected' if filters.type == 'dtf' }}>🎨 DTF</option>
+                        <option value="embroidery" {{ 'selected' if filters.type == 'embroidery' }}>Stickerei</option>
+                        <option value="print" {{ 'selected' if filters.type == 'print' }}>Druck</option>
+                        <option value="dtf" {{ 'selected' if filters.type == 'dtf' }}>DTF</option>
                     </select>
                 </div>
                 <div class="col-md-2">
                     <label class="form-label small">Status</label>
                     <select name="status" class="form-select form-select-sm">
-                        <option value="">Alle Status</option>
+                        <option value="">Aktiv (Standard)</option>
                         <option value="active" {{ 'selected' if filters.status == 'active' }}>Aktiv</option>
                         <option value="draft" {{ 'selected' if filters.status == 'draft' }}>Entwurf</option>
                         <option value="archived" {{ 'selected' if filters.status == 'archived' }}>Archiviert</option>
-                        <option value="needs_revision" {{ 'selected' if filters.status == 'needs_revision' }}>Überarbeitung</option>
+                        <option value="needs_revision" {{ 'selected' if filters.status == 'needs_revision' }}>Ueberarbeitung</option>
                     </select>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <label class="form-label small">Kunde</label>
                     <select name="customer" class="form-select form-select-sm">
                         <option value="">Alle Kunden</option>
@@ -112,77 +108,118 @@
                 </div>
                 <div class="col-md-3">
                     <label class="form-label small">Suche</label>
-                    <input type="text" name="search" class="form-control form-control-sm" 
+                    <input type="text" name="search" class="form-control form-control-sm"
                            placeholder="Name, Nummer, Tags..." value="{{ filters.search or '' }}">
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-1">
                     <button type="submit" class="btn btn-primary btn-sm w-100">
-                        <i class="bi bi-search"></i> Filtern
+                        <i class="bi bi-search"></i>
                     </button>
                 </div>
+                {% if show_archived %}
+                <div class="col-md-2">
+                    <a href="{{ url_for('designs.index') }}" class="btn btn-outline-secondary btn-sm w-100">
+                        <i class="bi bi-eye-slash me-1"></i> Archiv ausblenden
+                    </a>
+                </div>
+                {% else %}
+                <div class="col-md-2">
+                    <a href="{{ url_for('designs.index', archiv='1') }}" class="btn btn-outline-dark btn-sm w-100">
+                        <i class="bi bi-archive me-1"></i> Archiv anzeigen
+                    </a>
+                </div>
+                {% endif %}
             </form>
         </div>
     </div>
+
+    {% if show_archived and not filters.status %}
+    <div class="alert alert-dark d-flex align-items-center mb-4">
+        <i class="bi bi-archive me-2"></i>
+        <span>Archiv-Ansicht: Alle Designs werden angezeigt (inkl. archivierte).</span>
+    </div>
+    {% endif %}
 
     <!-- Design-Grid -->
     {% if designs.items %}
     <div class="row g-3">
         {% for design in designs.items %}
         <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
-            <div class="card h-100 design-card" onclick="window.location='{{ url_for('designs.show', design_id=design.id) }}'">
+            <div class="card h-100 design-card {{ 'border-dark opacity-75' if design.status == 'archived' }}"
+                 onclick="window.location='{{ url_for('designs.show', design_id=design.id) }}'">
                 <!-- Thumbnail -->
-                <div class="design-thumbnail bg-light d-flex align-items-center justify-content-center" style="height: 140px;">
+                <div class="design-thumbnail bg-light d-flex align-items-center justify-content-center" style="height: 140px; overflow: hidden;">
                     {% if design.thumbnail_path %}
-                    <img src="{{ design.thumbnail_path }}" class="img-fluid" style="max-height: 100%;">
+                    <img src="{{ design.thumbnail_path }}" class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+                    {% elif design.preview_image_path %}
+                    <img src="{{ design.preview_image_path }}" class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;">
                     {% else %}
-                    <span class="display-4 text-muted">{{ design.type_icon }}</span>
+                    <div class="text-center p-2">
+                        {% if design.design_type == 'embroidery' %}
+                            <i class="bi bi-bezier2 display-5 text-primary"></i>
+                            <div class="small text-muted mt-1">
+                                {% if design.stitch_count %}{{ "{:,}".format(design.stitch_count) }} Stiche{% endif %}
+                                {% if design.width_mm and design.height_mm %}<br>{{ design.width_mm }}x{{ design.height_mm }}mm{% endif %}
+                            </div>
+                        {% elif design.design_type == 'print' or design.design_type == 'dtf' %}
+                            <i class="bi bi-printer display-5 text-success"></i>
+                            <div class="small text-muted mt-1">
+                                {% if design.width_mm and design.height_mm %}{{ design.width_mm }}x{{ design.height_mm }}mm{% endif %}
+                            </div>
+                        {% else %}
+                            <i class="bi bi-palette display-5 text-muted"></i>
+                        {% endif %}
+                    </div>
                     {% endif %}
                 </div>
-                
+
                 <!-- Body -->
                 <div class="card-body py-2 px-3">
                     <div class="d-flex justify-content-between align-items-start mb-1">
                         <span class="badge bg-{{ design.status_color }} small">{{ design.status_display }}</span>
                         <span class="text-muted small">{{ design.type_icon }}</span>
                     </div>
-                    
+
                     <h6 class="card-title mb-1 text-truncate" title="{{ design.name }}">
                         {{ design.name }}
                     </h6>
-                    
-                    <p class="card-text small text-muted mb-2">
+
+                    <p class="card-text small text-muted mb-1">
                         {{ design.design_number }}
                     </p>
-                    
+
                     <!-- Technische Daten -->
                     <div class="small text-muted">
                         {% if design.design_type == 'embroidery' %}
                             {% if design.stitch_count %}
-                            <span title="Stichzahl">{{ "{:,}".format(design.stitch_count) }} Stiche</span><br>
+                            <span title="Stichzahl">{{ "{:,}".format(design.stitch_count) }} St.</span>
                             {% endif %}
                             {% if design.width_mm and design.height_mm %}
-                            <span title="Größe">{{ design.width_mm|round(1) }} x {{ design.height_mm|round(1) }} mm</span>
+                            <span title="Groesse">· {{ design.width_mm|round(1) }}x{{ design.height_mm|round(1) }}mm</span>
+                            {% endif %}
+                            {% if design.color_changes %}
+                            <span>· {{ design.color_changes }} Farben</span>
                             {% endif %}
                         {% else %}
                             {% if design.print_width_cm and design.print_height_cm %}
-                            <span>{{ design.print_width_cm }} x {{ design.print_height_cm }} cm</span><br>
+                            <span>{{ design.print_width_cm }}x{{ design.print_height_cm }}cm</span>
                             {% endif %}
                             {% if design.dpi %}
-                            <span>{{ design.dpi }} DPI</span>
+                            <span>· {{ design.dpi }} DPI</span>
                             {% endif %}
                         {% endif %}
                     </div>
-                    
+
                     <!-- Verwendung -->
                     {% if design.usage_count %}
-                    <div class="mt-2">
+                    <div class="mt-1">
                         <span class="badge bg-light text-dark small">
-                            {{ design.usage_count }}x verwendet
+                            <i class="bi bi-box-seam"></i> {{ design.usage_count }}x
                         </span>
                     </div>
                     {% endif %}
                 </div>
-                
+
                 <!-- Kunde -->
                 {% if design.customer %}
                 <div class="card-footer py-1 px-3 bg-light border-top">
@@ -191,6 +228,20 @@
                     </small>
                 </div>
                 {% endif %}
+
+                <!-- Archiv-Button (Event-Stop damit Karte nicht navigiert) -->
+                <div class="card-footer py-1 px-3 border-top d-flex justify-content-end gap-1" onclick="event.stopPropagation()">
+                    <a href="{{ url_for('designs.download', design_id=design.id) }}" class="btn btn-sm btn-outline-primary py-0" title="Download" {% if not design.file_path %}style="display:none"{% endif %}>
+                        <i class="bi bi-download"></i>
+                    </a>
+                    <form action="{{ url_for('designs.archive', design_id=design.id) }}" method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" class="btn btn-sm btn-outline-{{ 'success' if design.status == 'archived' else 'dark' }} py-0"
+                                title="{{ 'Wiederherstellen' if design.status == 'archived' else 'Archivieren' }}">
+                            <i class="bi bi-{{ 'arrow-counterclockwise' if design.status == 'archived' else 'archive' }}"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
         {% endfor %}
@@ -207,7 +258,7 @@
                 </a>
             </li>
             {% endif %}
-            
+
             {% for page in designs.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
                 {% if page %}
                     <li class="page-item {{ 'active' if page == designs.page }}">
@@ -217,7 +268,7 @@
                     <li class="page-item disabled"><span class="page-link">...</span></li>
                 {% endif %}
             {% endfor %}
-            
+
             {% if designs.has_next %}
             <li class="page-item">
                 <a class="page-link" href="{{ url_for('designs.index', page=designs.next_num, **filters) }}">
@@ -241,9 +292,14 @@
             Beginne mit dem Anlegen deines ersten Designs!
             {% endif %}
         </p>
-        <a href="{{ url_for('designs.new') }}" class="btn btn-primary">
-            <i class="bi bi-plus-lg"></i> Neues Design anlegen
-        </a>
+        <div class="d-flex gap-2 justify-content-center">
+            <a href="{{ url_for('designs.new') }}" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Neues Design anlegen
+            </a>
+            <a href="{{ url_for('designs.folder_import') }}" class="btn btn-outline-info">
+                <i class="bi bi-folder-plus"></i> Ordner importieren
+            </a>
+        </div>
     </div>
     {% endif %}
 </div>
@@ -261,7 +317,6 @@
 }
 .design-thumbnail {
     border-bottom: 1px solid #e2e8f0;
-    overflow: hidden;
 }
 </style>
 {% endblock %}

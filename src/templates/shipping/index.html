@@ -3,179 +3,432 @@
 {% block title %}Versandabwicklung - StitchAdmin{% endblock %}
 
 {% block content %}
-<!-- Bootstrap Icons -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
-
-<div class="row">
-    <div class="col-md-12">
-        <h1><i class="bi bi-truck"></i> Versandabwicklung</h1>
-        <div class="mt-3">
-            <a href="{{ url_for('shipping.index') }}" class="btn btn-primary btn-lg">
-                <i class="bi bi-list-ul"></i> Alle Versendungen
-            </a>
-            <a href="#ready-orders" class="btn btn-success btn-lg">
-                <i class="bi bi-box-seam"></i> Versandbereit ({{ stats.ready_to_ship }})
-            </a>
-        </div>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="fw-bold mb-0"><i class="bi bi-truck me-2"></i>Versandabwicklung</h2>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('shipping.new') }}" class="btn btn-success">
+            <i class="bi bi-plus-lg me-1"></i>Neuer Versand
+        </a>
+        <a href="{{ url_for('shipping.probebox') }}" class="btn btn-outline-info">
+            <i class="bi bi-box-seam me-1"></i>Probebox
+        </a>
     </div>
 </div>
 
-<!-- Versand-KPIs -->
-<div class="row mt-4">
-    <div class="col-md-3">
-        <div class="card text-white bg-success mb-3">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="bi bi-box-seam"></i> Versandbereit
-                </h5>
-                <p class="card-text display-6">{{ stats.ready_to_ship or 0 }}</p>
+<!-- KPIs kompakt -->
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 bg-success text-white">
+            <div class="card-body py-2 px-3 d-flex align-items-center gap-2">
+                <i class="bi bi-box-seam" style="font-size:1.3rem;"></i>
+                <div>
+                    <div class="fw-bold fs-5">{{ stats.ready_to_ship or 0 }}</div>
+                    <small class="opacity-75">Versandbereit</small>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-primary mb-3">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="bi bi-truck"></i> Heute versendet
-                </h5>
-                <p class="card-text display-6">{{ stats.shipped or 0 }}</p>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 bg-warning text-dark">
+            <div class="card-body py-2 px-3 d-flex align-items-center gap-2">
+                <i class="bi bi-person-check" style="font-size:1.3rem;"></i>
+                <div>
+                    <div class="fw-bold fs-5">{{ stats.abholung or 0 }}</div>
+                    <small class="opacity-75">Abholung offen</small>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-info mb-3">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="bi bi-archive"></i> Gesamt-Sendungen
-                </h5>
-                <p class="card-text display-6">{{ shipments|length or 0 }}</p>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 bg-primary text-white">
+            <div class="card-body py-2 px-3 d-flex align-items-center gap-2">
+                <i class="bi bi-truck" style="font-size:1.3rem;"></i>
+                <div>
+                    <div class="fw-bold fs-5">{{ stats.shipped or 0 }}</div>
+                    <small class="opacity-75">Versendet</small>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-white bg-warning mb-3">
-            <div class="card-body">
-                <h5 class="card-title">
-                    <i class="bi bi-clock-history"></i> Ausstehend
-                </h5>
-                <p class="card-text display-6">{{ stats.pending or 0 }}</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Versandbereite Aufträge -->
-<div class="row mt-4" id="ready-orders">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="bi bi-box-seam"></i> Versandbereite Aufträge <span class="badge bg-success">{{ ready_orders|length }}</span></h5>
-            </div>
-            <div class="card-body">
-                {% if ready_orders %}
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Auftrag</th>
-                                    <th>Kunde</th>
-                                    <th>Artikel</th>
-                                    <th>Wert</th>
-                                    <th>Fertigstellung</th>
-                                    <th>Aktionen</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for order in ready_orders %}
-                                <tr>
-                                    <td>
-                                        <a href="{{ url_for('orders.show', order_id=order.id) }}">
-                                            {{ order.order_number or order.id }}
-                                        </a>
-                                        {% if order.rush_order %}
-                                            <br><span class="badge bg-danger">EXPRESS</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if order.customer %}
-                                            <strong>{{ order.customer.first_name }} {{ order.customer.last_name }}</strong>
-                                            {% if order.customer.company_name %}
-                                                <br><small class="text-muted">{{ order.customer.company_name }}</small>
-                                            {% endif %}
-                                        {% else %}
-                                            <span class="text-muted">Kunde gelöscht</span>
-                                        {% endif %}
-                                        {% if order.due_date %}
-                                            <br><small class="text-muted">Wunschtermin: {{ order.due_date.strftime('%d.%m.%Y') }}</small>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {{ order.description or 'Keine Beschreibung' }}
-                                    </td>
-                                    <td>
-                                        <strong>{{ "%.2f"|format(order.total_price or 0) }} €</strong>
-                                    </td>
-                                    <td>
-                                        {% if order.production_end %}
-                                            <small>{{ order.production_end.strftime('%d.%m.%Y %H:%M') }}</small>
-                                        {% else %}
-                                            <small class="text-muted">Unbekannt</small>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <a href="{{ url_for('shipping.new', order_id=order.id) }}" 
-                                           class="btn btn-success btn-sm">
-                                            <i class="bi bi-truck"></i> Versand vorbereiten
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="text-center text-muted py-5">
-                        <i class="bi bi-check-circle display-1 text-success"></i>
-                        <h4 class="mt-3">Alle Aufträge versendet!</h4>
-                        <p>Aktuell sind keine Aufträge versandbereit.</p>
-                        <a href="{{ url_for('production.index') }}" class="btn btn-primary">
-                            <i class="bi bi-gear-wide-connected"></i> Zur Produktion
-                        </a>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Versanddienstleister -->
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h6><i class="bi bi-truck"></i> Verfügbare Versanddienstleister</h6>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    {% for carrier in carriers %}
-                    <div class="col-md-2">
-                        <div class="card mb-3">
-                            <div class="card-body text-center">
-                                <h6>{{ carrier }}</h6>
-                                <small class="text-muted">Verfügbar</small>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
+    <div class="col-6 col-md-3">
+        <div class="card border-0 bg-secondary text-white">
+            <div class="card-body py-2 px-3 d-flex align-items-center gap-2">
+                <i class="bi bi-archive" style="font-size:1.3rem;"></i>
+                <div>
+                    <div class="fw-bold fs-5">{{ shipments|length or 0 }}</div>
+                    <small class="opacity-75">Gesamt</small>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="mt-3">
-    <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
-        <i class="bi bi-arrow-left"></i> Zurück zum Dashboard
-    </a>
+<!-- Tabs: Versand / Abholung -->
+<div class="card border-0 shadow-sm mb-3" id="ready-orders">
+    <div class="card-header bg-white p-0">
+        <ul class="nav nav-tabs card-header-tabs" id="versandTabs">
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-toggle="tab" href="#tab-versand">
+                    <i class="bi bi-truck me-1"></i>Versand
+                    <span class="badge bg-success ms-1">{{ versand_orders|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab-abholung">
+                    <i class="bi bi-person-check me-1"></i>Abholung
+                    <span class="badge bg-warning text-dark ms-1">{{ abholung_orders|length }}</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body p-0">
+        <div class="tab-content">
+
+            <!-- Tab: Versand -->
+            <div class="tab-pane fade show active" id="tab-versand">
+                {% if versand_orders %}
+                <!-- Export-Toolbar -->
+                <div class="d-flex align-items-center gap-2 p-2 bg-light border-bottom">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="selectAllVersand"
+                               onchange="toggleAll(this, 'versand-check')">
+                        <label class="form-check-label small" for="selectAllVersand">Alle</label>
+                    </div>
+                    <span class="text-muted small" id="selectionCount">0 ausgewaehlt</span>
+                    <div class="ms-auto d-flex gap-1">
+                        <button onclick="exportSelected('dpd')" class="btn btn-outline-success btn-sm" id="btnDpd" disabled>
+                            <i class="bi bi-file-earmark-arrow-down"></i> DPD
+                        </button>
+                        <button onclick="exportSelected('dhl')" class="btn btn-outline-primary btn-sm" id="btnDhl" disabled>
+                            <i class="bi bi-file-earmark-arrow-down"></i> DHL
+                        </button>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width:32px;"></th>
+                                <th>Auftrag</th>
+                                <th>Kunde</th>
+                                <th class="d-none d-lg-table-cell">Beschreibung</th>
+                                <th class="text-end">Wert</th>
+                                <th class="text-center">Rechnung</th>
+                                <th class="d-none d-md-table-cell">Fertig</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in versand_orders %}
+                            <tr>
+                                <td>
+                                    <input class="form-check-input versand-check" type="checkbox"
+                                           value="{{ order.id }}" onchange="updateCount()">
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}" class="fw-semibold text-decoration-none">
+                                        {{ order.order_number or order.id }}
+                                    </a>
+                                    {% if order.rush_order %}
+                                        <span class="badge bg-danger ms-1">EILIG</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.customer %}
+                                        {{ order.customer.first_name }} {{ order.customer.last_name }}
+                                        {% if order.customer.company_name %}
+                                            <br><small class="text-muted">{{ order.customer.company_name }}</small>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">–</span>
+                                    {% endif %}
+                                </td>
+                                <td class="d-none d-lg-table-cell"><small class="text-muted">{{ (order.description or '–')[:40] }}</small></td>
+                                <td class="text-end fw-semibold">{{ "%.2f"|format(order.total_price or 0) }} &euro;</td>
+                                <td class="text-center">
+                                    {% if order.invoice_id %}
+                                    <span class="badge bg-success"><i class="bi bi-check-lg"></i></span>
+                                    {% else %}
+                                    <a href="{{ url_for('rechnung.rechnung_aus_auftrag_erstellen', order_id=order.id) }}"
+                                       class="badge bg-danger text-decoration-none" title="Rechnung fehlt"><i class="bi bi-x-lg"></i></a>
+                                    {% endif %}
+                                </td>
+                                <td class="d-none d-md-table-cell">
+                                    {% if order.production_end %}
+                                        <small>{{ order.production_end.strftime('%d.%m.') }}</small>
+                                    {% else %}
+                                        <small class="text-muted">–</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('shipping.new', order_id=order.id) }}"
+                                       class="btn btn-success btn-sm">
+                                        <i class="bi bi-truck"></i> Versand
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-check-circle display-4 text-success"></i>
+                    <p class="mt-2">Alle Versandauftraege erledigt!</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Tab: Abholung -->
+            <div class="tab-pane fade" id="tab-abholung">
+                {% if abholung_orders %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Auftrag</th>
+                                <th>Kunde</th>
+                                <th class="d-none d-lg-table-cell">Beschreibung</th>
+                                <th class="text-end">Wert</th>
+                                <th class="text-center">Rechnung</th>
+                                <th class="d-none d-md-table-cell">Fertig</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in abholung_orders %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('orders.show', order_id=order.id) }}" class="fw-semibold text-decoration-none">
+                                        {{ order.order_number or order.id }}
+                                    </a>
+                                    {% if order.rush_order %}
+                                        <span class="badge bg-danger ms-1">EILIG</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.customer %}
+                                        {{ order.customer.first_name }} {{ order.customer.last_name }}
+                                        {% if order.customer.company_name %}
+                                            <br><small class="text-muted">{{ order.customer.company_name }}</small>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">–</span>
+                                    {% endif %}
+                                </td>
+                                <td class="d-none d-lg-table-cell"><small class="text-muted">{{ (order.description or '–')[:40] }}</small></td>
+                                <td class="text-end fw-semibold">{{ "%.2f"|format(order.total_price or 0) }} &euro;</td>
+                                <td class="text-center">
+                                    {% if order.invoice_id %}
+                                    <span class="badge bg-success"><i class="bi bi-check-lg"></i></span>
+                                    {% else %}
+                                    <a href="{{ url_for('rechnung.rechnung_aus_auftrag_erstellen', order_id=order.id) }}"
+                                       class="badge bg-danger text-decoration-none" title="Rechnung fehlt"><i class="bi bi-x-lg"></i></a>
+                                    {% endif %}
+                                </td>
+                                <td class="d-none d-md-table-cell">
+                                    {% if order.production_end %}
+                                        <small>{{ order.production_end.strftime('%d.%m.') }}</small>
+                                    {% else %}
+                                        <small class="text-muted">–</small>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('shipping.abholung_unterschrift', order_id=order.id) }}"
+                                           class="btn btn-warning" target="_blank">
+                                            <i class="bi bi-pen"></i> Unterschrift
+                                        </a>
+                                        <button type="button" class="btn btn-warning dropdown-toggle dropdown-toggle-split"
+                                                data-bs-toggle="dropdown"></button>
+                                        <ul class="dropdown-menu dropdown-menu-end">
+                                            <li>
+                                                <a class="dropdown-item" href="{{ url_for('shipping.abholung_unterschrift', order_id=order.id) }}" target="_blank">
+                                                    <i class="bi bi-pen me-2"></i>Unterschrift vor Ort
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <a class="dropdown-item" href="{{ url_for('shipping.abholung_unterschrift_mail', order_id=order.id) }}">
+                                                    <i class="bi bi-envelope me-2"></i>Unterschrift per Mail
+                                                </a>
+                                            </li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <a class="dropdown-item" href="{{ url_for('shipping.new', order_id=order.id) }}">
+                                                    <i class="bi bi-truck me-2"></i>Doch Versand
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-check-circle display-4 text-success"></i>
+                    <p class="mt-2">Keine offenen Abholungen!</p>
+                </div>
+                {% endif %}
+            </div>
+
+        </div><!-- /tab-content -->
+    </div>
 </div>
+
+<!-- Bisherige Sendungen -->
+{% if shipments %}
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-archive me-1"></i>Bisherige Sendungen</h6>
+        <div class="d-flex gap-2 align-items-center">
+            <small class="text-muted">{{ shipments|length }} gesamt</small>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary btn-sm active" onclick="filterShipments('all', this)">Alle</button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="filterShipments('created', this)">Offen</button>
+                <button class="btn btn-outline-primary btn-sm" onclick="filterShipments('shipped', this)">Versendet</button>
+                <button class="btn btn-outline-success btn-sm" onclick="filterShipments('delivered', this)">Zugestellt</button>
+            </div>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Versand-ID</th>
+                    <th>Auftrag</th>
+                    <th>Kunde</th>
+                    <th>Dienstleister</th>
+                    <th>Sendungsnummer</th>
+                    <th class="d-none d-md-table-cell">Erstellt</th>
+                    <th>Status</th>
+                    <th class="text-end">Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in shipments %}
+                <tr class="shipment-row" data-status="{{ s.status }}">
+                    <td>
+                        <a href="{{ url_for('shipping.show', shipment_id=s.id) }}" class="fw-semibold text-decoration-none">
+                            {{ s.id }}
+                        </a>
+                        {% if s.shipment_type == 'probebox' %}
+                            <span class="badge bg-info ms-1">Probe</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if s.order %}
+                        <a href="{{ url_for('orders.show', order_id=s.order_id) }}">{{ s.order.order_number or s.order_id }}</a>
+                        {% else %}–{% endif %}
+                    </td>
+                    <td>
+                        {% if s.order and s.order.customer %}
+                            {{ s.order.customer.display_name }}
+                        {% elif s.recipient_name %}
+                            {{ s.recipient_name }}
+                        {% else %}–{% endif %}
+                    </td>
+                    <td><span class="badge bg-secondary">{{ s.carrier or '–' }}</span></td>
+                    <td>
+                        {% if s.tracking_number %}
+                            <code class="small">{{ s.tracking_number }}</code>
+                            {% if s.carrier == 'DHL' %}
+                                <a href="https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?piececode={{ s.tracking_number }}" target="_blank" class="ms-1" title="Tracking"><i class="bi bi-box-arrow-up-right small"></i></a>
+                            {% elif s.carrier == 'DPD' %}
+                                <a href="https://tracking.dpd.de/parcelstatus?query={{ s.tracking_number }}" target="_blank" class="ms-1" title="Tracking"><i class="bi bi-box-arrow-up-right small"></i></a>
+                            {% endif %}
+                        {% elif s.status == 'created' %}
+                            <form method="POST" action="{{ url_for('shipping.update_tracking', shipment_id=s.id) }}" class="d-flex gap-1" style="max-width:220px;">
+                                <input type="text" class="form-control form-control-sm" name="tracking_number" placeholder="Sendungsnr. eingeben" style="font-size:0.8rem;">
+                                <button type="submit" class="btn btn-sm btn-outline-success" title="Speichern"><i class="bi bi-check-lg"></i></button>
+                            </form>
+                        {% else %}
+                            <span class="text-muted">–</span>
+                        {% endif %}
+                    </td>
+                    <td class="d-none d-md-table-cell"><small>{{ s.created_at.strftime('%d.%m.%Y') if s.created_at else '–' }}</small></td>
+                    <td>
+                        {% if s.status == 'created' %}
+                            <span class="badge bg-warning text-dark">Offen</span>
+                        {% elif s.status == 'shipped' %}
+                            <span class="badge bg-primary">Versendet</span>
+                        {% elif s.status == 'delivered' %}
+                            <span class="badge bg-success">Zugestellt</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ s.status or '–' }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm">
+                            {% if s.status == 'created' %}
+                                <form method="POST" action="{{ url_for('shipping.mark_shipped', shipment_id=s.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-primary btn-sm" title="Als versendet markieren">
+                                        <i class="bi bi-truck"></i>
+                                    </button>
+                                </form>
+                            {% endif %}
+                            {% if s.tracking_number and s.order and s.order.customer and s.order.customer.email %}
+                                <form method="POST" action="{{ url_for('shipping.send_tracking_email', shipment_id=s.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-info btn-sm" title="Tracking per E-Mail senden">
+                                        <i class="bi bi-envelope-arrow-up"></i>
+                                    </button>
+                                </form>
+                            {% endif %}
+                            {% if s.status == 'shipped' %}
+                                <form method="POST" action="{{ url_for('shipping.mark_delivered', shipment_id=s.id) }}" class="d-inline">
+                                    <button type="submit" class="btn btn-success btn-sm" title="Als zugestellt markieren">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                </form>
+                            {% endif %}
+                            <a href="{{ url_for('shipping.show', shipment_id=s.id) }}" class="btn btn-outline-secondary btn-sm" title="Details">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<script>
+function toggleAll(master, cls) {
+    document.querySelectorAll('.' + cls).forEach(cb => cb.checked = master.checked);
+    updateCount();
+}
+
+function updateCount() {
+    const count = document.querySelectorAll('.versand-check:checked').length;
+    document.getElementById('selectionCount').textContent = count + ' ausgewaehlt';
+    document.getElementById('btnDpd').disabled = count === 0;
+    document.getElementById('btnDhl').disabled = count === 0;
+}
+
+function filterShipments(status, btn) {
+    document.querySelectorAll('.shipment-row').forEach(function(row) {
+        if (status === 'all' || row.dataset.status === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    btn.closest('.btn-group').querySelectorAll('.btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+}
+
+function exportSelected(carrier) {
+    const ids = Array.from(document.querySelectorAll('.versand-check:checked'))
+                     .map(cb => cb.value).join(',');
+    if (!ids) return;
+    const url = carrier === 'dpd'
+        ? '{{ url_for("shipping.export_orders_dpd") }}?ids=' + ids
+        : '{{ url_for("shipping.export_orders_dhl") }}?ids=' + ids;
+    window.location.href = url;
+}
+</script>
 {% endblock %}

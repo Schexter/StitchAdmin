@@ -7,9 +7,14 @@
             <h2 class="fw-bold mb-1">{{ inquiry.inquiry_number }}</h2>
             <p class="text-muted mb-0">{{ inquiry.type_label }} &ndash; {{ inquiry.created_at.strftime('%d.%m.%Y %H:%M') if inquiry.created_at else '' }}</p>
         </div>
-        <a href="{{ url_for('inquiry_admin.list') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left me-1"></i>Zurück
-        </a>
+        <div>
+            <a href="{{ url_for('inquiry_admin.bearbeiten', id=inquiry.id) }}" class="btn btn-outline-primary me-2">
+                <i class="bi bi-pencil me-1"></i>Bearbeiten
+            </a>
+            <a href="{{ url_for('inquiry_admin.list') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Zur&uuml;ck
+            </a>
+        </div>
     </div>
 
     <div class="row g-4">
@@ -35,10 +40,29 @@
                             <strong>Firma:</strong> {{ inquiry.company_name or '-' }}
                         </div>
                     </div>
-                    {% if inquiry.customer_id %}
-                    <a href="{{ url_for('customers.detail', customer_id=inquiry.customer_id) }}" class="btn btn-sm btn-outline-primary mt-2">
-                        <i class="bi bi-person-badge me-1"></i>Kunde im CRM öffnen
-                    </a>
+                    {% if inquiry.customer_id and inquiry.customer %}
+                        {% set c = inquiry.customer %}
+                        {% if c.first_name != inquiry.first_name or c.last_name != inquiry.last_name %}
+                        <div class="alert alert-warning mt-3 mb-2 py-2 px-3">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            <strong>Namensabweichung:</strong>
+                            Anfrage: <em>{{ inquiry.full_name }}</em> &ndash;
+                            CRM-Kunde: <em>{{ c.first_name }} {{ c.last_name }}</em>
+                            <form method="POST" action="{{ url_for('inquiry_admin.update_customer_name', id=inquiry.id) }}" class="d-inline ms-2">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm btn-warning">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Kundendaten aktualisieren
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                        <a href="{{ url_for('customers.show', customer_id=inquiry.customer_id) }}" class="btn btn-sm btn-outline-primary mt-2">
+                            <i class="bi bi-person-badge me-1"></i>Kunde im CRM öffnen
+                        </a>
+                    {% elif inquiry.customer_id %}
+                        <a href="{{ url_for('customers.show', customer_id=inquiry.customer_id) }}" class="btn btn-sm btn-outline-primary mt-2">
+                            <i class="bi bi-person-badge me-1"></i>Kunde im CRM öffnen
+                        </a>
                     {% endif %}
                 </div>
             </div>
@@ -75,6 +99,41 @@
                 </div>
             </div>
 
+            <!-- Antwort senden -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-reply me-2"></i>Antwort senden</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('inquiry_admin.reply', id=inquiry.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-2">
+                            <small class="text-muted">An: {{ inquiry.email }}</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="reply_subject">Betreff</label>
+                            <input type="text" class="form-control" id="reply_subject" name="subject"
+                                   value="Re: {{ inquiry.type_label }} - {{ inquiry.inquiry_number }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="reply_body">Nachricht</label>
+                            <textarea class="form-control" id="reply_body" name="body" rows="6"
+                                      placeholder="Ihre Antwort...">Sehr geehrte{% if inquiry.last_name %}r Herr/Frau {{ inquiry.last_name }}{% endif %},
+
+vielen Dank für Ihre Anfrage.
+
+
+
+Mit freundlichen Grüßen,
+{{ current_user.username }}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-send me-1"></i>Antwort senden
+                        </button>
+                    </form>
+                </div>
+            </div>
+
             <!-- DSGVO -->
             <div class="card border-0 shadow-sm mb-4">
                 <div class="card-header bg-white">
@@ -100,6 +159,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('inquiry_admin.save_notes', id=inquiry.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <textarea class="form-control mb-2" name="internal_notes" rows="3"
                                   placeholder="Interne Notizen...">{{ inquiry.internal_notes or '' }}</textarea>
                         <button type="submit" class="btn btn-sm btn-primary">
@@ -124,6 +184,7 @@
                         </span>
                     </div>
                     <form method="POST" action="{{ url_for('inquiry_admin.change_status', id=inquiry.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <select name="status" class="form-select form-select-sm mb-2">
                             <option value="neu" {{ 'selected' if inquiry.status == 'neu' }}>Neu</option>
                             <option value="in_bearbeitung" {{ 'selected' if inquiry.status == 'in_bearbeitung' }}>In Bearbeitung</option>
@@ -135,6 +196,85 @@
                         </select>
                         <button type="submit" class="btn btn-sm btn-primary w-100">Status ändern</button>
                     </form>
+                    {% if inquiry.status not in ['storniert', 'erledigt'] %}
+                    <button type="button" class="btn btn-sm btn-outline-danger w-100 mt-2"
+                            data-bs-toggle="modal" data-bs-target="#storniereAnfrageModal">
+                        <i class="bi bi-x-circle me-1"></i> Stornieren mit Grund
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Angebot & Auftrag -->
+            <div class="card border-0 shadow-sm mb-4 border-start border-3 border-{{ 'success' if inquiry.order_id else ('primary' if inquiry.angebot_id else 'warning') }}">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-file-earmark-text me-1"></i>Angebot & Auftrag</h6>
+                </div>
+                <div class="card-body">
+                    {% if inquiry.order_id %}
+                    <a href="{{ url_for('orders.show', order_id=inquiry.order_id) }}" class="btn btn-sm btn-success w-100 mb-2">
+                        <i class="bi bi-clipboard-check me-1"></i>Auftrag öffnen
+                    </a>
+                    {% endif %}
+
+                    {% if inquiry.angebot_id and inquiry.angebot %}
+                    <a href="{{ url_for('angebote.show', angebot_id=inquiry.angebot_id) }}" class="btn btn-sm btn-outline-primary w-100 mb-2">
+                        <i class="bi bi-file-earmark-text me-1"></i>Angebot {{ inquiry.angebot.angebotsnummer }} öffnen
+                    </a>
+                    {% endif %}
+
+                    {% if not inquiry.angebot_id and not inquiry.order_id and inquiry.customer_id %}
+                    <a href="{{ url_for('inquiry_admin.als_auftrag', id=inquiry.id) }}" class="btn btn-sm btn-success w-100 mb-2">
+                        <i class="bi bi-arrow-right-circle me-1"></i>Direkt als Auftrag
+                    </a>
+                    <a href="{{ url_for('angebote.neu', anfrage_id=inquiry.id) }}" class="btn btn-sm btn-outline-primary w-100">
+                        <i class="bi bi-file-earmark-text me-1"></i>Angebot erstellen
+                    </a>
+                    {% elif not inquiry.customer_id %}
+                    <div class="alert alert-warning mb-2 py-2 px-3 small">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        Kein CRM-Kunde verkn&uuml;pft.
+                    </div>
+                    <form method="POST" action="{{ url_for('inquiry_admin.kunde_anlegen', id=inquiry.id) }}" class="mb-2">
+                        <button type="submit" class="btn btn-sm btn-primary w-100">
+                            <i class="bi bi-person-plus me-1"></i>Kunde anlegen ({{ inquiry.full_name }})
+                        </button>
+                    </form>
+                    <div class="position-relative">
+                        <input type="text" class="form-control form-control-sm mb-1" id="kunde-link-suche"
+                               placeholder="Bestehenden Kunden suchen..." autocomplete="off"
+                               oninput="sucheKundeLink(this.value)">
+                        <div id="kunde-link-ergebnisse" class="list-group position-absolute w-100 shadow-sm"
+                             style="display:none; z-index:100; max-height:200px; overflow-y:auto;"></div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Versand -->
+            <div class="card border-0 shadow-sm mb-4 border-start border-3 border-info">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="bi bi-truck me-1"></i>Versand</h6>
+                </div>
+                <div class="card-body">
+                    <a href="{{ url_for('shipping.probebox', inquiry_id=inquiry.id) }}" class="btn btn-sm btn-info text-white w-100 mb-2">
+                        <i class="bi bi-truck me-1"></i>Versand ausloesen
+                    </a>
+                    <small class="text-muted d-block">Muster/Proben direkt aus der Anfrage versenden (ohne Auftrag).</small>
+                    {% if inquiry.shipments %}
+                    <hr class="my-2">
+                    <small class="fw-bold">Versendete Sendungen:</small>
+                    {% for s in inquiry.shipments %}
+                    <div class="d-flex justify-content-between align-items-center mt-1">
+                        <a href="{{ url_for('shipping.show', shipment_id=s.id) }}" class="small">
+                            {{ s.id }}
+                        </a>
+                        <span class="badge bg-{{ 'success' if s.status == 'shipped' else ('primary' if s.status == 'delivered' else 'secondary') }} small">
+                            {{ s.status }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
                 </div>
             </div>
 
@@ -145,6 +285,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('inquiry_admin.assign', id=inquiry.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <select name="assigned_to" class="form-select form-select-sm mb-2">
                             <option value="">Nicht zugewiesen</option>
                             {% for user in users %}
@@ -175,4 +316,57 @@
         </div>
     </div>
 </div>
+
+<!-- Anfrage stornieren Modal -->
+<div class="modal fade" id="storniereAnfrageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-x-circle text-danger me-2"></i>Anfrage stornieren</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('inquiry_admin.stornieren', id=inquiry.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Stornierungsgrund <small class="text-muted">(optional)</small></label>
+                        <textarea class="form-control" name="grund" rows="3"
+                                  placeholder="z.B. Kunde hat abgesagt, zu teuer, kein Interesse mehr..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Abbrechen</button>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-x-circle"></i> Anfrage stornieren
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function sucheKundeLink(q) {
+    var box = document.getElementById('kunde-link-ergebnisse');
+    if (q.length < 2) { box.style.display = 'none'; return; }
+    fetch('/customers/api/search?q=' + encodeURIComponent(q) + '&limit=10')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var items = data.customers || [];
+            if (!items.length) { box.innerHTML = '<div class="list-group-item small text-muted">Kein Ergebnis</div>'; box.style.display = 'block'; return; }
+            box.innerHTML = items.map(function(c) {
+                return '<a href="{{ url_for("inquiry_admin.kunde_verknuepfen", id=inquiry.id) }}?kunde_id=' + c.id + '" class="list-group-item list-group-item-action py-1 small">' +
+                    '<strong>' + (c.display_name || c.name) + '</strong>' +
+                    (c.company_name ? ' <span class="text-muted">(' + c.company_name + ')</span>' : '') +
+                    (c.email ? '<br><small class="text-muted">' + c.email + '</small>' : '') +
+                    '</a>';
+            }).join('');
+            box.style.display = 'block';
+        });
+}
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#kunde-link-suche') && !e.target.closest('#kunde-link-ergebnisse'))
+        document.getElementById('kunde-link-ergebnisse').style.display = 'none';
+});
+</script>
 {% endblock %}

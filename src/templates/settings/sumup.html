@@ -6,91 +6,300 @@
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-8 offset-md-2">
-            <div class="card">
-                <div class="card-header">
-                    <h4><i class="bi bi-credit-card-2-front"></i> SumUp Integration</h4>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }} alert-dismissible fade show">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <!-- Verbindungsstatus -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-wifi me-2"></i>Verbindungsstatus</h5>
                 </div>
                 <div class="card-body">
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category }}">{{ message }}</div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
-
-                    {% if is_connected %}
-                        <div class="alert alert-success">
-                            <h5 class="alert-heading">Erfolgreich verbunden!</h5>
-                            <p>StitchAdmin ist mit Ihrem SumUp-Konto verbunden. Kartenzahlungen sind jetzt aktiviert.</p>
+                    {% if is_connected and api_key_status == 'ok' %}
+                        <div class="alert alert-success mb-0">
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            <strong>Verbunden</strong> - SumUp API-Key ist gueltig. Kartenzahlungen sind aktiviert.
                         </div>
-                        
-                        {% if token %}
+                    {% elif api_key_status and api_key_status != 'ok' %}
+                        <div class="alert alert-danger mb-0">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            <strong>API-Key Fehler:</strong> {{ api_key_status }}
+                        </div>
+                    {% elif is_connected and token %}
+                        <div class="alert alert-success mb-0">
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            <strong>Verbunden</strong> (OAuth) - Gueltig bis {{ token.expires_at.strftime('%d.%m.%Y %H:%M') }}
+                        </div>
+                    {% elif settings and settings.sumup_api_key %}
+                        <div class="alert alert-warning mb-0">
+                            <i class="bi bi-hourglass-split me-2"></i>
+                            API-Key hinterlegt, Verbindung wird geprueft...
+                        </div>
+                    {% else %}
+                        <div class="alert alert-secondary mb-0">
+                            <i class="bi bi-dash-circle me-2"></i>
+                            Nicht konfiguriert. Bitte API-Key und Merchant Code eintragen.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- API-Zugangsdaten -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-key me-2"></i>SumUp API-Zugangsdaten</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('settings.sumup_save_keys') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="sumup_api_key" class="form-label fw-semibold">API Key (Secret Key)</label>
+                            <input type="password" class="form-control" id="sumup_api_key" name="sumup_api_key"
+                                   value="{{ settings.sumup_api_key or '' }}"
+                                   placeholder="sup_sk_...">
+                            <small class="text-muted">
+                                Der <strong>Secret Key</strong> (beginnt mit sup_sk_) aus dem
+                                <a href="https://developer.sumup.com/api-keys" target="_blank">SumUp Developer Portal</a>.
+                                Nicht den Public Key (sup_pk_) verwenden!
+                            </small>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sumup_merchant_code" class="form-label fw-semibold">Merchant Code</label>
+                            <input type="text" class="form-control" id="sumup_merchant_code" name="sumup_merchant_code"
+                                   value="{{ settings.sumup_merchant_code or '' }}"
+                                   placeholder="z.B. MD3H93G4">
+                            <small class="text-muted">Ihr SumUp Haendler-Code (unter SumUp Profil &gt; Kontodetails)</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save me-1"></i>Speichern
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Terminal-Verwaltung (Cloud API) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-phone me-2"></i>Terminal-Verwaltung</h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadReaders()">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Aktualisieren
+                    </button>
+                </div>
+                <div class="card-body">
+                    {% if not is_connected %}
+                    <div class="alert alert-secondary mb-0">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Bitte zuerst API-Key und Merchant Code eintragen.
+                    </div>
+                    {% else %}
+
+                    <!-- Registrierte Terminals -->
+                    <div id="readers-list" class="mb-4">
+                        <div class="text-center text-muted py-3">
+                            <div class="spinner-border spinner-border-sm me-1"></div> Terminals werden geladen...
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- Neues Terminal pairen -->
+                    <h6 class="fw-semibold mb-3"><i class="bi bi-plus-circle me-1"></i>Neues Terminal registrieren</h6>
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <strong>So geht's:</strong> Auf dem SumUp Solo &rarr; <em>Einstellungen &rarr; Verbindungen &rarr; Cloud API &rarr; Verbinden</em>.
+                        Der angezeigte Code hier eingeben.
+                    </div>
+                    <form id="pair-form" onsubmit="pairReader(event)">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Terminal-Name</label>
+                                <input type="text" class="form-control" id="reader_name" placeholder="z.B. Kasse Theke" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-semibold">Pairing-Code</label>
+                                <input type="text" class="form-control text-uppercase" id="pairing_code"
+                                       placeholder="z.B. ABCD1234" maxlength="20" required
+                                       style="letter-spacing: 2px; font-family: monospace;">
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="btn btn-primary w-100" id="pair-btn">
+                                    <i class="bi bi-link-45deg me-1"></i>Verbinden
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="pair-result" class="mt-2"></div>
+
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- OAuth (optional) -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="bi bi-credit-card-2-front me-2"></i>OAuth-Verbindung (optional)</h5>
+                </div>
+                <div class="card-body">
+                    {% if is_connected and token %}
+                        <div class="alert alert-success mb-3">
+                            <i class="bi bi-check-circle me-1"></i>
+                            <strong>OAuth verbunden</strong>
+                        </div>
                         <ul class="list-group mb-3">
-                            <li class="list-group-item">
-                                <strong>Token-Typ:</strong> {{ token.token_type }}
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Token-Typ</span>
+                                <strong>{{ token.token_type }}</strong>
                             </li>
-                            <li class="list-group-item">
-                                <strong>Gültig bis:</strong> {{ token.expires_at.strftime('%d.%m.%Y %H:%M:%S') }}
-                            </li>
-                            <li class="list-group-item">
-                                <strong>Berechtigungen:</strong> <span class="badge bg-secondary">{{ token.scope }}</span>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Gueltig bis</span>
+                                <strong>{{ token.expires_at.strftime('%d.%m.%Y %H:%M') }}</strong>
                             </li>
                         </ul>
-                        {% endif %}
-
                         <form action="{{ url_for('settings.sumup_disconnect') }}" method="POST">
-                            <button type="submit" class="btn btn-danger">
-                                <i class="bi bi-x-circle"></i> Verbindung zu SumUp trennen
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="bi bi-x-circle me-1"></i>Verbindung trennen
                             </button>
                         </form>
                     {% else %}
-                        <div class="alert alert-warning">
-                            <h5 class="alert-heading">Nicht verbunden</h5>
-                            <p>Verbinden Sie StitchAdmin mit Ihrem SumUp-Konto, um Kartenzahlungen direkt über das Kassensystem abzuwickeln.</p>
-                        </div>
-
-                        <h5 class="mt-4">Voraussetzungen:</h5>
-                        <ol>
-                            <li>Ein aktives <strong>SumUp-Konto</strong> (<a href="https://sumup.de" target="_blank">Hier registrieren</a>)</li>
-                            <li><strong>SumUp API Credentials</strong> (Client ID & Secret)
-                                <ul class="mt-2">
-                                    <li>Erstellen Sie eine App im <a href="https://me.sumup.com/developers" target="_blank">SumUp Developer Portal</a></li>
-                                    <li>Notieren Sie sich die <code>Client ID</code> und <code>Client Secret</code></li>
-                                    <li>Tragen Sie diese als Umgebungsvariablen ein:
-                                        <ul>
-                                            <li><code>SUMUP_CLIENT_ID</code></li>
-                                            <li><code>SUMUP_CLIENT_SECRET</code></li>
-                                        </ul>
-                                    </li>
-                                    <li>Redirect URL in SumUp: <code>{{ request.url_root }}settings/integrations/sumup/callback</code></li>
-                                </ul>
-                            </li>
-                        </ol>
-
-                        <div class="alert alert-info mt-3">
-                            <i class="bi bi-info-circle"></i>
-                            <strong>Hinweis:</strong> Die Umgebungsvariablen müssen vor dem Start von StitchAdmin gesetzt werden.
-                            Bei Änderungen muss die Anwendung neu gestartet werden.
-                        </div>
-
-                        <p class="mt-4">
-                            Klicken Sie auf den folgenden Button, um zur sicheren Anmeldeseite von SumUp weitergeleitet zu werden.
-                            Ihre Anmeldedaten werden <strong>niemals</strong> von StitchAdmin gespeichert.
+                        <p class="text-muted mb-3">
+                            <small>Die OAuth-Verbindung ist optional, wenn ein API-Key eingetragen ist.
+                            Sie wird nur benoetigt, wenn kein API-Key verfuegbar ist.</small>
                         </p>
-
                         <form action="{{ url_for('settings.sumup_authorize') }}" method="POST">
-                            <button type="submit" class="btn btn-primary btn-lg">
-                                <i class="bi bi-link-45deg"></i> Jetzt mit SumUp verbinden
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-link-45deg me-1"></i>Mit SumUp per OAuth verbinden
                             </button>
                         </form>
                     {% endif %}
                 </div>
-                <div class="card-footer text-muted">
-                    Sichere Verbindung via OAuth2.
-                </div>
             </div>
+
+            <a href="{{ url_for('settings.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i>Zurueck zu Einstellungen
+            </a>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if is_connected %}
+document.addEventListener('DOMContentLoaded', loadReaders);
+
+function loadReaders() {
+    const container = document.getElementById('readers-list');
+    if (!container) return;
+    container.innerHTML = '<div class="text-center text-muted py-3"><div class="spinner-border spinner-border-sm me-1"></div> Terminals werden geladen...</div>';
+
+    fetch("{{ url_for('settings.sumup_readers') }}")
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            container.innerHTML = `<div class="alert alert-danger mb-0"><i class="bi bi-exclamation-triangle me-1"></i>${data.error}</div>`;
+            return;
+        }
+        const readers = data.readers || [];
+        if (readers.length === 0) {
+            container.innerHTML = '<div class="alert alert-secondary mb-0"><i class="bi bi-dash-circle me-1"></i>Keine Terminals registriert. Bitte unten ein Terminal verbinden.</div>';
+            return;
+        }
+        let html = '<div class="list-group">';
+        readers.forEach(r => {
+            const statusBadge = r.status === 'paired' || r.status === 'online'
+                ? '<span class="badge bg-success ms-2">Verbunden</span>'
+                : `<span class="badge bg-secondary ms-2">${r.status}</span>`;
+            html += `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-phone me-2"></i>
+                    <strong>${r.name || r.id}</strong>
+                    ${statusBadge}
+                    <br><small class="text-muted">ID: ${r.id}</small>
+                </div>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteReader('${r.id}', '${(r.name || r.id).replace(/'/g, "\\'")}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>`;
+        });
+        html += '</div>';
+        container.innerHTML = html;
+    })
+    .catch(err => {
+        container.innerHTML = `<div class="alert alert-danger mb-0">Fehler: ${err.message}</div>`;
+    });
+}
+
+function pairReader(e) {
+    e.preventDefault();
+    const btn = document.getElementById('pair-btn');
+    const resultDiv = document.getElementById('pair-result');
+    const name = document.getElementById('reader_name').value.trim();
+    const code = document.getElementById('pairing_code').value.trim();
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Verbinde...';
+    resultDiv.innerHTML = '';
+
+    const formData = new FormData();
+    formData.append('reader_name', name);
+    formData.append('pairing_code', code);
+    formData.append('csrf_token', '{{ csrf_token() }}');
+
+    fetch("{{ url_for('settings.sumup_pair_reader') }}", {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            resultDiv.innerHTML = '<div class="alert alert-success"><i class="bi bi-check-circle me-1"></i>Terminal erfolgreich verbunden!</div>';
+            document.getElementById('reader_name').value = '';
+            document.getElementById('pairing_code').value = '';
+            loadReaders();
+        } else {
+            resultDiv.innerHTML = `<div class="alert alert-danger"><i class="bi bi-exclamation-triangle me-1"></i>${data.error}</div>`;
+        }
+    })
+    .catch(err => {
+        resultDiv.innerHTML = `<div class="alert alert-danger">Fehler: ${err.message}</div>`;
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-link-45deg me-1"></i>Verbinden';
+    });
+}
+
+function deleteReader(readerId, readerName) {
+    if (!confirm(`Terminal "${readerName}" wirklich entfernen?`)) return;
+
+    const formData = new FormData();
+    formData.append('csrf_token', '{{ csrf_token() }}');
+
+    fetch(`/settings/integrations/sumup/readers/${readerId}/delete`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadReaders();
+        } else {
+            alert('Fehler: ' + data.error);
+        }
+    });
+}
+{% endif %}
+</script>
 {% endblock %}

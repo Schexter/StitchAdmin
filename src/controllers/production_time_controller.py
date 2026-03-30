@@ -88,11 +88,15 @@ def stop_tracking():
     else:
         return jsonify({'success': False, 'error': 'Log-ID oder Auftrags-ID erforderlich'}), 400
 
-    if not log:
-        return jsonify({'success': False, 'error': 'Keine aktive Zeiterfassung gefunden'}), 404
-
-    if log.ended_at:
-        return jsonify({'success': False, 'error': 'Zeiterfassung bereits beendet'}), 400
+    if not log or log.ended_at:
+        # Keine aktive Zeiterfassung - trotzdem Erfolg melden damit
+        # die Produktion abgeschlossen werden kann
+        return jsonify({
+            'success': True,
+            'log_id': None,
+            'duration_minutes': 0,
+            'message': 'Keine aktive Zeiterfassung - Produktion wird direkt abgeschlossen'
+        })
 
     # Stoppen und Daten ergänzen
     log.stop(ended_by=current_user.username if current_user else session.get('username'))
@@ -110,6 +114,16 @@ def stop_tracking():
         log.stitch_count = int(data.get('stitch_count'))
     if data.get('color_changes'):
         log.color_changes = int(data.get('color_changes'))
+
+    # Druck / DTF / Sublimation Felder
+    if data.get('print_temperature'):
+        log.print_temperature = int(data.get('print_temperature'))
+    if data.get('print_time_seconds'):
+        log.print_time_seconds = int(data.get('print_time_seconds'))
+    if data.get('excess_sheets_stored') is not None:
+        log.excess_sheets_stored = str(data.get('excess_sheets_stored')).lower() in ('true', '1', 'ja', 'yes', 'on')
+    if data.get('storage_number'):
+        log.storage_number = data.get('storage_number')
 
     db.session.commit()
 

@@ -10,6 +10,7 @@ from src.models import db, Order, Machine, ProductionSchedule, ActivityLog, Pack
 from sqlalchemy import and_
 import json
 import os
+from src.utils.activity_logger import log_activity
 import logging
 
 logger = logging.getLogger(__name__)
@@ -85,17 +86,6 @@ def calculate_thread_requirements(order):
 
     return thread_requirements
 
-def log_activity(action, details):
-    """Aktivität in Datenbank protokollieren"""
-    activity = ActivityLog(
-        username=current_user.username,
-        action=action,
-        details=details,
-        ip_address=request.remote_addr
-    )
-    db.session.add(activity)
-    db.session.commit()
-
 def _record_automatic_thread_usage(order):
     """Erfasst automatisch Garnverbrauch beim Produktionsabschluss"""
     from src.models import Thread, ThreadStock, ThreadUsage
@@ -110,7 +100,7 @@ def _record_automatic_thread_usage(order):
     if order.selected_threads:
         try:
             selected_threads = json.loads(order.selected_threads)
-        except:
+        except (json.JSONDecodeError, TypeError, ValueError):
             if order.thread_colors:
                 thread_colors = [c.strip() for c in order.thread_colors.split(',')]
                 for color in thread_colors:
@@ -222,7 +212,7 @@ def planning():
     try:
         start = datetime.strptime(start_date, '%Y-%m-%d').date()
         end = datetime.strptime(end_date, '%Y-%m-%d').date()
-    except:
+    except (ValueError, TypeError):
         start = date.today()
         end = date.today() + timedelta(days=7)
     
@@ -422,6 +412,62 @@ def worklist():
                          machine_name=machine_name)
 
 
+@production_bp.route('/order/<order_id>/start-wizard')
+@login_required
+def start_wizard(order_id):
+    """Produktionsstart-Wizard: Auftrag pruefen, Maschine zuweisen, starten"""
+    order = Order.query.get_or_404(order_id)
+
+    if order.status != 'accepted':
+        flash('Nur angenommene Auftraege koennen gestartet werden!', 'danger')
+        return redirect(url_for('production.index'))
+
+    # Maschinen laden
+    machines = Machine.query.filter_by(is_active=True).order_by(Machine.name).all()
+
+    # Belegte Maschinen markieren
+    busy_machines = set()
+    busy_orders = Order.query.filter_by(status='in_progress').filter(
+        Order.assigned_machine_id.isnot(None)
+    ).all()
+    for o in busy_orders:
+        busy_machines.add(o.assigned_machine_id)
+
+    # Garnbedarf berechnen (falls vorhanden)
+    thread_needs = []
+    try:
+        from src.models.models import Thread
+        if order.items:
+            for item in order.items:
+                total_qty = item.quantity or 0
+                if item.article and item.article.stitch_count:
+                    thread_needs.append({
+                        'article': item.article.name,
+                        'quantity': total_qty,
+                        'stitch_count': item.article.stitch_count,
+                        'total_stitches': item.article.stitch_count * total_qty
+                    })
+    except Exception:
+        pass
+
+    # Auftragspositionen
+    positions = []
+    for item in order.items:
+        positions.append({
+            'name': item.article.name if item.article else 'Artikel',
+            'size': item.textile_size or '',
+            'color': item.textile_color or '',
+            'quantity': item.quantity or 0,
+        })
+
+    return render_template('production/start_wizard.html',
+                         order=order,
+                         machines=machines,
+                         busy_machines=busy_machines,
+                         thread_needs=thread_needs,
+                         positions=positions)
+
+
 @production_bp.route('/order/<order_id>/start', methods=['POST'])
 @login_required
 def start_production(order_id):
@@ -458,9 +504,18 @@ def start_production(order_id):
     )
     db.session.add(history)
     db.session.commit()
-    
-    log_activity('production_started', f'Produktion gestartet: Auftrag {order.id}')
-    flash(f'Produktion für Auftrag {order.id} wurde gestartet!', 'success')
+
+    # E-Mail Automation: Kunde über Produktionsstart informieren
+    try:
+        from src.services.email_automation_service import EmailAutomationService
+        automation = EmailAutomationService()
+        automation.check_and_send(order, 'order_status', 'in_progress', 'accepted')
+    except Exception as e:
+        db.session.rollback()
+        logger.warning(f'Email-Automation Fehler bei Produktionsstart: {e}')
+
+    log_activity('production_started', f'Produktion gestartet: Auftrag {order_id}')
+    flash(f'Produktion für Auftrag {order_id} wurde gestartet!', 'success')
     return redirect(url_for('production.index'))
 
 
@@ -524,8 +579,17 @@ def complete_production(order_id):
     except Exception as e:
         logger.warning(f"Workflow-Integration fehlgeschlagen: {e}")
 
-    log_activity('production_completed', f'Produktion abgeschlossen: Auftrag {order.id}')
-    flash(f'Produktion für Auftrag {order.id} wurde abgeschlossen!', 'success')
+    # E-Mail Automation: Kunde über fertige Produktion informieren
+    try:
+        from src.services.email_automation_service import EmailAutomationService
+        automation = EmailAutomationService()
+        automation.check_and_send(order, 'order_status', 'ready', 'in_progress')
+    except Exception as e:
+        db.session.rollback()
+        logger.warning(f'Email-Automation Fehler bei Produktion fertig: {e}')
+
+    log_activity('production_completed', f'Produktion abgeschlossen: Auftrag {order_id}')
+    flash(f'Produktion für Auftrag {order_id} wurde abgeschlossen!', 'success')
     return redirect(url_for('production.index'))
 
 
@@ -541,7 +605,7 @@ def schedule_production():
     
     try:
         scheduled_start = datetime.strptime(f"{scheduled_date} {scheduled_time}", '%Y-%m-%d %H:%M')
-    except:
+    except (ValueError, TypeError):
         flash('Ungültiges Datum/Zeit Format!', 'danger')
         return redirect(url_for('production.planning'))
     
@@ -605,56 +669,85 @@ def cancel_schedule(schedule_id):
 
 
 # =====================================================
-# ALTER KALENDER (Backup)
+# PRODUKTIONSKALENDER (FullCalendar)
 # =====================================================
 
 @production_bp.route('/calendar')
 @login_required
 def calendar():
-    """Produktionskalender - ALTER STYLE (Backup)"""
-    week_offset = request.args.get('week', 0, type=int)
-    today = date.today()
-    
-    days_since_monday = today.weekday()
-    week_start = today - timedelta(days=days_since_monday) + timedelta(weeks=week_offset)
-    week_end = week_start + timedelta(days=6)
-    
+    """Produktionskalender mit Tag/Woche/Monat und Maschinen-Ressourcen"""
     settings = load_production_settings()
     machines = Machine.query.filter_by(status='active').order_by(Machine.type, Machine.name).all()
-    
-    schedules = ProductionSchedule.query.filter(
-        and_(
-            ProductionSchedule.scheduled_start >= week_start,
-            ProductionSchedule.scheduled_start <= week_end,
-            ProductionSchedule.status != 'cancelled'
-        )
-    ).all()
-    
-    calendar_data = {}
-    for day_offset in range(7):
-        current_date = week_start + timedelta(days=day_offset)
-        calendar_data[current_date] = {}
-        
-        for machine in machines:
-            day_schedules = [s for s in schedules 
-                           if s.machine_id == machine.id 
-                           and s.scheduled_start.date() == current_date]
-            calendar_data[current_date][machine.id] = day_schedules
-    
+
     waiting_orders = Order.query.filter_by(status='accepted').order_by(
         Order.rush_order.desc(), Order.created_at
     ).all()
-    
+
     return render_template('production/calendar.html',
-                         week_start=week_start,
-                         week_end=week_end,
-                         week_offset=week_offset,
-                         calendar_data=calendar_data,
                          machines=machines,
                          waiting_orders=waiting_orders,
-                         settings=settings,
-                         today=today,
-                         timedelta=timedelta)
+                         settings=settings)
+
+
+@production_bp.route('/api/events')
+@login_required
+def api_events():
+    """FullCalendar Events-API — liefert Schedules als JSON"""
+    start_str = request.args.get('start')
+    end_str = request.args.get('end')
+
+    try:
+        start_dt = datetime.strptime(start_str[:10], '%Y-%m-%d') if start_str else datetime.utcnow() - timedelta(days=30)
+        end_dt = datetime.strptime(end_str[:10], '%Y-%m-%d') if end_str else datetime.utcnow() + timedelta(days=30)
+    except (ValueError, TypeError):
+        start_dt = datetime.utcnow() - timedelta(days=30)
+        end_dt = datetime.utcnow() + timedelta(days=30)
+
+    schedules = ProductionSchedule.query.filter(
+        and_(
+            ProductionSchedule.scheduled_start >= start_dt,
+            ProductionSchedule.scheduled_start <= end_dt,
+            ProductionSchedule.status != 'cancelled'
+        )
+    ).all()
+
+    events = []
+    for s in schedules:
+        order = s.order
+        is_rush = order.rush_order if order else False
+        customer_name = order.customer.display_name if order and order.customer else 'Unbekannt'
+        order_type = getattr(order, 'order_type', '') or ''
+
+        color = '#dc3545' if is_rush else '#0d6efd'
+        if order_type == 'dtf':
+            color = '#dc3545' if is_rush else '#198754'
+        elif order_type == 'printing':
+            color = '#dc3545' if is_rush else '#6f42c1'
+
+        status_colors = {
+            'in_progress': '#fd7e14',
+            'completed': '#6c757d',
+        }
+        color = status_colors.get(s.status, color)
+
+        events.append({
+            'id': str(s.id),
+            'resourceId': s.machine_id,
+            'title': f'{s.order_id} — {customer_name}',
+            'start': s.scheduled_start.isoformat(),
+            'end': s.scheduled_end.isoformat(),
+            'color': color,
+            'extendedProps': {
+                'orderId': s.order_id,
+                'customer': customer_name,
+                'status': s.status,
+                'orderType': order_type,
+                'rush': is_rush,
+                'description': (order.description or '') if order else '',
+            }
+        })
+
+    return jsonify(events)
 
 
 # =====================================================
@@ -669,7 +762,7 @@ def api_machine_availability(machine_id):
     
     try:
         check_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    except:
+    except (ValueError, TypeError):
         return jsonify({'error': 'Invalid date format'}), 400
     
     schedules = ProductionSchedule.query.filter(
@@ -705,12 +798,17 @@ def api_move_schedule():
     new_machine_id = data.get('machine_id')
     
     schedule = ProductionSchedule.query.get_or_404(schedule_id)
-    
+
     try:
         new_start_dt = datetime.strptime(new_start, '%Y-%m-%d %H:%M')
-        duration = schedule.scheduled_end - schedule.scheduled_start
-        new_end_dt = new_start_dt + duration
-    except:
+        # Optional: new_end fuer Resize-Operationen
+        new_end = data.get('new_end')
+        if new_end:
+            new_end_dt = datetime.strptime(new_end, '%Y-%m-%d %H:%M')
+        else:
+            duration = schedule.scheduled_end - schedule.scheduled_start
+            new_end_dt = new_start_dt + duration
+    except (ValueError, TypeError):
         return jsonify({'error': 'Invalid datetime format'}), 400
     
     conflict = ProductionSchedule.query.filter(
@@ -763,7 +861,7 @@ def api_schedule_order():
     try:
         start_dt = datetime.strptime(start_time, '%Y-%m-%d %H:%M')
         end_dt = start_dt + timedelta(hours=duration_hours)
-    except:
+    except (ValueError, TypeError):
         return jsonify({'error': 'Invalid datetime format'}), 400
     
     conflict = ProductionSchedule.query.filter(
@@ -807,6 +905,274 @@ def api_schedule_order():
             'customer_name': order.customer.display_name if order.customer else 'Unbekannt',
             'description': order.description or 'Keine Beschreibung'
         }
+    })
+
+
+# =====================================================
+# PRODUKTIONSJOBS - Auftraege in mehrere Jobs aufteilen
+# =====================================================
+
+@production_bp.route('/jobs/<order_id>', methods=['GET'])
+@login_required
+def get_jobs(order_id):
+    """Alle Produktionsjobs eines Auftrags"""
+    from src.models.production_job import ProductionJob
+    jobs = ProductionJob.query.filter_by(order_id=order_id).order_by(
+        ProductionJob.sort_order, ProductionJob.id
+    ).all()
+    return jsonify({
+        'success': True,
+        'jobs': [{
+            'id': j.id,
+            'job_number': j.job_number,
+            'job_type': j.job_type,
+            'type_label': j.type_label,
+            'type_icon': j.type_icon,
+            'status': j.status,
+            'status_label': j.status_label,
+            'status_badge_class': j.status_badge_class,
+            'description': j.description,
+            'assigned_machine_id': j.assigned_machine_id,
+            'machine_name': j.machine.name if j.machine else None,
+            'assigned_to': j.assigned_to,
+            'started_at': j.started_at.isoformat() if j.started_at else None,
+            'completed_at': j.completed_at.isoformat() if j.completed_at else None,
+            'duration_minutes': j.duration_minutes,
+            'notes': j.notes
+        } for j in jobs]
+    })
+
+
+@production_bp.route('/jobs/create', methods=['POST'])
+@login_required
+def create_job():
+    """Neuen Produktionsjob anlegen"""
+    from src.models.production_job import ProductionJob
+    data = request.get_json() or request.form
+
+    order_id = data.get('order_id')
+    if not order_id:
+        return jsonify({'success': False, 'error': 'order_id fehlt'}), 400
+
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'}), 404
+
+    job_type = data.get('job_type', 'other')
+    description = data.get('description', '')
+
+    job = ProductionJob(
+        order_id=order_id,
+        job_number=ProductionJob.generate_job_number(),
+        job_type=job_type,
+        description=description,
+        assigned_machine_id=data.get('machine_id') or None,
+        assigned_to=data.get('assigned_to', ''),
+        notes=data.get('notes', ''),
+        sort_order=data.get('sort_order', 0),
+        created_by=current_user.username if current_user.is_authenticated else 'System'
+    )
+
+    db.session.add(job)
+    db.session.commit()
+
+    log_activity('production_job_created', f'Produktionsjob {job.job_number} ({job.type_label}) fuer Auftrag {order_id} angelegt')
+
+    return jsonify({
+        'success': True,
+        'job': {
+            'id': job.id,
+            'job_number': job.job_number,
+            'job_type': job.job_type,
+            'type_label': job.type_label,
+            'status': job.status,
+            'description': job.description
+        }
+    })
+
+
+@production_bp.route('/jobs/<int:job_id>/start', methods=['POST'])
+@login_required
+def start_job(job_id):
+    """Produktionsjob starten"""
+    from src.models.production_job import ProductionJob
+    job = ProductionJob.query.get_or_404(job_id)
+
+    if job.status != 'pending':
+        return jsonify({'success': False, 'error': 'Job kann nur aus Status "Ausstehend" gestartet werden'}), 400
+
+    job.start()
+
+    # Wenn erster Job des Auftrags startet und Auftrag noch 'accepted' ist, auf in_progress setzen
+    order = job.order
+    if order.status == 'accepted':
+        order.status = 'in_progress'
+        order.production_start = datetime.utcnow()
+        from src.models import OrderStatusHistory
+        history = OrderStatusHistory(
+            order_id=order.id,
+            from_status='accepted',
+            to_status='in_progress',
+            comment=f'Produktionsjob {job.job_number} ({job.type_label}) gestartet',
+            changed_by=current_user.username
+        )
+        db.session.add(history)
+
+    db.session.commit()
+    log_activity('production_job_started', f'Produktionsjob {job.job_number} gestartet')
+
+    return jsonify({'success': True, 'job_id': job.id, 'status': 'in_progress'})
+
+
+@production_bp.route('/jobs/<int:job_id>/complete', methods=['POST'])
+@login_required
+def complete_job(job_id):
+    """Produktionsjob abschliessen"""
+    from src.models.production_job import ProductionJob
+    job = ProductionJob.query.get_or_404(job_id)
+
+    if job.status != 'in_progress':
+        return jsonify({'success': False, 'error': 'Nur laufende Jobs koennen abgeschlossen werden'}), 400
+
+    data = request.get_json() or {}
+    job.complete()
+    if data.get('notes'):
+        job.notes = data.get('notes')
+
+    db.session.commit()
+
+    # Pruefen ob alle Jobs des Auftrags fertig sind
+    order = job.order
+    if order.all_jobs_completed():
+        order.status = 'ready'
+        order.production_end = datetime.utcnow()
+        if order.production_start:
+            duration = order.production_end - order.production_start
+            order.production_minutes = int(duration.total_seconds() / 60)
+
+        from src.models import OrderStatusHistory
+        history = OrderStatusHistory(
+            order_id=order.id,
+            from_status='in_progress',
+            to_status='ready',
+            comment='Alle Produktionsjobs abgeschlossen',
+            changed_by=current_user.username
+        )
+        db.session.add(history)
+        db.session.commit()
+
+        # Workflow-Integration (Packliste etc.)
+        try:
+            class ProductionMock:
+                def __init__(self, order_id, completed_by):
+                    self.id = None
+                    self.order_id = order_id
+                    self.completed_by = completed_by
+            production_mock = ProductionMock(order.id, current_user.username)
+            from src.utils.workflow_helpers import complete_production_workflow
+            complete_production_workflow(production=production_mock, order=order, current_user=current_user)
+        except Exception as e:
+            logger.warning(f"Workflow-Integration fehlgeschlagen: {e}")
+
+        # E-Mail Automation
+        try:
+            from src.services.email_automation_service import EmailAutomationService
+            automation = EmailAutomationService()
+            automation.check_and_send(order, 'order_status', 'ready', 'in_progress')
+        except Exception as e:
+            db.session.rollback()
+            logger.warning(f'Email-Automation Fehler: {e}')
+
+        log_activity('production_completed', f'Alle Jobs fertig - Auftrag {order.id} abgeschlossen')
+        return jsonify({
+            'success': True,
+            'job_id': job.id,
+            'status': 'completed',
+            'order_completed': True,
+            'message': f'Letzter Job abgeschlossen - Auftrag {order.order_number or order.id} ist fertig!'
+        })
+
+    log_activity('production_job_completed', f'Produktionsjob {job.job_number} abgeschlossen')
+    completed, total = order.job_progress()
+    return jsonify({
+        'success': True,
+        'job_id': job.id,
+        'status': 'completed',
+        'order_completed': False,
+        'progress': f'{completed}/{total}',
+        'message': f'Job abgeschlossen ({completed}/{total})'
+    })
+
+
+@production_bp.route('/jobs/<int:job_id>', methods=['DELETE'])
+@login_required
+def delete_job(job_id):
+    """Produktionsjob loeschen"""
+    from src.models.production_job import ProductionJob
+    job = ProductionJob.query.get_or_404(job_id)
+
+    if job.status == 'in_progress':
+        return jsonify({'success': False, 'error': 'Laufende Jobs koennen nicht geloescht werden'}), 400
+
+    job_number = job.job_number
+    order_id = job.order_id
+    db.session.delete(job)
+    db.session.commit()
+
+    log_activity('production_job_deleted', f'Produktionsjob {job_number} fuer Auftrag {order_id} geloescht')
+    return jsonify({'success': True})
+
+
+@production_bp.route('/jobs/auto-create', methods=['POST'])
+@login_required
+def auto_create_jobs():
+    """Automatisch Jobs basierend auf Auftrags-Typ erstellen"""
+    from src.models.production_job import ProductionJob
+    data = request.get_json() or request.form
+
+    order_id = data.get('order_id')
+    order = Order.query.get(order_id)
+    if not order:
+        return jsonify({'success': False, 'error': 'Auftrag nicht gefunden'}), 404
+
+    # Bestehende pending-Jobs nicht duplizieren
+    existing = ProductionJob.query.filter_by(order_id=order_id).filter(
+        ProductionJob.status != 'cancelled'
+    ).count()
+    if existing > 0:
+        return jsonify({'success': False, 'error': 'Auftrag hat bereits Produktionsjobs'}), 400
+
+    # Job-Typen basierend auf order_type
+    type_map = {
+        'embroidery': [('embroidery', 'Stickerei')],
+        'dtf': [('dtf', 'DTF-Druck')],
+        'sublimation': [('sublimation', 'Sublimation')],
+        'printing': [('printing', 'Druck')],
+        'combined': [('embroidery', 'Stickerei'), ('dtf', 'DTF-Druck')],
+    }
+
+    job_types = type_map.get(order.order_type, [('other', order.order_type or 'Produktion')])
+    created_jobs = []
+
+    for idx, (jtype, desc) in enumerate(job_types):
+        job = ProductionJob(
+            order_id=order_id,
+            job_number=ProductionJob.generate_job_number(),
+            job_type=jtype,
+            description=desc,
+            sort_order=idx,
+            created_by=current_user.username
+        )
+        db.session.add(job)
+        created_jobs.append(job)
+
+    db.session.commit()
+
+    log_activity('production_jobs_auto_created', f'{len(created_jobs)} Jobs fuer Auftrag {order_id} auto-erstellt')
+    return jsonify({
+        'success': True,
+        'count': len(created_jobs),
+        'jobs': [{'id': j.id, 'job_number': j.job_number, 'type_label': j.type_label} for j in created_jobs]
     })
 
 

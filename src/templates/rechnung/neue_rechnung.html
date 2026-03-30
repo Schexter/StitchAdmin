@@ -12,6 +12,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('rechnung.rechnung_erstellen') }}" id="rechnungsform">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="row">
                             <!-- Linke Spalte: Kundendaten -->
                             <div class="col-md-6">
@@ -168,6 +169,7 @@
 let positionen = [];
 let positionCounter = 0;
 let kunden = [];
+const preKundeId = {{ pre_kunde.id|tojson if pre_kunde else 'null' }};
 
 // Initialisierung
 document.addEventListener('DOMContentLoaded', function() {
@@ -197,6 +199,9 @@ function loadCustomers() {
                     const option = document.createElement('option');
                     option.value = customer.id;
                     option.textContent = `${customer.display_name}${customer.customer_number ? ' (' + customer.customer_number + ')' : ''}`;
+                    if (preKundeId && String(customer.id) === String(preKundeId)) {
+                        option.selected = true;
+                    }
                     select.appendChild(option);
                 });
             }

@@ -3,11 +3,14 @@
 Buchungen Controller - Buchungsjournal und Auswertungen
 """
 
-from flask import Blueprint, render_template, request, jsonify, send_file
-from flask_login import login_required
+from flask import Blueprint, render_template, request, jsonify, send_file, current_app, flash, redirect, url_for
+from flask_login import login_required, current_user
 from datetime import date, datetime, timedelta
 from io import BytesIO, StringIO
+from decimal import Decimal
 import csv
+import os
+import uuid
 
 from src.services.buchungs_service import BuchungsService
 from src.models.buchungsmodul import Kontenrahmen
@@ -145,6 +148,122 @@ def eingangsrechnung_neu():
             flash(f'Fehler: {str(e)}', 'danger')
 
     return render_template('buchungen/eingangsrechnung_neu.html')
+
+@buchungen_bp.route('/eingangsrechnung/wizard')
+@login_required
+def eingangsrechnung_wizard():
+    """Eingangsrechnung Wizard - Drag & Drop mit OCR"""
+    from src.services.eingangsrechnung_ocr_service import KATEGORIEN, ZAHLUNGSART_KONTEN
+    return render_template('buchungen/eingangsrechnung_wizard.html',
+                           kategorien=KATEGORIEN,
+                           zahlungsarten=ZAHLUNGSART_KONTEN)
+
+
+@buchungen_bp.route('/eingangsrechnung/upload', methods=['POST'])
+@login_required
+def eingangsrechnung_upload():
+    """PDF oder Bild hochladen und Daten extrahieren"""
+    from src.services.eingangsrechnung_ocr_service import extrahiere_rechnungsdaten, extrahiere_aus_bild, berechne_fehlende_werte
+
+    # Datei aus 'pdf' oder 'datei' Feld
+    datei = request.files.get('pdf') or request.files.get('datei')
+    if not datei:
+        return jsonify({'success': False, 'error': 'Keine Datei uebermittelt'}), 400
+
+    erlaubte = {'.pdf', '.jpg', '.jpeg', '.png', '.webp', '.heic'}
+    ext = os.path.splitext(datei.filename.lower())[1]
+    if ext not in erlaubte:
+        return jsonify({'success': False, 'error': f'Erlaubte Formate: PDF, JPG, PNG'}), 400
+
+    # Temporaere Datei speichern
+    upload_dir = os.path.join(current_app.root_path, '..', 'instance', 'eingangsrechnungen')
+    os.makedirs(upload_dir, exist_ok=True)
+
+    dateiname = f'{uuid.uuid4().hex}_{datei.filename}'
+    pfad = os.path.join(upload_dir, dateiname)
+    datei.save(pfad)
+
+    # OCR je nach Dateityp
+    if ext == '.pdf':
+        daten = extrahiere_rechnungsdaten(pfad)
+    else:
+        daten = extrahiere_aus_bild(pfad)
+
+    daten = berechne_fehlende_werte(
+        daten.get('netto', ''), daten.get('mwst_betrag', ''),
+        daten.get('brutto', ''), daten.get('mwst_satz', 19)
+    ) | daten
+
+    daten['temp_datei'] = dateiname
+    daten['original_dateiname'] = datei.filename
+
+    return jsonify({'success': True, 'daten': daten})
+
+
+# Legacy-Route fuer Abwaertskompatibilitaet
+@buchungen_bp.route('/eingangsrechnung/upload-pdf', methods=['POST'])
+@login_required
+def eingangsrechnung_upload_pdf():
+    """Redirect auf neue Upload-Route"""
+    return eingangsrechnung_upload()
+
+
+@buchungen_bp.route('/eingangsrechnung/buchen', methods=['POST'])
+@login_required
+def eingangsrechnung_buchen():
+    """Eingangsrechnung final buchen und PDF archivieren - nutzt RechnungService"""
+    from src.services.rechnung_service import RechnungService
+
+    try:
+        kategorie_key = request.form.get('kategorie', 'sonstiges')
+        lieferant = request.form.get('lieferant', '').strip()
+        rechnungsnummer = request.form.get('rechnungsnummer', '').strip()
+        rechnungsdatum_str = request.form.get('rechnungsdatum', '')
+        netto_str = request.form.get('netto', '0').replace(',', '.')
+        mwst_str = request.form.get('mwst_betrag', '0').replace(',', '.')
+        mwst_satz = int(request.form.get('mwst_satz', 19))
+        temp_datei = request.form.get('temp_datei', '')
+
+        netto = Decimal(netto_str)
+        mwst_betrag = Decimal(mwst_str)
+        brutto = netto + mwst_betrag
+        rechnungsdatum = date.fromisoformat(rechnungsdatum_str) if rechnungsdatum_str else date.today()
+
+        # Zentral ueber RechnungService buchen (eine Quelle der Wahrheit)
+        rechnung, fehler = RechnungService.erfasse_eingangsrechnung(
+            lieferant_name=lieferant,
+            rechnungsnummer=rechnungsnummer,
+            rechnungsdatum=rechnungsdatum,
+            netto=netto,
+            mwst_betrag=mwst_betrag,
+            mwst_satz=mwst_satz,
+            kategorie=kategorie_key,
+            auto_buchen=True
+        )
+
+        if not rechnung:
+            flash(f'Fehler beim Buchen: {fehler}', 'danger')
+            return redirect(url_for('buchungen.eingangsrechnung_wizard'))
+
+        # PDF archivieren
+        if temp_datei:
+            upload_dir = os.path.join(current_app.root_path, '..', 'instance', 'eingangsrechnungen')
+            src_pfad = os.path.join(upload_dir, temp_datei)
+            if os.path.exists(src_pfad):
+                belegnummer = rechnung.rechnungsnummer
+                archiv_name = f'{rechnungsdatum.strftime("%Y%m%d")}_{belegnummer}_{temp_datei}'
+                archiv_pfad = os.path.join(upload_dir, archiv_name)
+                os.rename(src_pfad, archiv_pfad)
+
+        flash(f'Eingangsrechnung {rechnung.rechnungsnummer} von {lieferant} gebucht ({brutto:.2f} EUR brutto).', 'success')
+        return redirect(url_for('buchungen.index'))
+
+    except Exception as e:
+        from src.models import db
+        db.session.rollback()
+        flash(f'Fehler beim Buchen: {e}', 'danger')
+        return redirect(url_for('buchungen.eingangsrechnung_wizard'))
+
 
 @buchungen_bp.route('/konten')
 @login_required
