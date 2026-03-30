@@ -61,12 +61,13 @@ def create_design():
             design.stitch_count = int(request.form.get('stitch_count') or 0) or None
             design.width_mm = float(request.form.get('width_mm') or 0) or None
             design.height_mm = float(request.form.get('height_mm') or 0) or None
-            design.thread_colors = request.form.get('thread_colors')
+            design.thread_colors = request.form.get('thread_colors') or None
         else:
             # Druck-Details
             design.print_width_cm = float(request.form.get('print_width_cm') or 0) or None
             design.print_height_cm = float(request.form.get('print_height_cm') or 0) or None
-            design.print_colors = int(request.form.get('print_colors') or 1)
+            # Druckfarben (Pantone / Hex) als JSON speichern
+            design.thread_colors = request.form.get('print_colors_data') or None
 
         # Preise
         design.setup_price = float(request.form.get('setup_price') or 0)
@@ -160,11 +161,12 @@ def update_design(design_id):
             design.stitch_count = int(request.form.get('stitch_count') or 0) or None
             design.width_mm = float(request.form.get('width_mm') or 0) or None
             design.height_mm = float(request.form.get('height_mm') or 0) or None
-            design.thread_colors = request.form.get('thread_colors')
+            design.thread_colors = request.form.get('thread_colors') or None
         else:
             design.print_width_cm = float(request.form.get('print_width_cm') or 0) or None
             design.print_height_cm = float(request.form.get('print_height_cm') or 0) or None
-            design.print_colors = int(request.form.get('print_colors') or 1)
+            # Druckfarben (Pantone / Hex) als JSON speichern
+            design.thread_colors = request.form.get('print_colors_data') or None
 
         # Preise
         design.setup_price = float(request.form.get('setup_price') or 0)
@@ -415,12 +417,9 @@ def send_design_approval(design_id):
             'sent_to': order.customer.email
         }
 
-        # Token in thread_colors speichern (als JSON, wird nicht für Druck-Designs verwendet)
-        if design.design_type != 'stick':
-            design.thread_colors = json.dumps({'approval_token': token_data})
-        else:
-            existing_notes = design.approval_notes or ''
-            design.approval_notes = f"{existing_notes}\n[TOKEN:{approval_token}]".strip()
+        # Token in approval_notes speichern (einheitlich für alle Design-Typen)
+        existing_notes = design.approval_notes or ''
+        design.approval_notes = f"{existing_notes}\n[TOKEN:{approval_token}]".strip()
 
         # Auch Order-Token setzen falls nicht vorhanden
         if not order.design_approval_token:
@@ -694,19 +693,112 @@ def get_design_image(design_id):
     abort(404)
 
 
+@order_design_bp.route('/price-suggestion', methods=['GET'])
+@login_required
+def get_price_suggestion():
+    """Kalkulierter Preis-Vorschlag basierend auf Design-Parametern"""
+    try:
+        from src.services.textildruck_kalkulation import StickKalkulator, TextildruckKalkulator
+        from decimal import Decimal
+
+        design_type = request.args.get('design_type', 'stick')
+        menge = max(int(request.args.get('menge') or 1), 1)
+
+        if design_type == 'stick':
+            stichzahl = int(request.args.get('stichzahl') or 0)
+            farbwechsel = int(request.args.get('farbwechsel') or 0)
+
+            if stichzahl <= 0:
+                return jsonify({'success': False, 'error': 'Stichzahl erforderlich'})
+
+            kalk = StickKalkulator()
+            result = kalk.berechne_komplett(
+                stichzahl=stichzahl,
+                farbwechsel=farbwechsel,
+                menge=menge
+            )
+
+            return jsonify({
+                'success': True,
+                'verfahren': result['verfahren'],
+                'setup_price': float(result['einrichtekosten']),
+                'price_per_piece': float(result['vk_pro_stueck_netto']),
+                'breakdown': {
+                    'stickpreis': float(result['stickpreis']),
+                    'einrichtekosten': float(result['einrichtekosten']),
+                    'selbstkosten': float(result['selbstkosten']),
+                    'vk_netto': float(result['vk_pro_stueck_netto']),
+                    'vk_brutto': float(result['vk_pro_stueck_brutto']),
+                }
+            })
+
+        else:
+            # Druckverfahren (dtg, flex, siebdruck, sublimation)
+            print_method = request.args.get('print_method', design_type)
+            width_cm = float(request.args.get('width_cm') or 0)
+            height_cm = float(request.args.get('height_cm') or 0)
+            flaeche_cm2 = max(width_cm * height_cm, 1.0)
+            anzahl_farben = int(request.args.get('anzahl_farben') or 1)
+
+            kalk = TextildruckKalkulator()
+
+            if print_method in ('flex', 'flock'):
+                result = kalk.berechne_flex_flock(
+                    menge=menge,
+                    flaeche_cm2=flaeche_cm2,
+                    ist_flock=(print_method == 'flock')
+                )
+                setup = float(result.get('schnitt_kosten', 0))
+            elif print_method in ('dtg', 'dtf', 'sublimation', 'printing'):
+                result = kalk.berechne_dtg(
+                    menge=menge,
+                    druckgroesse_cm2=flaeche_cm2
+                )
+                setup = float(result.get('einrichtung', 0))
+            else:
+                # Siebdruck (Standard)
+                result = kalk.berechne_siebdruck(
+                    menge=menge,
+                    anzahl_farben=anzahl_farben,
+                    druckgroesse_cm2=flaeche_cm2
+                )
+                setup = float(result.get('fixkosten_gesamt', 0))
+
+            return jsonify({
+                'success': True,
+                'verfahren': result['verfahren'],
+                'setup_price': setup,
+                'price_per_piece': float(result['vk_pro_stueck_netto']),
+                'breakdown': {
+                    'selbstkosten': float(result.get('selbstkosten_pro_stueck', 0)),
+                    'vk_netto': float(result['vk_pro_stueck_netto']),
+                    'vk_brutto': float(result['vk_pro_stueck_brutto']),
+                }
+            })
+
+    except Exception as e:
+        current_app.logger.error(f"Fehler bei Preisberechnung: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+
 def get_position_label(position_code):
     """Gibt das Label für einen Position-Code zurück"""
     position_map = {
+        'vorne': 'Vorne',
+        'hinten': 'Hinten',
+        'seite_links': 'Seite links',
+        'seite_rechts': 'Seite rechts',
+        'rundum': 'Rundum / Umlaufend',
         'brust_links': 'Brust links',
         'brust_rechts': 'Brust rechts',
         'brust_mitte': 'Brust Mitte',
+        'bauch': 'Bauch',
         'aermel_links': 'Ärmel links',
         'aermel_rechts': 'Ärmel rechts',
         'ruecken': 'Rücken',
         'ruecken_oben': 'Rücken oben',
         'ruecken_unten': 'Rücken unten',
         'kragen': 'Kragen/Nacken',
-        'bauch': 'Bauch',
         'hosenbein_links': 'Hosenbein links',
         'hosenbein_rechts': 'Hosenbein rechts',
         'kappe_vorne': 'Kappe vorne',
